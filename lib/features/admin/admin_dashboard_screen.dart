@@ -1,7 +1,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/admin/admin_dashboard_view_model.dart';
-import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
+import 'package:try_neuro/features/resources/resources_screen.dart';
+import 'package:try_neuro/features/staff/staff_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -44,12 +45,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 children: [
                   _buildStatsGrid(),
                   const SizedBox(height: 24),
-                  Text('Записи на сегодня', style: Theme.of(context).textTheme.headlineSmall),
+                  Text('Управление', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 8),
-                  _buildTodaysAppointmentsList(),
+                  _buildManagementButton(
+                    context,
+                    title: 'Персонал',
+                    icon: Icons.badge,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StaffScreen())),
+                  ),
+                  _buildManagementButton(
+                    context,
+                    title: 'Ресурсы',
+                    icon: Icons.build_circle_outlined,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ResourcesScreen())),
+                  ),
+                  _buildManagementButton(
+                    context,
+                    title: 'Услуги',
+                    icon: Icons.cut,
+                    onTap: () {},
+                  ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildManagementButton(BuildContext context, {required String title, required IconData icon, required VoidCallback onTap}) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(title),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
     );
   }
 
@@ -83,33 +113,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTodaysAppointmentsList() {
-    if (_viewModel.todaysAppointments.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32.0),
-        child: Center(
-          child: Text('На сегодня записей нет', style: TextStyle(fontSize: 16, color: Colors.grey)),
-        ),
-      );
-    }
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _viewModel.todaysAppointments.length,
-      itemBuilder: (context, index) {
-        final appointment = _viewModel.todaysAppointments[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 4.0),
-          child: ListTile(
-            leading: CircleAvatar(child: Text(appointment.time.format(context))),
-            title: Text(appointment.clientName),
-            subtitle: Text(appointment.service),
-          ),
-        );
-      },
     );
   }
 }
