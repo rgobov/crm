@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 
-// ИЗМЕНЕНО: Теперь это StatefulWidget
 class DayTimeline extends StatefulWidget {
   final DateTime day;
   final List<Appointment> appointments;
@@ -25,7 +24,6 @@ class DayTimeline extends StatefulWidget {
 class _DayTimelineState extends State<DayTimeline> {
   Timer? _timer;
 
-  // Настройки внешнего вида
   final double hourHeight = 60.0;
   final int startHour = 8;
   final int endHour = 22;
@@ -34,9 +32,7 @@ class _DayTimelineState extends State<DayTimeline> {
   @override
   void initState() {
     super.initState();
-    // Запускаем таймер, который будет обновлять UI каждую минуту
     _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
-      // Вызываем пустой setState, чтобы спровоцировать перерисовку
       if (mounted) {
         setState(() {});
       }
@@ -45,7 +41,7 @@ class _DayTimelineState extends State<DayTimeline> {
 
   @override
   void dispose() {
-    _timer?.cancel(); // Обязательно отменяем таймер
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -78,10 +74,9 @@ class _DayTimelineState extends State<DayTimeline> {
     final minutesFromStart = (now.hour - startHour) * 60 + now.minute;
     final top = minutesFromStart * (hourHeight / 60);
 
-    // Используем Stack, чтобы добавить кружок в начале линии
     return Positioned(
-      top: top - 6, // Смещаем, чтобы кружок был по центру линии
-      left: timeColumnWidth - 6, // Смещаем, чтобы кружок был на границе
+      top: top - 6, 
+      left: timeColumnWidth - 6, 
       right: 0,
       child: SizedBox(
         height: 12,
@@ -90,7 +85,7 @@ class _DayTimelineState extends State<DayTimeline> {
             Container(
               width: 12,
               height: 12,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.red,
                 shape: BoxShape.circle,
               ),
@@ -178,7 +173,8 @@ class _DayTimelineState extends State<DayTimeline> {
             child: GestureDetector(
               onTap: () => widget.onAppointmentTap(appointment),
               child: Card(
-                color: Theme.of(context).primaryColor.withOpacity(0.9),
+                // ИСПРАВЛЕНИЕ
+                color: Theme.of(context).primaryColor.withAlpha((255 * 0.9).round()),
                 child: Padding(
                   padding: const EdgeInsets.all(4.0),
                   child: Text(
