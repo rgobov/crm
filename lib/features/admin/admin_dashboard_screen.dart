@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/admin/admin_dashboard_view_model.dart';
 import 'package:try_neuro/features/resources/resources_screen.dart';
+import 'package:try_neuro/features/services/services_screen.dart';
 import 'package:try_neuro/features/staff/staff_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -45,7 +46,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 children: [
                   _buildStatsGrid(),
                   const SizedBox(height: 24),
-                  Text('Управление', style: Theme.of(context).textTheme.headlineSmall),
+                  Text('Управление справочниками', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 8),
                   _buildManagementButton(
                     context,
@@ -63,7 +64,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     context,
                     title: 'Услуги',
                     icon: Icons.cut,
-                    onTap: () {},
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServicesScreen())),
                   ),
                 ],
               ),

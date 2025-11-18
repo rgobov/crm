@@ -43,12 +43,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     super.dispose();
   }
 
-  void _loadAppointmentsForMonth(DateTime month) async {
+  Future<void> _loadAppointmentsForMonth(DateTime month) async {
     final appointments = await _scheduleService.getAppointmentsForMonth(month);
-    _events = LinkedHashMap(
-      equals: isSameDay,
-      hashCode: (key) => key.day * 1000000 + key.month * 10000 + key.year,
-    );
+    _events.clear(); // Очищаем перед заполнением
     for (var appointment in appointments) {
       final day = DateTime.utc(appointment.date.year, appointment.date.month, appointment.date.day);
       if (_events[day] == null) {
@@ -82,16 +79,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   void _navigateAndRefresh() async {
+    final newAppointmentDate = _selectedDay ?? DateTime.now();
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AppointmentEditScreen(
-          selectedDate: _selectedDay ?? DateTime.now(),
+          selectedDate: newAppointmentDate,
         ),
       ),
     );
     if (result == true) {
-       _loadAppointmentsForMonth(_focusedDay);
+       _focusedDay = newAppointmentDate; // Обновляем фокус на дату новой записи
+       _selectedDay = newAppointmentDate;
+       _loadAppointmentsForMonth(newAppointmentDate);
     }
   }
 
@@ -170,10 +170,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
           child: ListTile(
-            leading: CircleAvatar(child: Text('${appointment.durationInMinutes}м')),
+            leading: CircleAvatar(
+              child: Text(appointment.time.format(context)),
+            ),
             title: Text(appointment.clientName),
             subtitle: Text(appointment.service),
-            trailing: Text(appointment.time.format(context)),
+            trailing: Text('${appointment.durationInMinutes} мин.'),
             onTap: () => _navigateToDetailScreen(appointment),
           ),
         );
