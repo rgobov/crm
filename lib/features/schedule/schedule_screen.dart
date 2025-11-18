@@ -1,10 +1,10 @@
 
-import 'dart:collection';
 import 'package:flutter/material.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/data/schedule_service.dart';
+import 'package:try_neuro/features/schedule/day_timeline.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
@@ -18,92 +18,65 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final ScheduleService _scheduleService = sl<ScheduleService>();
 
-  late final ValueNotifier<List<Appointment>> _selectedAppointments;
-  
-  LinkedHashMap<DateTime, List<Appointment>> _events = LinkedHashMap(
-    equals: isSameDay,
-    hashCode: (key) => key.day * 1000000 + key.month * 10000 + key.year,
-  );
-
-  CalendarFormat _calendarFormat = CalendarFormat.week;
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
+  DateTime _selectedDay = DateTime.now();
+  List<Appointment> _appointmentsForDay = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _selectedDay = _focusedDay;
-    _selectedAppointments = ValueNotifier([]);
-    _loadAppointmentsForMonth(_focusedDay);
+    _loadAppointmentsForDay(_selectedDay);
   }
 
-  @override
-  void dispose() {
-    _selectedAppointments.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadAppointmentsForMonth(DateTime month) async {
-    final appointments = await _scheduleService.getAppointmentsForMonth(month);
-    _events.clear(); // Очищаем перед заполнением
-    for (var appointment in appointments) {
-      final day = DateTime.utc(appointment.date.year, appointment.date.month, appointment.date.day);
-      if (_events[day] == null) {
-        _events[day] = [];
-      }
-      _events[day]!.add(appointment);
-    }
-    if(mounted) {
-        setState(() {}); 
-        _onDaySelected(_selectedDay!, _focusedDay);
-    }
-  }
-
-  List<Appointment> _getEventsForDay(DateTime day) {
-    return _events[day] ?? [];
-  }
-
-  void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    if (!isSameDay(_selectedDay, selectedDay)) {
+  Future<void> _loadAppointmentsForDay(DateTime day) async {
+    setState(() {
+      _isLoading = true;
+    });
+    final appointments = await _scheduleService.getAppointmentsForDay(day);
+    if (mounted) {
       setState(() {
-        _selectedDay = selectedDay;
-        _focusedDay = focusedDay;
+        _appointmentsForDay = appointments;
+        _isLoading = false;
       });
     }
-    _selectedAppointments.value = _getEventsForDay(selectedDay);
   }
 
-  void _onPageChanged(DateTime focusedDay) {
-    _focusedDay = focusedDay;
-    _loadAppointmentsForMonth(focusedDay);
+  void _changeDay(int days) {
+    setState(() {
+      _selectedDay = _selectedDay.add(Duration(days: days));
+    });
+    _loadAppointmentsForDay(_selectedDay);
   }
 
-  void _navigateAndRefresh() async {
-    final newAppointmentDate = _selectedDay ?? DateTime.now();
-    final result = await Navigator.push(
+  void _onEmptySlotTap(TimeOfDay time) {
+    _navigateToEdit(preselectedTime: time);
+  }
+
+  void _navigateToEdit({Appointment? appointment, TimeOfDay? preselectedTime}) async {
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => AppointmentEditScreen(
-          selectedDate: newAppointmentDate,
+          selectedDate: _selectedDay,
+          initialAppointment: appointment,
+          // initialTime: preselectedTime, // Это нужно будет добавить в AppointmentEditScreen
         ),
       ),
     );
     if (result == true) {
-       _focusedDay = newAppointmentDate; // Обновляем фокус на дату новой записи
-       _selectedDay = newAppointmentDate;
-       _loadAppointmentsForMonth(newAppointmentDate);
+      _loadAppointmentsForDay(_selectedDay);
     }
   }
 
-  void _navigateToDetailScreen(Appointment appointment) async {
-    final result = await Navigator.push(
+  void _navigateToDetail(Appointment appointment) async {
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => AppointmentDetailScreen(appointment: appointment),
       ),
     );
     if (result == true) {
-      _loadAppointmentsForMonth(_focusedDay);
+      _loadAppointmentsForDay(_selectedDay);
     }
   }
 
@@ -115,71 +88,43 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       body: Column(
         children: [
-          TableCalendar<Appointment>(
-            firstDay: DateTime.utc(2020, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
-            focusedDay: _focusedDay,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-            calendarFormat: _calendarFormat,
-            startingDayOfWeek: StartingDayOfWeek.monday,
-            locale: 'ru_RU',
-            eventLoader: _getEventsForDay,
-            onDaySelected: _onDaySelected,
-            onFormatChanged: (format) {
-              if (_calendarFormat != format) {
-                setState(() {
-                  _calendarFormat = format;
-                });
-              }
-            },
-            onPageChanged: _onPageChanged,
-          ),
-          const SizedBox(height: 8.0),
+          _buildDaySelector(),
+          const Divider(height: 1),
           Expanded(
-            child: ValueListenableBuilder<List<Appointment>>(
-              valueListenable: _selectedAppointments,
-              builder: (context, value, _) {
-                return _buildAppointmentList(value);
-              },
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : DayTimeline(
+                    day: _selectedDay,
+                    appointments: _appointmentsForDay,
+                    onAppointmentTap: _navigateToDetail,
+                    onEmptySlotTap: _onEmptySlotTap,
+                  ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'schedule_fab',
-        onPressed: _navigateAndRefresh,
+        onPressed: () => _navigateToEdit(),
         tooltip: 'Создать запись',
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildAppointmentList(List<Appointment> appointments) {
-    if (appointments.isEmpty) {
-      return const Center(
-        child: Text(
-          'На выбранный день нет записей',
-          style: TextStyle(fontSize: 18, color: Colors.grey),
-        ),
-      );
-    }
-    return ListView.builder(
-      itemCount: appointments.length,
-      itemBuilder: (context, index) {
-        final appointment = appointments[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-          child: ListTile(
-            leading: CircleAvatar(
-              child: Text(appointment.time.format(context)),
-            ),
-            title: Text(appointment.clientName),
-            subtitle: Text(appointment.service),
-            trailing: Text('${appointment.durationInMinutes} мин.'),
-            onTap: () => _navigateToDetailScreen(appointment),
+  Widget _buildDaySelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => _changeDay(-1)),
+          Text(
+            DateFormat.yMMMMd('ru_RU').format(_selectedDay),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-        );
-      },
+          IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _changeDay(1)),
+        ],
+      ),
     );
   }
 }
