@@ -1,11 +1,11 @@
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/schedule/day_timeline.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
+import 'package:try_neuro/features/schedule/horizontal_date_picker.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -31,6 +31,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Future<void> _loadAppointmentsForDay(DateTime day) async {
     setState(() {
       _isLoading = true;
+      _selectedDay = day; // Обновляем выбранный день
     });
     final appointments = await _scheduleService.getAppointmentsForDay(day);
     if (mounted) {
@@ -39,13 +40,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  void _changeDay(int days) {
-    setState(() {
-      _selectedDay = _selectedDay.add(Duration(days: days));
-    });
-    _loadAppointmentsForDay(_selectedDay);
   }
 
   void _onEmptySlotTap(TimeOfDay time) {
@@ -59,7 +53,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         builder: (context) => AppointmentEditScreen(
           selectedDate: _selectedDay,
           initialAppointment: appointment,
-          // initialTime: preselectedTime, // Это нужно будет добавить в AppointmentEditScreen
+          // TODO: передать preselectedTime в AppointmentEditScreen и использовать в initState
         ),
       ),
     );
@@ -88,8 +82,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       body: Column(
         children: [
-          _buildDaySelector(),
-          const Divider(height: 1),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -100,6 +92,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     onEmptySlotTap: _onEmptySlotTap,
                   ),
           ),
+          // Новый переключатель дат внизу
+          const Divider(height: 1),
+          HorizontalDatePicker(
+            initialDate: _selectedDay,
+            onDateSelected: (date) {
+              _loadAppointmentsForDay(date);
+            },
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -107,23 +107,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         onPressed: () => _navigateToEdit(),
         tooltip: 'Создать запись',
         child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  Widget _buildDaySelector() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => _changeDay(-1)),
-          Text(
-            DateFormat.yMMMMd('ru_RU').format(_selectedDay),
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => _changeDay(1)),
-        ],
       ),
     );
   }
