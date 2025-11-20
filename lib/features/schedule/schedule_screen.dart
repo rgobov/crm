@@ -53,7 +53,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         builder: (context) => AppointmentEditScreen(
           selectedDate: _selectedDay,
           initialAppointment: appointment,
-          // TODO: передать preselectedTime в AppointmentEditScreen и использовать в initState
+          preselectedTime: preselectedTime,
         ),
       ),
     );

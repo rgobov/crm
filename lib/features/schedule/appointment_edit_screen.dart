@@ -17,8 +17,14 @@ import 'package:try_neuro/service_locator.dart';
 class AppointmentEditScreen extends StatefulWidget {
   final DateTime selectedDate;
   final Appointment? initialAppointment;
+  final TimeOfDay? preselectedTime;
 
-  const AppointmentEditScreen({super.key, required this.selectedDate, this.initialAppointment});
+  const AppointmentEditScreen({
+    super.key, 
+    required this.selectedDate, 
+    this.initialAppointment,
+    this.preselectedTime,
+  });
 
   @override
   State<AppointmentEditScreen> createState() => _AppointmentEditScreenState();
@@ -64,9 +70,14 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     super.initState();
     _serviceController.text = widget.initialAppointment?.service ?? '';
     _durationController = TextEditingController(text: widget.initialAppointment?.durationInMinutes.toString() ?? '60');
-    _selectedTime = widget.initialAppointment?.time;
+    
+    // Инициализация времени: либо из записи, либо предвыбранное, либо текущее/null
+    _selectedTime = widget.initialAppointment?.time ?? widget.preselectedTime;
+    
     _loadInitialData().then((_) {
-      if (_isEditing) _checkAvailability();
+      if (_isEditing || widget.preselectedTime != null) {
+        _checkAvailability();
+      }
     });
   }
 
@@ -173,13 +184,22 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
 
     if (newContact != null) {
       await _loadInitialData();
-      final fullNewContact = _contacts.firstWhere((c) => c.name == newContact.name, orElse: () => _contacts.last);
-      setState(() => _selectedContact = fullNewContact);
+      // Use try/catch or where to find the contact, avoid crash if not found immediately (though it should be there)
+      try {
+          final fullNewContact = _contacts.firstWhere((c) => c.name == newContact.name, orElse: () => _contacts.last);
+          setState(() => _selectedContact = fullNewContact);
+      } catch (e) {
+          // ignore
+      }
     }
   }
 
   Future<void> _saveForm() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Выберите время записи')));
+      return;
+    }
     setState(() => _isSaving = true);
     
     final serviceName = _serviceController.text;
@@ -238,7 +258,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                       );
                     },
                     onSelected: (Service selection) {
-                      setState(() { // ИСПРАВЛЕНИЕ
+                      setState(() {
                         _serviceController.text = selection.name;
                         _durationController.text = selection.durationInMinutes.toString();
                       });
