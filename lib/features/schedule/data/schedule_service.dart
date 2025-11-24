@@ -5,8 +5,28 @@ import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 class ScheduleService {
 
   final List<Appointment> _appointments = [
-    Appointment(id: '1', date: DateTime.now(), time: const TimeOfDay(hour: 10, minute: 0), durationInMinutes: 60, clientName: 'Иван Петров', service: 'Стрижка мужская', staffMemberId: '1'),
-    Appointment(id: '2', date: DateTime.now(), time: const TimeOfDay(hour: 12, minute: 30), durationInMinutes: 90, clientName: 'Анна Сидорова', service: 'Маникюр', resourceId: '2', staffMemberId: '3'),
+    Appointment(
+      id: '1', 
+      date: DateTime.now(), 
+      time: const TimeOfDay(hour: 10, minute: 0), 
+      durationInMinutes: 60, 
+      clientName: 'Иван Петров', 
+      service: 'Стрижка мужская', 
+      staffMemberId: '1',
+      status: AppointmentStatus.scheduled,
+    ),
+    Appointment(
+      id: '2', 
+      date: DateTime.now(), 
+      time: const TimeOfDay(hour: 12, minute: 30), 
+      durationInMinutes: 90, 
+      clientName: 'Анна Сидорова', 
+      service: 'Маникюр', 
+      resourceId: '2', 
+      staffMemberId: '3',
+      status: AppointmentStatus.completed,
+      comment: 'Клиент доволен',
+    ),
   ];
 
   Future<List<Appointment>> getAppointmentsForMonth(DateTime month) async {
@@ -17,6 +37,24 @@ class ScheduleService {
   Future<List<Appointment>> getAppointmentsForDay(DateTime day) async {
     await Future.delayed(const Duration(milliseconds: 300));
     final dayAppointments = _appointments.where((appointment) => appointment.date.year == day.year && appointment.date.month == day.month && appointment.date.day == day.day).toList();
+    dayAppointments.sort((a, b) {
+      final aDouble = a.time.hour + a.time.minute / 60.0;
+      final bDouble = b.time.hour + b.time.minute / 60.0;
+      return aDouble.compareTo(bDouble);
+    });
+    return dayAppointments;
+  }
+
+  // Новый метод для фильтрации по сотруднику
+  Future<List<Appointment>> getAppointmentsForStaff(String staffId, DateTime day) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final dayAppointments = _appointments.where((appointment) => 
+      appointment.staffMemberId == staffId &&
+      appointment.date.year == day.year && 
+      appointment.date.month == day.month && 
+      appointment.date.day == day.day
+    ).toList();
+    
     dayAppointments.sort((a, b) {
       final aDouble = a.time.hour + a.time.minute / 60.0;
       final bDouble = b.time.hour + b.time.minute / 60.0;
@@ -37,7 +75,6 @@ class ScheduleService {
     await Future.delayed(const Duration(milliseconds: 200));
     final otherAppointments = _appointments.where((a) => a.id != currentAppointmentId && a.resourceId == resourceId && a.date.year == date.year && a.date.month == date.month && a.date.day == date.day);
     for (final appointment in otherAppointments) {
-      // ИСПРАВЛЕНИЕ: Используем реальную длительность существующей записи
       if (_doIntervalsOverlap(time, duration, appointment.time, appointment.durationInMinutes)) {
         return false;
       }
@@ -49,7 +86,6 @@ class ScheduleService {
     await Future.delayed(const Duration(milliseconds: 200));
     final otherAppointments = _appointments.where((a) => a.id != currentAppointmentId && a.staffMemberId == staffMemberId && a.date.year == date.year && a.date.month == date.month && a.date.day == date.day);
     for (final appointment in otherAppointments) {
-      // ИСПРАВЛЕНИЕ: Используем реальную длительность существующей записи
       if (_doIntervalsOverlap(time, duration, appointment.time, appointment.durationInMinutes)) {
         return false; 
       }
@@ -57,9 +93,30 @@ class ScheduleService {
     return true; 
   }
   
-  Future<void> addAppointment({required DateTime date, required TimeOfDay time, required int durationInMinutes, required String clientName, required String service, String? resourceId, String? staffMemberId}) async {
+  Future<void> addAppointment({
+    required DateTime date, 
+    required TimeOfDay time, 
+    required int durationInMinutes, 
+    required String clientName, 
+    required String service, 
+    String? resourceId, 
+    String? staffMemberId,
+    AppointmentStatus status = AppointmentStatus.scheduled,
+    String? comment,
+  }) async {
     final newId = DateTime.now().millisecondsSinceEpoch.toString();
-    _appointments.add(Appointment(id: newId, date: date, time: time, durationInMinutes: durationInMinutes, clientName: clientName, service: service, resourceId: resourceId, staffMemberId: staffMemberId));
+    _appointments.add(Appointment(
+      id: newId, 
+      date: date, 
+      time: time, 
+      durationInMinutes: durationInMinutes, 
+      clientName: clientName, 
+      service: service, 
+      resourceId: resourceId, 
+      staffMemberId: staffMemberId,
+      status: status,
+      comment: comment,
+    ));
   }
 
   Future<void> updateAppointment(Appointment appointment) async {

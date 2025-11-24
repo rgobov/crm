@@ -4,6 +4,7 @@ import 'package:try_neuro/features/admin/admin_dashboard_screen.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/manager/manager_home_screen.dart';
+import 'package:try_neuro/features/staff/employee_home_screen.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,7 +17,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController(text: 'manager@demo.com');
   final _passwordController = TextEditingController(text: 'managerpass');
-  final _authService = sl<AuthService>(); // <--- ИЗМЕНЕНИЕ
+  final _authService = sl<AuthService>(); 
   bool _isLoading = false;
 
   Future<void> _login() async {
@@ -43,6 +44,12 @@ class _LoginScreenState extends State<LoginScreen> {
         case UserRole.manager:
           homeScreen = const ManagerHomeScreen();
           break;
+        case UserRole.employee:
+          homeScreen = EmployeeHomeScreen(user: user);
+          break;
+        default:
+          // На случай добавления новых ролей в будущем
+          homeScreen = const ManagerHomeScreen();
       }
       Navigator.pushReplacement(
         context,
