@@ -20,6 +20,10 @@ dependencies:
   path_provider: ^2.1.3
   connectivity_plus: ^6.0.3
   async: ^2.11.0
+  
+  # Новые зависимости
+  dio: ^5.4.0
+  flutter_secure_storage: ^9.0.0
 
 dev_dependencies:
   flutter_test:

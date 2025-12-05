@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:try_neuro/features/admin/admin_dashboard_screen.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
+import 'package:try_neuro/features/auth/register_company_screen.dart';
 import 'package:try_neuro/features/manager/manager_home_screen.dart';
 import 'package:try_neuro/features/staff/employee_home_screen.dart';
 import 'package:try_neuro/service_locator.dart';
@@ -48,7 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
           homeScreen = EmployeeHomeScreen(user: user);
           break;
         default:
-          // На случай добавления новых ролей в будущем
           homeScreen = const ManagerHomeScreen();
       }
       Navigator.pushReplacement(
@@ -63,6 +63,13 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
+  }
+
+  void _navigateToRegister() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RegisterCompanyScreen()),
+    );
   }
 
   @override
@@ -119,6 +126,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: const Text('Войти'),
                   ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: _navigateToRegister,
+              child: const Text('Зарегистрировать компанию'),
+            ),
           ],
         ),
       ),
