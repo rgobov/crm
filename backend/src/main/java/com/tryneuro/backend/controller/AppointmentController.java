@@ -20,32 +20,32 @@ public class AppointmentController {
     }
 
     @GetMapping
-    public List<Appointment> getAllAppointments(@RequestHeader("X-Tenant-ID") String tenantId) {
+    public List<Appointment> getAllAppointments(@RequestAttribute("tenantId") String tenantId) {
         return appointmentService.getAllAppointments(tenantId);
     }
     
     @GetMapping("/day")
     public List<Appointment> getAppointmentsForDay(
-            @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestAttribute("tenantId") String tenantId,
             @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return appointmentService.getAppointmentsForDay(tenantId, date);
     }
 
     @GetMapping("/staff/{staffId}")
     public List<Appointment> getAppointmentsForStaff(
-            @RequestHeader("X-Tenant-ID") String tenantId,
+            @RequestAttribute("tenantId") String tenantId,
             @PathVariable String staffId,
             @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return appointmentService.getAppointmentsForStaff(tenantId, staffId, date);
     }
 
     @PostMapping
-    public Appointment createAppointment(@RequestHeader("X-Tenant-ID") String tenantId, @RequestBody Appointment appointment) {
+    public Appointment createAppointment(@RequestAttribute("tenantId") String tenantId, @RequestBody Appointment appointment) {
         return appointmentService.addAppointment(appointment, tenantId);
     }
 
     @PutMapping("/{id}")
-    public Appointment updateAppointment(@RequestHeader("X-Tenant-ID") String tenantId, @PathVariable String id, @RequestBody Appointment appointment) {
+    public Appointment updateAppointment(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody Appointment appointment) {
         return appointmentService.updateAppointment(id, appointment, tenantId);
     }
 

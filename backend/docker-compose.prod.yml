@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    image: roma1975/try_neuro_backend:latest
+    container_name: tryneuro_backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tryneuro_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: k918ddBi10e8_db_pass_secure
+      # ВАЖНО: Мы переопределяем URL подключения, так как внутри Docker сети база доступна по имени сервиса "postgres", а не "localhost"
+      # Пароль базы данных я поменял на более сложный для примера, но на сервере он должен совпадать с тем, что ниже
+    restart: always
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: tryneuro_db_prod
+    environment:
+      POSTGRES_DB: tryneuro_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: k918ddBi10e8_db_pass_secure # Тот же пароль
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_prod_data:

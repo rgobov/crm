@@ -3,17 +3,17 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SessionService {
   final _storage = const FlutterSecureStorage();
 
-  static const _tenantIdKey = 'tenant_id';
+  static const _tokenKey = 'jwt_token';
 
-  Future<void> saveSession(String tenantId) async {
-    await _storage.write(key: _tenantIdKey, value: tenantId);
+  Future<void> saveToken(String token) async {
+    await _storage.write(key: _tokenKey, value: token);
   }
 
-  Future<String?> getTenantId() async {
-    return await _storage.read(key: _tenantIdKey);
+  Future<String?> getToken() async {
+    return await _storage.read(key: _tokenKey);
   }
 
   Future<void> clearSession() async {
-    await _storage.delete(key: _tenantIdKey);
+    await _storage.delete(key: _tokenKey);
   }
 }

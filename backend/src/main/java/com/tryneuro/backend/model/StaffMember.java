@@ -22,4 +22,8 @@ public class StaffMember {
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
+
+    // Это поле не хранится в таблице staff_members, но мы будем заполнять его при отправке клиенту
+    @Transient
+    private String role; 
 }

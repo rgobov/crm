@@ -1,5 +1,7 @@
 
 import 'package:get_it/get_it.dart';
+import 'package:try_neuro/core/network/http_client.dart';
+import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/core/offline/offline_queue_service.dart';
 import 'package:try_neuro/core/offline/sync_service.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
@@ -13,13 +15,19 @@ import 'package:try_neuro/features/staff/data/staff_service.dart';
 final sl = GetIt.instance;
 
 void setupServiceLocator() {
-  // Регистрируем сервисы как "ленивые синглтоны".
+  // Core сервисы
+  sl.registerLazySingleton(() => SessionService());
+  sl.registerLazySingleton(() => HttpClient());
+
+  // Feature сервисы
   sl.registerLazySingleton(() => AuthService());
   sl.registerLazySingleton(() => ContactService());
   sl.registerLazySingleton(() => ScheduleService());
   sl.registerLazySingleton(() => ResourceService());
   sl.registerLazySingleton(() => StaffService());
-  sl.registerLazySingleton(() => AppService()); // <-- ДОБАВЛЕНО
+  sl.registerLazySingleton(() => AppService());
+  
+  // Offline
   sl.registerLazySingleton(() => OfflineQueueService());
   sl.registerLazySingleton(() => SyncService());
 }

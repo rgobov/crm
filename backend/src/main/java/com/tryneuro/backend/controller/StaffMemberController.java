@@ -1,5 +1,6 @@
 package com.tryneuro.backend.controller;
 
+import com.tryneuro.backend.dto.CreateStaffRequest;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.service.StaffMemberService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,13 +19,19 @@ public class StaffMemberController {
     }
 
     @GetMapping
-    public List<StaffMember> getAllStaff(@RequestHeader("X-Tenant-ID") String tenantId) {
+    public List<StaffMember> getAllStaff(@RequestAttribute("tenantId") String tenantId) {
         return staffMemberService.getAllStaff(tenantId);
     }
 
     @PostMapping
-    public StaffMember createStaffMember(@RequestHeader("X-Tenant-ID") String tenantId, @RequestBody StaffMember staffMember) {
-        return staffMemberService.addStaffMember(staffMember, tenantId);
+    public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
+        return staffMemberService.addStaffMember(request, tenantId);
+    }
+    
+    // Добавили метод для обновления (PUT)
+    @PutMapping("/{id}")
+    public StaffMember updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
+        return staffMemberService.updateStaffMember(id, request, tenantId);
     }
 
     @DeleteMapping("/{id}")

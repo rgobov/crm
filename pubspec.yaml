@@ -21,9 +21,10 @@ dependencies:
   connectivity_plus: ^6.0.3
   async: ^2.11.0
   
-  # Новые зависимости
+  # Зависимости для бэкенда
   dio: ^5.4.0
   flutter_secure_storage: ^9.0.0
+  jwt_decoder: ^2.0.1
 
 dev_dependencies:
   flutter_test:

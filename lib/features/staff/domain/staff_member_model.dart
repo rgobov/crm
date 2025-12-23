@@ -1,12 +1,16 @@
-
 class StaffMember {
   final String id;
   final String name;
-  final String? specialty; // e.g., 'Парикмахер-стилист', 'Автомеханик'
+  final String specialty;
+  final String? role; // Добавили поле role
 
   StaffMember({
     required this.id,
     required this.name,
-    this.specialty,
+    required this.specialty,
+    this.role,
   });
+
+  // Если вы используете freezed или json_serializable, нужно перегенерировать код.
+  // Но судя по коду, вы парсите вручную в сервисе.
 }

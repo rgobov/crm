@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, String> {
     Optional<User> findByEmail(String email);
     List<User> findByTenantId(String tenantId);
+    Optional<User> findByStaffId(String staffId); // Добавили метод поиска по ID сотрудника
 }

@@ -8,17 +8,20 @@ import com.tryneuro.backend.repository.CompanyRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CompanyService {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Autowired
-    public CompanyService(CompanyRepository companyRepository, UserRepository userRepository) {
+    public CompanyService(CompanyRepository companyRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
@@ -34,7 +37,7 @@ public class CompanyService {
         // 2. Создаем пользователя-админа, привязанного к этой компании
         User admin = new User();
         admin.setEmail(request.getAdminEmail());
-        admin.setPassword(request.getAdminPassword()); // В реальном коде нужно хешировать!
+        admin.setPassword(passwordEncoder.encode(request.getAdminPassword())); // Хешируем пароль
         admin.setRole(UserRole.ADMIN);
         admin.setTenantId(savedCompany.getId());
 

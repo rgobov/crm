@@ -1,41 +1,45 @@
-
+import 'package:dio/dio.dart';
+import 'package:try_neuro/core/network/http_client.dart';
 import 'package:try_neuro/features/resources/domain/resource_model.dart';
+import 'package:try_neuro/service_locator.dart';
 
 class ResourceService {
-  final List<Resource> _resources = [
-    Resource(id: '1', name: 'Подъемник #1', description: 'Двухстоечный'),
-    Resource(id: '2', name: 'Аппарат для чистки лица', description: 'Модель SuperClean 2000'),
-    Resource(id: '3', name: 'Парикмахерское кресло #2'),
-  ];
+  final Dio _dio = sl<HttpClient>().dio;
 
   Future<List<Resource>> getResources() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return List.unmodifiable(_resources);
+    final response = await _dio.get('/resources');
+    final List<dynamic> data = response.data;
+    return data.map((json) => _fromJson(json)).toList();
   }
 
   Future<void> addResource({
     required String name,
     String? description,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final newId = DateTime.now().millisecondsSinceEpoch.toString();
-    _resources.add(Resource(
-      id: newId,
-      name: name,
-      description: description,
-    ));
+    await _dio.post('/resources', data: {
+      'name': name,
+      'description': description,
+    });
   }
 
   Future<void> updateResource(Resource resource) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final index = _resources.indexWhere((r) => r.id == resource.id);
-    if (index != -1) {
-      _resources[index] = resource;
-    }
+     // Аналогично StaffService, используем POST (save) для обновления, передавая ID
+    await _dio.post('/resources', data: {
+      'id': resource.id,
+      'name': resource.name,
+      'description': resource.description,
+    });
   }
 
   Future<void> deleteResource(String resourceId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    _resources.removeWhere((r) => r.id == resourceId);
+    await _dio.delete('/resources/$resourceId');
+  }
+
+  Resource _fromJson(Map<String, dynamic> json) {
+    return Resource(
+      id: json['id'],
+      name: json['name'],
+      description: json['description'],
+    );
   }
 }

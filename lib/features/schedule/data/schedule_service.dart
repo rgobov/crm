@@ -1,79 +1,48 @@
-
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:try_neuro/core/network/http_client.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
+import 'package:try_neuro/service_locator.dart';
 
 class ScheduleService {
-
-  final List<Appointment> _appointments = [
-    Appointment(
-      id: '1', 
-      date: DateTime.now(), 
-      time: const TimeOfDay(hour: 10, minute: 0), 
-      durationInMinutes: 60, 
-      clientName: 'Иван Петров', 
-      service: 'Стрижка мужская', 
-      staffMemberId: '1',
-      status: AppointmentStatus.scheduled,
-    ),
-    Appointment(
-      id: '2', 
-      date: DateTime.now(), 
-      time: const TimeOfDay(hour: 12, minute: 30), 
-      durationInMinutes: 90, 
-      clientName: 'Анна Сидорова', 
-      service: 'Маникюр', 
-      resourceId: '2', 
-      staffMemberId: '3',
-      status: AppointmentStatus.completed,
-      comment: 'Клиент доволен',
-    ),
-  ];
+  final Dio _dio = sl<HttpClient>().dio;
 
   Future<List<Appointment>> getAppointmentsForMonth(DateTime month) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return _appointments.where((appointment) => appointment.date.year == month.year && appointment.date.month == month.month).toList();
+    // В реальном API лучше иметь метод range, но пока будем фильтровать на клиенте или запрашивать все
+    // Для простоты запрашиваем все, но это ПЛОХО для продакшена.
+    // В будущем нужно добавить эндпоинт /appointments?start=...&end=...
+    final response = await _dio.get('/appointments');
+    final List<dynamic> data = response.data;
+    final allAppointments = data.map((json) => _fromJson(json)).toList();
+    
+    return allAppointments.where((appointment) => appointment.date.year == month.year && appointment.date.month == month.month).toList();
   }
 
   Future<List<Appointment>> getAppointmentsForDay(DateTime day) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final dayAppointments = _appointments.where((appointment) => appointment.date.year == day.year && appointment.date.month == day.month && appointment.date.day == day.day).toList();
-    dayAppointments.sort((a, b) {
-      final aDouble = a.time.hour + a.time.minute / 60.0;
-      final bDouble = b.time.hour + b.time.minute / 60.0;
-      return aDouble.compareTo(bDouble);
-    });
-    return dayAppointments;
-  }
-
-  // Новый метод для фильтрации по сотруднику
-  Future<List<Appointment>> getAppointmentsForStaff(String staffId, DateTime day) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    final dayAppointments = _appointments.where((appointment) => 
-      appointment.staffMemberId == staffId &&
-      appointment.date.year == day.year && 
-      appointment.date.month == day.month && 
-      appointment.date.day == day.day
-    ).toList();
+    final dateStr = DateFormat('yyyy-MM-dd').format(day);
+    final response = await _dio.get('/appointments/day', queryParameters: {'date': dateStr});
     
-    dayAppointments.sort((a, b) {
-      final aDouble = a.time.hour + a.time.minute / 60.0;
-      final bDouble = b.time.hour + b.time.minute / 60.0;
-      return aDouble.compareTo(bDouble);
-    });
-    return dayAppointments;
+    final List<dynamic> data = response.data;
+    return data.map((json) => _fromJson(json)).toList();
   }
 
-  bool _doIntervalsOverlap(TimeOfDay startA, int durationA, TimeOfDay startB, int durationB) {
-    final endA = startA.hour * 60 + startA.minute + durationA;
-    final startA_minutes = startA.hour * 60 + startA.minute;
-    final endB = startB.hour * 60 + startB.minute + durationB;
-    final startB_minutes = startB.hour * 60 + startB.minute;
-    return startA_minutes < endB && startB_minutes < endA;
+  Future<List<Appointment>> getAppointmentsForStaff(String staffId, DateTime day) async {
+    final dateStr = DateFormat('yyyy-MM-dd').format(day);
+    final response = await _dio.get('/appointments/staff/$staffId', queryParameters: {'date': dateStr});
+    
+    final List<dynamic> data = response.data;
+    return data.map((json) => _fromJson(json)).toList();
   }
 
+  // Эти методы проверки доступности пока оставим локальными для скорости UI, 
+  // но в идеале их тоже нужно делать через backend.
+  // Пока просто сделаем запрос всех записей на день и проверим пересечения локально.
   Future<bool> isResourceAvailable({required String resourceId, required DateTime date, required TimeOfDay time, required int duration, String? currentAppointmentId}) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final otherAppointments = _appointments.where((a) => a.id != currentAppointmentId && a.resourceId == resourceId && a.date.year == date.year && a.date.month == date.month && a.date.day == date.day);
+    // Запрашиваем все записи на этот день
+    final dayAppointments = await getAppointmentsForDay(date);
+    
+    final otherAppointments = dayAppointments.where((a) => a.id != currentAppointmentId && a.resourceId == resourceId);
     for (final appointment in otherAppointments) {
       if (_doIntervalsOverlap(time, duration, appointment.time, appointment.durationInMinutes)) {
         return false;
@@ -83,14 +52,23 @@ class ScheduleService {
   }
 
   Future<bool> isStaffMemberAvailable({required String staffMemberId, required DateTime date, required TimeOfDay time, required int duration, String? currentAppointmentId}) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final otherAppointments = _appointments.where((a) => a.id != currentAppointmentId && a.staffMemberId == staffMemberId && a.date.year == date.year && a.date.month == date.month && a.date.day == date.day);
+     final dayAppointments = await getAppointmentsForDay(date);
+     
+    final otherAppointments = dayAppointments.where((a) => a.id != currentAppointmentId && a.staffMemberId == staffMemberId);
     for (final appointment in otherAppointments) {
       if (_doIntervalsOverlap(time, duration, appointment.time, appointment.durationInMinutes)) {
         return false; 
       }
     }
     return true; 
+  }
+  
+  bool _doIntervalsOverlap(TimeOfDay startA, int durationA, TimeOfDay startB, int durationB) {
+    final endA = startA.hour * 60 + startA.minute + durationA;
+    final startA_minutes = startA.hour * 60 + startA.minute;
+    final endB = startB.hour * 60 + startB.minute + durationB;
+    final startB_minutes = startB.hour * 60 + startB.minute;
+    return startA_minutes < endB && startB_minutes < endA;
   }
   
   Future<void> addAppointment({
@@ -104,29 +82,56 @@ class ScheduleService {
     AppointmentStatus status = AppointmentStatus.scheduled,
     String? comment,
   }) async {
-    final newId = DateTime.now().millisecondsSinceEpoch.toString();
-    _appointments.add(Appointment(
-      id: newId, 
-      date: date, 
-      time: time, 
-      durationInMinutes: durationInMinutes, 
-      clientName: clientName, 
-      service: service, 
-      resourceId: resourceId, 
-      staffMemberId: staffMemberId,
-      status: status,
-      comment: comment,
-    ));
+    final appointmentData = {
+      'date': DateFormat('yyyy-MM-dd').format(date),
+      'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00',
+      'durationInMinutes': durationInMinutes,
+      'clientName': clientName,
+      'service': service,
+      'resourceId': resourceId,
+      'staffMemberId': staffMemberId,
+      'status': status.name.toUpperCase(), // Передаем как строку
+      'comment': comment,
+    };
+    
+    await _dio.post('/appointments', data: appointmentData);
   }
 
   Future<void> updateAppointment(Appointment appointment) async {
-    final index = _appointments.indexWhere((a) => a.id == appointment.id);
-    if (index != -1) {
-      _appointments[index] = appointment;
-    }
+    final appointmentData = {
+      'date': DateFormat('yyyy-MM-dd').format(appointment.date),
+      'time': '${appointment.time.hour.toString().padLeft(2, '0')}:${appointment.time.minute.toString().padLeft(2, '0')}:00',
+      'durationInMinutes': appointment.durationInMinutes,
+      'clientName': appointment.clientName,
+      'service': appointment.service,
+      'resourceId': appointment.resourceId,
+      'staffMemberId': appointment.staffMemberId,
+      'status': appointment.status.name.toUpperCase(),
+      'comment': appointment.comment,
+    };
+
+    await _dio.put('/appointments/${appointment.id}', data: appointmentData);
   }
 
   Future<void> deleteAppointment(String appointmentId) async {
-    _appointments.removeWhere((a) => a.id == appointmentId);
+    await _dio.delete('/appointments/$appointmentId');
+  }
+  
+  Appointment _fromJson(Map<String, dynamic> json) {
+    final timeParts = (json['time'] as String).split(':');
+    final time = TimeOfDay(hour: int.parse(timeParts[0]), minute: int.parse(timeParts[1]));
+    
+    return Appointment(
+      id: json['id'],
+      date: DateTime.parse(json['date']),
+      time: time,
+      durationInMinutes: json['durationInMinutes'],
+      clientName: json['clientName'],
+      service: json['service'],
+      resourceId: json['resourceId'],
+      staffMemberId: json['staffMemberId'],
+      status: AppointmentStatus.values.firstWhere((e) => e.name.toUpperCase() == json['status'], orElse: () => AppointmentStatus.scheduled),
+      comment: json['comment'],
+    );
   }
 }

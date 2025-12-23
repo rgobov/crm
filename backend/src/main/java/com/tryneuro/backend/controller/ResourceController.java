@@ -18,12 +18,12 @@ public class ResourceController {
     }
 
     @GetMapping
-    public List<Resource> getAllResources(@RequestHeader("X-Tenant-ID") String tenantId) {
+    public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
         return resourceService.getAllResources(tenantId);
     }
 
     @PostMapping
-    public Resource createResource(@RequestHeader("X-Tenant-ID") String tenantId, @RequestBody Resource resource) {
+    public Resource createResource(@RequestAttribute("tenantId") String tenantId, @RequestBody Resource resource) {
         return resourceService.addResource(resource, tenantId);
     }
 

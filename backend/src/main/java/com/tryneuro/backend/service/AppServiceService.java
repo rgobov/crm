@@ -1,6 +1,5 @@
 package com.tryneuro.backend.service;
 
-import com.tryneuro.backend.model.Service;
 import com.tryneuro.backend.repository.ServiceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

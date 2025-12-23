@@ -1,41 +1,44 @@
-
+import 'package:dio/dio.dart';
+import 'package:try_neuro/core/network/http_client.dart';
 import 'package:try_neuro/features/services/domain/service_model.dart';
+import 'package:try_neuro/service_locator.dart';
 
 class AppService {
-  final List<Service> _services = [
-    Service(id: '1', name: 'Стрижка мужская', durationInMinutes: 45),
-    Service(id: '2', name: 'Замена масла', durationInMinutes: 60),
-    Service(id: '3', name: 'Маникюр с покрытием', durationInMinutes: 90),
-  ];
+  final Dio _dio = sl<HttpClient>().dio;
 
   Future<List<Service>> getServices() async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    return List.unmodifiable(_services);
+    final response = await _dio.get('/services');
+    final List<dynamic> data = response.data;
+    return data.map((json) => _fromJson(json)).toList();
   }
 
   Future<void> addService({
     required String name,
     required int durationInMinutes,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final newId = DateTime.now().millisecondsSinceEpoch.toString();
-    _services.add(Service(
-      id: newId,
-      name: name,
-      durationInMinutes: durationInMinutes,
-    ));
+    await _dio.post('/services', data: {
+      'name': name,
+      'durationInMinutes': durationInMinutes,
+    });
   }
 
   Future<void> updateService(Service service) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final index = _services.indexWhere((s) => s.id == service.id);
-    if (index != -1) {
-      _services[index] = service;
-    }
+    await _dio.post('/services', data: {
+      'id': service.id,
+      'name': service.name,
+      'durationInMinutes': service.durationInMinutes,
+    });
   }
 
   Future<void> deleteService(String serviceId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    _services.removeWhere((s) => s.id == serviceId);
+    await _dio.delete('/services/$serviceId');
+  }
+
+  Service _fromJson(Map<String, dynamic> json) {
+    return Service(
+      id: json['id'],
+      name: json['name'],
+      durationInMinutes: json['durationInMinutes'],
+    );
   }
 }

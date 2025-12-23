@@ -91,6 +91,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
+      childAspectRatio: 0.8, // Делаем карточки чуть выше (было 1.0 по умолчанию)
       children: [
         _buildStatCard('Клиенты', _viewModel.totalClients.toString(), Icons.people, Colors.blue),
         _buildStatCard('Записи сегодня', _viewModel.todaysAppointmentsCount.toString(), Icons.calendar_today, Colors.orange),
@@ -103,14 +104,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0), // Уменьшили отступы
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircleAvatar(backgroundColor: color, radius: 20, child: Icon(icon, color: Colors.white)),
-            const SizedBox(height: 10),
-            Text(value, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-            Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
+            CircleAvatar(backgroundColor: color, radius: 18, child: Icon(icon, color: Colors.white, size: 20)),
+            const SizedBox(height: 8),
+            FittedBox( // Масштабируем число, если оно слишком большое
+               fit: BoxFit.scaleDown,
+               child: Text(
+                 value, 
+                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)
+               ),
+            ),
+            const SizedBox(height: 4),
+            Flexible( // Позволяем тексту заголовка переноситься или обрезаться
+              child: Text(
+                title, 
+                textAlign: TextAlign.center, 
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),

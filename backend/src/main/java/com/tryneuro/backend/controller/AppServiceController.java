@@ -18,12 +18,12 @@ public class AppServiceController {
     }
 
     @GetMapping
-    public List<Service> getAllServices(@RequestHeader("X-Tenant-ID") String tenantId) {
+    public List<Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
         return appServiceService.getAllServices(tenantId);
     }
 
     @PostMapping
-    public Service createService(@RequestHeader("X-Tenant-ID") String tenantId, @RequestBody Service service) {
+    public Service createService(@RequestAttribute("tenantId") String tenantId, @RequestBody Service service) {
         return appServiceService.addService(service, tenantId);
     }
 

@@ -22,7 +22,20 @@ public class CompanyController {
 
     @PostMapping("/register")
     public ResponseEntity<Company> registerCompany(@RequestBody RegisterCompanyRequest request) {
-        Company company = companyService.registerCompany(request);
-        return ResponseEntity.ok(company);
+        System.out.println("DEBUG: --- NEW REGISTER REQUEST ---");
+        System.out.println("DEBUG: Name: " + request.getCompanyName());
+        System.out.println("DEBUG: Address: " + request.getCompanyAddress());
+        System.out.println("DEBUG: Admin Email: " + request.getAdminEmail());
+        System.out.println("DEBUG: Password: " + (request.getAdminPassword() != null ? "***" : "NULL"));
+        
+        try {
+            Company company = companyService.registerCompany(request);
+            System.out.println("DEBUG: Service call finished successfully. Company ID: " + company.getId());
+            return ResponseEntity.ok(company);
+        } catch (Exception e) {
+            System.out.println("DEBUG: ERROR in registerCompany: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 }
