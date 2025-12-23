@@ -27,7 +27,7 @@ class DayTimeline extends StatefulWidget {
 class _DayTimelineState extends State<DayTimeline> {
   Timer? _timer;
 
-  final double hourHeight = 60.0;
+  final double hourHeight = 80.0; // Увеличили высоту часа
   final int startHour = 8;
   final int endHour = 22;
   final double timeColumnWidth = 60.0;
@@ -65,12 +65,10 @@ class _DayTimelineState extends State<DayTimeline> {
     final totalHours = endHour - startHour;
     final totalHeight = totalHours * hourHeight;
 
-    // Включаем "Без сотрудника" как отдельную колонку, если есть такие записи
     final hasUnassigned = widget.appointments.any((a) => a.staffMemberId == null);
 
     return Column(
       children: [
-        // Заголовки сотрудников
         SizedBox(
           height: 50,
           child: Row(
@@ -97,19 +95,16 @@ class _DayTimelineState extends State<DayTimeline> {
           ),
         ),
         const Divider(height: 1),
-        // Основная область таймлайна
         Expanded(
           child: SingleChildScrollView(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Колонка времени
                 SizedBox(
                   width: timeColumnWidth,
                   height: totalHeight,
                   child: _buildTimeColumn(totalHeight),
                 ),
-                // Колонки сотрудников (горизонтальный скролл)
                 Expanded(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -136,14 +131,13 @@ class _DayTimelineState extends State<DayTimeline> {
         final hour = startHour + index;
         return SizedBox(
           height: hourHeight,
-          child: Text('$hour:00', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          child: Center(child: Text('$hour:00', style: const TextStyle(fontSize: 12, color: Colors.grey))),
         );
       }),
     );
   }
 
   Widget _buildStaffColumn(BuildContext context, String? staffId, String staffName, double totalHeight) {
-    // Фильтруем записи для текущего сотрудника
     final columnAppointments = widget.appointments.where((a) => a.staffMemberId == staffId).toList();
 
     return Container(
@@ -154,17 +148,26 @@ class _DayTimelineState extends State<DayTimeline> {
       ),
       child: Stack(
         children: [
-          // Сетка времени
+          // Сетка времени (теперь с 15-минутными интервалами)
           Column(
-            children: List.generate(endHour - startHour, (index) {
-              final hour = startHour + index;
-              return InkWell(
-                onTap: () => widget.onEmptySlotTap(TimeOfDay(hour: hour, minute: 0), staffId),
-                child: Container(
-                  height: hourHeight,
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
-                  ),
+            children: List.generate(endHour - startHour, (hourIndex) {
+              final hour = startHour + hourIndex;
+              return SizedBox(
+                height: hourHeight,
+                child: Column(
+                  children: List.generate(4, (minuteIndex) { // 4 интервала по 15 минут
+                    final minute = minuteIndex * 15;
+                    return Expanded(
+                      child: InkWell(
+                        onTap: () => widget.onEmptySlotTap(TimeOfDay(hour: hour, minute: minute), staffId),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border(top: BorderSide(color: minute == 0 ? Colors.grey.shade200 : Colors.grey.shade100, width: 0.5)),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
                 ),
               );
             }),
@@ -179,16 +182,18 @@ class _DayTimelineState extends State<DayTimeline> {
               top: top,
               left: 2,
               right: 2,
-              height: height,
+              height: height > 0 ? height : 1, // Минимальная высота, чтобы избежать ошибок
               child: GestureDetector(
                 onTap: () => widget.onAppointmentTap(appointment),
                 child: Card(
                   color: _getStatusColor(appointment.status),
                   margin: EdgeInsets.zero,
+                  elevation: 2,
                   child: Padding(
                     padding: const EdgeInsets.all(4.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         Text(
                           appointment.clientName,
@@ -200,7 +205,7 @@ class _DayTimelineState extends State<DayTimeline> {
                           style: const TextStyle(color: Colors.white70, fontSize: 10),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (appointment.comment != null && appointment.comment!.isNotEmpty)
+                         if (appointment.comment != null && appointment.comment!.isNotEmpty)
                            Padding(
                              padding: const EdgeInsets.only(top: 2),
                              child: Icon(Icons.comment, size: 10, color: Colors.white.withOpacity(0.8)),
@@ -212,7 +217,7 @@ class _DayTimelineState extends State<DayTimeline> {
               ),
             );
           }),
-          // Индикатор текущего времени (если сегодня)
+          // Индикатор текущего времени
           if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth),
         ],
       ),
