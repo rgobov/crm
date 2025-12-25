@@ -5,7 +5,7 @@ class AppConfig {
   // true: приложение будет подключаться к удаленному серверу (продакшен).
   // false: приложение будет подключаться к локальному бэкенду (разработка).
   //
-  static const bool isProduction = false; 
+  static const bool isProduction = true;
 
   // --- АДРЕСА СЕРВЕРОВ ---
   static const String productionUrl = 'http://738629.cloud4box.ru:8080/api';
