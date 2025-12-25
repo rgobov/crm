@@ -1,28 +1,37 @@
-# Этап 1: Сборка Flutter-приложения
+# Этап 1: Установка Flutter SDK и сборка приложения
 FROM dart:stable AS build
+
+# Устанавливаем Git, так как он нужен для скачивания Flutter
+RUN apt-get update && apt-get install -y git
+
+# Устанавливаем нужную версию Flutter SDK
+ARG FLUTTER_VERSION=3.19.6
+RUN git clone https://github.com/flutter/flutter.git --depth 1 --branch ${FLUTTER_VERSION} /flutter
+ENV PATH="/flutter/bin:${PATH}"
+
+# Проверяем установку и включаем веб
+RUN flutter --version
+RUN flutter config --enable-web
 
 WORKDIR /app
 
-# Копируем все файлы проекта
-COPY . .
-
-# Включаем поддержку веб
-RUN flutter config --enable-web
+# Копируем только файлы зависимостей для кэширования
+COPY pubspec.* ./
 
 # Скачиваем зависимости
 RUN flutter pub get
 
+# Копируем все остальные файлы проекта
+COPY . .
+
 # Собираем веб-версию приложения
-RUN flutter build web
+RUN flutter build web --release
 
 # Этап 2: Настройка веб-сервера Nginx для раздачи сайта
 FROM nginx:alpine
 
-# Копируем собранный сайт из первого этапа в папку веб-сервера
+# Копируем собранный сайт из первого этапа
 COPY --from=build /app/build/web /usr/share/nginx/html
 
-# Открываем порт 80 для http-трафика
 EXPOSE 80
-
-# Команда для запуска веб-сервера
 CMD ["nginx", "-g", "daemon off;"]

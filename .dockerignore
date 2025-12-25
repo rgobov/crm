@@ -1,0 +1,27 @@
+build/
+.dart_tool/
+.git/
+.github/
+.idea/
+.vscode/
+
+# Исключаем специфичные для платформ папки, которые не нужны для сборки web
+android/
+ios/
+linux/
+macos/
+windows/
+
+# Исключаем Docker-файлы, чтобы они не копировались сами в себя
+Dockerfile
+Dockerfile.web
+docker-compose.yml
+docker-compose.prod.yml
+
+# Файлы IDE
+*.iml
+
+# Папки бэкенда, которые не нужны для сборки фронтенда
+backend/target/
+backend/src/
+backend/pom.xml
