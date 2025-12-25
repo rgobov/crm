@@ -1,17 +1,20 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:try_neuro/features/resources/data/resource_service.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
-import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class AppointmentDetailScreen extends StatefulWidget {
   final Appointment appointment;
+  final List<Appointment> appointmentsForDay; // Добавили список записей
 
-  const AppointmentDetailScreen({super.key, required this.appointment});
+  const AppointmentDetailScreen({
+    super.key,
+    required this.appointment,
+    required this.appointmentsForDay, // Сделали обязательным
+  });
 
   @override
   State<AppointmentDetailScreen> createState() => _AppointmentDetailScreenState();
@@ -19,295 +22,102 @@ class AppointmentDetailScreen extends StatefulWidget {
 
 class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   final _scheduleService = sl<ScheduleService>();
-  final _resourceService = sl<ResourceService>();
-  final _staffService = sl<StaffService>();
-
-  Future<String?>? _resourceNameFuture;
-  Future<String?>? _staffNameFuture;
-  
-  late Appointment _currentAppointment;
-  late TextEditingController _commentController;
-  bool _isEditingComment = false;
-  bool _hasChanges = false; // Флаг изменений
+  late Appointment _appointment;
 
   @override
   void initState() {
     super.initState();
-    _currentAppointment = widget.appointment;
-    _commentController = TextEditingController(text: _currentAppointment.comment);
-
-    if (_currentAppointment.resourceId != null) {
-      _resourceNameFuture = _getResourceName(_currentAppointment.resourceId!);
-    }
-    if (_currentAppointment.staffMemberId != null) {
-      _staffNameFuture = _getStaffName(_currentAppointment.staffMemberId!);
-    }
+    _appointment = widget.appointment;
   }
 
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  Future<String?> _getResourceName(String resourceId) async {
-    final resources = await _resourceService.getResources();
-    try {
-      return resources.firstWhere((r) => r.id == resourceId).name;
-    } catch (e) {
-      return 'Неизвестный ресурс';
-    }
-  }
-
-  Future<String?> _getStaffName(String staffId) async {
-    final staff = await _staffService.getStaff();
-    try {
-      return staff.firstWhere((s) => s.id == staffId).name;
-    } catch (e) {
-      return 'Неизвестный сотрудник';
-    }
-  }
-
-  void _navigateToEditScreen() async {
-    final result = await Navigator.push(
+  void _navigateToEdit() async {
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => AppointmentEditScreen(
-          selectedDate: _currentAppointment.date,
-          initialAppointment: _currentAppointment,
+          selectedDate: _appointment.date,
+          initialAppointment: _appointment,
+          appointmentsForDay: widget.appointmentsForDay, // Передаем список дальше
         ),
       ),
     );
     if (result == true && mounted) {
-       Navigator.of(context).pop(true);
+      // Если мы вернулись с сохранения, нужно обновить данные
+      // Мы можем либо вернуть обновленную запись, либо просто true и обновить весь список на главном экране
+      Navigator.pop(context, true); // Возвращаемся на главный экран и говорим ему обновиться
     }
   }
 
-  void _deleteAppointment() async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _deleteAppointment() async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удаление'),
-        content: const Text('Вы уверены, что хотите удалить запись?'),
+        title: const Text('Удалить запись?'),
+        content: const Text('Это действие нельзя будет отменить.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Удалить', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
-
-    if (confirmed == true) {
-      await _scheduleService.deleteAppointment(_currentAppointment.id);
-      if (mounted) Navigator.of(context).pop(true);
+    if (confirm == true) {
+      await _scheduleService.deleteAppointment(_appointment.id);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
     }
-  }
-
-  Future<void> _updateStatus(AppointmentStatus newStatus) async {
-    if (newStatus == _currentAppointment.status) return;
-
-    final updated = Appointment(
-      id: _currentAppointment.id,
-      date: _currentAppointment.date,
-      time: _currentAppointment.time,
-      durationInMinutes: _currentAppointment.durationInMinutes,
-      clientName: _currentAppointment.clientName,
-      service: _currentAppointment.service,
-      resourceId: _currentAppointment.resourceId,
-      staffMemberId: _currentAppointment.staffMemberId,
-      status: newStatus,
-      comment: _currentAppointment.comment,
-    );
-
-    await _scheduleService.updateAppointment(updated);
-    setState(() {
-      _currentAppointment = updated;
-      _hasChanges = true; // Отмечаем, что были изменения
-    });
-  }
-  
-  Future<void> _saveComment() async {
-    final updated = Appointment(
-      id: _currentAppointment.id,
-      date: _currentAppointment.date,
-      time: _currentAppointment.time,
-      durationInMinutes: _currentAppointment.durationInMinutes,
-      clientName: _currentAppointment.clientName,
-      service: _currentAppointment.service,
-      resourceId: _currentAppointment.resourceId,
-      staffMemberId: _currentAppointment.staffMemberId,
-      status: _currentAppointment.status,
-      comment: _commentController.text,
-    );
-    
-    await _scheduleService.updateAppointment(updated);
-    setState(() {
-      _currentAppointment = updated;
-      _isEditingComment = false;
-      _hasChanges = true; // Отмечаем, что были изменения
-    });
-    FocusScope.of(context).unfocus();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Перехватываем кнопку "Назад"
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        Navigator.of(context).pop(_hasChanges);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Детали записи'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(_hasChanges),
-          ),
-          actions: [
-            IconButton(icon: const Icon(Icons.edit), onPressed: _navigateToEditScreen, tooltip: 'Редактировать'),
-            IconButton(icon: const Icon(Icons.delete), onPressed: _deleteAppointment, tooltip: 'Удалить')
-          ]
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Статус
-              Card(
-                color: Colors.grey.shade100,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: DropdownButton<AppointmentStatus>(
-                    value: _currentAppointment.status,
-                    isExpanded: true,
-                    underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(value: AppointmentStatus.scheduled, child: Text('Запланировано')),
-                      DropdownMenuItem(value: AppointmentStatus.completed, child: Text('Выполнено', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))),
-                      DropdownMenuItem(value: AppointmentStatus.cancelled, child: Text('Отменено', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) _updateStatus(val);
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              _buildDetailRow(context, Icons.person, 'Клиент', _currentAppointment.clientName),
-              _buildDetailRow(context, Icons.cut, 'Услуга', _currentAppointment.service),
-              _buildDetailRow(context, Icons.calendar_today, 'Дата', DateFormat.yMMMMd('ru_RU').format(_currentAppointment.date)),
-              _buildDetailRow(context, Icons.access_time, 'Время', _currentAppointment.time.format(context)),
-              if (_staffNameFuture != null)
-                FutureBuilder<String?>(
-                  future: _staffNameFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Center(child: CircularProgressIndicator()));
-                    }
-                    if (snapshot.hasData) {
-                      return _buildDetailRow(context, Icons.badge, 'Сотрудник', snapshot.data!);
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-              if (_resourceNameFuture != null)
-                FutureBuilder<String?>(
-                  future: _resourceNameFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Padding(padding: EdgeInsets.symmetric(vertical: 8.0), child: Center(child: CircularProgressIndicator()));
-                    }
-                    if (snapshot.hasData) {
-                      return _buildDetailRow(context, Icons.build, 'Ресурс', snapshot.data!);
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-                
-              const Divider(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Комментарий', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: Icon(_isEditingComment ? Icons.close : Icons.edit_note),
-                    onPressed: () {
-                      setState(() {
-                        if (_isEditingComment) {
-                          // Отмена редактирования: возвращаем старый текст
-                          _commentController.text = _currentAppointment.comment ?? '';
-                        }
-                        _isEditingComment = !_isEditingComment;
-                      });
-                    },
-                  )
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (_isEditingComment)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: _commentController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'Введите комментарий к записи...',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: _saveComment,
-                      icon: const Icon(Icons.check),
-                      label: const Text('Сохранить комментарий'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    (_currentAppointment.comment == null || _currentAppointment.comment!.isEmpty) 
-                      ? 'Нет комментария' 
-                      : _currentAppointment.comment!,
-                    style: TextStyle(color: Colors.grey.shade800),
-                  ),
-                ),
-            ],
-          ),
+    final timeFormat = DateFormat.Hm();
+    final startTime = timeFormat.format(DateTime(0).add(Duration(hours: _appointment.time.hour, minutes: _appointment.time.minute)));
+    final endTime = timeFormat.format(DateTime(0).add(Duration(hours: _appointment.time.hour, minutes: _appointment.time.minute + _appointment.durationInMinutes)));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Детали записи'),
+        actions: [
+          IconButton(icon: const Icon(Icons.edit), onPressed: _navigateToEdit, tooltip: 'Изменить'),
+          IconButton(icon: const Icon(Icons.delete_outline), onPressed: _deleteAppointment, tooltip: 'Удалить'),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow(context, icon: Icons.person, title: 'Клиент', content: _appointment.clientName),
+            _buildDetailRow(context, icon: Icons.cut, title: 'Услуга', content: _appointment.service),
+            _buildDetailRow(context, icon: Icons.timer, title: 'Длительность', content: '${_appointment.durationInMinutes} мин.'),
+            _buildDetailRow(context, icon: Icons.access_time, title: 'Время', content: '$startTime - $endTime'),
+            if (_appointment.staffMemberId != null) // TODO: Загрузить имя сотрудника
+              _buildDetailRow(context, icon: Icons.badge, title: 'Сотрудник', content: 'ID: ${_appointment.staffMemberId}'),
+            if (_appointment.resourceId != null) // TODO: Загрузить имя ресурса
+              _buildDetailRow(context, icon: Icons.build, title: 'Ресурс', content: 'ID: ${_appointment.resourceId}'),
+            if (_appointment.comment != null && _appointment.comment!.isNotEmpty)
+              _buildDetailRow(context, icon: Icons.comment, title: 'Комментарий', content: _appointment.comment!),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(BuildContext context, IconData icon, String title, String value) {
+  Widget _buildDetailRow(BuildContext context, {required IconData icon, required String title, required String content}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Theme.of(context).primaryColor, size: 28),
+          Icon(icon, color: Colors.grey.shade600, size: 20),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700)),
-                const SizedBox(height: 2),
-                Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(content, style: Theme.of(context).textTheme.bodyLarge),
               ],
             ),
           ),

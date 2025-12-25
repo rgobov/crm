@@ -21,7 +21,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   final ScheduleService _scheduleService = sl<ScheduleService>();
   
   DateTime _selectedDay = DateTime.now();
-  List<Appointment> _myAppointments = [];
+  List<Appointment> _allAppointmentsForDay = []; // Теперь храним все записи
   bool _isLoading = true;
 
   @override
@@ -41,11 +41,12 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
       _selectedDay = day;
     });
 
-    final appointments = await _scheduleService.getAppointmentsForStaff(widget.user.staffId!, day);
+    // Загружаем ВСЕ записи на день
+    final appointments = await _scheduleService.getAppointmentsForDay(day);
 
     if (mounted) {
       setState(() {
-        _myAppointments = appointments;
+        _allAppointmentsForDay = appointments;
         _isLoading = false;
       });
     }
@@ -70,7 +71,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   void _navigateToDetail(Appointment appointment) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => AppointmentDetailScreen(appointment: appointment)),
+      // Передаем список всех записей
+      MaterialPageRoute(builder: (context) => AppointmentDetailScreen(appointment: appointment, appointmentsForDay: _allAppointmentsForDay)),
     );
     if (result == true) {
       _loadAppointments(_selectedDay);
@@ -79,6 +81,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Фильтруем только записи текущего сотрудника для отображения
+    final myAppointments = _allAppointmentsForDay.where((a) => a.staffMemberId == widget.user.staffId).toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Моё расписание'),
@@ -88,13 +93,13 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator())
-              : _myAppointments.isEmpty
+              : myAppointments.isEmpty
                 ? const Center(child: Text('На этот день записей нет'))
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _myAppointments.length,
+                    itemCount: myAppointments.length,
                     itemBuilder: (context, index) {
-                      final appointment = _myAppointments[index];
+                      final appointment = myAppointments[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         color: _getStatusColor(appointment.status),

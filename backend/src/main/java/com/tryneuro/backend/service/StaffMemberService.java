@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +21,7 @@ public class StaffMemberService {
     private final StaffMemberRepository staffMemberRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
     @Autowired
     public StaffMemberService(StaffMemberRepository staffMemberRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
@@ -27,56 +30,46 @@ public class StaffMemberService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    private LocalTime parseTime(String time) {
+        if (time == null || time.isEmpty()) return null;
+        try {
+            return LocalTime.parse(time, timeFormatter);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public List<StaffMember> getAllStaff(String tenantId) {
         List<StaffMember> staffMembers = staffMemberRepository.findByTenantId(tenantId);
-        
-        // Для каждого сотрудника ищем его пользователя и заполняем роль
         for (StaffMember staff : staffMembers) {
-            Optional<User> userOpt = userRepository.findByStaffId(staff.getId());
-            if (userOpt.isPresent()) {
-                staff.setRole(userOpt.get().getRole().name());
-            } else {
-                staff.setRole("NONE"); // Или null, если аккаунта нет
-            }
+            userRepository.findByStaffId(staff.getId()).ifPresent(user -> staff.setRole(user.getRole().name()));
         }
-        
         return staffMembers;
     }
 
     @Transactional
     public StaffMember addStaffMember(CreateStaffRequest request, String tenantId) {
-        // ... (код создания остается тем же, см. ниже полное обновление) ...
-        // Но так как я перезаписываю файл, мне нужно вернуть код addStaffMember на место.
-        // И добавить метод updateStaffMemberRole
-        
-        // 1. Создаем сотрудника (StaffMember)
         StaffMember staffMember = new StaffMember();
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
         staffMember.setTenantId(tenantId);
+        staffMember.setAvailable(request.isAvailable());
+        staffMember.setWorkStartTime(parseTime(request.getWorkStartTime()));
+        staffMember.setWorkEndTime(parseTime(request.getWorkEndTime()));
+        staffMember.setBreakStartTime(parseTime(request.getBreakStartTime()));
+        staffMember.setBreakEndTime(parseTime(request.getBreakEndTime()));
         
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
 
-        // 2. Если переданы данные для входа
-        if (request.getEmail() != null && !request.getEmail().isEmpty() &&
-            request.getPassword() != null && !request.getPassword().isEmpty()) {
-            
+        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             User user = new User();
             user.setEmail(request.getEmail());
             user.setPassword(passwordEncoder.encode(request.getPassword()));
             user.setTenantId(tenantId);
             user.setStaffId(savedStaff.getId());
-
-            if ("MANAGER".equalsIgnoreCase(request.getRole())) {
-                user.setRole(UserRole.MANAGER);
-            } else {
-                user.setRole(UserRole.EMPLOYEE);
-            }
-
+            user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
             userRepository.save(user);
-            savedStaff.setRole(user.getRole().name()); // Возвращаем роль клиенту
-        } else {
-            savedStaff.setRole("NONE");
+            savedStaff.setRole(user.getRole().name());
         }
 
         return savedStaff;
@@ -87,52 +80,27 @@ public class StaffMemberService {
         StaffMember staffMember = staffMemberRepository.findById(id).orElseThrow(() -> new RuntimeException("Staff not found"));
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
+        staffMember.setAvailable(request.isAvailable());
+        staffMember.setWorkStartTime(parseTime(request.getWorkStartTime()));
+        staffMember.setWorkEndTime(parseTime(request.getWorkEndTime()));
+        staffMember.setBreakStartTime(parseTime(request.getBreakStartTime()));
+        staffMember.setBreakEndTime(parseTime(request.getBreakEndTime()));
+        
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         
-        // Ищем пользователя, связанного с этим сотрудником
         Optional<User> userOpt = userRepository.findByStaffId(id);
-        
-        if (request.getRole() != null) {
-            UserRole newRole = "MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE;
-            
-            if (userOpt.isPresent()) {
-                // Если пользователь уже есть - обновляем роль
-                User user = userOpt.get();
-                user.setRole(newRole);
-                userRepository.save(user);
-                savedStaff.setRole(newRole.name());
-            } else {
-                // Если пользователя не было, но роль передали...
-                // Тут сложнее: у нас может не быть email/password для создания нового пользователя.
-                // В рамках этой задачи предположим, что мы меняем роль только если пользователь уже есть.
-                // Или если email/pass переданы, создаем нового (логика аналогична create).
-                if (request.getEmail() != null && request.getPassword() != null) {
-                     User newUser = new User();
-                     newUser.setEmail(request.getEmail());
-                     newUser.setPassword(passwordEncoder.encode(request.getPassword()));
-                     newUser.setTenantId(tenantId);
-                     newUser.setStaffId(id);
-                     newUser.setRole(newRole);
-                     userRepository.save(newUser);
-                     savedStaff.setRole(newRole.name());
-                } else {
-                    savedStaff.setRole("NONE"); 
-                }
-            }
-        } else if (userOpt.isPresent()) {
-             savedStaff.setRole(userOpt.get().getRole().name());
-        } else {
-             savedStaff.setRole("NONE");
+        if (request.getRole() != null && userOpt.isPresent()) {
+            User user = userOpt.get();
+            user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
+            userRepository.save(user);
         }
-        
+
+        userOpt.ifPresent(user -> savedStaff.setRole(user.getRole().name()));
         return savedStaff;
     }
 
     public void deleteStaffMember(String id) {
-        // Удаляем пользователя перед удалением сотрудника
-        Optional<User> userOpt = userRepository.findByStaffId(id);
-        userOpt.ifPresent(userRepository::delete);
-        
+        userRepository.findByStaffId(id).ifPresent(userRepository::delete);
         staffMemberRepository.deleteById(id);
     }
 }

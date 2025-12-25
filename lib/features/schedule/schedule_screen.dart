@@ -64,10 +64,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           selectedDate: _selectedDay,
           initialAppointment: appointment,
           preselectedTime: preselectedTime,
-          // Мы могли бы передать staffId в AppointmentEditScreen, но пока он это не поддерживает напрямую в конструкторе как preselected
-          // Но так как логика просит "лучше сделать", я пока оставлю это на уровне передачи времени.
-          // Чтобы полноценно предзаполнять сотрудника, нужно будет доработать AppointmentEditScreen, 
-          // но в рамках текущей задачи мы фокусируемся на отображении.
+          appointmentsForDay: _appointmentsForDay,
         ),
       ),
     );
@@ -80,7 +77,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => AppointmentDetailScreen(appointment: appointment),
+        builder: (context) => AppointmentDetailScreen(
+          appointment: appointment,
+          appointmentsForDay: _appointmentsForDay, // Передаем список записей
+        ),
       ),
     );
     if (result == true) {

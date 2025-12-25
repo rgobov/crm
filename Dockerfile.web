@@ -1,0 +1,28 @@
+# Этап 1: Сборка Flutter-приложения
+FROM dart:stable AS build
+
+WORKDIR /app
+
+# Копируем все файлы проекта
+COPY . .
+
+# Включаем поддержку веб
+RUN flutter config --enable-web
+
+# Скачиваем зависимости
+RUN flutter pub get
+
+# Собираем веб-версию приложения
+RUN flutter build web
+
+# Этап 2: Настройка веб-сервера Nginx для раздачи сайта
+FROM nginx:alpine
+
+# Копируем собранный сайт из первого этапа в папку веб-сервера
+COPY --from=build /app/build/web /usr/share/nginx/html
+
+# Открываем порт 80 для http-трафика
+EXPOSE 80
+
+# Команда для запуска веб-сервера
+CMD ["nginx", "-g", "daemon off;"]

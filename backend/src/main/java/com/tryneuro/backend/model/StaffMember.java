@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalTime;
+
 @Entity
 @Table(name = "staff_members")
 @Data
@@ -23,7 +25,16 @@ public class StaffMember {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // Это поле не хранится в таблице staff_members, но мы будем заполнять его при отправке клиенту
+    // График работы
+    private LocalTime workStartTime;
+    private LocalTime workEndTime;
+    private LocalTime breakStartTime;
+    private LocalTime breakEndTime;
+
+    // Доступность (например, для отпуска или больничного)
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean available = true;
+
     @Transient
-    private String role; 
+    private String role;
 }
