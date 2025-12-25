@@ -1,7 +1,7 @@
-
 import 'package:get_it/get_it.dart';
 import 'package:try_neuro/core/network/http_client.dart';
 import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/core/session/token_storage.dart'; // Импортируем
 import 'package:try_neuro/core/offline/offline_queue_service.dart';
 import 'package:try_neuro/core/offline/sync_service.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
@@ -11,10 +11,12 @@ import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/services/data/app_service.dart';
 import 'package:try_neuro/features/staff/data/staff_service.dart';
 
-// Создаем глобальный экземпляр Service Locator
 final sl = GetIt.instance;
 
 void setupServiceLocator() {
+  // Регистрируем фабрику хранилища токенов
+  sl.registerLazySingleton<TokenStorage>(() => tokenStorage); // Исправил опечатку
+
   // Core сервисы
   sl.registerLazySingleton(() => SessionService());
   sl.registerLazySingleton(() => HttpClient());

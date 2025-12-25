@@ -8,25 +8,29 @@ import 'package:try_neuro/core/offline/sync_service.dart';
 import 'package:try_neuro/features/auth/login_screen.dart';
 import 'package:try_neuro/service_locator.dart';
 
-void main() {
-  // Инициализируем локатор сервисов
+// 1. Делаем функцию main асинхронной
+void main() async {
+  // 2. Эта строка - КЛЮЧ К РЕШЕНИЮ.
+  // Она гарантирует, что все сервисы Flutter будут готовы к работе.
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Теперь безопасно инициализируем сервисы
   setupServiceLocator();
 
   // Запускаем сервис синхронизации
   sl<SyncService>().start();
 
-  // Инициализируем данные для локализации дат (для русского языка)
-  initializeDateFormatting('ru_RU', null).then((_) {
-    runZonedGuarded(() {
-        runApp(const MyApp());
-      },
-      (error, stackTrace) {
-        // Здесь можно будет добавить логирование ошибок в будущем
-        print('Caught error: $error');
-        print(stackTrace);
-      },
-    );
-  });
+  // Инициализируем данные для локализации дат
+  await initializeDateFormatting('ru_RU', null);
+
+  runZonedGuarded(() {
+      runApp(const MyApp());
+    },
+    (error, stackTrace) {
+      print('Caught error: $error');
+      print(stackTrace);
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {

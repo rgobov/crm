@@ -21,9 +21,9 @@ dependencies:
   connectivity_plus: ^6.0.3
   async: ^2.11.0
   
-  # Зависимости для бэкенда
   dio: ^5.4.0
   flutter_secure_storage: ^9.0.0
+  shared_preferences: ^2.2.3 # Добавили зависимость
   jwt_decoder: ^2.0.1
 
 dev_dependencies:
@@ -32,7 +32,6 @@ dev_dependencies:
 
   flutter_lints: ^3.0.0
 
-# Принудительно устанавливаем одну версию intl для всех пакетов, чтобы избежать конфликта
 dependency_overrides:
   intl: 0.18.1
 

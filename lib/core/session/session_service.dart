@@ -1,19 +1,27 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:try_neuro/core/session/token_storage.dart';
+import 'package:try_neuro/service_locator.dart';
 
 class SessionService {
-  final _storage = const FlutterSecureStorage();
+  // Зависим от абстракции, а не от конкретной реализации
+  final TokenStorage _storage = sl<TokenStorage>();
 
-  static const _tokenKey = 'jwt_token';
+  String? _currentToken;
 
-  Future<void> saveToken(String token) async {
-    await _storage.write(key: _tokenKey, value: token);
+  Future<void> saveToken(String token) {
+    _currentToken = token;
+    return _storage.saveToken(token);
   }
 
   Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
+    if (_currentToken != null) {
+      return _currentToken;
+    }
+    _currentToken = await _storage.getToken();
+    return _currentToken;
   }
 
-  Future<void> clearSession() async {
-    await _storage.delete(key: _tokenKey);
+  Future<void> clearSession() {
+    _currentToken = null;
+    return _storage.deleteToken();
   }
 }
