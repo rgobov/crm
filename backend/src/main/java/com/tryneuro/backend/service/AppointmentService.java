@@ -1,5 +1,6 @@
 package com.tryneuro.backend.service;
 
+import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.repository.AppointmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,14 @@ public class AppointmentService {
     @Autowired
     public AppointmentService(AppointmentRepository appointmentRepository) {
         this.appointmentRepository = appointmentRepository;
+    }
+
+    // НОВЫЙ МЕТОД ДЛЯ "ТЕПЛОВОЙ КАРТЫ"
+    public List<WorkloadDto> getWorkloadForMonth(String tenantId, int year, int month, String staffId) {
+        if (staffId != null && !staffId.isEmpty()) {
+            return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
+        }
+        return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
     }
 
     public List<Appointment> getAllAppointments(String tenantId) {

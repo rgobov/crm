@@ -1,9 +1,6 @@
-
 import 'package:flutter/material.dart';
-import 'package:try_neuro/features/admin/admin_dashboard_view_model.dart';
-import 'package:try_neuro/features/resources/resources_screen.dart';
-import 'package:try_neuro/features/services/services_screen.dart';
-import 'package:try_neuro/features/staff/staff_screen.dart';
+import 'package:try_neuro/features/calendar/calendar_screen.dart';
+import 'package:try_neuro/features/admin/admin_management_tab.dart'; // Выносим старый дашборд в отдельную вкладку
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -13,122 +10,39 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  final AdminDashboardViewModel _viewModel = AdminDashboardViewModel();
-  bool _isLoading = true;
+  int _selectedIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
+  static const List<Widget> _widgetOptions = <Widget>[
+    AdminManagementTab(), // Старый дашборд теперь первая вкладка
+    CalendarScreen(), 
+  ];
 
-  Future<void> _loadData() async {
-    await _viewModel.loadData();
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Панель администратора'),
+        title: Text(_selectedIndex == 0 ? 'Панель администратора' : 'Календарь загрузки'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () async => _loadData(),
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  _buildStatsGrid(),
-                  const SizedBox(height: 24),
-                  Text('Управление справочниками', style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 8),
-                  _buildManagementButton(
-                    context,
-                    title: 'Персонал',
-                    icon: Icons.badge,
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StaffScreen())),
-                  ),
-                  _buildManagementButton(
-                    context,
-                    title: 'Ресурсы',
-                    icon: Icons.build_circle_outlined,
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ResourcesScreen())),
-                  ),
-                  _buildManagementButton(
-                    context,
-                    title: 'Услуги',
-                    icon: Icons.cut,
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServicesScreen())),
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildManagementButton(BuildContext context, {required String title, required IconData icon, required VoidCallback onTap}) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4.0),
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  Widget _buildStatsGrid() {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
-      childAspectRatio: 0.8, // Делаем карточки чуть выше (было 1.0 по умолчанию)
-      children: [
-        _buildStatCard('Клиенты', _viewModel.totalClients.toString(), Icons.people, Colors.blue),
-        _buildStatCard('Записи сегодня', _viewModel.todaysAppointmentsCount.toString(), Icons.calendar_today, Colors.orange),
-        _buildStatCard('Ресурсы', _viewModel.totalResources.toString(), Icons.build, Colors.green),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0), // Уменьшили отступы
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(backgroundColor: color, radius: 18, child: Icon(icon, color: Colors.white, size: 20)),
-            const SizedBox(height: 8),
-            FittedBox( // Масштабируем число, если оно слишком большое
-               fit: BoxFit.scaleDown,
-               child: Text(
-                 value, 
-                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)
-               ),
-            ),
-            const SizedBox(height: 4),
-            Flexible( // Позволяем тексту заголовка переноситься или обрезаться
-              child: Text(
-                title, 
-                textAlign: TextAlign.center, 
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+      body: _widgetOptions.elementAt(_selectedIndex),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Управление',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_view_month),
+            label: 'Календарь',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
       ),
     );
   }

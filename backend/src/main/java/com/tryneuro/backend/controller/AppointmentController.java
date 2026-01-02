@@ -1,9 +1,13 @@
 package com.tryneuro.backend.controller;
 
+import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
+import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.service.AppointmentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -17,6 +21,23 @@ public class AppointmentController {
     @Autowired
     public AppointmentController(AppointmentService appointmentService) {
         this.appointmentService = appointmentService;
+    }
+
+    // НОВЫЙ ЭНДПОИНТ
+    @GetMapping("/workload")
+    public ResponseEntity<List<WorkloadDto>> getWorkload(
+            @AuthenticationPrincipal User user,
+            @RequestParam int year,
+            @RequestParam int month) {
+        
+        String staffId = null;
+        // Если роль - сотрудник, то ищем загрузку только для него
+        if ("EMPLOYEE".equalsIgnoreCase(user.getRole().name())) {
+            staffId = user.getStaffId();
+        }
+
+        List<WorkloadDto> workload = appointmentService.getWorkloadForMonth(user.getTenantId(), year, month, staffId);
+        return ResponseEntity.ok(workload);
     }
 
     @GetMapping

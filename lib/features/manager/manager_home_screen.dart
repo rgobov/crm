@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:try_neuro/features/calendar/calendar_screen.dart';
 import 'package:try_neuro/features/contacts/contacts_screen.dart';
 import 'package:try_neuro/features/schedule/schedule_screen.dart';
 
@@ -14,8 +15,9 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
   int _selectedIndex = 0;
 
   static const List<Widget> _widgetOptions = <Widget>[
-    ContactsScreen(),
     ScheduleScreen(),
+    CalendarScreen(),
+    ContactsScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -35,12 +37,16 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
         type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'Клиенты',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today),
             label: 'Расписание',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_view_month),
+            label: 'Календарь',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'Клиенты',
           ),
         ],
         currentIndex: _selectedIndex,
