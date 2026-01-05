@@ -8,13 +8,14 @@ import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class StaffMemberService {
@@ -42,13 +43,22 @@ public class StaffMemberService {
     public List<StaffMember> getAllStaff(String tenantId) {
         List<StaffMember> staffMembers = staffMemberRepository.findByTenantId(tenantId);
         for (StaffMember staff : staffMembers) {
-            userRepository.findByStaffId(staff.getId()).ifPresent(user -> staff.setRole(user.getRole().name()));
+            userRepository.findByStaffId(staff.getId()).ifPresent(user -> {
+                staff.setRole(user.getRole().name());
+                staff.setEmail(user.getEmail());
+            });
         }
         return staffMembers;
     }
 
     @Transactional
     public StaffMember addStaffMember(CreateStaffRequest request, String tenantId) {
+        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
+            userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Пользователь с email " + request.getEmail() + " уже существует.");
+            });
+        }
+
         StaffMember staffMember = new StaffMember();
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
@@ -70,14 +80,22 @@ public class StaffMemberService {
             user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
             userRepository.save(user);
             savedStaff.setRole(user.getRole().name());
+            savedStaff.setEmail(user.getEmail());
         }
 
         return savedStaff;
     }
     
+    // --- ВОССТАНОВЛЕННЫЙ МЕТОД ---
     @Transactional
     public StaffMember updateStaffMember(String id, CreateStaffRequest request, String tenantId) {
-        StaffMember staffMember = staffMemberRepository.findById(id).orElseThrow(() -> new RuntimeException("Staff not found"));
+        StaffMember staffMember = staffMemberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник с id " + id + " не найден"));
+
+        if (!staffMember.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
+        }
+
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
         staffMember.setAvailable(request.isAvailable());
@@ -88,14 +106,15 @@ public class StaffMemberService {
         
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         
-        Optional<User> userOpt = userRepository.findByStaffId(id);
-        if (request.getRole() != null && userOpt.isPresent()) {
-            User user = userOpt.get();
-            user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
-            userRepository.save(user);
-        }
+        userRepository.findByStaffId(id).ifPresent(user -> {
+            if (request.getRole() != null) {
+                user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
+                userRepository.save(user);
+            }
+            savedStaff.setRole(user.getRole().name());
+            savedStaff.setEmail(user.getEmail());
+        });
 
-        userOpt.ifPresent(user -> savedStaff.setRole(user.getRole().name()));
         return savedStaff;
     }
 

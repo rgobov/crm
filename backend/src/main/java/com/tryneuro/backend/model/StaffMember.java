@@ -25,16 +25,17 @@ public class StaffMember {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // График работы
     private LocalTime workStartTime;
     private LocalTime workEndTime;
     private LocalTime breakStartTime;
     private LocalTime breakEndTime;
 
-    // Доступность (например, для отпуска или больничного)
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean available = true;
 
-    @Transient
+    @Transient // Это поле не будет сохраняться в БД
     private String role;
+
+    @Transient // И это поле тоже не будет сохраняться в БД
+    private String email;
 }
