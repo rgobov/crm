@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
@@ -28,11 +27,13 @@ class _StaffScreenState extends State<StaffScreen> {
     });
   }
 
+  // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
   void _navigateToEditScreen({StaffMember? staffMember}) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => StaffEditScreen(initialStaffMember: staffMember),
+        // Убираем устаревший параметр `initialEmail`
+        builder: (context) => StaffEditScreen(staffMember: staffMember),
       ),
     );
     if (result == true) {
@@ -90,7 +91,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 return ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.badge)),
                   title: Text(staffMember.name),
-                  subtitle: staffMember.specialty != null ? Text(staffMember.specialty!) : null,
+                  subtitle: Text(staffMember.specialty),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                     onPressed: () => _deleteStaffMember(staffMember.id),

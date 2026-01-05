@@ -1,14 +1,15 @@
-
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
-import 'package:intl/intl.dart';
+import 'dart:async';
 
 class StaffEditScreen extends StatefulWidget {
-  final StaffMember? initialStaffMember;
-
-  const StaffEditScreen({super.key, this.initialStaffMember});
+  final StaffMember? staffMember;
+  // `initialEmail` больше не нужен, так как мы получаем его из staffMember
+  const StaffEditScreen({super.key, this.staffMember});
 
   @override
   State<StaffEditScreen> createState() => _StaffEditScreenState();
@@ -17,80 +18,54 @@ class StaffEditScreen extends StatefulWidget {
 class _StaffEditScreenState extends State<StaffEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _staffService = sl<StaffService>();
+  final _sessionService = sl<SessionService>();
 
-  late final TextEditingController _nameController;
-  late final TextEditingController _specialtyController;
-  
+  bool get _isEditing => widget.staffMember != null;
+
+  // Контроллеры для полей
+  final _nameController = TextEditingController();
+  final _specialtyController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = 'EMPLOYEE';
-  bool _isAvailable = true;
-  TimeOfDay? _workStartTime, _workEndTime, _breakStartTime, _breakEndTime;
+  final _newPasswordController = TextEditingController(); // Для нового пароля
 
-  bool _isSaving = false;
-  bool _createUser = false;
-  bool get _isEditing => widget.initialStaffMember != null;
+  // Переменные состояния
   bool _hasAccount = false;
+  bool _isAvailable = true;
+  String _selectedRole = 'EMPLOYEE';
+  TimeOfDay? _workStartTime, _workEndTime, _breakStartTime, _breakEndTime;
+  bool _isLoading = true; // Начинаем с загрузки
+  User? _currentUser;
 
   @override
   void initState() {
     super.initState();
-    final staff = widget.initialStaffMember;
-    _nameController = TextEditingController(text: staff?.name);
-    _specialtyController = TextEditingController(text: staff?.specialty);
-    
-    if (staff != null) {
-      _isAvailable = staff.available;
-      _workStartTime = staff.workStartTime;
-      _workEndTime = staff.workEndTime;
-      _breakStartTime = staff.breakStartTime;
-      _breakEndTime = staff.breakEndTime;
-
-      if (staff.role != null && staff.role != 'NONE') {
-        _hasAccount = true;
-        _selectedRole = staff.role!;
-      }
-    }
+    _loadInitialData();
   }
 
-  Future<void> _saveForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isSaving = true);
+  Future<void> _loadInitialData() async {
+    final user = await _sessionService.getCurrentUser();
+    final member = widget.staffMember;
 
-      try {
-        if (_isEditing) {
-          final updatedStaffMember = StaffMember(
-            id: widget.initialStaffMember!.id,
-            name: _nameController.text,
-            specialty: _specialtyController.text,
-            available: _isAvailable,
-            workStartTime: _workStartTime,
-            workEndTime: _workEndTime,
-            breakStartTime: _breakStartTime,
-            breakEndTime: _breakEndTime,
-          );
-          await _staffService.updateStaffMember(updatedStaffMember, role: _hasAccount ? _selectedRole : null);
-        } else {
-          await _staffService.addStaffMember(
-            name: _nameController.text,
-            specialty: _specialtyController.text,
-            email: _createUser ? _emailController.text : null,
-            password: _createUser ? _passwordController.text : null,
-            role: _createUser ? _selectedRole : null,
-            available: _isAvailable,
-            workStartTime: _workStartTime,
-            workEndTime: _workEndTime,
-            breakStartTime: _breakStartTime,
-            breakEndTime: _breakEndTime,
-          );
+    if (mounted) {
+      setState(() {
+        _currentUser = user;
+        if (member != null) {
+          _nameController.text = member.name;
+          _specialtyController.text = member.specialty;
+          _isAvailable = member.available;
+          _selectedRole = member.role ?? 'EMPLOYEE';
+          _workStartTime = member.workStartTime;
+          _workEndTime = member.workEndTime;
+          _breakStartTime = member.breakStartTime;
+          _breakEndTime = member.breakEndTime;
+          if (member.email != null) {
+            _hasAccount = true;
+            _emailController.text = member.email!;
+          }
         }
-
-        if (mounted) Navigator.of(context).pop(true);
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
-      } finally {
-        if (mounted) setState(() => _isSaving = false);
-      }
+        _isLoading = false;
+      });
     }
   }
 
@@ -100,77 +75,117 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
     _specialtyController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _newPasswordController.dispose();
     super.dispose();
+  }
+
+  String? _formatTime(TimeOfDay? time) {
+    if (time == null) return null;
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _saveForm() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    try {
+      if (_isEditing) {
+        await _staffService.updateStaffMember(
+          id: widget.staffMember!.id,
+          name: _nameController.text,
+          specialty: _specialtyController.text,
+          role: _selectedRole,
+          available: _isAvailable,
+          workStartTime: _formatTime(_workStartTime),
+          workEndTime: _formatTime(_workEndTime),
+          breakStartTime: _formatTime(_breakStartTime),
+          breakEndTime: _formatTime(_breakEndTime),
+          // Передаем email и новый пароль
+          email: _emailController.text,
+          password: _newPasswordController.text,
+        );
+      } else {
+        await _staffService.addStaffMember(
+          name: _nameController.text,
+          specialty: _specialtyController.text,
+          email: _hasAccount ? _emailController.text : null,
+          password: _hasAccount ? _passwordController.text : null,
+          role: _selectedRole,
+          available: _isAvailable,
+          workStartTime: _formatTime(_workStartTime),
+          workEndTime: _formatTime(_workEndTime),
+          breakStartTime: _formatTime(_breakStartTime),
+          breakEndTime: _formatTime(_breakEndTime),
+        );
+      }
+      if (mounted) Navigator.of(context).pop(true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _selectTime(BuildContext context, TimeOfDay? initialTime, ValueChanged<TimeOfDay> onTimeSelected) async {
+    final TimeOfDay? picked = await showTimePicker(context: context, initialTime: initialTime ?? TimeOfDay.now());
+    if (picked != null && picked != initialTime) {
+      onTimeSelected(picked);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isAdmin = _currentUser?.role == UserRole.admin;
+    final bool isEmailFieldEnabled = !_isEditing || isAdmin;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Изменить сотрудника' : 'Новый сотрудник'),
-        actions: [
-          if (_isSaving) const Padding(padding: EdgeInsets.only(right: 16), child: CircularProgressIndicator()) else IconButton(icon: const Icon(Icons.save), onPressed: _saveForm, tooltip: 'Сохранить')
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Имя', border: OutlineInputBorder()), validator: (v) => v!.trim().isEmpty ? 'Введите имя' : null),
-              const SizedBox(height: 16),
-              TextFormField(controller: _specialtyController, decoration: const InputDecoration(labelText: 'Специальность', border: OutlineInputBorder())),
-              const SizedBox(height: 24),
-              const Divider(),
-              SwitchListTile(title: const Text('Сотрудник доступен'), subtitle: const Text('Если выключено, его нельзя будет выбрать для записи'), value: _isAvailable, onChanged: (v) => setState(() => _isAvailable = v)),
-              const Divider(),
-              const SizedBox(height: 16),
-              Text('График работы', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Row(children: [ Expanded(child: _buildTimePickerField('Начало работы', _workStartTime, (t) => setState(() => _workStartTime = t))), const SizedBox(width: 16), Expanded(child: _buildTimePickerField('Конец работы', _workEndTime, (t) => setState(() => _workEndTime = t)))]), 
-              const SizedBox(height: 16),
-               Row(children: [ Expanded(child: _buildTimePickerField('Начало перерыва', _breakStartTime, (t) => setState(() => _breakStartTime = t))), const SizedBox(width: 16), Expanded(child: _buildTimePickerField('Конец перерыва', _breakEndTime, (t) => setState(() => _breakEndTime = t)))]), 
-              const SizedBox(height: 24),
-              const Divider(),
-              
-              if (_isEditing && _hasAccount) ...[
-                Text('Управление доступом', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(value: _selectedRole, items: const [ DropdownMenuItem(value: 'EMPLOYEE', child: Text('Сотрудник')), DropdownMenuItem(value: 'MANAGER', child: Text('Менеджер'))], onChanged: (v) => setState(() => _selectedRole = v!), decoration: const InputDecoration(labelText: 'Роль', border: OutlineInputBorder())),
-              ],
-
-              if (!_isEditing) ...[
-                SwitchListTile(title: const Text('Создать учетную запись'), value: _createUser, onChanged: (v) => setState(() => _createUser = v)),
-                if (_createUser) ...[
+      appBar: AppBar(title: Text(_isEditing ? 'Редактировать сотрудника' : 'Новый сотрудник')),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Имя'), validator: (v) => v!.isEmpty ? 'Введите имя' : null),
                   const SizedBox(height: 16),
-                  TextFormField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()), validator: (v) => _createUser && (v == null || !v.contains('@')) ? 'Введите email' : null),
+                  TextFormField(controller: _specialtyController, decoration: const InputDecoration(labelText: 'Специальность'), validator: (v) => v!.isEmpty ? 'Введите специальность' : null),
                   const SizedBox(height: 16),
-                  TextFormField(controller: _passwordController, decoration: const InputDecoration(labelText: 'Пароль', border: OutlineInputBorder()), obscureText: true, validator: (v) => _createUser && (v == null || v.length < 6) ? 'Минимум 6 символов' : null),
+                  // --- ЛОГИКА ОТОБРАЖЕНИЯ ПОЛЕЙ АККАУНТА ---
+                  if (!_isEditing) // Показываем свитчер только при создании
+                    SwitchListTile(
+                      title: const Text('Создать учетную запись'),
+                      value: _hasAccount,
+                      onChanged: (value) => setState(() => _hasAccount = value),
+                    ),
+                  // Показываем поля, если создаем аккаунт, ИЛИ если редактируем и аккаунт уже есть
+                  if (_hasAccount) ...[
+                    TextFormField(
+                      controller: _emailController, 
+                      decoration: const InputDecoration(labelText: 'Email'), 
+                      validator: (v) => v!.isEmpty ? 'Введите email' : null, 
+                      enabled: isEmailFieldEnabled,
+                    ),
+                    const SizedBox(height: 16),
+                    // Поле "Пароль" только при создании
+                    if (!_isEditing)
+                      TextFormField(controller: _passwordController, decoration: const InputDecoration(labelText: 'Пароль'), obscureText: true, validator: (v) => (v!.isEmpty) ? 'Введите пароль' : null),
+                    // Поле "Новый пароль" только у админа при редактировании
+                    if (_isEditing && isAdmin)
+                      TextFormField(controller: _newPasswordController, decoration: const InputDecoration(labelText: 'Новый пароль (оставьте пустым, чтобы не менять)'), obscureText: true),
+                    const SizedBox(height: 16),
+                  ],
+                  DropdownButtonFormField<String>(
+                    value: _selectedRole,
+                    items: const [DropdownMenuItem(value: 'EMPLOYEE', child: Text('Сотрудник')), DropdownMenuItem(value: 'MANAGER', child: Text('Менеджер'))],
+                    onChanged: (v) => setState(() => _selectedRole = v!),
+                    decoration: const InputDecoration(labelText: 'Роль'),
+                  ),
                   const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(value: _selectedRole, items: const [ DropdownMenuItem(value: 'EMPLOYEE', child: Text('Сотрудник')), DropdownMenuItem(value: 'MANAGER', child: Text('Менеджер'))], onChanged: (v) => setState(() => _selectedRole = v!), decoration: const InputDecoration(labelText: 'Роль', border: OutlineInputBorder())),
+                  SwitchListTile(title: const Text('Доступен'), value: _isAvailable, onChanged: (v) => setState(() => _isAvailable = v)),
+                  const SizedBox(height: 24),
+                  ElevatedButton(onPressed: _isLoading ? null : _saveForm, child: const Text('Сохранить')),
                 ],
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimePickerField(String label, TimeOfDay? time, Function(TimeOfDay?) onTimeChanged) {
-    return InkWell(
-      onTap: () async {
-        final newTime = await showTimePicker(context: context, initialTime: time ?? TimeOfDay.now());
-        if (newTime != null) {
-          onTimeChanged(newTime);
-        }
-      },
-      child: InputDecorator(
-        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-        child: Text(time?.format(context) ?? 'Не указано'),
-      ),
+              ),
+            ),
     );
   }
 }

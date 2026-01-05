@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:try_neuro/core/session/session_service.dart';
-import 'package:try_neuro/features/auth/domain/user_model.dart';
+import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/schedule/day_timeline.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/schedule/horizontal_date_picker.dart';
-import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
@@ -20,8 +18,7 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final ScheduleService _scheduleService = sl<ScheduleService>();
-  final StaffService _staffService = sl<StaffService>();
-  final SessionService _sessionService = sl<SessionService>();
+  final ManagerService _managerService = sl<ManagerService>();
 
   DateTime _selectedDay = DateTime.now();
   List<Appointment> _appointmentsForDay = [];
@@ -40,17 +37,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       _selectedDay = day;
     });
     
-    // Запрашиваем всех сотрудников, чтобы получить их роли
-    final allStaff = await _staffService.getStaff();
-    final appointments = await _scheduleService.getAppointmentsForDay(day);
+    final results = await Future.wait([
+      _scheduleService.getAppointmentsForDay(day),
+      _managerService.getStaffForSchedule(), 
+    ]);
 
     if (mounted) {
       setState(() {
-        _appointmentsForDay = appointments;
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Фильтруем список БЕЗ УСЛОВИЙ ---
-        // В этом расписании мы всегда хотим видеть только исполнителей (EMPLOYEE)
-        _staff = allStaff.where((s) => s.role == 'EMPLOYEE').toList();
-        
+        _appointmentsForDay = results[0] as List<Appointment>;
+        _staff = results[1] as List<StaffMember>; 
         _isLoading = false;
       });
     }

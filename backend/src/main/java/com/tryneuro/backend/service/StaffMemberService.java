@@ -86,11 +86,10 @@ public class StaffMemberService {
         return savedStaff;
     }
     
-    // --- ВОССТАНОВЛЕННЫЙ МЕТОД ---
     @Transactional
     public StaffMember updateStaffMember(String id, CreateStaffRequest request, String tenantId) {
         StaffMember staffMember = staffMemberRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник с id " + id + " не найден"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
 
         if (!staffMember.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
@@ -107,10 +106,27 @@ public class StaffMemberService {
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         
         userRepository.findByStaffId(id).ifPresent(user -> {
+            boolean userNeedsUpdate = false;
+
             if (request.getRole() != null) {
                 user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
+                userNeedsUpdate = true;
+            }
+
+            if (request.getEmail() != null && !request.getEmail().isEmpty()) {
+                user.setEmail(request.getEmail());
+                userNeedsUpdate = true;
+            }
+
+            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
+                userNeedsUpdate = true;
+            }
+
+            if (userNeedsUpdate) {
                 userRepository.save(user);
             }
+
             savedStaff.setRole(user.getRole().name());
             savedStaff.setEmail(user.getEmail());
         });
