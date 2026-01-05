@@ -40,23 +40,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       _selectedDay = day;
     });
     
-    final results = await Future.wait([
-      _scheduleService.getAppointmentsForDay(day),
-      _staffService.getStaff(),
-      _sessionService.getCurrentUser(),
-    ]);
+    // Запрашиваем всех сотрудников, чтобы получить их роли
+    final allStaff = await _staffService.getStaff();
+    final appointments = await _scheduleService.getAppointmentsForDay(day);
 
     if (mounted) {
       setState(() {
-        _appointmentsForDay = results[0] as List<Appointment>;
-        final allStaff = results[1] as List<StaffMember>;
-        final currentUser = results[2] as User?;
-
-        if (currentUser?.role == UserRole.manager) {
-          _staff = allStaff.where((s) => s.role != 'MANAGER').toList();
-        } else {
-          _staff = allStaff;
-        }
+        _appointmentsForDay = appointments;
+        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Фильтруем список БЕЗ УСЛОВИЙ ---
+        // В этом расписании мы всегда хотим видеть только исполнителей (EMPLOYEE)
+        _staff = allStaff.where((s) => s.role == 'EMPLOYEE').toList();
         
         _isLoading = false;
       });

@@ -1,5 +1,5 @@
-
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/config/app_config.dart'; // Импортируем конфиг
 import 'package:try_neuro/features/admin/admin_dashboard_screen.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
@@ -16,8 +16,16 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'manager@demo.com');
-  final _passwordController = TextEditingController(text: 'managerpass');
+  // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+  // Инициализируем контроллеры. Если не продакшен - подставляем данные.
+  final _emailController = TextEditingController(
+    text: AppConfig.isProduction ? null : 'forts1@e1.ru',
+  );
+  final _passwordController = TextEditingController(
+    text: AppConfig.isProduction ? null : 'qwerty',
+  );
+  // ---------------------
+
   final _authService = sl<AuthService>(); 
   bool _isLoading = false;
 

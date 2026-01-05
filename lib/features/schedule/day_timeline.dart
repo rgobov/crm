@@ -1,8 +1,8 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
+import 'dart:math';
 
 class DayTimeline extends StatefulWidget {
   final DateTime day;
@@ -27,9 +27,7 @@ class DayTimeline extends StatefulWidget {
 class _DayTimelineState extends State<DayTimeline> {
   Timer? _timer;
 
-  final double hourHeight = 80.0; // Увеличили высоту часа
-  final int startHour = 8;
-  final int endHour = 22;
+  final double hourHeight = 80.0;
   final double timeColumnWidth = 60.0;
   final double staffColumnWidth = 150.0;
 
@@ -62,9 +60,27 @@ class _DayTimelineState extends State<DayTimeline> {
 
   @override
   Widget build(BuildContext context) {
+    int startHour = 23;
+    int endHour = 0;
+
+    if (widget.staff.isEmpty) {
+      startHour = 8;
+      endHour = 22;
+    } else {
+      for (var staffMember in widget.staff) {
+        if (staffMember.workStartTime != null) {
+          startHour = min(startHour, staffMember.workStartTime!.hour);
+        }
+        if (staffMember.workEndTime != null) {
+          endHour = max(endHour, staffMember.workEndTime!.hour + 1);
+        }
+      }
+      if (startHour == 23) startHour = 8;
+      if (endHour == 0) endHour = 22;
+    }
+
     final totalHours = endHour - startHour;
     final totalHeight = totalHours * hourHeight;
-
     final hasUnassigned = widget.appointments.any((a) => a.staffMemberId == null);
 
     return Column(
@@ -80,9 +96,16 @@ class _DayTimelineState extends State<DayTimeline> {
                   physics: const ClampingScrollPhysics(),
                   children: [
                     ...widget.staff.map((s) => SizedBox(
-                      width: staffColumnWidth,
-                      child: Center(child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-                    )),
+                          width: staffColumnWidth,
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                                Text(s.specialty, style: TextStyle(fontSize: 12, color: Colors.grey.shade600), textAlign: TextAlign.center),
+                              ],
+                            ),
+                          ))),
                     if (hasUnassigned)
                       SizedBox(
                         width: staffColumnWidth,
@@ -103,16 +126,16 @@ class _DayTimelineState extends State<DayTimeline> {
                 SizedBox(
                   width: timeColumnWidth,
                   height: totalHeight,
-                  child: _buildTimeColumn(totalHeight),
+                  child: _buildTimeColumn(totalHeight, startHour, endHour),
                 ),
                 Expanded(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        ...widget.staff.map((s) => _buildStaffColumn(context, s.id, s.name, totalHeight)),
+                        ...widget.staff.map((s) => _buildStaffColumn(context, s.id, s.name, totalHeight, startHour, endHour)),
                         if (hasUnassigned)
-                          _buildStaffColumn(context, null, 'Не назначен', totalHeight),
+                          _buildStaffColumn(context, null, 'Не назначен', totalHeight, startHour, endHour),
                       ],
                     ),
                   ),
@@ -125,7 +148,7 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  Widget _buildTimeColumn(double totalHeight) {
+  Widget _buildTimeColumn(double totalHeight, int startHour, int endHour) {
     return Column(
       children: List.generate(endHour - startHour, (index) {
         final hour = startHour + index;
@@ -137,7 +160,7 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  Widget _buildStaffColumn(BuildContext context, String? staffId, String staffName, double totalHeight) {
+  Widget _buildStaffColumn(BuildContext context, String? staffId, String staffName, double totalHeight, int startHour, int endHour) {
     final columnAppointments = widget.appointments.where((a) => a.staffMemberId == staffId).toList();
 
     return Container(
@@ -148,14 +171,13 @@ class _DayTimelineState extends State<DayTimeline> {
       ),
       child: Stack(
         children: [
-          // Сетка времени (теперь с 15-минутными интервалами)
           Column(
             children: List.generate(endHour - startHour, (hourIndex) {
               final hour = startHour + hourIndex;
               return SizedBox(
                 height: hourHeight,
                 child: Column(
-                  children: List.generate(4, (minuteIndex) { // 4 интервала по 15 минут
+                  children: List.generate(4, (minuteIndex) {
                     final minute = minuteIndex * 15;
                     return Expanded(
                       child: InkWell(
@@ -172,7 +194,6 @@ class _DayTimelineState extends State<DayTimeline> {
               );
             }),
           ),
-          // Записи
           ...columnAppointments.map((appointment) {
             final minutesFromStart = (appointment.time.hour - startHour) * 60 + appointment.time.minute;
             final top = minutesFromStart * (hourHeight / 60);
@@ -182,7 +203,7 @@ class _DayTimelineState extends State<DayTimeline> {
               top: top,
               left: 2,
               right: 2,
-              height: height > 0 ? height : 1, // Минимальная высота, чтобы избежать ошибок
+              height: height > 0 ? height : 1,
               child: GestureDetector(
                 onTap: () => widget.onAppointmentTap(appointment),
                 child: Card(
@@ -195,16 +216,8 @@ class _DayTimelineState extends State<DayTimeline> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        Text(
-                          appointment.clientName,
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          appointment.service,
-                          style: const TextStyle(color: Colors.white70, fontSize: 10),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(appointment.clientName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                        Text(appointment.service, style: const TextStyle(color: Colors.white70, fontSize: 10), overflow: TextOverflow.ellipsis),
                          if (appointment.comment != null && appointment.comment!.isNotEmpty)
                            Padding(
                              padding: const EdgeInsets.only(top: 2),
@@ -217,8 +230,8 @@ class _DayTimelineState extends State<DayTimeline> {
               ),
             );
           }),
-          // Индикатор текущего времени
-          if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth),
+          // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+          if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth, startHour, endHour),
         ],
       ),
     );
@@ -229,7 +242,7 @@ class _DayTimelineState extends State<DayTimeline> {
     return widget.day.year == now.year && widget.day.month == now.month && widget.day.day == now.day;
   }
 
-  Widget _buildCurrentTimeIndicator(double width) {
+  Widget _buildCurrentTimeIndicator(double width, int startHour, int endHour) {
     final now = DateTime.now();
     if (now.hour < startHour || now.hour >= endHour) {
       return const SizedBox.shrink();
