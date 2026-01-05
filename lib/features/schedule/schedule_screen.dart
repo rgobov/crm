@@ -1,5 +1,6 @@
-
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/data/schedule_service.dart';
@@ -20,6 +21,7 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final ScheduleService _scheduleService = sl<ScheduleService>();
   final StaffService _staffService = sl<StaffService>();
+  final SessionService _sessionService = sl<SessionService>();
 
   DateTime _selectedDay = DateTime.now();
   List<Appointment> _appointmentsForDay = [];
@@ -41,12 +43,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final results = await Future.wait([
       _scheduleService.getAppointmentsForDay(day),
       _staffService.getStaff(),
+      _sessionService.getCurrentUser(),
     ]);
 
     if (mounted) {
       setState(() {
         _appointmentsForDay = results[0] as List<Appointment>;
-        _staff = results[1] as List<StaffMember>;
+        final allStaff = results[1] as List<StaffMember>;
+        final currentUser = results[2] as User?;
+
+        if (currentUser?.role == UserRole.manager) {
+          _staff = allStaff.where((s) => s.role != 'MANAGER').toList();
+        } else {
+          _staff = allStaff;
+        }
+        
         _isLoading = false;
       });
     }
@@ -64,6 +75,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           selectedDate: _selectedDay,
           initialAppointment: appointment,
           preselectedTime: preselectedTime,
+          preselectedStaffId: preselectedStaffId, 
           appointmentsForDay: _appointmentsForDay,
         ),
       ),
@@ -79,7 +91,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       MaterialPageRoute(
         builder: (context) => AppointmentDetailScreen(
           appointment: appointment,
-          appointmentsForDay: _appointmentsForDay, // Передаем список записей
+          appointmentsForDay: _appointmentsForDay,
         ),
       ),
     );
