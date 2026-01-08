@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/network/http_client.dart';
+import 'package:try_neuro/features/schedule/domain/appointment_comment_model.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/schedule/domain/workload_model.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
@@ -9,7 +10,6 @@ import 'package:try_neuro/service_locator.dart';
 class EmployeeService {
   final Dio _dio = sl<HttpClient>().dio;
 
-  // --- НОВЫЙ МЕТОД ---
   Future<StaffMember> getMyProfile() async {
     final response = await _dio.get('/employee/profile');
     return StaffMember.fromJson(response.data);
@@ -29,5 +29,20 @@ class EmployeeService {
     });
     final List<dynamic> data = response.data;
     return data.map((json) => Workload.fromJson(json)).toList();
+  }
+
+  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем единый эндпоинт /api/comments ---
+  Future<List<AppointmentComment>> getComments(String appointmentId) async {
+    final response = await _dio.get('/comments/appointment/$appointmentId');
+    final List<dynamic> data = response.data;
+    return data.map((json) => AppointmentComment.fromJson(json)).toList();
+  }
+
+  Future<AppointmentComment> addComment(String appointmentId, String text) async {
+    final response = await _dio.post(
+      '/comments/appointment/$appointmentId',
+      data: {'text': text},
+    );
+    return AppointmentComment.fromJson(response.data);
   }
 }

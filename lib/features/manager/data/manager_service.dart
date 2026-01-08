@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/network/http_client.dart';
+import 'package:try_neuro/features/schedule/domain/appointment_comment_model.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/schedule/domain/workload_model.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
@@ -22,7 +23,6 @@ class ManagerService {
     return data.map((json) => Appointment.fromJson(json)).toList();
   }
 
-  // --- НОВЫЙ МЕТОД ---
   Future<List<Workload>> getWorkloadForMonth(int year, int month) async {
     final response = await _dio.get('/manager/workload', queryParameters: {
       'year': year,
@@ -34,5 +34,20 @@ class ManagerService {
 
   Future<void> addAppointment(Appointment appointment) async {
     await _dio.post('/manager/appointments', data: appointment.toJson());
+  }
+
+  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем единый эндпоинт /api/comments ---
+  Future<List<AppointmentComment>> getComments(String appointmentId) async {
+    final response = await _dio.get('/comments/appointment/$appointmentId');
+    final List<dynamic> data = response.data;
+    return data.map((json) => AppointmentComment.fromJson(json)).toList();
+  }
+
+  Future<AppointmentComment> addComment(String appointmentId, String text) async {
+    final response = await _dio.post(
+      '/comments/appointment/$appointmentId',
+      data: {'text': text},
+    );
+    return AppointmentComment.fromJson(response.data);
   }
 }

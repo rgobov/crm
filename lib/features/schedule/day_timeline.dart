@@ -182,9 +182,7 @@ class _DayTimelineState extends State<DayTimeline> {
       decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.shade300))),
       child: Stack(
         children: [
-          // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Вставляем список виджетов напрямую ---
           ..._buildWorkingHoursBackground(staffMember, totalHeight, startHour, endHour),
-          
           Column(
             children: List.generate(endHour - startHour, (hourIndex) {
               final hour = startHour + hourIndex;
@@ -228,11 +226,6 @@ class _DayTimelineState extends State<DayTimeline> {
                       children: [
                         Text(appointment.clientName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                         Text(appointment.service, style: const TextStyle(color: Colors.white70, fontSize: 10), overflow: TextOverflow.ellipsis),
-                        if (appointment.comment != null && appointment.comment!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Icon(Icons.comment, size: 10, color: Colors.white.withOpacity(0.8)),
-                          ),
                       ],
                     ),
                   ),
@@ -246,7 +239,6 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Метод теперь возвращает List<Widget> ---
   List<Widget> _buildWorkingHoursBackground(StaffMember? staff, double totalHeight, int startHour, int endHour) {
     double timeToY(TimeOfDay time) {
       final double minutesFromTimelineStart = ((time.hour - startHour) * 60 + time.minute).toDouble();

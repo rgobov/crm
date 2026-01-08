@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
+import 'package:try_neuro/features/schedule/comment_thread_screen.dart';
 import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
@@ -9,13 +10,13 @@ import 'package:try_neuro/service_locator.dart';
 class AppointmentDetailScreen extends StatefulWidget {
   final Appointment appointment;
   final List<Appointment> appointmentsForDay;
-  final List<StaffMember> staff; // <<< НОВОЕ ПОЛЕ
+  final List<StaffMember> staff;
 
   const AppointmentDetailScreen({
     super.key,
     required this.appointment,
     required this.appointmentsForDay,
-    required this.staff, // <<< НОВЫЙ ПАРАМЕТР
+    required this.staff,
   });
 
   @override
@@ -31,7 +32,6 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   void initState() {
     super.initState();
     _appointment = widget.appointment;
-    // Находим имя сотрудника при инициализации
     if (_appointment.staffMemberId != null) {
       try {
         _staffName = widget.staff.firstWhere((s) => s.id == _appointment.staffMemberId).name;
@@ -55,6 +55,15 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
     if (result == true && mounted) {
       Navigator.pop(context, true);
     }
+  }
+
+  void _navigateToComments() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommentThreadScreen(appointmentId: _appointment.id),
+      ),
+    );
   }
 
   Future<void> _deleteAppointment() async {
@@ -87,6 +96,7 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
       appBar: AppBar(
         title: const Text('Детали записи'),
         actions: [
+          IconButton(icon: const Icon(Icons.chat_bubble_outline), onPressed: _navigateToComments, tooltip: 'Комментарии'),
           IconButton(icon: const Icon(Icons.edit), onPressed: _navigateToEdit, tooltip: 'Изменить'),
           IconButton(icon: const Icon(Icons.delete_outline), onPressed: _deleteAppointment, tooltip: 'Удалить'),
         ],
@@ -104,8 +114,6 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
               _buildDetailRow(context, icon: Icons.badge, title: 'Сотрудник', content: _staffName!),
             if (_appointment.resourceId != null)
               _buildDetailRow(context, icon: Icons.build, title: 'Ресурс', content: 'ID: ${_appointment.resourceId}'),
-            if (_appointment.comment != null && _appointment.comment!.isNotEmpty)
-              _buildDetailRow(context, icon: Icons.comment, title: 'Комментарий', content: _appointment.comment!),
           ],
         ),
       ),

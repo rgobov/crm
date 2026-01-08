@@ -49,16 +49,6 @@ public class JwtUtil {
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }
-    
-    public String extractTenantId(String token) {
-        final Claims claims = extractAllClaims(token);
-        return claims.get("tenantId", String.class);
-    }
-
-    public String extractStaffId(String token) {
-        final Claims claims = extractAllClaims(token);
-        return claims.get("staffId", String.class);
-    }
 
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
@@ -69,7 +59,7 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-    private Claims extractAllClaims(String token) {
+    public Claims extractAllClaims(String token) {
         return Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token).getBody();
     }
 
@@ -77,8 +67,11 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
-    public Boolean validateToken(String token, UserDetails userDetails) {
+    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Правильная логика валидации ---
+    public Boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
+        // Проверяем, что username из токена совпадает с username из userDetails
+        // И что токен еще не истек
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
 }

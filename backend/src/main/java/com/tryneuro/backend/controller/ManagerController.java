@@ -33,7 +33,6 @@ public class ManagerController {
         return scheduleService.getAppointmentsForDay(date, tenantId);
     }
 
-    // --- НОВЫЙ ЭНДПОИНТ ДЛЯ КАЛЕНДАРЯ ---
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, 
                                        @RequestParam int year, 

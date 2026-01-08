@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+// Вспомогательная функция для безопасного парсинга времени
+TimeOfDay _parseTime(String timeString) {
+  final parts = timeString.split(':');
+  return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+}
+
+DateTime _parseDate(String dateString) {
+  return DateTime.parse(dateString);
+}
+
 enum AppointmentStatus { scheduled, completed, cancelled }
 
 class Appointment {
@@ -13,8 +23,7 @@ class Appointment {
   final String? resourceId;
   final String? staffMemberId;
   final AppointmentStatus status;
-  final String? comment;
-  String? tenantId;
+  final String? tenantId;
 
   Appointment({
     required this.id,
@@ -25,42 +34,39 @@ class Appointment {
     required this.service,
     this.resourceId,
     this.staffMemberId,
-    this.status = AppointmentStatus.scheduled,
-    this.comment,
+    required this.status,
     this.tenantId,
   });
 
-  // --- Фабричный конструктор для создания из JSON ---
   factory Appointment.fromJson(Map<String, dynamic> json) {
-    final timeParts = (json['time'] as String).split(':');
     return Appointment(
       id: json['id'],
-      date: DateTime.parse(json['date']),
-      time: TimeOfDay(hour: int.parse(timeParts[0]), minute: int.parse(timeParts[1])),
+      date: _parseDate(json['date'] as String),
+      time: _parseTime(json['time'] as String),
       durationInMinutes: json['durationInMinutes'],
       clientName: json['clientName'],
       service: json['service'],
       resourceId: json['resourceId'],
       staffMemberId: json['staffMemberId'],
-      status: AppointmentStatus.values.firstWhere((e) => e.name.toUpperCase() == json['status'].toUpperCase(), orElse: () => AppointmentStatus.scheduled),
-      comment: json['comment'],
+      status: AppointmentStatus.values.firstWhere(
+        (e) => e.name == (json['status'] as String?)?.toLowerCase(),
+        orElse: () => AppointmentStatus.scheduled,
+      ),
       tenantId: json['tenantId'],
     );
   }
 
-  // --- Метод для преобразования в JSON ---
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'date': DateFormat('yyyy-MM-dd').format(date),
-      'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+      'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00',
       'durationInMinutes': durationInMinutes,
       'clientName': clientName,
       'service': service,
       'resourceId': resourceId,
       'staffMemberId': staffMemberId,
       'status': status.name.toUpperCase(),
-      'comment': comment,
       'tenantId': tenantId,
     };
   }

@@ -2,7 +2,7 @@ package com.tryneuro.backend.controller;
 
 import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
-import com.tryneuro.backend.model.StaffMember; // <<< ВОССТАНАВЛИВАЕМ ИМПОРТ
+import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
