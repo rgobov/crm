@@ -28,18 +28,15 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData(_selectedDay);
+    _loadData();
   }
 
-  Future<void> _loadData(DateTime day) async {
-    setState(() {
-      _isLoading = true;
-      _selectedDay = day;
-    });
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
 
     try {
       final results = await Future.wait([
-        _employeeService.getMyAppointmentsForDay(day),
+        _employeeService.getMyAppointmentsForDay(_selectedDay),
         _employeeService.getMyProfile(),
       ]);
 
@@ -76,11 +73,10 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
       ),
     );
     if (result == true) {
-      _loadData(_selectedDay);
+      _loadData();
     }
   }
 
-  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Передаем список сотрудников (_self) ---
   void _navigateToDetail(Appointment appointment) async {
     final result = await Navigator.push<bool>(
       context,
@@ -88,12 +84,12 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
         builder: (context) => AppointmentDetailScreen(
           appointment: appointment,
           appointmentsForDay: _appointmentsForDay,
-          staff: _self, // Сотрудник передает только себя
+          staff: _self,
         ),
       ),
     );
     if (result == true) {
-      _loadData(_selectedDay);
+      _loadData();
     }
   }
 
@@ -114,13 +110,15 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
                     staff: _self,
                     onAppointmentTap: _navigateToDetail,
                     onEmptySlotTap: _onEmptySlotTap,
+                    onRefresh: _loadData, // <<< ПЕРЕДАЕМ ФУНКЦИЮ
                   ),
           ),
           const Divider(height: 1),
           HorizontalDatePicker(
             initialDate: _selectedDay,
             onDateSelected: (date) {
-              _loadData(date);
+              setState(() => _selectedDay = date);
+              _loadData();
             },
           ),
         ],

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-// Вспомогательная функция для безопасного парсинга времени
 TimeOfDay _parseTime(String timeString) {
   final parts = timeString.split(':');
   return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
@@ -69,5 +68,21 @@ class Appointment {
       'status': status.name.toUpperCase(),
       'tenantId': tenantId,
     };
+  }
+
+  // --- НОВЫЙ МЕТОД ---
+  Appointment copyWith({AppointmentStatus? status}) {
+    return Appointment(
+      id: id,
+      date: date,
+      time: time,
+      durationInMinutes: durationInMinutes,
+      clientName: clientName,
+      service: service,
+      resourceId: resourceId,
+      staffMemberId: staffMemberId,
+      status: status ?? this.status,
+      tenantId: tenantId,
+    );
   }
 }

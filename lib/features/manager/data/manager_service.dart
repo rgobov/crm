@@ -36,7 +36,15 @@ class ManagerService {
     await _dio.post('/manager/appointments', data: appointment.toJson());
   }
 
-  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем единый эндпоинт /api/comments ---
+  // --- НОВЫЙ МЕТОД ---
+  Future<Appointment> updateAppointment(Appointment appointment) async {
+    final response = await _dio.put(
+      '/manager/appointments/${appointment.id}',
+      data: appointment.toJson(),
+    );
+    return Appointment.fromJson(response.data);
+  }
+
   Future<List<AppointmentComment>> getComments(String appointmentId) async {
     final response = await _dio.get('/comments/appointment/$appointmentId');
     final List<dynamic> data = response.data;

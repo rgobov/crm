@@ -28,18 +28,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   void initState() {
     super.initState();
     _selectedDay = widget.initialDate ?? DateTime.now();
-    _loadData(_selectedDay);
+    _loadData();
   }
 
-  Future<void> _loadData(DateTime day) async {
-    setState(() {
-      _isLoading = true;
-      _selectedDay = day;
-    });
+  // Меняем, чтобы можно было вызывать без параметра
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
     
     try {
       final results = await Future.wait([
-        _managerService.getAppointmentsForDay(day),
+        _managerService.getAppointmentsForDay(_selectedDay),
         _managerService.getStaffForSchedule(), 
       ]);
 
@@ -76,11 +74,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
     );
     if (result == true) {
-      _loadData(_selectedDay);
+      _loadData();
     }
   }
 
-  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Передаем список сотрудников ---
   void _navigateToDetail(Appointment appointment) async {
     final result = await Navigator.push<bool>(
       context,
@@ -88,12 +85,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         builder: (context) => AppointmentDetailScreen(
           appointment: appointment,
           appointmentsForDay: _appointmentsForDay,
-          staff: _staff, // Передаем _staff
+          staff: _staff,
         ),
       ),
     );
     if (result == true) {
-      _loadData(_selectedDay);
+      _loadData();
     }
   }
 
@@ -114,13 +111,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     staff: _staff,
                     onAppointmentTap: _navigateToDetail,
                     onEmptySlotTap: _onEmptySlotTap,
+                    onRefresh: _loadData, // <<< ПЕРЕДАЕМ ФУНКЦИЮ
                   ),
           ),
           const Divider(height: 1),
           HorizontalDatePicker(
             initialDate: _selectedDay,
             onDateSelected: (date) {
-              _loadData(date);
+              setState(() => _selectedDay = date);
+              _loadData();
             },
           ),
         ],

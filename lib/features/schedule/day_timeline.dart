@@ -1,7 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/features/auth/domain/user_model.dart';
+import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
+import 'package:try_neuro/features/staff/data/employee_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
+import 'package:try_neuro/service_locator.dart';
 import 'dart:math';
 import 'striped_background_painter.dart';
 
@@ -11,6 +16,7 @@ class DayTimeline extends StatefulWidget {
   final List<StaffMember> staff;
   final Function(Appointment) onAppointmentTap;
   final Function(TimeOfDay, String?) onEmptySlotTap;
+  final Future<void> Function() onRefresh;
 
   const DayTimeline({
     super.key,
@@ -19,6 +25,7 @@ class DayTimeline extends StatefulWidget {
     required this.staff,
     required this.onAppointmentTap,
     required this.onEmptySlotTap,
+    required this.onRefresh,
   });
 
   @override
@@ -26,7 +33,14 @@ class DayTimeline extends StatefulWidget {
 }
 
 class _DayTimelineState extends State<DayTimeline> {
+  final _sessionService = sl<SessionService>();
+  final _managerService = sl<ManagerService>();
+  final _employeeService = sl<EmployeeService>();
+
   Timer? _timer;
+  String? _selectedAppointmentId;
+  User? _currentUser;
+  bool _isUpdatingStatus = false;
 
   final double hourHeight = 80.0;
   final double timeColumnWidth = 60.0;
@@ -35,6 +49,9 @@ class _DayTimelineState extends State<DayTimeline> {
   @override
   void initState() {
     super.initState();
+    _sessionService.getCurrentUser().then((user) {
+      if (mounted) setState(() => _currentUser = user);
+    });
     _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) {
         setState(() {});
@@ -48,10 +65,40 @@ class _DayTimelineState extends State<DayTimeline> {
     super.dispose();
   }
 
+  Future<void> _updateStatus(Appointment appointment, AppointmentStatus newStatus) async {
+    if (_isUpdatingStatus) return;
+    setState(() => _isUpdatingStatus = true);
+
+    try {
+      final updatedAppointment = appointment.copyWith(status: newStatus);
+      
+      if (_currentUser?.role == UserRole.manager) {
+        await _managerService.updateAppointment(updatedAppointment);
+      } else if (_currentUser?.role == UserRole.employee) {
+        await _employeeService.updateAppointment(updatedAppointment);
+      }
+      
+      await widget.onRefresh();
+      if (mounted) {
+        setState(() => _selectedAppointmentId = null);
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: ${e.toString()}')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingStatus = false);
+      }
+    }
+  }
+
   Color _getStatusColor(AppointmentStatus status) {
+    final primaryColor = Theme.of(context).primaryColor;
     switch (status) {
       case AppointmentStatus.scheduled:
-        return Theme.of(context).primaryColor.withOpacity(0.9);
+        return primaryColor.withOpacity(0.9);
       case AppointmentStatus.completed:
         return Colors.green.withOpacity(0.9);
       case AppointmentStatus.cancelled:
@@ -96,68 +143,71 @@ class _DayTimelineState extends State<DayTimeline> {
     final totalHeight = totalHours * hourHeight;
     final hasUnassigned = widget.appointments.any((a) => a.staffMemberId == null);
 
-    return Column(
-      children: [
-        SizedBox(
-          height: 50,
-          child: Row(
-            children: [
-              SizedBox(width: timeColumnWidth, child: const Center(child: Icon(Icons.access_time, size: 16))),
-              Expanded(
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  children: [
-                    ...widget.staff.map((s) => SizedBox(
-                          width: staffColumnWidth,
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                                Text(s.specialty, style: TextStyle(fontSize: 12, color: Colors.grey.shade600), textAlign: TextAlign.center),
-                              ],
-                            ),
-                          ))),
-                    if (hasUnassigned)
-                      SizedBox(
-                        width: staffColumnWidth,
-                        child: const Center(child: Text('Не назначен', style: TextStyle(fontStyle: FontStyle.italic))),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: SingleChildScrollView(
+    return GestureDetector(
+      onTap: () => setState(() => _selectedAppointmentId = null),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 50,
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: timeColumnWidth,
-                  height: totalHeight,
-                  child: _buildTimeColumn(totalHeight, startHour, endHour),
-                ),
+                SizedBox(width: timeColumnWidth, child: const Center(child: Icon(Icons.access_time, size: 16))),
                 Expanded(
-                  child: SingleChildScrollView(
+                  child: ListView(
                     scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        ...widget.staff.map((s) => _buildStaffColumn(context, s, totalHeight, startHour, endHour)),
-                        if (hasUnassigned)
-                          _buildStaffColumn(context, null, totalHeight, startHour, endHour),
-                      ],
-                    ),
+                    physics: const ClampingScrollPhysics(),
+                    children: [
+                      ...widget.staff.map((s) => SizedBox(
+                            width: staffColumnWidth,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                                  Text(s.specialty, style: TextStyle(fontSize: 12, color: Colors.grey.shade600), textAlign: TextAlign.center),
+                                ],
+                              ),
+                            ))),
+                      if (hasUnassigned)
+                        SizedBox(
+                          width: staffColumnWidth,
+                          child: const Center(child: Text('Не назначен', style: TextStyle(fontStyle: FontStyle.italic))),
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: timeColumnWidth,
+                    height: totalHeight,
+                    child: _buildTimeColumn(totalHeight, startHour, endHour),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ...widget.staff.map((s) => _buildStaffColumn(context, s, totalHeight, startHour, endHour)),
+                          if (hasUnassigned)
+                            _buildStaffColumn(context, null, totalHeight, startHour, endHour),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -202,39 +252,73 @@ class _DayTimelineState extends State<DayTimeline> {
               );
             }),
           ),
-          ...columnAppointments.map((appointment) {
-            final minutesFromStart = (appointment.time.hour - startHour) * 60 + appointment.time.minute;
-            final top = minutesFromStart * (hourHeight / 60);
-            final height = appointment.durationInMinutes * (hourHeight / 60);
-
-            return Positioned(
-              top: top,
-              left: 2,
-              right: 2,
-              height: height > 0 ? height : 1,
-              child: GestureDetector(
-                onTap: () => widget.onAppointmentTap(appointment),
-                child: Card(
-                  color: _getStatusColor(appointment.status),
-                  margin: EdgeInsets.zero,
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Text(appointment.clientName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                        Text(appointment.service, style: const TextStyle(color: Colors.white70, fontSize: 10), overflow: TextOverflow.ellipsis),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
+          ...columnAppointments.map((appointment) => _buildAppointmentCard(appointment, startHour, endHour)),
           if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth, startHour, endHour),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAppointmentCard(Appointment appointment, int startHour, int endHour) {
+    final minutesFromStart = (appointment.time.hour - startHour) * 60 + appointment.time.minute;
+    final top = minutesFromStart * (hourHeight / 60);
+    final height = appointment.durationInMinutes * (hourHeight / 60);
+    final isSelected = _selectedAppointmentId == appointment.id;
+
+    return Positioned(
+      top: top,
+      left: 2,
+      right: 2,
+      height: height > 0 ? height : 1,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            if (isSelected) {
+              _selectedAppointmentId = null; 
+            } else {
+              _selectedAppointmentId = appointment.id;
+            }
+          });
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Card(
+              color: _getStatusColor(appointment.status),
+              margin: EdgeInsets.zero,
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(appointment.clientName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                    Text(appointment.service, style: const TextStyle(color: Colors.white70, fontSize: 10), overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            ),
+            if (isSelected)
+              AnimatedOpacity(
+                opacity: isSelected ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: Container(
+                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), borderRadius: BorderRadius.circular(4)),
+                  child: _isUpdatingStatus && _selectedAppointmentId == appointment.id
+                      ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            IconButton(icon: const Icon(Icons.check_circle, color: Colors.greenAccent), onPressed: () => _updateStatus(appointment, AppointmentStatus.completed), tooltip: 'Выполнено'),
+                            IconButton(icon: const Icon(Icons.cancel, color: Colors.redAccent), onPressed: () => _updateStatus(appointment, AppointmentStatus.cancelled), tooltip: 'Клиент не пришел'),
+                            IconButton(icon: const Icon(Icons.info_outline, color: Colors.white), onPressed: () => widget.onAppointmentTap(appointment), tooltip: 'Детали'),
+                          ],
+                        ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
