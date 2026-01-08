@@ -80,6 +80,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
+  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Передаем список сотрудников ---
   void _navigateToDetail(Appointment appointment) async {
     final result = await Navigator.push<bool>(
       context,
@@ -87,6 +88,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         builder: (context) => AppointmentDetailScreen(
           appointment: appointment,
           appointmentsForDay: _appointmentsForDay,
+          staff: _staff, // Передаем _staff
         ),
       ),
     );

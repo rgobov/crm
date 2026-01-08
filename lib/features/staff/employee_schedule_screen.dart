@@ -80,6 +80,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
     }
   }
 
+  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Передаем список сотрудников (_self) ---
   void _navigateToDetail(Appointment appointment) async {
     final result = await Navigator.push<bool>(
       context,
@@ -87,6 +88,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
         builder: (context) => AppointmentDetailScreen(
           appointment: appointment,
           appointmentsForDay: _appointmentsForDay,
+          staff: _self, // Сотрудник передает только себя
         ),
       ),
     );
@@ -124,7 +126,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        heroTag: 'employee_schedule_fab', 
+        heroTag: 'employee_schedule_fab',
         onPressed: () => _navigateToEdit(preselectedStaffId: widget.user.staffId),
         tooltip: 'Создать запись',
         child: const Icon(Icons.add),

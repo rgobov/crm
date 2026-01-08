@@ -1,19 +1,21 @@
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
+import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class AppointmentDetailScreen extends StatefulWidget {
   final Appointment appointment;
-  final List<Appointment> appointmentsForDay; // Добавили список записей
+  final List<Appointment> appointmentsForDay;
+  final List<StaffMember> staff; // <<< НОВОЕ ПОЛЕ
 
   const AppointmentDetailScreen({
     super.key,
     required this.appointment,
-    required this.appointmentsForDay, // Сделали обязательным
+    required this.appointmentsForDay,
+    required this.staff, // <<< НОВЫЙ ПАРАМЕТР
   });
 
   @override
@@ -23,11 +25,20 @@ class AppointmentDetailScreen extends StatefulWidget {
 class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   final _scheduleService = sl<ScheduleService>();
   late Appointment _appointment;
+  String? _staffName;
 
   @override
   void initState() {
     super.initState();
     _appointment = widget.appointment;
+    // Находим имя сотрудника при инициализации
+    if (_appointment.staffMemberId != null) {
+      try {
+        _staffName = widget.staff.firstWhere((s) => s.id == _appointment.staffMemberId).name;
+      } catch (e) {
+        _staffName = 'Не найден';
+      }
+    }
   }
 
   void _navigateToEdit() async {
@@ -37,14 +48,12 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
         builder: (context) => AppointmentEditScreen(
           selectedDate: _appointment.date,
           initialAppointment: _appointment,
-          appointmentsForDay: widget.appointmentsForDay, // Передаем список дальше
+          appointmentsForDay: widget.appointmentsForDay,
         ),
       ),
     );
     if (result == true && mounted) {
-      // Если мы вернулись с сохранения, нужно обновить данные
-      // Мы можем либо вернуть обновленную запись, либо просто true и обновить весь список на главном экране
-      Navigator.pop(context, true); // Возвращаемся на главный экран и говорим ему обновиться
+      Navigator.pop(context, true);
     }
   }
 
@@ -91,9 +100,9 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
             _buildDetailRow(context, icon: Icons.cut, title: 'Услуга', content: _appointment.service),
             _buildDetailRow(context, icon: Icons.timer, title: 'Длительность', content: '${_appointment.durationInMinutes} мин.'),
             _buildDetailRow(context, icon: Icons.access_time, title: 'Время', content: '$startTime - $endTime'),
-            if (_appointment.staffMemberId != null) // TODO: Загрузить имя сотрудника
-              _buildDetailRow(context, icon: Icons.badge, title: 'Сотрудник', content: 'ID: ${_appointment.staffMemberId}'),
-            if (_appointment.resourceId != null) // TODO: Загрузить имя ресурса
+            if (_staffName != null)
+              _buildDetailRow(context, icon: Icons.badge, title: 'Сотрудник', content: _staffName!),
+            if (_appointment.resourceId != null)
               _buildDetailRow(context, icon: Icons.build, title: 'Ресурс', content: 'ID: ${_appointment.resourceId}'),
             if (_appointment.comment != null && _appointment.comment!.isNotEmpty)
               _buildDetailRow(context, icon: Icons.comment, title: 'Комментарий', content: _appointment.comment!),
