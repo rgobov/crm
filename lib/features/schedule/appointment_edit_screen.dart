@@ -93,24 +93,58 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   }
 
   void _onPhoneChanged() {
+    final phoneInput = _phoneSearchController.text.trim();
+    
+    // 1. Если поле пустое — сбрасываем выбор клиента
+    if (phoneInput.isEmpty) {
+      if (_selectedContact != null) {
+        setState(() => _selectedContact = null);
+      }
+      return;
+    }
+
+    // 2. Если этот номер уже принадлежит выбранному контакту — ничего не ищем
+    if (_selectedContact != null && _selectedContact!.phone == phoneInput) {
+      return;
+    }
+
+    // 3. Запускаем поиск с задержкой (Debounce)
     if (_phoneDebounce?.isActive ?? false) _phoneDebounce!.cancel();
-    _phoneDebounce = Timer(const Duration(milliseconds: 600), () async {
-      final phone = _phoneSearchController.text.trim();
-      if (phone.length >= 5) {
-        final contact = await _contactService.findContactByPhone(phone);
+    _phoneDebounce = Timer(const Duration(milliseconds: 700), () async {
+      // Берем самое актуальное значение из контроллера внутри таймера
+      final currentPhone = _phoneSearchController.text.trim();
+      
+      if (currentPhone.length >= 5) {
+        final contact = await _contactService.findContactByPhone(currentPhone);
+        
         if (contact != null && mounted) {
+          // Если за время запроса мы уже выбрали этого клиента — выходим
+          if (_selectedContact?.id == contact.id) return;
+
           setState(() {
-            try {
-              _selectedContact = _contacts.firstWhere((c) => c.id == contact.id);
-            } catch (e) {
+            // Пытаемся найти контакт в уже загруженном списке или добавляем его
+            final index = _contacts.indexWhere((c) => c.id == contact.id);
+            if (index != -1) {
+              _selectedContact = _contacts[index];
+            } else {
               _contacts.insert(0, contact);
               _selectedContact = contact;
             }
-            // Обновляем поле телефона, чтобы соответствовало найденному контакту
+            
+            // Синхронизируем текст (без вызова слушателя снова)
+            _phoneSearchController.removeListener(_onPhoneChanged);
             _phoneSearchController.text = contact.phone;
+            _phoneSearchController.addListener(_onPhoneChanged);
           });
+
+          // Уведомляем пользователя один раз
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Клиент найден: ${contact.name}'), duration: const Duration(seconds: 1)),
+            SnackBar(
+              content: Text('Клиент найден: ${contact.name}'), 
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
         }
       }
@@ -151,7 +185,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
           _selectedContact = _contacts.firstWhere((c) => c.name == widget.initialAppointment!.clientName);
           if (widget.initialAppointment!.resourceId != null) _selectedResource = _resources.firstWhere((r) => r.id == widget.initialAppointment!.resourceId);
           if (widget.initialAppointment!.staffMemberId != null) _selectedStaffMember = _staff.firstWhere((s) => s.id == widget.initialAppointment!.staffMemberId);
-          // Устанавливаем номер телефона при редактировании
+          
           if (_selectedContact != null) {
             _phoneSearchController.removeListener(_onPhoneChanged);
             _phoneSearchController.text = _selectedContact!.phone;
@@ -285,7 +319,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   }
 
   void _quickAddContact() async {
-    // --- ИЗМЕНЕНИЕ: Получаем объект созданного контакта ---
     final dynamic result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddContactScreen()),
@@ -293,12 +326,14 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     
     if (result is Contact) {
       setState(() {
-        // Добавляем нового клиента в локальный список
         _contacts.insert(0, result);
         _selectedContact = result;
-        // Заполняем поле поиска телефоном нового клиента
+        
+        _phoneSearchController.removeListener(_onPhoneChanged);
         _phoneSearchController.text = result.phone;
+        _phoneSearchController.addListener(_onPhoneChanged);
       });
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Клиент добавлен и выбран: ${result.name}')),
       );
@@ -357,15 +392,14 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                               isExpanded: true,
                               items: _contacts.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
                               onChanged: (v) {
-                                setState(() {
-                                  _selectedContact = v;
-                                  if (v != null) {
-                                    // Отключаем слушатель, чтобы не запускать поиск при ручном выборе
+                                if (v != null && _selectedContact?.id != v.id) {
+                                  setState(() {
+                                    _selectedContact = v;
                                     _phoneSearchController.removeListener(_onPhoneChanged);
                                     _phoneSearchController.text = v.phone;
                                     _phoneSearchController.addListener(_onPhoneChanged);
-                                  }
-                                });
+                                  });
+                                }
                               },
                               decoration: const InputDecoration(
                                 labelText: 'Клиент',
