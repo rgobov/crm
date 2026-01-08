@@ -32,7 +32,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if(!_isLoading) setState(() => _isLoading = true);
 
     try {
       final results = await Future.wait([
@@ -44,15 +44,25 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
         setState(() {
           _appointmentsForDay = results[0] as List<Appointment>;
           _self = [results[1] as StaffMember];
-          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
-        setState(() => _isLoading = false);
       }
+    } finally {
+      if(mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // --- НОВЫЙ МЕТОД ДЛЯ ЛОКАЛЬНОГО ОБНОВЛЕНИЯ ---
+  void _onAppointmentUpdated(Appointment updatedAppointment) {
+    setState(() {
+      final index = _appointmentsForDay.indexWhere((a) => a.id == updatedAppointment.id);
+      if (index != -1) {
+        _appointmentsForDay[index] = updatedAppointment;
+      }
+    });
   }
 
   void _onEmptySlotTap(TimeOfDay time, String? staffId) {
@@ -110,7 +120,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
                     staff: _self,
                     onAppointmentTap: _navigateToDetail,
                     onEmptySlotTap: _onEmptySlotTap,
-                    onRefresh: _loadData, // <<< ПЕРЕДАЕМ ФУНКЦИЮ
+                    onAppointmentUpdated: _onAppointmentUpdated, // <<< ПЕРЕДАЕМ ФУНКЦИЮ
                   ),
           ),
           const Divider(height: 1),

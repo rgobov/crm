@@ -16,7 +16,7 @@ class DayTimeline extends StatefulWidget {
   final List<StaffMember> staff;
   final Function(Appointment) onAppointmentTap;
   final Function(TimeOfDay, String?) onEmptySlotTap;
-  final Future<void> Function() onRefresh;
+  final Function(Appointment) onAppointmentUpdated; // <<< ИЗМЕНЕНИЕ
 
   const DayTimeline({
     super.key,
@@ -25,7 +25,7 @@ class DayTimeline extends StatefulWidget {
     required this.staff,
     required this.onAppointmentTap,
     required this.onEmptySlotTap,
-    required this.onRefresh,
+    required this.onAppointmentUpdated, // <<< ИЗМЕНЕНИЕ
   });
 
   @override
@@ -70,15 +70,18 @@ class _DayTimelineState extends State<DayTimeline> {
     setState(() => _isUpdatingStatus = true);
 
     try {
-      final updatedAppointment = appointment.copyWith(status: newStatus);
+      final appointmentWithNewStatus = appointment.copyWith(status: newStatus);
+      late final Appointment updatedAppointment;
       
       if (_currentUser?.role == UserRole.manager) {
-        await _managerService.updateAppointment(updatedAppointment);
+        updatedAppointment = await _managerService.updateAppointment(appointmentWithNewStatus);
       } else if (_currentUser?.role == UserRole.employee) {
-        await _employeeService.updateAppointment(updatedAppointment);
+        updatedAppointment = await _employeeService.updateAppointment(appointmentWithNewStatus);
+      } else {
+        return;
       }
       
-      await widget.onRefresh();
+      widget.onAppointmentUpdated(updatedAppointment);
       if (mounted) {
         setState(() => _selectedAppointmentId = null);
       }
