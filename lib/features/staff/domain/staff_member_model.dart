@@ -1,48 +1,59 @@
 import 'package:flutter/material.dart';
 
+// Вспомогательная функция для безопасного парсинга времени
+TimeOfDay? _parseTime(String? timeString) {
+  if (timeString == null) return null;
+  try {
+    final parts = timeString.split(':');
+    final hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1]);
+    return TimeOfDay(hour: hour, minute: minute);
+  } catch (e) {
+    return null;
+  }
+}
+
 class StaffMember {
   final String id;
   final String name;
   final String specialty;
-  final String? role;
-  final bool available;
+  final String tenantId;
   final TimeOfDay? workStartTime;
   final TimeOfDay? workEndTime;
   final TimeOfDay? breakStartTime;
   final TimeOfDay? breakEndTime;
-  String? email; // Делаем поле изменяемым
+  final bool available;
+  final String? role;
+  final String? email;
 
   StaffMember({
     required this.id,
     required this.name,
     required this.specialty,
-    this.role,
-    this.available = true,
+    required this.tenantId,
     this.workStartTime,
     this.workEndTime,
     this.breakStartTime,
     this.breakEndTime,
+    required this.available,
+    this.role,
     this.email,
   });
 
   factory StaffMember.fromJson(Map<String, dynamic> json) {
-    TimeOfDay? parseTime(String? time) {
-      if (time == null) return null;
-      final parts = time.split(':');
-      return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-    }
-
     return StaffMember(
       id: json['id'],
       name: json['name'],
       specialty: json['specialty'],
+      tenantId: json['tenantId'],
+      available: json['available'] ?? false,
       role: json['role'],
-      available: json['available'] ?? true,
-      workStartTime: parseTime(json['workStartTime']),
-      workEndTime: parseTime(json['workEndTime']),
-      breakStartTime: parseTime(json['breakStartTime']),
-      breakEndTime: parseTime(json['breakEndTime']),
-      email: json['email'], // Принимаем email с бэкенда
+      email: json['email'],
+      // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Парсим строки во время ---
+      workStartTime: _parseTime(json['workStartTime']),
+      workEndTime: _parseTime(json['workEndTime']),
+      breakStartTime: _parseTime(json['breakStartTime']),
+      breakEndTime: _parseTime(json['breakEndTime']),
     );
   }
 }

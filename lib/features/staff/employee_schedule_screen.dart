@@ -1,33 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:try_neuro/features/manager/data/manager_service.dart';
+import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/day_timeline.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/schedule/horizontal_date_picker.dart';
+import 'package:try_neuro/features/staff/data/employee_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
-class ScheduleScreen extends StatefulWidget {
-  final DateTime? initialDate;
-  const ScheduleScreen({super.key, this.initialDate});
+class EmployeeScheduleScreen extends StatefulWidget {
+  final User user;
+  const EmployeeScheduleScreen({super.key, required this.user});
 
   @override
-  State<ScheduleScreen> createState() => _ScheduleScreenState();
+  State<EmployeeScheduleScreen> createState() => _EmployeeScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
-  final ManagerService _managerService = sl<ManagerService>();
+class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
+  final EmployeeService _employeeService = sl<EmployeeService>();
 
-  late DateTime _selectedDay;
+  DateTime _selectedDay = DateTime.now();
   List<Appointment> _appointmentsForDay = [];
-  List<StaffMember> _staff = [];
+  List<StaffMember> _self = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _selectedDay = widget.initialDate ?? DateTime.now();
     _loadData(_selectedDay);
   }
 
@@ -36,24 +36,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       _isLoading = true;
       _selectedDay = day;
     });
-    
+
     try {
       final results = await Future.wait([
-        _managerService.getAppointmentsForDay(day),
-        _managerService.getStaffForSchedule(), 
+        _employeeService.getMyAppointmentsForDay(day),
+        _employeeService.getMyProfile(),
       ]);
 
       if (mounted) {
         setState(() {
           _appointmentsForDay = results[0] as List<Appointment>;
-          _staff = results[1] as List<StaffMember>; 
+          _self = [results[1] as StaffMember];
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: ${e.toString()}')));
       }
     }
   }
@@ -70,7 +70,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           selectedDate: _selectedDay,
           initialAppointment: appointment,
           preselectedTime: preselectedTime,
-          preselectedStaffId: preselectedStaffId, 
+          preselectedStaffId: preselectedStaffId,
           appointmentsForDay: _appointmentsForDay,
         ),
       ),
@@ -99,7 +99,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Расписание'),
+        title: const Text('Мое расписание'),
       ),
       body: Column(
         children: [
@@ -109,7 +109,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 : DayTimeline(
                     day: _selectedDay,
                     appointments: _appointmentsForDay,
-                    staff: _staff,
+                    staff: _self,
                     onAppointmentTap: _navigateToDetail,
                     onEmptySlotTap: _onEmptySlotTap,
                   ),
@@ -124,8 +124,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        heroTag: 'schedule_fab',
-        onPressed: () => _navigateToEdit(),
+        heroTag: 'employee_schedule_fab', 
+        onPressed: () => _navigateToEdit(preselectedStaffId: widget.user.staffId),
         tooltip: 'Создать запись',
         child: const Icon(Icons.add),
       ),

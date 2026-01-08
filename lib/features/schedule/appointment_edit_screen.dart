@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -64,6 +65,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   User? _currentUser;
+  bool get _isEditing => widget.initialAppointment != null;
 
   @override
   void initState() {
@@ -170,7 +172,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
               status: newAppointment.status);
         }
       }
-
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -179,6 +180,70 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  Future<void> _showWheelTimePicker() async {
+    int selectedHour = _selectedTime?.hour ?? TimeOfDay.now().hour;
+    int selectedMinute = _selectedTime?.minute ?? 0;
+
+    if (selectedMinute % 5 != 0) {
+        selectedMinute = (selectedMinute / 5).round() * 5;
+        if (selectedMinute == 60) selectedMinute = 55;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Выберите время'),
+          content: SizedBox(
+            height: 150,
+            width: 200,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Expanded(
+                  child: CupertinoPicker(
+                    scrollController: FixedExtentScrollController(initialItem: selectedHour),
+                    itemExtent: 32.0,
+                    onSelectedItemChanged: (int index) {
+                      selectedHour = index;
+                    },
+                    children: List<Widget>.generate(24, (int index) {
+                      return Center(child: Text(index.toString().padLeft(2, '0')));
+                    }),
+                  ),
+                ),
+                Expanded(
+                  child: CupertinoPicker(
+                    scrollController: FixedExtentScrollController(initialItem: selectedMinute ~/ 5),
+                    itemExtent: 32.0,
+                    onSelectedItemChanged: (int index) {
+                      selectedMinute = index * 5;
+                    },
+                    children: List<Widget>.generate(12, (int index) {
+                        return Center(child: Text((index * 5).toString().padLeft(2, '0')));
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Отмена')),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedTime = TimeOfDay(hour: selectedHour, minute: selectedMinute);
+                });
+                Navigator.of(context).pop();
+              },
+              child: const Text('Готово', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -204,9 +269,15 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                   TextFormField(controller: _serviceController, decoration: const InputDecoration(labelText: 'Услуга', border: OutlineInputBorder())),
                   const SizedBox(height: 16),
                   TextFormField(controller: _durationController, decoration: const InputDecoration(labelText: 'Длительность (мин)'), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
-                  const SizedBox(height: 16),
+                   const SizedBox(height: 16),
                   ListTile(title: Text('Дата: ${DateFormat.yMMMMd('ru').format(_selectedDate)}')),
-                  ListTile(title: Text('Время: ${_selectedTime?.format(context) ?? 'Не выбрано'}')),
+                  ListTile(
+                    leading: const Icon(Icons.access_time),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade400)),
+                    title: const Text('Время записи'),
+                    subtitle: Text(_selectedTime?.format(context) ?? 'Не выбрано'),
+                    onTap: _showWheelTimePicker,
+                  ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<StaffMember>(
                     value: _selectedStaffMember,

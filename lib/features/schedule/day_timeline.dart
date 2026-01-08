@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'dart:math';
+import 'striped_background_painter.dart';
 
 class DayTimeline extends StatefulWidget {
   final DateTime day;
@@ -58,12 +59,17 @@ class _DayTimelineState extends State<DayTimeline> {
     }
   }
 
+  bool get _isToday {
+    final now = DateTime.now();
+    return widget.day.year == now.year && widget.day.month == now.month && widget.day.day == now.day;
+  }
+
   @override
   Widget build(BuildContext context) {
     int startHour = 23;
     int endHour = 0;
 
-    if (widget.staff.isEmpty) {
+    if (widget.staff.isEmpty && widget.appointments.isEmpty) {
       startHour = 8;
       endHour = 22;
     } else {
@@ -72,12 +78,19 @@ class _DayTimelineState extends State<DayTimeline> {
           startHour = min(startHour, staffMember.workStartTime!.hour);
         }
         if (staffMember.workEndTime != null) {
-          endHour = max(endHour, staffMember.workEndTime!.hour + 1);
+          endHour = max(endHour, staffMember.workEndTime!.hour);
         }
       }
+      for (var appointment in widget.appointments) {
+        startHour = min(startHour, appointment.time.hour);
+        final appointmentEndHour = (appointment.time.hour * 60 + appointment.time.minute + appointment.durationInMinutes) / 60;
+        endHour = max(endHour, appointmentEndHour.ceil());
+      }
+
       if (startHour == 23) startHour = 8;
       if (endHour == 0) endHour = 22;
     }
+    endHour = min(endHour + 1, 24);
 
     final totalHours = endHour - startHour;
     final totalHeight = totalHours * hourHeight;
@@ -133,9 +146,9 @@ class _DayTimelineState extends State<DayTimeline> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        ...widget.staff.map((s) => _buildStaffColumn(context, s.id, s.name, totalHeight, startHour, endHour)),
+                        ...widget.staff.map((s) => _buildStaffColumn(context, s, totalHeight, startHour, endHour)),
                         if (hasUnassigned)
-                          _buildStaffColumn(context, null, 'Не назначен', totalHeight, startHour, endHour),
+                          _buildStaffColumn(context, null, totalHeight, startHour, endHour),
                       ],
                     ),
                   ),
@@ -160,17 +173,18 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  Widget _buildStaffColumn(BuildContext context, String? staffId, String staffName, double totalHeight, int startHour, int endHour) {
-    final columnAppointments = widget.appointments.where((a) => a.staffMemberId == staffId).toList();
+  Widget _buildStaffColumn(BuildContext context, StaffMember? staffMember, double totalHeight, int startHour, int endHour) {
+    final columnAppointments = widget.appointments.where((a) => a.staffMemberId == staffMember?.id).toList();
 
     return Container(
       width: staffColumnWidth,
       height: totalHeight,
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: Colors.grey.shade300)),
-      ),
+      decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.shade300))),
       child: Stack(
         children: [
+          // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Вставляем список виджетов напрямую ---
+          ..._buildWorkingHoursBackground(staffMember, totalHeight, startHour, endHour),
+          
           Column(
             children: List.generate(endHour - startHour, (hourIndex) {
               final hour = startHour + hourIndex;
@@ -181,12 +195,8 @@ class _DayTimelineState extends State<DayTimeline> {
                     final minute = minuteIndex * 15;
                     return Expanded(
                       child: InkWell(
-                        onTap: () => widget.onEmptySlotTap(TimeOfDay(hour: hour, minute: minute), staffId),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border(top: BorderSide(color: minute == 0 ? Colors.grey.shade200 : Colors.grey.shade100, width: 0.5)),
-                          ),
-                        ),
+                        onTap: () => widget.onEmptySlotTap(TimeOfDay(hour: hour, minute: minute), staffMember?.id),
+                        child: Container(decoration: BoxDecoration(border: Border(top: BorderSide(color: minute == 0 ? Colors.grey.shade200 : Colors.grey.shade100, width: 0.5)))),
                       ),
                     );
                   }),
@@ -218,11 +228,11 @@ class _DayTimelineState extends State<DayTimeline> {
                       children: [
                         Text(appointment.clientName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                         Text(appointment.service, style: const TextStyle(color: Colors.white70, fontSize: 10), overflow: TextOverflow.ellipsis),
-                         if (appointment.comment != null && appointment.comment!.isNotEmpty)
-                           Padding(
-                             padding: const EdgeInsets.only(top: 2),
-                             child: Icon(Icons.comment, size: 10, color: Colors.white.withOpacity(0.8)),
-                           ),
+                        if (appointment.comment != null && appointment.comment!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Icon(Icons.comment, size: 10, color: Colors.white.withOpacity(0.8)),
+                          ),
                       ],
                     ),
                   ),
@@ -230,16 +240,69 @@ class _DayTimelineState extends State<DayTimeline> {
               ),
             );
           }),
-          // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
           if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth, startHour, endHour),
         ],
       ),
     );
   }
-  
-  bool get _isToday {
-    final now = DateTime.now();
-    return widget.day.year == now.year && widget.day.month == now.month && widget.day.day == now.day;
+
+  // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Метод теперь возвращает List<Widget> ---
+  List<Widget> _buildWorkingHoursBackground(StaffMember? staff, double totalHeight, int startHour, int endHour) {
+    double timeToY(TimeOfDay time) {
+      final double minutesFromTimelineStart = ((time.hour - startHour) * 60 + time.minute).toDouble();
+      return minutesFromTimelineStart * (hourHeight / 60);
+    }
+
+    if (staff == null || staff.workStartTime == null || staff.workEndTime == null) {
+      return [Positioned.fill(child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.08)))];
+    }
+
+    final List<Widget> backgroundBlocks = [];
+
+    final workStartPos = timeToY(staff.workStartTime!);
+    final workEndPos = timeToY(staff.workEndTime!);
+
+    if (workStartPos > 0) {
+      backgroundBlocks.add(
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: workStartPos,
+          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.08)),
+        ),
+      );
+    }
+
+    if (staff.breakStartTime != null && staff.breakEndTime != null) {
+      final breakStartPos = timeToY(staff.breakStartTime!);
+      final breakEndPos = timeToY(staff.breakEndTime!);
+      if (breakEndPos > breakStartPos) {
+        backgroundBlocks.add(
+          Positioned(
+            top: breakStartPos,
+            left: 0,
+            right: 0,
+            height: breakEndPos - breakStartPos,
+            child: const StripedBackground(backgroundColor: Color(0xFFE0E0E0), stripeColor: Colors.black26),
+          ),
+        );
+      }
+    }
+
+    if (workEndPos < totalHeight) {
+      backgroundBlocks.add(
+        Positioned(
+          top: workEndPos,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.08)),
+        ),
+      );
+    }
+
+    return backgroundBlocks;
   }
 
   Widget _buildCurrentTimeIndicator(double width, int startHour, int endHour) {

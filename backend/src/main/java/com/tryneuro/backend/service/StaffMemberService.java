@@ -16,19 +16,20 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class StaffMemberService {
     private final StaffMemberRepository staffMemberRepository;
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder; // ВОССТАНАВЛИВАЕМ ПОЛЕ
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
     @Autowired
     public StaffMemberService(StaffMemberRepository staffMemberRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.staffMemberRepository = staffMemberRepository;
         this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.passwordEncoder = passwordEncoder; // Теперь эта строка корректна
     }
 
     private LocalTime parseTime(String time) {
@@ -38,6 +39,17 @@ public class StaffMemberService {
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    public Optional<StaffMember> getStaffMemberById(String id) {
+        Optional<StaffMember> staffOpt = staffMemberRepository.findById(id);
+        staffOpt.ifPresent(staff -> {
+            userRepository.findByStaffId(staff.getId()).ifPresent(user -> {
+                staff.setRole(user.getRole().name());
+                staff.setEmail(user.getEmail());
+            });
+        });
+        return staffOpt;
     }
 
     public List<StaffMember> getAllStaff(String tenantId) {

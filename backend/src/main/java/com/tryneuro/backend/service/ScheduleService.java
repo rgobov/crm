@@ -1,5 +1,6 @@
 package com.tryneuro.backend.service;
 
+import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.repository.AppointmentRepository;
@@ -26,7 +27,20 @@ public class ScheduleService {
         return appointmentRepository.findByDateAndTenantId(date, tenantId);
     }
 
-    public boolean isStaffMemberAvailable(String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
+    public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {
+        return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
+    }
+
+    public List<WorkloadDto> getWorkloadForStaffAndMonth(String staffId, int year, int month) {
+        return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
+    }
+
+    public List<WorkloadDto> getWorkloadForMonth(String tenantId, int year, int month) {
+        return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
+    }
+
+    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Добавляем tenantId ---
+    public boolean isStaffMemberAvailable(String tenantId, String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
         StaffMember staffMember = staffMemberRepository.findById(staffMemberId).orElse(null);
         if (staffMember == null || !staffMember.isAvailable()) {
             return false;
@@ -35,21 +49,22 @@ public class ScheduleService {
         LocalTime appointmentStartTime = time;
         LocalTime appointmentEndTime = time.plusMinutes(duration);
 
-        if (staffMember.getWorkStartTime() != null && appointmentStartTime.isBefore(staffMember.getWorkStartTime())) {
-            return false;
-        }
-        if (staffMember.getWorkEndTime() != null && appointmentEndTime.isAfter(staffMember.getWorkEndTime())) {
-            return false;
-        }
-
-        if (staffMember.getBreakStartTime() != null && staffMember.getBreakEndTime() != null) {
-            if (appointmentStartTime.isBefore(staffMember.getBreakEndTime()) && appointmentEndTime.isAfter(staffMember.getBreakStartTime())) {
+        if (staffMember.getWorkStartTime() != null && staffMember.getWorkEndTime() != null) {
+            if (appointmentStartTime.isBefore(staffMember.getWorkStartTime())) {
                 return false;
+            }
+            if (appointmentEndTime.isAfter(staffMember.getWorkEndTime())) {
+                return false;
+            }
+            if (staffMember.getBreakStartTime() != null && staffMember.getBreakEndTime() != null) {
+                if (appointmentStartTime.isBefore(staffMember.getBreakEndTime()) && appointmentEndTime.isAfter(staffMember.getBreakStartTime())) {
+                    return false;
+                }
             }
         }
 
-        // Используем правильный метод
-        List<Appointment> staffAppointments = appointmentRepository.findByStaffMemberIdAndDate(staffMemberId, date);
+        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем правильный метод репозитория ---
+        List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
         for (Appointment existingAppointment : staffAppointments) {
             if (currentAppointmentId != null && existingAppointment.getId().equals(currentAppointmentId)) {
                 continue;
@@ -65,7 +80,6 @@ public class ScheduleService {
     }
 
     public boolean isResourceAvailable(String resourceId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
-        // Используем правильный метод
         List<Appointment> resourceAppointments = appointmentRepository.findByResourceIdAndDate(resourceId, date);
         LocalTime newAppointmentStart = time;
         LocalTime newAppointmentEnd = time.plusMinutes(duration);
@@ -83,7 +97,7 @@ public class ScheduleService {
         return true;
     }
     
-     public Appointment addAppointment(Appointment appointment) {
+    public Appointment addAppointment(Appointment appointment) {
         return appointmentRepository.save(appointment);
     }
 

@@ -6,33 +6,28 @@ import 'package:try_neuro/features/schedule/domain/workload_model.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
-class ManagerService {
+class EmployeeService {
   final Dio _dio = sl<HttpClient>().dio;
 
-  Future<List<StaffMember>> getStaffForSchedule() async {
-    final response = await _dio.get('/manager/schedule/staff');
-    final List<dynamic> data = response.data;
-    return data.map((json) => StaffMember.fromJson(json)).toList();
+  // --- НОВЫЙ МЕТОД ---
+  Future<StaffMember> getMyProfile() async {
+    final response = await _dio.get('/employee/profile');
+    return StaffMember.fromJson(response.data);
   }
 
-  Future<List<Appointment>> getAppointmentsForDay(DateTime date) async {
+  Future<List<Appointment>> getMyAppointmentsForDay(DateTime date) async {
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    final response = await _dio.get('/manager/appointments/day', queryParameters: {'date': dateStr});
+    final response = await _dio.get('/employee/appointments', queryParameters: {'date': dateStr});
     final List<dynamic> data = response.data;
     return data.map((json) => Appointment.fromJson(json)).toList();
   }
 
-  // --- НОВЫЙ МЕТОД ---
-  Future<List<Workload>> getWorkloadForMonth(int year, int month) async {
-    final response = await _dio.get('/manager/workload', queryParameters: {
+  Future<List<Workload>> getMyWorkloadForMonth(int year, int month) async {
+    final response = await _dio.get('/employee/workload', queryParameters: {
       'year': year,
       'month': month,
     });
     final List<dynamic> data = response.data;
     return data.map((json) => Workload.fromJson(json)).toList();
-  }
-
-  Future<void> addAppointment(Appointment appointment) async {
-    await _dio.post('/manager/appointments', data: appointment.toJson());
   }
 }

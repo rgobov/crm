@@ -13,21 +13,18 @@ import java.util.List;
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, String> {
 
-    // --- Старые методы ---
-    List<Appointment> findByTenantIdAndDate(String tenantId, LocalDate date);
-    List<Appointment> findByTenantIdAndStaffMemberIdAndDate(String tenantId, String staffMemberId, LocalDate date);
     List<Appointment> findByDateAndTenantId(LocalDate date, String tenantId);
-    List<Appointment> findByStaffMemberIdAndDate(String staffMemberId, LocalDate date);
-    List<Appointment> findByResourceIdAndDate(String resourceId, LocalDate date);
+    List<Appointment> findByResourceIdAndDate(String resourceId, LocalDate date); // Этот метод тоже нужно будет исправить, но позже
     List<Appointment> findByTenantId(String tenantId);
 
-    // --- НОВЫЙ МЕТОД: Загрузка для всех сотрудников (для менеджера/админа) ---
+    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Метод теперь требует tenantId ---
+    List<Appointment> findByTenantIdAndStaffMemberIdAndDate(String tenantId, String staffMemberId, LocalDate date);
+
     @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.date), COUNT(a)) " +
            "FROM Appointment a WHERE a.tenantId = :tenantId AND YEAR(a.date) = :year AND MONTH(a.date) = :month " +
            "GROUP BY DAY(a.date)")
     List<WorkloadDto> getWorkloadForMonth(@Param("tenantId") String tenantId, @Param("year") int year, @Param("month") int month);
 
-    // --- НОВЫЙ МЕТОД: Загрузка для конкретного сотрудника ---
     @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.date), COUNT(a)) " +
            "FROM Appointment a WHERE a.staffMemberId = :staffId AND YEAR(a.date) = :year AND MONTH(a.date) = :month " +
            "GROUP BY DAY(a.date)")
