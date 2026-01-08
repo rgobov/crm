@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/contacts/contact_edit_screen.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
@@ -30,11 +29,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     );
 
     if (result == true) {
-      // Если экран редактирования вернул true, значит данные изменились.
-      // Вместо того, чтобы перезагружать с сервера, мы просто закроем этот экран,
-      // так как предыдущий экран (список клиентов) все равно обновится.
       if (mounted) {
-        // Мы также передаем true назад, чтобы список клиентов обновился
         Navigator.of(context).pop(true);
       }
     }
@@ -53,17 +48,20 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildDetailCard('Телефон', _contact.phone, Icons.phone),
-            if (_contact.email != null && _contact.email!.isNotEmpty)
-              _buildDetailCard('Email', _contact.email!, Icons.email),
-            if (_contact.notes != null && _contact.notes!.isNotEmpty)
-              _buildDetailCard('Заметки', _contact.notes!, Icons.note),
-          ],
+      // --- ИЗМЕНЕНИЕ: Добавляем SelectionArea только для содержимого ---
+      body: SelectionArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildDetailCard('Телефон', _contact.phone, Icons.phone),
+              if (_contact.email != null && _contact.email!.isNotEmpty)
+                _buildDetailCard('Email', _contact.email!, Icons.email),
+              if (_contact.notes != null && _contact.notes!.isNotEmpty)
+                _buildDetailCard('Заметки', _contact.notes!, Icons.note),
+            ],
+          ),
         ),
       ),
     );

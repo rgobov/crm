@@ -13,7 +13,6 @@ class ContactsScreen extends StatefulWidget {
   State<ContactsScreen> createState() => _ContactsScreenState();
 }
 
-// Добавляем RouteAware, чтобы знать, когда пользователь вернулся на этот экран
 class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
   final ContactService _contactService = sl<ContactService>();
   final _searchController = TextEditingController();
@@ -32,7 +31,6 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Мы можем вызвать загрузку здесь, чтобы список обновлялся при каждом переключении вкладок
     _loadContacts(query: _searchController.text, silent: true);
   }
 
@@ -44,7 +42,6 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
     super.dispose();
   }
 
-  // silent = true позволяет обновлять список в фоне без показа индикатора загрузки в центре экрана
   Future<void> _loadContacts({String? query, bool silent = false}) async {
     if (!silent) {
       setState(() {
@@ -62,7 +59,6 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        // Не показываем ошибку при фоновом обновлении, чтобы не спамить пользователя
         if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
         }
@@ -131,31 +127,34 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
             ),
           ),
           Expanded(
-            child: _isLoading && _contacts.isEmpty // Показываем индикатор только если список еще совсем пуст
+            child: _isLoading && _contacts.isEmpty 
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: () => _loadContacts(query: _searchController.text),
-                    child: _contacts.isEmpty
-                        ? Center(
-                            child: Text(_searchController.text.isEmpty 
-                                ? 'Список клиентов пуст' 
-                                : 'Клиенты не найдены'))
-                        : ListView.builder(
-                            itemCount: _contacts.length,
-                            itemBuilder: (context, index) {
-                              final contact = _contacts[index];
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                                  child: Text(contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?'),
-                                ),
-                                title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text(contact.phone),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => _navigateToDetailScreen(contact),
-                              );
-                            },
-                          ),
+                    // Оборачиваем только список в SelectionArea
+                    child: SelectionArea(
+                      child: _contacts.isEmpty
+                          ? Center(
+                              child: Text(_searchController.text.isEmpty 
+                                  ? 'Список клиентов пуст' 
+                                  : 'Клиенты не найдены'))
+                          : ListView.builder(
+                              itemCount: _contacts.length,
+                              itemBuilder: (context, index) {
+                                final contact = _contacts[index];
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                                    child: Text(contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?'),
+                                  ),
+                                  title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text(contact.phone),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: () => _navigateToDetailScreen(contact),
+                                );
+                              },
+                            ),
+                    ),
                   ),
           ),
         ],

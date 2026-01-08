@@ -78,8 +78,6 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   }
 
   Future<void> _deleteAppointment() async {
-    // Эта функция потребует отдельной реализации эндпоинтов удаления
-    // в ролевых контроллерах, если она нужна.
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Функция удаления пока не реализована.')),
     );
@@ -100,20 +98,23 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
           IconButton(icon: const Icon(Icons.delete_outline), onPressed: _deleteAppointment, tooltip: 'Удалить'),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDetailRow(context, icon: Icons.person, title: 'Клиент', content: _appointment.clientName),
-            _buildDetailRow(context, icon: Icons.cut, title: 'Услуга', content: _appointment.service),
-            _buildDetailRow(context, icon: Icons.timer, title: 'Длительность', content: '${_appointment.durationInMinutes} мин.'),
-            _buildDetailRow(context, icon: Icons.access_time, title: 'Время', content: '$startTime - $endTime'),
-            if (_staffName != null)
-              _buildDetailRow(context, icon: Icons.badge, title: 'Сотрудник', content: _staffName!),
-            if (_appointment.resourceId != null)
-              _buildDetailRow(context, icon: Icons.build, title: 'Ресурс', content: 'ID: ${_appointment.resourceId}'),
-          ],
+      // Оборачиваем только содержимое в SelectionArea для копирования имен и телефонов
+      body: SelectionArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow(context, icon: Icons.person, title: 'Клиент', content: _appointment.clientName),
+              _buildDetailRow(context, icon: Icons.cut, title: 'Услуга', content: _appointment.service),
+              _buildDetailRow(context, icon: Icons.timer, title: 'Длительность', content: '${_appointment.durationInMinutes} мин.'),
+              _buildDetailRow(context, icon: Icons.access_time, title: 'Время', content: '$startTime - $endTime'),
+              if (_staffName != null)
+                _buildDetailRow(context, icon: Icons.badge, title: 'Сотрудник', content: _staffName!),
+              if (_appointment.resourceId != null)
+                _buildDetailRow(context, icon: Icons.build, title: 'Ресурс', content: 'ID: ${_appointment.resourceId}'),
+            ],
+          ),
         ),
       ),
     );
