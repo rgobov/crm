@@ -28,7 +28,7 @@ public class AppointmentComment {
     @Column(name = "author_name", nullable = false)
     private String authorName; // Имя того, кто написал
 
-    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Меняем тип данных на стандартный TEXT ---
+    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Убираем @Lob и явно указываем тип TEXT ---
     @Column(name = "text", nullable = false, columnDefinition = "TEXT")
     private String text;
 
