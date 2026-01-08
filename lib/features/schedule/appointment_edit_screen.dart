@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
+import 'package:try_neuro/features/contacts/add_contact_screen.dart'; 
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
@@ -49,7 +50,9 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   final _employeeService = sl<EmployeeService>();
 
   final _serviceController = TextEditingController();
+  final _phoneSearchController = TextEditingController();
   late final TextEditingController _durationController;
+  Timer? _phoneDebounce;
 
   List<Contact> _contacts = [];
   List<Resource> _resources = [];
@@ -75,6 +78,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     _durationController = TextEditingController(text: widget.initialAppointment?.durationInMinutes.toString() ?? '60');
     _selectedTime = widget.initialAppointment?.time ?? widget.preselectedTime;
     _selectedDate = widget.initialAppointment?.date ?? widget.selectedDate;
+    _phoneSearchController.addListener(_onPhoneChanged);
     _loadInitialData();
   }
 
@@ -82,7 +86,35 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   void dispose() {
     _serviceController.dispose();
     _durationController.dispose();
+    _phoneSearchController.removeListener(_onPhoneChanged);
+    _phoneSearchController.dispose();
+    _phoneDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onPhoneChanged() {
+    if (_phoneDebounce?.isActive ?? false) _phoneDebounce!.cancel();
+    _phoneDebounce = Timer(const Duration(milliseconds: 600), () async {
+      final phone = _phoneSearchController.text.trim();
+      if (phone.length >= 5) {
+        final contact = await _contactService.findContactByPhone(phone);
+        if (contact != null && mounted) {
+          setState(() {
+            try {
+              _selectedContact = _contacts.firstWhere((c) => c.id == contact.id);
+            } catch (e) {
+              _contacts.insert(0, contact);
+              _selectedContact = contact;
+            }
+            // Обновляем поле телефона, чтобы соответствовало найденному контакту
+            _phoneSearchController.text = contact.phone;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Клиент найден: ${contact.name}'), duration: const Duration(seconds: 1)),
+          );
+        }
+      }
+    });
   }
 
   Future<void> _loadInitialData() async {
@@ -119,6 +151,12 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
           _selectedContact = _contacts.firstWhere((c) => c.name == widget.initialAppointment!.clientName);
           if (widget.initialAppointment!.resourceId != null) _selectedResource = _resources.firstWhere((r) => r.id == widget.initialAppointment!.resourceId);
           if (widget.initialAppointment!.staffMemberId != null) _selectedStaffMember = _staff.firstWhere((s) => s.id == widget.initialAppointment!.staffMemberId);
+          // Устанавливаем номер телефона при редактировании
+          if (_selectedContact != null) {
+            _phoneSearchController.removeListener(_onPhoneChanged);
+            _phoneSearchController.text = _selectedContact!.phone;
+            _phoneSearchController.addListener(_onPhoneChanged);
+          }
         } catch (e) { /* ignore */ }
       } else if (widget.preselectedStaffId != null) {
         final matchingStaff = _staff.where((s) => s.id == widget.preselectedStaffId).toList();
@@ -246,65 +284,250 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     );
   }
 
+  void _quickAddContact() async {
+    // --- ИЗМЕНЕНИЕ: Получаем объект созданного контакта ---
+    final dynamic result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddContactScreen()),
+    );
+    
+    if (result is Contact) {
+      setState(() {
+        // Добавляем нового клиента в локальный список
+        _contacts.insert(0, result);
+        _selectedContact = result;
+        // Заполняем поле поиска телефоном нового клиента
+        _phoneSearchController.text = result.phone;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Клиент добавлен и выбран: ${result.name}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isStaffSelectionLocked = widget.preselectedStaffId != null;
+    final primaryColor = Theme.of(context).primaryColor;
+
     return Scaffold(
-      appBar: AppBar(title: Text(widget.initialAppointment != null ? 'Изменить запись' : 'Новая запись')),
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: Text(_isEditing ? 'Изменить запись' : 'Новая запись'),
+        elevation: 0,
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Form(
               key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  DropdownButtonFormField<Contact>(
-                    value: _selectedContact,
-                    items: _contacts.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
-                    onChanged: (v) => setState(() => _selectedContact = v),
-                    decoration: const InputDecoration(labelText: 'Клиент', border: OutlineInputBorder()),
-                    validator: (v) => v == null ? 'Выберите клиента' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(controller: _serviceController, decoration: const InputDecoration(labelText: 'Услуга', border: OutlineInputBorder())),
-                  const SizedBox(height: 16),
-                  TextFormField(controller: _durationController, decoration: const InputDecoration(labelText: 'Длительность (мин)'), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
-                   const SizedBox(height: 16),
-                  ListTile(title: Text('Дата: ${DateFormat.yMMMMd('ru').format(_selectedDate)}')),
-                  ListTile(
-                    leading: const Icon(Icons.access_time),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade400)),
-                    title: const Text('Время записи'),
-                    subtitle: Text(_selectedTime?.format(context) ?? 'Не выбрано'),
-                    onTap: _showWheelTimePicker,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<StaffMember>(
-                    value: _selectedStaffMember,
-                    items: _staff.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
-                    onChanged: isStaffSelectionLocked ? null : (v) => setState(() => _selectedStaffMember = v),
-                    decoration: InputDecoration(
-                      labelText: 'Сотрудник',
-                      border: const OutlineInputBorder(),
-                      filled: isStaffSelectionLocked,
-                      fillColor: isStaffSelectionLocked ? Colors.grey.shade200 : null,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildSectionHeader('Информация о клиенте'),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: _phoneSearchController,
+                              decoration: InputDecoration(
+                                labelText: 'Поиск по телефону',
+                                hintText: '+7...',
+                                prefixIcon: const Icon(Icons.phone),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  icon: const Icon(Icons.person_add_alt_1, color: Colors.blue),
+                                  tooltip: 'Новый клиент',
+                                  onPressed: _quickAddContact,
+                                ),
+                              ),
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<Contact>(
+                              value: _selectedContact,
+                              isExpanded: true,
+                              items: _contacts.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(),
+                              onChanged: (v) {
+                                setState(() {
+                                  _selectedContact = v;
+                                  if (v != null) {
+                                    // Отключаем слушатель, чтобы не запускать поиск при ручном выборе
+                                    _phoneSearchController.removeListener(_onPhoneChanged);
+                                    _phoneSearchController.text = v.phone;
+                                    _phoneSearchController.addListener(_onPhoneChanged);
+                                  }
+                                });
+                              },
+                              decoration: const InputDecoration(
+                                labelText: 'Клиент',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.person),
+                              ),
+                              validator: (v) => v == null ? 'Выберите клиента' : null,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<Resource>(
-                    value: _selectedResource,
-                    items: _resources.map((r) => DropdownMenuItem(value: r, child: Text(r.name))).toList(),
-                    onChanged: (v) => setState(() => _selectedResource = v),
-                    decoration: const InputDecoration(labelText: 'Ресурс', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _isSaving ? null : _saveForm,
-                    child: const Text('Сохранить'),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+
+                    _buildSectionHeader('Детали визита'),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: _serviceController,
+                              decoration: const InputDecoration(
+                                labelText: 'Услуга',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.cut),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: TextFormField(
+                                    controller: _durationController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Длительность',
+                                      suffixText: 'мин',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 4,
+                                  child: InkWell(
+                                    onTap: _showWheelTimePicker,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: Colors.grey.shade400),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.access_time, size: 20),
+                                          const SizedBox(width: 8),
+                                          Text(_selectedTime?.format(context) ?? 'Время'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.calendar_today),
+                              title: Text(DateFormat.yMMMMd('ru').format(_selectedDate)),
+                              subtitle: const Text('Дата записи'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    _buildSectionHeader('Исполнение'),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            DropdownButtonFormField<StaffMember>(
+                              value: _selectedStaffMember,
+                              isExpanded: true,
+                              items: _staff.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+                              onChanged: isStaffSelectionLocked ? null : (v) => setState(() => _selectedStaffMember = v),
+                              decoration: InputDecoration(
+                                labelText: 'Сотрудник',
+                                border: const OutlineInputBorder(),
+                                prefixIcon: const Icon(Icons.badge),
+                                filled: isStaffSelectionLocked,
+                                fillColor: isStaffSelectionLocked ? Colors.grey.shade100 : null,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<Resource>(
+                              value: _selectedResource,
+                              isExpanded: true,
+                              items: _resources.map((r) => DropdownMenuItem(value: r, child: Text(r.name))).toList(),
+                              onChanged: (v) => setState(() => _selectedResource = v),
+                              decoration: const InputDecoration(
+                                labelText: 'Ресурс (кабинет)',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.room),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      height: 54,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        onPressed: _isSaving ? null : _saveForm,
+                        child: _isSaving
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : Text(_isEditing ? 'ОБНОВИТЬ ЗАПИСЬ' : 'СОЗДАТЬ ЗАПИСЬ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade600,
+          letterSpacing: 1.1,
+        ),
+      ),
     );
   }
 }

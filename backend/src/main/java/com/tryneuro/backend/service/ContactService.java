@@ -17,11 +17,13 @@ public class ContactService {
         this.contactRepository = contactRepository;
     }
 
-    public List<Contact> getAllContacts(String tenantId) {
+    public List<Contact> getAllContacts(String tenantId, String query) {
+        if (query != null && !query.isEmpty()) {
+            return contactRepository.searchContacts(tenantId, query);
+        }
         return contactRepository.findByTenantId(tenantId);
     }
 
-    // Новый метод
     public Optional<Contact> findContactByPhone(String phone, String tenantId) {
         return contactRepository.findByPhoneAndTenantId(phone, tenantId);
     }

@@ -21,11 +21,11 @@ public class ContactController {
     }
 
     @GetMapping
-    public List<Contact> getAllContacts(@AuthenticationPrincipal User user) {
-        return contactService.getAllContacts(user.getTenantId());
+    public List<Contact> getAllContacts(@AuthenticationPrincipal User user, 
+                                        @RequestParam(required = false) String query) {
+        return contactService.getAllContacts(user.getTenantId(), query);
     }
 
-    // Новый эндпоинт
     @GetMapping("/by-phone")
     public ResponseEntity<Contact> getContactByPhone(@RequestParam String phone, @AuthenticationPrincipal User user) {
         return contactService.findContactByPhone(phone, user.getTenantId())

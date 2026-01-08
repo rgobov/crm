@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/contacts/contact_edit_screen.dart';
@@ -14,20 +13,27 @@ class ContactsScreen extends StatefulWidget {
   State<ContactsScreen> createState() => _ContactsScreenState();
 }
 
-class _ContactsScreenState extends State<ContactsScreen> {
+// Добавляем RouteAware, чтобы знать, когда пользователь вернулся на этот экран
+class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
   final ContactService _contactService = sl<ContactService>();
   final _searchController = TextEditingController();
   Timer? _debounce;
 
   List<Contact> _contacts = [];
   bool _isLoading = true;
-  bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
     _loadContacts();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Мы можем вызвать загрузку здесь, чтобы список обновлялся при каждом переключении вкладок
+    _loadContacts(query: _searchController.text, silent: true);
   }
 
   @override
@@ -38,10 +44,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadContacts({String? query}) async {
-    setState(() {
-      _isLoading = true;
-    });
+  // silent = true позволяет обновлять список в фоне без показа индикатора загрузки в центре экрана
+  Future<void> _loadContacts({String? query, bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
     try {
       final contacts = await _contactService.getContacts(query: query);
       if (mounted) {
@@ -53,14 +62,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        // Не показываем ошибку при фоновом обновлении, чтобы не спамить пользователя
+        if (!silent) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
+        }
       }
     }
   }
 
   void _onSearchChanged() {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
+    _debounce = Timer(const Duration(milliseconds: 500), () {
       _loadContacts(query: _searchController.text);
     });
   }
@@ -72,12 +84,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
         builder: (context) => ContactEditScreen(initialContact: contact),
       ),
     );
-    if (result == true) {
+    if (result != null) {
       _loadContacts(query: _searchController.text);
     }
   }
 
-   void _navigateToDetailScreen(Contact contact) async {
+  void _navigateToDetailScreen(Contact contact) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -89,80 +101,68 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
   }
 
-  AppBar _buildAppBar() {
-    if (_isSearching) {
-      return AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            setState(() {
-              _isSearching = false;
-            });
-            _searchController.clear(); // Это вызовет _onSearchChanged
-          },
-        ),
-        title: TextField(
-          controller: _searchController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Поиск...',
-            border: InputBorder.none,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.clear),
-            onPressed: () {
-              if (_searchController.text.isNotEmpty) {
-                _searchController.clear();
-              }
-            },
-          )
-        ],
-      );
-    } else {
-      return AppBar(
-        title: const Text('Клиенты'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              setState(() {
-                _isSearching = true;
-              });
-            },
-          )
-        ],
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _buildAppBar(),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => _loadContacts(query: _searchController.text),
-              child: _contacts.isEmpty
-                  ? Center(child: Text(_searchController.text.isEmpty ? 'Нет клиентов' : 'Клиенты не найдены'))
-                  : ListView.builder(
-                      itemCount: _contacts.length,
-                      itemBuilder: (context, index) {
-                        final contact = _contacts[index];
-                        return ListTile(
-                          leading: CircleAvatar(child: Text(contact.name.isNotEmpty ? contact.name[0] : '?')),
-                          title: Text(contact.name),
-                          subtitle: Text(contact.phone),
-                          onTap: () => _navigateToDetailScreen(contact),
-                        );
-                      },
-                    ),
+      appBar: AppBar(
+        title: const Text('Клиенты'),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Поиск по имени или телефону...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+              ),
             ),
+          ),
+          Expanded(
+            child: _isLoading && _contacts.isEmpty // Показываем индикатор только если список еще совсем пуст
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: () => _loadContacts(query: _searchController.text),
+                    child: _contacts.isEmpty
+                        ? Center(
+                            child: Text(_searchController.text.isEmpty 
+                                ? 'Список клиентов пуст' 
+                                : 'Клиенты не найдены'))
+                        : ListView.builder(
+                            itemCount: _contacts.length,
+                            itemBuilder: (context, index) {
+                              final contact = _contacts[index];
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                                  child: Text(contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?'),
+                                ),
+                                title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(contact.phone),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => _navigateToDetailScreen(contact),
+                              );
+                            },
+                          ),
+                  ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'contacts_fab',
-        onPressed: _navigateToEditScreen,
+        onPressed: () => _navigateToEditScreen(),
         tooltip: 'Добавить клиента',
         child: const Icon(Icons.add),
       ),
