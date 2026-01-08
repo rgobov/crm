@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/features/auth/domain/user_model.dart';
+import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
 import 'package:try_neuro/features/schedule/comment_thread_screen.dart';
-import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
+import 'package:try_neuro/features/staff/data/employee_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
@@ -24,7 +27,11 @@ class AppointmentDetailScreen extends StatefulWidget {
 }
 
 class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
-  final _scheduleService = sl<ScheduleService>();
+  final _sessionService = sl<SessionService>();
+  final _managerService = sl<ManagerService>();
+  final _employeeService = sl<EmployeeService>();
+  User? _currentUser;
+
   late Appointment _appointment;
   String? _staffName;
 
@@ -32,6 +39,10 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   void initState() {
     super.initState();
     _appointment = widget.appointment;
+    _sessionService.getCurrentUser().then((user) {
+      if (mounted) setState(() => _currentUser = user);
+    });
+
     if (_appointment.staffMemberId != null) {
       try {
         _staffName = widget.staff.firstWhere((s) => s.id == _appointment.staffMemberId).name;
@@ -67,23 +78,11 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   }
 
   Future<void> _deleteAppointment() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Удалить запись?'),
-        content: const Text('Это действие нельзя будет отменить.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Удалить', style: TextStyle(color: Colors.red))),
-        ],
-      ),
+    // Эта функция потребует отдельной реализации эндпоинтов удаления
+    // в ролевых контроллерах, если она нужна.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Функция удаления пока не реализована.')),
     );
-    if (confirm == true) {
-      await _scheduleService.deleteAppointment(_appointment.id);
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
-    }
   }
 
   @override

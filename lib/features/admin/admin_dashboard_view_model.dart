@@ -1,33 +1,66 @@
-
+import 'package:flutter/material.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
+import 'package:try_neuro/features/contacts/domain/contact_model.dart';
+import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/resources/data/resource_service.dart';
-import 'package:try_neuro/features/schedule/data/schedule_service.dart';
+import 'package:try_neuro/features/resources/domain/resource_model.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
+import 'package:try_neuro/features/schedule/domain/workload_model.dart';
+import 'package:try_neuro/features/staff/data/staff_service.dart';
+import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
-// Этот класс отвечает за загрузку и подготовку данных для экрана администратора
-class AdminDashboardViewModel {
-  final ContactService _contactService = sl<ContactService>();
-  final ScheduleService _scheduleService = sl<ScheduleService>();
-  final ResourceService _resourceService = sl<ResourceService>();
+class AdminDashboardViewModel extends ChangeNotifier {
+  final StaffService _staffService = sl<StaffService>();
+  final ManagerService _managerService = sl<ManagerService>();
+  final ContactService _contactService = sl<ContactService>(); // <<< ДОБАВЛЯЕМ
+  final ResourceService _resourceService = sl<ResourceService>(); // <<< ДОБАВЛЯЕМ
 
-  // Свойства для хранения загруженных данных
-  int totalClients = 0;
-  int todaysAppointmentsCount = 0;
-  int totalResources = 0;
-  List<Appointment> todaysAppointments = [];
+  bool _isLoading = true;
+  bool get isLoading => _isLoading;
 
-  // Метод, который загружает всю информацию параллельно
+  List<StaffMember> _staff = [];
+  List<StaffMember> get staff => _staff;
+
+  List<Appointment> _todayAppointments = [];
+  List<Appointment> get todayAppointments => _todayAppointments;
+
+  List<Workload> _monthlyWorkload = [];
+  List<Workload> get monthlyWorkload => _monthlyWorkload;
+
+  List<Contact> _contacts = []; // <<< НОВОЕ ПОЛЕ
+  List<Resource> _resources = []; // <<< НОВОЕ ПОЛЕ
+
+  int get totalClients => _contacts.length;
+  int get todaysAppointmentsCount => _todayAppointments.length;
+  int get totalResources => _resources.length;
+
   Future<void> loadData() async {
-    final results = await Future.wait([
-      _contactService.getContacts(),
-      _scheduleService.getAppointmentsForDay(DateTime.now()),
-      _resourceService.getResources(),
-    ]);
+    _isLoading = true;
+    notifyListeners();
 
-    totalClients = (results[0] as List).length;
-    todaysAppointments = results[1] as List<Appointment>;
-    todaysAppointmentsCount = todaysAppointments.length;
-    totalResources = (results[2] as List).length;
+    try {
+      final now = DateTime.now();
+      // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Загружаем все данные ---
+      final results = await Future.wait([
+        _staffService.getStaff(),
+        _managerService.getAppointmentsForDay(now),
+        _managerService.getWorkloadForMonth(now.year, now.month),
+        _contactService.getContacts(),
+        _resourceService.getResources(),
+      ]);
+
+      _staff = results[0] as List<StaffMember>;
+      _todayAppointments = results[1] as List<Appointment>;
+      _monthlyWorkload = results[2] as List<Workload>;
+      _contacts = results[3] as List<Contact>;
+      _resources = results[4] as List<Resource>;
+
+    } catch (e) {
+      // Handle error
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

@@ -10,10 +10,10 @@ import 'package:try_neuro/features/contacts/domain/contact_model.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/resources/data/resource_service.dart';
 import 'package:try_neuro/features/resources/domain/resource_model.dart';
-import 'package:try_neuro/features/schedule/data/schedule_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/services/data/app_service.dart';
 import 'package:try_neuro/features/services/domain/service_model.dart';
+import 'package:try_neuro/features/staff/data/employee_service.dart';
 import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/service_locator.dart';
@@ -40,13 +40,13 @@ class AppointmentEditScreen extends StatefulWidget {
 
 class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _scheduleService = sl<ScheduleService>();
   final _contactService = sl<ContactService>();
   final _resourceService = sl<ResourceService>();
   final _staffService = sl<StaffService>();
   final _appService = sl<AppService>();
   final _sessionService = sl<SessionService>();
   final _managerService = sl<ManagerService>();
+  final _employeeService = sl<EmployeeService>();
 
   final _serviceController = TextEditingController();
   late final TextEditingController _durationController;
@@ -66,6 +66,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   bool _isSaving = false;
   User? _currentUser;
   bool get _isEditing => widget.initialAppointment != null;
+
 
   @override
   void initState() {
@@ -93,6 +94,9 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
       late final List<StaffMember> staffList;
       if (_currentUser?.role == UserRole.manager) {
         staffList = await _managerService.getStaffForSchedule();
+      } else if (_currentUser?.role == UserRole.employee) {
+        final self = await _employeeService.getMyProfile();
+        staffList = [self];
       } else {
         staffList = await _staffService.getStaff();
       }
@@ -156,20 +160,16 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
       );
 
       if (widget.initialAppointment != null) {
-        await _scheduleService.updateAppointment(newAppointment);
+        if (_currentUser?.role == UserRole.manager) {
+          await _managerService.updateAppointment(newAppointment);
+        } else {
+          await _employeeService.updateAppointment(newAppointment);
+        }
       } else {
         if (_currentUser?.role == UserRole.manager) {
           await _managerService.addAppointment(newAppointment);
         } else {
-          await _scheduleService.addAppointment(
-              date: newAppointment.date,
-              time: newAppointment.time,
-              durationInMinutes: newAppointment.durationInMinutes,
-              clientName: newAppointment.clientName,
-              service: newAppointment.service,
-              resourceId: newAppointment.resourceId,
-              staffMemberId: newAppointment.staffMemberId,
-              status: newAppointment.status);
+          await _employeeService.addAppointment(newAppointment);
         }
       }
       if (mounted) Navigator.of(context).pop(true);
