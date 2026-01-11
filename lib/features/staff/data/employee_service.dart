@@ -22,6 +22,13 @@ class EmployeeService {
     return data.map((json) => Appointment.fromJson(json)).toList();
   }
 
+  // --- НОВЫЙ МЕТОД: История визитов клиента ---
+  Future<List<Appointment>> getContactAppointments(String contactId) async {
+    final response = await _dio.get('/employee/contacts/$contactId/appointments');
+    final List<dynamic> data = response.data;
+    return data.map((json) => Appointment.fromJson(json)).toList();
+  }
+
   Future<Appointment> updateAppointment(Appointment appointment) async {
     final response = await _dio.put(
       '/employee/appointments/${appointment.id}',
@@ -30,7 +37,6 @@ class EmployeeService {
     return Appointment.fromJson(response.data);
   }
 
-  // --- НОВЫЙ МЕТОД ---
   Future<void> addAppointment(Appointment appointment) async {
     await _dio.post('/employee/appointments', data: appointment.toJson());
   }

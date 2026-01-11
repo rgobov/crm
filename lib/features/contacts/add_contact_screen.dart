@@ -15,7 +15,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
   final _contactService = sl<ContactService>();
   
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final List<TextEditingController> _phoneControllers = [TextEditingController()];
   final _emailController = TextEditingController();
   final _notesController = TextEditingController();
   
@@ -24,26 +24,54 @@ class _AddContactScreenState extends State<AddContactScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _phoneController.dispose();
+    for (var controller in _phoneControllers) {
+      controller.dispose();
+    }
     _emailController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
+  void _addPhoneField() {
+    setState(() {
+      _phoneControllers.add(TextEditingController());
+    });
+  }
+
+  void _removePhoneField(int index) {
+    if (_phoneControllers.length > 1) {
+      setState(() {
+        _phoneControllers[index].dispose();
+        _phoneControllers.removeAt(index);
+      });
+    }
+  }
+
   Future<void> _saveContact() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final phones = _phoneControllers
+        .map((c) => c.text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList();
+
+    if (phones.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Добавьте хотя бы один номер телефона')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
     try {
-      // --- ИЗМЕНЕНИЕ: Получаем созданный объект ---
       final newContact = await _contactService.addContact(
         name: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
+        phones: phones,
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       );
       if (mounted) {
-        Navigator.of(context).pop(newContact); // <<< Возвращаем объект клиента
+        Navigator.of(context).pop(newContact);
       }
     } catch (e) {
       if (mounted) {
@@ -78,17 +106,44 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 ),
                 validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя' : null,
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Телефон*',
-                  prefixIcon: Icon(Icons.phone),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Введите телефон' : null,
+              const SizedBox(height: 24),
+              
+              const Text('Телефоны*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              ..._phoneControllers.asMap().entries.map((entry) {
+                int index = entry.key;
+                TextEditingController controller = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            labelText: index == 0 ? 'Основной телефон' : 'Дополнительный',
+                            prefixIcon: const Icon(Icons.phone),
+                            border: const OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.phone,
+                          validator: (v) => index == 0 && (v == null || v.trim().isEmpty) ? 'Введите телефон' : null,
+                        ),
+                      ),
+                      if (_phoneControllers.length > 1)
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                          onPressed: () => _removePhoneField(index),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+              TextButton.icon(
+                onPressed: _addPhoneField,
+                icon: const Icon(Icons.add),
+                label: const Text('ДОБАВИТЬ НОМЕР'),
               ),
+              
               const SizedBox(height: 16),
               TextFormField(
                 controller: _emailController,
@@ -114,9 +169,10 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 onPressed: _isSaving ? null : _saveContact,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _isSaving 
-                  ? const CircularProgressIndicator() 
+                  ? const CircularProgressIndicator(color: Colors.white) 
                   : const Text('СОХРАНИТЬ КЛИЕНТА', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],

@@ -23,6 +23,13 @@ class ManagerService {
     return data.map((json) => Appointment.fromJson(json)).toList();
   }
 
+  // --- НОВЫЙ МЕТОД: История визитов клиента ---
+  Future<List<Appointment>> getContactAppointments(String contactId) async {
+    final response = await _dio.get('/manager/contacts/$contactId/appointments');
+    final List<dynamic> data = response.data;
+    return data.map((json) => Appointment.fromJson(json)).toList();
+  }
+
   Future<List<Workload>> getWorkloadForMonth(int year, int month) async {
     final response = await _dio.get('/manager/workload', queryParameters: {
       'year': year,
@@ -36,7 +43,6 @@ class ManagerService {
     await _dio.post('/manager/appointments', data: appointment.toJson());
   }
 
-  // --- НОВЫЙ МЕТОД ---
   Future<Appointment> updateAppointment(Appointment appointment) async {
     final response = await _dio.put(
       '/manager/appointments/${appointment.id}',

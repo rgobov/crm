@@ -13,7 +13,7 @@ class ContactsScreen extends StatefulWidget {
   State<ContactsScreen> createState() => _ContactsScreenState();
 }
 
-class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
+class _ContactsScreenState extends State<ContactsScreen> {
   final ContactService _contactService = sl<ContactService>();
   final _searchController = TextEditingController();
   Timer? _debounce;
@@ -29,12 +29,6 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadContacts(query: _searchController.text, silent: true);
-  }
-
-  @override
   void dispose() {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
@@ -42,12 +36,8 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
     super.dispose();
   }
 
-  Future<void> _loadContacts({String? query, bool silent = false}) async {
-    if (!silent) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
+  Future<void> _loadContacts({String? query}) async {
+    setState(() => _isLoading = true);
     try {
       final contacts = await _contactService.getContacts(query: query);
       if (mounted) {
@@ -59,9 +49,7 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (!silent) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
-        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
       }
     }
   }
@@ -118,9 +106,7 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
                         onPressed: () => _searchController.clear(),
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Colors.grey.shade100,
               ),
@@ -131,13 +117,9 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: () => _loadContacts(query: _searchController.text),
-                    // Оборачиваем только список в SelectionArea
                     child: SelectionArea(
                       child: _contacts.isEmpty
-                          ? Center(
-                              child: Text(_searchController.text.isEmpty 
-                                  ? 'Список клиентов пуст' 
-                                  : 'Клиенты не найдены'))
+                          ? Center(child: Text(_searchController.text.isEmpty ? 'Список клиентов пуст' : 'Клиенты не найдены'))
                           : ListView.builder(
                               itemCount: _contacts.length,
                               itemBuilder: (context, index) {
@@ -148,7 +130,25 @@ class _ContactsScreenState extends State<ContactsScreen> with RouteAware {
                                     child: Text(contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?'),
                                   ),
                                   title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(contact.phone),
+                                  subtitle: Row(
+                                    children: [
+                                      Text(contact.displayPhone),
+                                      if (contact.phones.length > 1) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            '+${contact.phones.length - 1}',
+                                            style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                   trailing: const Icon(Icons.chevron_right),
                                   onTap: () => _navigateToDetailScreen(contact),
                                 );

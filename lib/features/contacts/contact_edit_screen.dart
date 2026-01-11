@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
@@ -15,12 +14,12 @@ class ContactEditScreen extends StatefulWidget {
 
 class _ContactEditScreenState extends State<ContactEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _contactService = sl<ContactService>(); // <--- ИЗМЕНЕНИЕ
+  final _contactService = sl<ContactService>();
 
-  late final _nameController;
-  late final _phoneController;
-  late final _emailController;
-  late final _notesController;
+  late final TextEditingController _nameController;
+  final List<TextEditingController> _phoneControllers = [];
+  late final TextEditingController _emailController;
+  late final TextEditingController _notesController;
 
   bool _isSaving = false;
   bool get _isEditing => widget.initialContact != null;
@@ -29,48 +28,99 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialContact?.name);
-    _phoneController = TextEditingController(text: widget.initialContact?.phone);
+    
+    // Инициализируем контроллеры для всех существующих телефонов
+    if (_isEditing && widget.initialContact!.phones.isNotEmpty) {
+      for (var phone in widget.initialContact!.phones) {
+        _phoneControllers.add(TextEditingController(text: phone));
+      }
+    } else {
+      _phoneControllers.add(TextEditingController());
+    }
+
     _emailController = TextEditingController(text: widget.initialContact?.email);
     _notesController = TextEditingController(text: widget.initialContact?.notes);
   }
 
-  Future<void> _saveForm() async {
-    if (_formKey.currentState!.validate()) {
+  @override
+  void dispose() {
+    _nameController.dispose();
+    for (var controller in _phoneControllers) {
+      controller.dispose();
+    }
+    _emailController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _addPhoneField() {
+    setState(() {
+      _phoneControllers.add(TextEditingController());
+    });
+  }
+
+  void _removePhoneField(int index) {
+    if (_phoneControllers.length > 1) {
       setState(() {
-        _isSaving = true;
+        _phoneControllers[index].dispose();
+        _phoneControllers.removeAt(index);
       });
+    }
+  }
+
+  Future<void> _saveForm() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final phones = _phoneControllers
+        .map((c) => c.text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList();
+
+    if (phones.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Добавьте хотя бы один номер телефона')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final contactData = Contact(
+        id: _isEditing ? widget.initialContact!.id : '',
+        name: _nameController.text.trim(),
+        phones: phones,
+        email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      );
 
       if (_isEditing) {
-        final updatedContact = Contact(
-          id: widget.initialContact!.id,
-          name: _nameController.text,
-          phone: _phoneController.text,
-          email: _emailController.text,
-          notes: _notesController.text,
-        );
-        await _contactService.updateContact(updatedContact);
+        await _contactService.updateContact(contactData);
       } else {
         await _contactService.addContact(
-          name: _nameController.text,
-          phone: _phoneController.text,
-          email: _emailController.text,
-          notes: _notesController.text,
+          name: contactData.name,
+          phones: contactData.phones,
+          email: contactData.email,
+          notes: contactData.notes,
         );
       }
 
       if (mounted) {
         Navigator.of(context).pop(true);
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка сохранения: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _notesController.dispose();
-    super.dispose();
   }
 
   @override
@@ -102,38 +152,55 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Имя',
+                  labelText: 'Имя фамилия*',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Пожалуйста, введите имя';
-                  }
-                  return null;
-                },
+                validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя' : null,
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Телефон',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
-                ),
-                keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Пожалуйста, введите телефон';
-                  }
-                  return null;
-                },
+              const SizedBox(height: 24),
+              
+              const Text('ТЕЛЕФОНЫ*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 8),
+              ..._phoneControllers.asMap().entries.map((entry) {
+                int index = entry.key;
+                TextEditingController controller = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            labelText: index == 0 ? 'Основной телефон' : 'Дополнительный',
+                            prefixIcon: const Icon(Icons.phone),
+                            border: const OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.phone,
+                          validator: (v) => index == 0 && (v == null || v.trim().isEmpty) ? 'Введите телефон' : null,
+                        ),
+                      ),
+                      if (_phoneControllers.length > 1)
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                          onPressed: () => _removePhoneField(index),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+              TextButton.icon(
+                onPressed: _addPhoneField,
+                icon: const Icon(Icons.add),
+                label: const Text('ДОБАВИТЬ ЕЩЕ НОМЕР'),
               ),
+              
               const SizedBox(height: 16),
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email (необязательно)',
+                  labelText: 'Email',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.email),
                 ),
@@ -143,7 +210,7 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
               TextFormField(
                 controller: _notesController,
                 decoration: const InputDecoration(
-                  labelText: 'Заметки (необязательно)',
+                  labelText: 'Заметки',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.note),
                 ),

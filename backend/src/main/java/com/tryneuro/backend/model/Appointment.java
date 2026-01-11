@@ -30,6 +30,10 @@ public class Appointment {
     @Column(name = "client_name", nullable = false)
     private String clientName;
 
+    // --- НОВОЕ ПОЛЕ ---
+    @Column(name = "contact_id")
+    private String contactId;
+
     @Column(nullable = false)
     private String service;
 

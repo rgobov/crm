@@ -53,6 +53,12 @@ public class EmployeeController {
         return scheduleService.getAppointmentsForStaff(user.getTenantId(), user.getStaffId(), date);
     }
 
+    // --- НОВЫЙ ЭНДПОИНТ: История посещений клиента ---
+    @GetMapping("/contacts/{contactId}/appointments")
+    public List<Appointment> getContactAppointments(@RequestAttribute("tenantId") String tenantId, @PathVariable String contactId) {
+        return scheduleService.getAppointmentsForContact(contactId, tenantId);
+    }
+
     @PutMapping("/appointments/{id}")
     public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
         Appointment updatedAppointment = scheduleService.updateAppointment(id, appointmentDetails);

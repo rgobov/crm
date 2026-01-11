@@ -31,6 +31,11 @@ public class ScheduleService {
         return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
     }
 
+    // --- НОВЫЙ МЕТОД: История посещений клиента ---
+    public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
+        return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
+    }
+
     public List<WorkloadDto> getWorkloadForStaffAndMonth(String staffId, int year, int month) {
         return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
     }
@@ -39,7 +44,6 @@ public class ScheduleService {
         return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
     }
 
-    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Добавляем tenantId ---
     public boolean isStaffMemberAvailable(String tenantId, String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
         StaffMember staffMember = staffMemberRepository.findById(staffMemberId).orElse(null);
         if (staffMember == null || !staffMember.isAvailable()) {
@@ -63,7 +67,6 @@ public class ScheduleService {
             }
         }
 
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем правильный метод репозитория ---
         List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
         for (Appointment existingAppointment : staffAppointments) {
             if (currentAppointmentId != null && existingAppointment.getId().equals(currentAppointmentId)) {
@@ -107,12 +110,17 @@ public class ScheduleService {
         appointment.setTime(appointmentDetails.getTime());
         appointment.setDurationInMinutes(appointmentDetails.getDurationInMinutes());
         appointment.setClientName(appointmentDetails.getClientName());
+        appointment.setContactId(appointmentDetails.getContactId()); // Не забываем про новое поле
         appointment.setService(appointmentDetails.getService());
         appointment.setStaffMemberId(appointmentDetails.getStaffMemberId());
         appointment.setResourceId(appointmentDetails.getResourceId());
         appointment.setStatus(appointmentDetails.getStatus());
         appointment.setComment(appointmentDetails.getComment());
         return appointmentRepository.save(appointment);
+    }
+
+    public Appointment updateAppointment(Appointment appointmentDetails) {
+        return updateAppointment(appointmentDetails.getId(), appointmentDetails);
     }
 
     public void deleteAppointment(String id) {

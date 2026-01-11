@@ -95,7 +95,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   void _onPhoneChanged() {
     final phoneInput = _phoneSearchController.text.trim();
     
-    // 1. Если поле пустое — сбрасываем выбор клиента
     if (phoneInput.isEmpty) {
       if (_selectedContact != null) {
         setState(() => _selectedContact = null);
@@ -103,26 +102,22 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
       return;
     }
 
-    // 2. Если этот номер уже принадлежит выбранному контакту — ничего не ищем
-    if (_selectedContact != null && _selectedContact!.phone == phoneInput) {
+    // --- ИСПРАВЛЕНИЕ: Проверяем наличие номера в списке телефона выбранного контакта ---
+    if (_selectedContact != null && _selectedContact!.phones.contains(phoneInput)) {
       return;
     }
 
-    // 3. Запускаем поиск с задержкой (Debounce)
     if (_phoneDebounce?.isActive ?? false) _phoneDebounce!.cancel();
     _phoneDebounce = Timer(const Duration(milliseconds: 700), () async {
-      // Берем самое актуальное значение из контроллера внутри таймера
       final currentPhone = _phoneSearchController.text.trim();
       
       if (currentPhone.length >= 5) {
         final contact = await _contactService.findContactByPhone(currentPhone);
         
         if (contact != null && mounted) {
-          // Если за время запроса мы уже выбрали этого клиента — выходим
           if (_selectedContact?.id == contact.id) return;
 
           setState(() {
-            // Пытаемся найти контакт в уже загруженном списке или добавляем его
             final index = _contacts.indexWhere((c) => c.id == contact.id);
             if (index != -1) {
               _selectedContact = _contacts[index];
@@ -131,13 +126,12 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
               _selectedContact = contact;
             }
             
-            // Синхронизируем текст (без вызова слушателя снова)
             _phoneSearchController.removeListener(_onPhoneChanged);
-            _phoneSearchController.text = contact.phone;
+            // Ставим номер телефона из найденного контакта (тот который искали)
+            _phoneSearchController.text = currentPhone;
             _phoneSearchController.addListener(_onPhoneChanged);
           });
 
-          // Уведомляем пользователя один раз
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -188,7 +182,8 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
           
           if (_selectedContact != null) {
             _phoneSearchController.removeListener(_onPhoneChanged);
-            _phoneSearchController.text = _selectedContact!.phone;
+            // --- ИСПРАВЛЕНИЕ: Используем displayPhone ---
+            _phoneSearchController.text = _selectedContact!.displayPhone;
             _phoneSearchController.addListener(_onPhoneChanged);
           }
         } catch (e) { /* ignore */ }
@@ -225,6 +220,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
         time: _selectedTime!,
         durationInMinutes: int.tryParse(_durationController.text) ?? 60,
         clientName: _selectedContact!.name,
+        contactId: _selectedContact!.id, // Сохраняем ID клиента
         service: _serviceController.text,
         resourceId: _selectedResource?.id,
         staffMemberId: _selectedStaffMember?.id,
@@ -330,7 +326,8 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
         _selectedContact = result;
         
         _phoneSearchController.removeListener(_onPhoneChanged);
-        _phoneSearchController.text = result.phone;
+        // --- ИСПРАВЛЕНИЕ: Используем displayPhone ---
+        _phoneSearchController.text = result.displayPhone;
         _phoneSearchController.addListener(_onPhoneChanged);
       });
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -396,7 +393,8 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                                   setState(() {
                                     _selectedContact = v;
                                     _phoneSearchController.removeListener(_onPhoneChanged);
-                                    _phoneSearchController.text = v.phone;
+                                    // --- ИСПРАВЛЕНИЕ: Используем displayPhone ---
+                                    _phoneSearchController.text = v.displayPhone;
                                     _phoneSearchController.addListener(_onPhoneChanged);
                                   });
                                 }

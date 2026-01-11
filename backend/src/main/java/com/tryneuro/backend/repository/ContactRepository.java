@@ -13,11 +13,13 @@ import java.util.Optional;
 public interface ContactRepository extends JpaRepository<Contact, String> {
     List<Contact> findByTenantId(String tenantId);
     
-    Optional<Contact> findByPhoneAndTenantId(String phone, String tenantId);
+    // Поиск по конкретному номеру телефона в массиве
+    @Query(value = "SELECT * FROM contacts WHERE tenant_id = :tenantId AND :phone = ANY(phones)", nativeQuery = true)
+    Optional<Contact> findByPhoneAndTenantId(@Param("phone") String phone, @Param("tenantId") String tenantId);
 
-    // Поиск по имени ИЛИ телефону (игнорируя регистр и небуквенные символы в телефоне для гибкости)
-    @Query("SELECT c FROM Contact c WHERE c.tenantId = :tenantId AND (" +
-           "LOWER(c.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "c.phone LIKE CONCAT('%', :query, '%'))")
+    // Поиск по части имени или по любому из номеров в массиве
+    @Query(value = "SELECT * FROM contacts WHERE tenant_id = :tenantId AND (" +
+           "LOWER(name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "EXISTS (SELECT 1 FROM unnest(phones) AS p WHERE p LIKE CONCAT('%', :query, '%')))", nativeQuery = true)
     List<Contact> searchContacts(@Param("tenantId") String tenantId, @Param("query") String query);
 }

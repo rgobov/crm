@@ -4,6 +4,11 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "contacts")
@@ -18,8 +23,10 @@ public class Contact {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
-    private String phone;
+    // --- ИЗМЕНЕНИЕ: Теперь это массив телефонов ---
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "phones", nullable = false, columnDefinition = "text[]")
+    private List<String> phones = new ArrayList<>();
 
     private String email;
 

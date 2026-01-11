@@ -41,6 +41,12 @@ public class ManagerController {
         return scheduleService.getAppointmentsForDay(date, tenantId);
     }
 
+    // --- НОВЫЙ ЭНДПОИНТ: История посещений клиента ---
+    @GetMapping("/contacts/{contactId}/appointments")
+    public List<Appointment> getContactAppointments(@RequestAttribute("tenantId") String tenantId, @PathVariable String contactId) {
+        return scheduleService.getAppointmentsForContact(contactId, tenantId);
+    }
+
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, @RequestParam int year, @RequestParam int month) {
         return scheduleService.getWorkloadForMonth(tenantId, year, month);

@@ -18,6 +18,7 @@ class Appointment {
   final TimeOfDay time;
   final int durationInMinutes;
   final String clientName;
+  final String? contactId; // --- НОВОЕ ПОЛЕ ---
   final String service;
   final String? resourceId;
   final String? staffMemberId;
@@ -30,6 +31,7 @@ class Appointment {
     required this.time,
     required this.durationInMinutes,
     required this.clientName,
+    this.contactId, // --- НОВОЕ ПОЛЕ ---
     required this.service,
     this.resourceId,
     this.staffMemberId,
@@ -44,6 +46,7 @@ class Appointment {
       time: _parseTime(json['time'] as String),
       durationInMinutes: json['durationInMinutes'],
       clientName: json['clientName'],
+      contactId: json['contactId'], // --- НОВОЕ ПОЛЕ ---
       service: json['service'],
       resourceId: json['resourceId'],
       staffMemberId: json['staffMemberId'],
@@ -62,6 +65,7 @@ class Appointment {
       'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00',
       'durationInMinutes': durationInMinutes,
       'clientName': clientName,
+      'contactId': contactId, // --- НОВОЕ ПОЛЕ ---
       'service': service,
       'resourceId': resourceId,
       'staffMemberId': staffMemberId,
@@ -70,7 +74,6 @@ class Appointment {
     };
   }
 
-  // --- НОВЫЙ МЕТОД ---
   Appointment copyWith({AppointmentStatus? status}) {
     return Appointment(
       id: id,
@@ -78,6 +81,7 @@ class Appointment {
       time: time,
       durationInMinutes: durationInMinutes,
       clientName: clientName,
+      contactId: contactId,
       service: service,
       resourceId: resourceId,
       staffMemberId: staffMemberId,

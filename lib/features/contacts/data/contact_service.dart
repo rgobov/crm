@@ -26,16 +26,15 @@ class ContactService {
     }
   }
 
-  // --- ИЗМЕНЕНИЕ: Возвращаем объект Contact ---
   Future<Contact> addContact({
     required String name,
-    required String phone,
+    required List<String> phones, // --- ИЗМЕНЕНИЕ: Список ---
     String? email,
     String? notes,
   }) async {
     final response = await _dio.post('/contacts', data: {
       'name': name,
-      'phone': phone,
+      'phones': phones, // Отправляем как массив
       'email': email,
       'notes': notes,
     });
