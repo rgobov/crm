@@ -41,12 +41,6 @@ public class ManagerController {
         return scheduleService.getAppointmentsForDay(date, tenantId);
     }
 
-    // --- НОВЫЙ ЭНДПОИНТ: История посещений клиента ---
-    @GetMapping("/contacts/{contactId}/appointments")
-    public List<Appointment> getContactAppointments(@RequestAttribute("tenantId") String tenantId, @PathVariable String contactId) {
-        return scheduleService.getAppointmentsForContact(contactId, tenantId);
-    }
-
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, @RequestParam int year, @RequestParam int month) {
         return scheduleService.getWorkloadForMonth(tenantId, year, month);
@@ -54,7 +48,11 @@ public class ManagerController {
 
     @GetMapping("/schedule/staff")
     public List<StaffMember> getStaffForSchedule(@RequestAttribute("tenantId") String tenantId) {
-        return staffMemberService.getAllStaff(tenantId);
+        // --- ИЗМЕНЕНИЕ: Возвращаем только рядовых сотрудников ---
+        List<StaffMember> allStaff = staffMemberService.getAllStaff(tenantId);
+        return allStaff.stream()
+                .filter(staff -> "EMPLOYEE".equals(staff.getRole()))
+                .collect(Collectors.toList());
     }
 
     @PostMapping("/appointments")
