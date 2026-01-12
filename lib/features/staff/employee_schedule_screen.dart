@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/network/time_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
@@ -19,8 +20,9 @@ class EmployeeScheduleScreen extends StatefulWidget {
 
 class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
   final EmployeeService _employeeService = sl<EmployeeService>();
+  final TimeService _timeService = sl<TimeService>(); // <<< ДОБАВЛЯЕМ
 
-  DateTime _selectedDay = DateTime.now();
+  late DateTime _selectedDay;
   List<Appointment> _appointmentsForDay = [];
   List<StaffMember> _self = [];
   bool _isLoading = true;
@@ -28,6 +30,8 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
   @override
   void initState() {
     super.initState();
+    // --- ИЗМЕНЕНИЕ: Используем серверное время ---
+    _selectedDay = _timeService.now();
     _loadData();
   }
 
@@ -55,7 +59,6 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
     }
   }
 
-  // --- НОВЫЙ МЕТОД ДЛЯ ЛОКАЛЬНОГО ОБНОВЛЕНИЯ ---
   void _onAppointmentUpdated(Appointment updatedAppointment) {
     setState(() {
       final index = _appointmentsForDay.indexWhere((a) => a.id == updatedAppointment.id);
@@ -120,7 +123,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
                     staff: _self,
                     onAppointmentTap: _navigateToDetail,
                     onEmptySlotTap: _onEmptySlotTap,
-                    onAppointmentUpdated: _onAppointmentUpdated, // <<< ПЕРЕДАЕМ ФУНКЦИЮ
+                    onAppointmentUpdated: _onAppointmentUpdated,
                   ),
           ),
           const Divider(height: 1),

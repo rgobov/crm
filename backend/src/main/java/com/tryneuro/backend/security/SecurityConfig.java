@@ -41,7 +41,8 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/api/companies/**").permitAll()
+                // Разрешаем системные эндпоинты, регистрацию и логин всем
+                .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**").permitAll() // <<< ИСПРАВЛЕНИЕ ТУТ
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/manager/**").hasRole("MANAGER")
                 .requestMatchers("/api/employee/**").hasRole("EMPLOYEE")
@@ -49,14 +50,12 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Регистрируем наш AuthenticationProvider ---
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
     }
     
-    // --- НОВЫЙ БИН: Явно создаем провайдер аутентификации ---
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();

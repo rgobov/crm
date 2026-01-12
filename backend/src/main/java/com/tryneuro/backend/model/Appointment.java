@@ -4,9 +4,11 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "appointments")
@@ -30,7 +32,6 @@ public class Appointment {
     @Column(name = "client_name", nullable = false)
     private String clientName;
 
-    // --- НОВОЕ ПОЛЕ ---
     @Column(name = "contact_id")
     private String contactId;
 
@@ -50,4 +51,9 @@ public class Appointment {
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
+
+    // --- НОВОЕ ПОЛЕ: Мировое время создания записи ---
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
 }

@@ -2,19 +2,26 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:try_neuro/core/network/time_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/core/offline/sync_service.dart';
 import 'package:try_neuro/features/auth/login_screen.dart';
 import 'package:try_neuro/service_locator.dart';
 
 void main() {
-  // ПРАВИЛЬНАЯ СТРУКТУРА
   runZonedGuarded(() async {
-    // Вся асинхронная инициализация должна быть ВНУТРИ runZonedGuarded
     WidgetsFlutterBinding.ensureInitialized();
     setupServiceLocator();
+    
+    // Сначала запускаем фоновые сервисы
     sl<SyncService>().start();
+    
+    // Синхронизируем время с сервером
+    await sl<TimeService>().sync();
+    
     await initializeDateFormatting('ru_RU', null);
+    Intl.defaultLocale = 'ru_RU';
     
     runApp(const MyApp());
 
@@ -31,6 +38,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CRM',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,

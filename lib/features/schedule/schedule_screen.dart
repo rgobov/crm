@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/network/time_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
@@ -18,6 +19,7 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final ManagerService _managerService = sl<ManagerService>();
+  final TimeService _timeService = sl<TimeService>(); // <<< ДОБАВЛЯЕМ
 
   late DateTime _selectedDay;
   List<Appointment> _appointmentsForDay = [];
@@ -27,7 +29,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDay = widget.initialDate ?? DateTime.now();
+    // --- ИЗМЕНЕНИЕ: Используем серверное время ---
+    _selectedDay = widget.initialDate ?? _timeService.now();
     _loadData();
   }
 
@@ -44,7 +47,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         setState(() {
           _appointmentsForDay = results[0] as List<Appointment>;
           final allStaff = results[1] as List<StaffMember>;
-          // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Добавляем фильтрацию на клиенте для надежности ---
           _staff = allStaff.where((s) => s.role == 'EMPLOYEE').toList(); 
           _isLoading = false;
         });

@@ -18,12 +18,14 @@ class Appointment {
   final TimeOfDay time;
   final int durationInMinutes;
   final String clientName;
-  final String? contactId; // --- НОВОЕ ПОЛЕ ---
+  final String? contactId;
   final String service;
   final String? resourceId;
   final String? staffMemberId;
   final AppointmentStatus status;
   final String? tenantId;
+  // --- НОВОЕ ПОЛЕ: Мировое время создания ---
+  final DateTime? createdAt;
 
   Appointment({
     required this.id,
@@ -31,12 +33,13 @@ class Appointment {
     required this.time,
     required this.durationInMinutes,
     required this.clientName,
-    this.contactId, // --- НОВОЕ ПОЛЕ ---
+    this.contactId,
     required this.service,
     this.resourceId,
     this.staffMemberId,
     required this.status,
     this.tenantId,
+    this.createdAt,
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
@@ -46,7 +49,7 @@ class Appointment {
       time: _parseTime(json['time'] as String),
       durationInMinutes: json['durationInMinutes'],
       clientName: json['clientName'],
-      contactId: json['contactId'], // --- НОВОЕ ПОЛЕ ---
+      contactId: json['contactId'],
       service: json['service'],
       resourceId: json['resourceId'],
       staffMemberId: json['staffMemberId'],
@@ -55,6 +58,8 @@ class Appointment {
         orElse: () => AppointmentStatus.scheduled,
       ),
       tenantId: json['tenantId'],
+      // Парсим createdAt из формата ISO 8601
+      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt'] as String) : null,
     );
   }
 
@@ -65,12 +70,13 @@ class Appointment {
       'time': '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00',
       'durationInMinutes': durationInMinutes,
       'clientName': clientName,
-      'contactId': contactId, // --- НОВОЕ ПОЛЕ ---
+      'contactId': contactId,
       'service': service,
       'resourceId': resourceId,
       'staffMemberId': staffMemberId,
       'status': status.name.toUpperCase(),
       'tenantId': tenantId,
+      // Мы не отправляем createdAt на сервер (он генерируется там автоматически)
     };
   }
 
@@ -87,6 +93,7 @@ class Appointment {
       staffMemberId: staffMemberId,
       status: status ?? this.status,
       tenantId: tenantId,
+      createdAt: createdAt,
     );
   }
 }

@@ -60,7 +60,7 @@ class _CommentThreadScreenState extends State<CommentThreadScreen> {
         await _employeeService.addComment(widget.appointmentId, text);
       }
       _textController.clear();
-      _loadData(); // Перезагружаем комментарии
+      _loadData();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка отправки: ${e.toString()}')));
@@ -126,6 +126,7 @@ class _CommentThreadScreenState extends State<CommentThreadScreen> {
             child: Text(comment.text),
           ),
           const SizedBox(height: 2),
+          // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем .toLocal() ---
           Text(
             '${comment.authorName} • ${DateFormat.Hm().format(comment.createdAt.toLocal())}',
             style: Theme.of(context).textTheme.bodySmall,
@@ -135,7 +136,6 @@ class _CommentThreadScreenState extends State<CommentThreadScreen> {
     );
   }
 
-  // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
   Widget _buildMessageInput() {
     return Container(
       padding: const EdgeInsets.all(8.0),
@@ -148,11 +148,11 @@ class _CommentThreadScreenState extends State<CommentThreadScreen> {
               decoration: const InputDecoration(
                 hintText: 'Введите комментарий...', 
                 border: InputBorder.none,
-                counterText: "", // Убираем стандартный счетчик, чтобы не мешал
+                counterText: "",
               ),
               maxLines: 3,
               minLines: 1,
-              maxLength: 500, // <<< ДОБАВЛЯЕМ ОГРАНИЧЕНИЕ
+              maxLength: 500,
             ),
           ),
           IconButton(

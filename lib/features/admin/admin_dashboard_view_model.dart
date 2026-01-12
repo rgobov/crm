@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/network/time_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
@@ -13,8 +14,9 @@ import 'package:try_neuro/service_locator.dart';
 class AdminDashboardViewModel extends ChangeNotifier {
   final StaffService _staffService = sl<StaffService>();
   final ManagerService _managerService = sl<ManagerService>();
-  final ContactService _contactService = sl<ContactService>(); // <<< ДОБАВЛЯЕМ
-  final ResourceService _resourceService = sl<ResourceService>(); // <<< ДОБАВЛЯЕМ
+  final ContactService _contactService = sl<ContactService>();
+  final ResourceService _resourceService = sl<ResourceService>();
+  final TimeService _timeService = sl<TimeService>(); // <<< ДОБАВЛЯЕМ
 
   bool _isLoading = true;
   bool get isLoading => _isLoading;
@@ -28,8 +30,8 @@ class AdminDashboardViewModel extends ChangeNotifier {
   List<Workload> _monthlyWorkload = [];
   List<Workload> get monthlyWorkload => _monthlyWorkload;
 
-  List<Contact> _contacts = []; // <<< НОВОЕ ПОЛЕ
-  List<Resource> _resources = []; // <<< НОВОЕ ПОЛЕ
+  List<Contact> _contacts = []; 
+  List<Resource> _resources = []; 
 
   int get totalClients => _contacts.length;
   int get todaysAppointmentsCount => _todayAppointments.length;
@@ -40,8 +42,9 @@ class AdminDashboardViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final now = DateTime.now();
-      // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Загружаем все данные ---
+      // --- ИЗМЕНЕНИЕ: Используем серверное время ---
+      final now = _timeService.now();
+      
       final results = await Future.wait([
         _staffService.getStaff(),
         _managerService.getAppointmentsForDay(now),

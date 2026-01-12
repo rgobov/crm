@@ -1,5 +1,3 @@
-import 'package:intl/intl.dart';
-
 class AppointmentComment {
   final String id;
   final String appointmentId;
@@ -19,12 +17,12 @@ class AppointmentComment {
 
   factory AppointmentComment.fromJson(Map<String, dynamic> json) {
     return AppointmentComment(
-      id: json['id'],
-      appointmentId: json['appointmentId'],
-      authorId: json['authorId'],
-      authorName: json['authorName'],
-      text: json['text'],
-      // Парсим дату из строки ISO 8601
+      id: json['id'] as String,
+      appointmentId: json['appointmentId'] as String,
+      authorId: json['authorId'] as String,
+      authorName: json['authorName'] as String,
+      text: json['text'] as String,
+      // DateTime.parse понимает формат ISO 8601 с часовым поясом (Z или +HH:mm)
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }

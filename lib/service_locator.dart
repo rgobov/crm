@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:try_neuro/core/network/http_client.dart';
+import 'package:try_neuro/core/network/time_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/core/session/token_storage.dart';
 import 'package:try_neuro/core/offline/offline_queue_service.dart';
@@ -20,6 +21,7 @@ void setupServiceLocator() {
   // Core сервисы
   sl.registerLazySingleton(() => SessionService());
   sl.registerLazySingleton(() => HttpClient());
+  sl.registerLazySingleton(() => TimeService()); // <<< РЕГИСТРАЦИЯ
 
   // Feature сервисы
   sl.registerLazySingleton(() => AuthService());
