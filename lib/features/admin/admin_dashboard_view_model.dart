@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/network/time_service.dart';
-import 'package:try_neuro/core/session/session_service.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
-import 'package:try_neuro/features/contacts/domain/contact_model.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/resources/data/resource_service.dart';
 import 'package:try_neuro/features/resources/domain/resource_model.dart';
@@ -19,7 +18,7 @@ class AdminDashboardViewModel extends ChangeNotifier {
   final ContactService _contactService = sl<ContactService>();
   final ResourceService _resourceService = sl<ResourceService>();
   final TimeService _timeService = sl<TimeService>();
-  final SessionService _sessionService = sl<SessionService>(); // <<< ДОБАВЛЯЕМ
+  final SessionService _sessionService = sl<SessionService>();
 
   bool _isLoading = true;
   bool get isLoading => _isLoading;
@@ -33,10 +32,11 @@ class AdminDashboardViewModel extends ChangeNotifier {
   List<Workload> _monthlyWorkload = [];
   List<Workload> get monthlyWorkload => _monthlyWorkload;
 
-  List<Contact> _contacts = []; 
-  List<Resource> _resources = []; 
+  // Мы больше не храним список всех клиентов здесь для экономии памяти
+  int _totalClientsCount = 0;
+  int get totalClients => _totalClientsCount;
 
-  int get totalClients => _contacts.length;
+  List<Resource> _resources = []; 
   int get todaysAppointmentsCount => _todayAppointments.length;
   int get totalResources => _resources.length;
 
@@ -48,23 +48,22 @@ class AdminDashboardViewModel extends ChangeNotifier {
       final user = await _sessionService.getCurrentUser();
       final now = _timeService.now();
       
-      // Определяем, какой сервис использовать для загрузки сотрудников
       final Future<List<StaffMember>> staffFuture = (user?.role == UserRole.admin) 
           ? _staffService.getStaff() 
           : _managerService.getStaffForSchedule();
 
       final results = await Future.wait([
-        staffFuture, // Динамический выбор сервиса
+        staffFuture,
         _managerService.getAppointmentsForDay(now),
         _managerService.getWorkloadForMonth(now.year, now.month),
-        _contactService.getContacts(),
+        _contactService.getContactsCount(), // <<< ОПТИМИЗИРОВАНО: Запрашиваем только число
         _resourceService.getResources(),
       ]);
 
       _staff = results[0] as List<StaffMember>;
       _todayAppointments = results[1] as List<Appointment>;
       _monthlyWorkload = results[2] as List<Workload>;
-      _contacts = results[3] as List<Contact>;
+      _totalClientsCount = results[3] as int; // <<< ОПТИМИЗИРОВАНО
       _resources = results[4] as List<Resource>;
 
     } catch (e) {

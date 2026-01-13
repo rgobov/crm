@@ -5,44 +5,41 @@ import 'package:try_neuro/service_locator.dart';
 
 class ContactService {
   final Dio _dio = sl<HttpClient>().dio;
-  
-  bool isOnline = true;
 
   Future<List<Contact>> getContacts({String? query}) async {
-    final response = await _dio.get('/contacts', queryParameters: {
-      if (query != null && query.isNotEmpty) 'query': query,
-    });
+    final response = await _dio.get('/contacts', queryParameters: query != null ? {'query': query} : null);
     final List<dynamic> data = response.data;
-    return data.map((json) => Contact.fromJson(json as Map<String, dynamic>)).toList();
+    return data.map((json) => Contact.fromJson(json)).toList();
+  }
+
+  // --- НОВОЕ: Экономный запрос количества клиентов ---
+  Future<int> getContactsCount() async {
+    final response = await _dio.get('/contacts/count');
+    return response.data as int;
   }
 
   Future<Contact?> findContactByPhone(String phone) async {
     try {
       final response = await _dio.get('/contacts/by-phone', queryParameters: {'phone': phone});
-      return Contact.fromJson(response.data as Map<String, dynamic>);
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 404) return null;
-      rethrow;
+      return Contact.fromJson(response.data);
+    } catch (e) {
+      return null;
     }
   }
 
-  Future<Contact> addContact({
-    required String name,
-    required List<String> phones, // --- ИЗМЕНЕНИЕ: Список ---
-    String? email,
-    String? notes,
-  }) async {
+  Future<Contact> addContact({required String name, required List<String> phones, String? email, String? notes}) async {
     final response = await _dio.post('/contacts', data: {
       'name': name,
-      'phones': phones, // Отправляем как массив
+      'phones': phones,
       'email': email,
       'notes': notes,
     });
-    return Contact.fromJson(response.data as Map<String, dynamic>);
+    return Contact.fromJson(response.data);
   }
 
-  Future<void> updateContact(Contact contact) async {
-    await _dio.put('/contacts/${contact.id}', data: contact.toJson());
+  Future<Contact> updateContact(Contact contact) async {
+    final response = await _dio.put('/contacts/${contact.id}', data: contact.toJson());
+    return Contact.fromJson(response.data);
   }
 
   Future<void> deleteContact(String id) async {

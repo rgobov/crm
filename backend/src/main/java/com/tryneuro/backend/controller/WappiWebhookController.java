@@ -22,18 +22,30 @@ public class WappiWebhookController {
 
     @PostMapping
     public void handleWappiEvent(@RequestBody Map<String, Object> payload) {
-        // Логируем только важные события, чтобы не захламлять консоль
+        // Извлекаем данные сообщения
         Map<String, Object> data = (Map<String, Object>) payload.get("data");
         if (data == null) return;
 
-        String buttonId = (String) data.get("button_id");
         String phone = (String) data.get("sender");
+        String messageBody = (String) data.get("body");
 
-        if (buttonId == null || phone == null) return;
+        if (phone == null || messageBody == null) return;
 
-        System.out.println("DEBUG: Wappi Webhook - Button '" + buttonId + "' clicked by " + phone);
+        // --- ЛОГИКА РАСПОЗНАВАНИЯ КОМАНД ---
+        // Ищем в тексте сообщения наши команды или простые ответы
+        boolean isConfirm = messageBody.contains("/confirm") || 
+                           messageBody.equalsIgnoreCase("Да") || 
+                           messageBody.equalsIgnoreCase("Подтверждаю");
+        
+        boolean isCancel = messageBody.contains("/cancel") || 
+                          messageBody.equalsIgnoreCase("Нет") || 
+                          messageBody.equalsIgnoreCase("Отмена");
 
-        // Поиск контакта по любому из номеров в массиве
+        if (!isConfirm && !isCancel) return;
+
+        System.out.println("DEBUG: Webhook - Processed signal from " + phone + ". Action: " + (isConfirm ? "CONFIRM" : "CANCEL"));
+
+        // Ищем клиента по номеру телефона
         List<Contact> allContacts = contactRepository.findAll();
         Optional<Contact> contactOpt = allContacts.stream()
                 .filter(c -> c.getPhones().stream().anyMatch(p -> p.replaceAll("[^0-9]", "").equals(phone)))
@@ -41,18 +53,20 @@ public class WappiWebhookController {
 
         if (contactOpt.isPresent()) {
             Contact contact = contactOpt.get();
-            // Находим последнюю запись клиента (по которой пришло напоминание)
+            // Находим последнюю запись этого клиента
             List<Appointment> apps = appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contact.getId(), contact.getTenantId());
             
             if (!apps.isEmpty()) {
                 Appointment latestApp = apps.get(0);
-                if ("confirm".equals(buttonId)) {
+                
+                if (isConfirm) {
                     latestApp.setStatus(AppointmentStatus.CONFIRMED);
-                } else if ("cancel".equals(buttonId)) {
+                } else {
                     latestApp.setStatus(AppointmentStatus.NEEDS_CALL);
                 }
+                
                 appointmentRepository.save(latestApp);
-                System.out.println("SUCCESS: Appointment status updated to " + latestApp.getStatus() + " for " + contact.getName());
+                System.out.println("SUCCESS: Status updated for " + contact.getName());
             }
         }
     }

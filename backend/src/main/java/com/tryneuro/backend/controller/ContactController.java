@@ -1,11 +1,9 @@
 package com.tryneuro.backend.controller;
 
 import com.tryneuro.backend.model.Contact;
-import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.service.ContactService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,6 +11,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/contacts")
 public class ContactController {
+
     private final ContactService contactService;
 
     @Autowired
@@ -21,30 +20,36 @@ public class ContactController {
     }
 
     @GetMapping
-    public List<Contact> getAllContacts(@AuthenticationPrincipal User user, 
-                                        @RequestParam(required = false) String query) {
-        return contactService.getAllContacts(user.getTenantId(), query);
+    public List<Contact> getAllContacts(@RequestAttribute("tenantId") String tenantId, @RequestParam(required = false) String query) {
+        return contactService.getAllContacts(tenantId, query);
+    }
+
+    // --- НОВОЕ: Эндпоинт для подсчета клиентов ---
+    @GetMapping("/count")
+    public long getContactsCount(@RequestAttribute("tenantId") String tenantId) {
+        return contactService.countContacts(tenantId);
     }
 
     @GetMapping("/by-phone")
-    public ResponseEntity<Contact> getContactByPhone(@RequestParam String phone, @AuthenticationPrincipal User user) {
-        return contactService.findContactByPhone(phone, user.getTenantId())
+    public ResponseEntity<Contact> findByPhone(@RequestAttribute("tenantId") String tenantId, @RequestParam String phone) {
+        return contactService.findContactByPhone(phone, tenantId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public Contact createContact(@RequestBody Contact contact, @AuthenticationPrincipal User user) {
-        return contactService.addContact(contact, user.getTenantId());
+    public Contact addContact(@RequestBody Contact contact, @RequestAttribute("tenantId") String tenantId) {
+        return contactService.addContact(contact, tenantId);
     }
 
     @PutMapping("/{id}")
-    public Contact updateContact(@PathVariable String id, @RequestBody Contact contact, @AuthenticationPrincipal User user) {
-        return contactService.updateContact(id, contact, user.getTenantId());
+    public Contact updateContact(@PathVariable String id, @RequestBody Contact contact, @RequestAttribute("tenantId") String tenantId) {
+        return contactService.updateContact(id, contact, tenantId);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteContact(@PathVariable String id) {
+    public ResponseEntity<Void> deleteContact(@PathVariable String id) {
         contactService.deleteContact(id);
+        return ResponseEntity.ok().build();
     }
 }

@@ -98,7 +98,8 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
   }
 
   Future<void> _sendTest() async {
-    final TextEditingController phoneCtrl = TextEditingController();
+    // --- ИЗМЕНЕНИЕ: Захардкодили номер в контроллер по умолчанию ---
+    final TextEditingController phoneCtrl = TextEditingController(text: PhoneUtils.format('79122488565'));
     
     final phone = await showDialog<String>(
       context: context,
@@ -107,11 +108,15 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Введите ваш номер телефона (только цифры) для получения тестового сообщения:'),
+            const Text('Введите номер телефона для получения тестового сообщения:'),
             const SizedBox(height: 16),
             TextField(
               controller: phoneCtrl,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: '79991234567'),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(), 
+                hintText: '+7 (___) ___-__-__',
+                helperText: 'Номер можно изменить или стереть',
+              ),
               keyboardType: TextInputType.phone,
               inputFormatters: [RussianPhoneInputFormatter()],
             ),
@@ -237,7 +242,6 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
                       decoration: const InputDecoration(labelText: 'Мессенджер', border: OutlineInputBorder()),
                       items: const [
                         DropdownMenuItem(value: 'TELEGRAM', child: Text('Telegram')),
-                        DropdownMenuItem(value: 'WHATSAPP', child: Text('WhatsApp')),
                       ],
                       onChanged: (val) => setState(() => _messengerType = val!),
                     ),

@@ -22,9 +22,7 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.security.cert.X509Certificate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -33,6 +31,8 @@ public class WappiService {
 
     private final WappiSettingsRepository settingsRepository;
     private final StaffMemberRepository staffMemberRepository;
+    
+    // Создаем RestTemplate с обходом SSL и Hostname для локальных тестов
     private final RestTemplate restTemplate = createUnsecureRestTemplate();
 
     public WappiSettings saveSettings(String tenantId, WappiSettings newSettings) {
@@ -59,8 +59,8 @@ public class WappiService {
         WappiSettings settings = settingsRepository.findByTenantId(tenantId)
                 .orElseThrow(() -> new RuntimeException("Настройки не найдены"));
         
-        String testText = "🚀 Тестовое асинхронное сообщение с кнопками (TAPI).";
-        sendToWappiTelegramAsync(settings, phone.replaceAll("[^0-9]", ""), testText);
+        String testText = "🚀 Тестовое сообщение. Нажмите на /confirm для проверки связи!";
+        sendToWappiTAPI(settings, phone.replaceAll("[^0-9]", ""), testText);
     }
 
     public void sendReminder(Appointment appointment, Contact contact) {
@@ -73,7 +73,7 @@ public class WappiService {
         if (contact.getPhones().isEmpty()) return;
         
         String phone = contact.getPhones().get(0).replaceAll("[^0-9]", "");
-        sendToWappiTelegramAsync(settings, phone, message);
+        sendToWappiTAPI(settings, phone, message);
     }
 
     private String buildMessage(Appointment appointment, Contact contact, String template) {
@@ -88,8 +88,11 @@ public class WappiService {
                 .replace("{master}", masterName);
     }
 
-    private void sendToWappiTelegramAsync(WappiSettings settings, String phone, String text) {
-        // --- ПРАВИЛЬНЫЙ URL ДЛЯ TELEGRAM ASYNC (TAPI) ---
+    private void sendToWappiTAPI(WappiSettings settings, String phone, String text) {
+        // Добавляем «команды-кнопки» в конец сообщения
+        String finalMessage = text + "\n\n✅ Подтвердить: /confirm\n❌ Отмена: /cancel";
+
+        // Используем асинхронный эндпоинт TAPI для текста
         String url = UriComponentsBuilder.fromHttpUrl("https://api.wappi.pro/tapi/async/message/send")
                 .queryParam("profile_id", settings.getProfileId())
                 .queryParam("timeout_from", 1)
@@ -100,32 +103,22 @@ public class WappiService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Authorization", settings.getApiKey());
 
-        // Формируем структуру кнопок (reply_markup для Telegram)
-        Map<String, Object> replyMarkup = new HashMap<>();
-        List<List<Map<String, String>>> inlineKeyboard = new ArrayList<>();
-        List<Map<String, String>> row = new ArrayList<>();
-        row.add(Map.of("text", "✅ Подтверждаю", "callback_data", "confirm"));
-        row.add(Map.of("text", "❌ Отмена/Перенос", "callback_data", "cancel"));
-        inlineKeyboard.add(row);
-        replyMarkup.put("inline_keyboard", inlineKeyboard);
-
         Map<String, Object> body = new HashMap<>();
         body.put("recipient", phone);
-        body.put("body", text);
-        body.put("reply_markup", replyMarkup);
+        body.put("body", finalMessage);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        System.out.println("DEBUG: Sending TAPI Message via URL: " + url);
+        System.out.println("DEBUG: Sending TAPI text command to: " + phone);
         
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
             System.out.println("DEBUG: Wappi Response: " + response.getStatusCode());
         } catch (HttpStatusCodeException e) {
-            System.err.println("DEBUG: Wappi API Error " + e.getStatusCode() + ": " + e.getResponseBodyAsString());
-            throw new RuntimeException("Wappi error: " + e.getStatusCode());
+            System.err.println("DEBUG: Wappi API Error: " + e.getResponseBodyAsString());
+            throw new RuntimeException("TAPI error: " + e.getStatusCode());
         } catch (Exception e) {
             System.err.println("DEBUG: Connection Error: " + e.getMessage());
-            throw new RuntimeException("Connection error: " + e.getMessage());
+            throw new RuntimeException("Connection error");
         }
     }
 

@@ -38,13 +38,12 @@ class SyncService {
 
     print('Начинаю синхронизацию. Операций в очереди: ${operations.length}');
 
-    _contactService.isOnline = true;
+    // --- УДАЛЕНО: _contactService.isOnline = true; (Метод отсутствует в ContactService) ---
 
     for (final op in operations) {
       try {
         if (op.type == 'add_contact') {
-          // --- ИСПРАВЛЕНИЕ: Передаем список телефонов ---
-          // Если в офлайн-очереди лежит один телефон, оборачиваем его в список
+          // Гарантируем, что телефоны передаются как список
           final dynamic phoneData = op.data['phones'] ?? [op.data['phone']];
           final List<String> phones = (phoneData is List) 
               ? List<String>.from(phoneData) 

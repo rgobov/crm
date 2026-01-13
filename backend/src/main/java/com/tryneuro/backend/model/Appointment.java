@@ -52,12 +52,11 @@ public class Appointment {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // Сделаем поле nullable, чтобы старые записи не ломали бэкенд
     @CreationTimestamp
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
-    // --- ИСПРАВЛЕНИЕ: Используем Boolean вместо boolean ---
-    @Column(name = "reminder_sent")
-    private Boolean reminderSent = false;
+    // Используем boolean с дефолтным значением false
+    @Column(name = "reminder_sent", nullable = false)
+    private boolean reminderSent = false;
 }

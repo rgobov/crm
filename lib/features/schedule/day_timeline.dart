@@ -316,8 +316,11 @@ class _DayTimelineState extends State<DayTimeline> {
     final double actualHeight = appointment.durationInMinutes * (hourHeight / 60);
     final isSelected = _selectedAppointmentId == appointment.id;
     
+    // ПРИ ВЫБОРЕ КАРТОЧКА РАСШИРЯЕТСЯ
     final double displayHeight = isSelected ? max(actualHeight, 95.0) : actualHeight;
-    final bool showContent = isSelected || actualHeight >= 25;
+
+    // --- ФИНАЛЬНАЯ ЗАЩИТА: Скрываем контент, если высота меньше 35 пикселей ---
+    final bool canShowContent = isSelected || actualHeight >= 35;
 
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 250),
@@ -341,14 +344,16 @@ class _DayTimelineState extends State<DayTimeline> {
             child: Stack(
               fit: StackFit.expand,
               children: [
+                // Цветной фон
                 Container(color: _getStatusColor(appointment.status)),
                 
-                if (showContent)
+                // Текст и индикаторы (рисуем только если есть место)
+                if (canShowContent)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                    padding: const EdgeInsets.all(4.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisSize: MainAxisSize.min, // ВАЖНО
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -361,12 +366,11 @@ class _DayTimelineState extends State<DayTimeline> {
                                 maxLines: 1,
                               ),
                             ),
-                            // --- ИНДИКАТОР: Колокольчик ---
                             if (appointment.reminderSent == true)
-                              const Icon(Icons.notifications_active, color: Colors.white, size: 12),
+                              const Icon(Icons.notifications_active, color: Colors.white, size: 10),
                           ],
                         ),
-                        if (displayHeight > 40)
+                        if (displayHeight > 45)
                           Text(
                             appointment.service, 
                             style: const TextStyle(color: Colors.white70, fontSize: 9), 
@@ -377,6 +381,7 @@ class _DayTimelineState extends State<DayTimeline> {
                     ),
                   ),
 
+                // Панель кнопок (при выборе)
                 if (isSelected)
                   Positioned(
                     bottom: 0,

@@ -26,14 +26,18 @@ public class ContactService {
         return contactRepository.findByTenantId(tenantId);
     }
 
+    // --- НОВОЕ: Подсчет количества ---
+    public long countContacts(String tenantId) {
+        return contactRepository.countByTenantId(tenantId);
+    }
+
     public Optional<Contact> findContactByPhone(String phone, String tenantId) {
         return contactRepository.findByCleanPhone(phone, tenantId);
     }
 
     public Contact addContact(Contact contact, String tenantId) {
-        // --- ПРОВЕРКА НА ДУБЛИКАТЫ ---
         for (String phone : contact.getPhones()) {
-            String cleanPhone = phone.replace("+", "");
+            String cleanPhone = phone.replaceAll("[^0-9]", "");
             Optional<Contact> existing = contactRepository.findByCleanPhone(cleanPhone, tenantId);
             if (existing.isPresent()) {
                 throw new ResponseStatusException(
@@ -48,9 +52,8 @@ public class ContactService {
     }
 
     public Contact updateContact(String id, Contact contact, String tenantId) {
-        // При обновлении тоже стоит проверять, не заняты ли новые номера другими клиентами
         for (String phone : contact.getPhones()) {
-            String cleanPhone = phone.replace("+", "");
+            String cleanPhone = phone.replaceAll("[^0-9]", "");
             contactRepository.findByCleanPhone(cleanPhone, tenantId)
                 .ifPresent(existing -> {
                     if (!existing.getId().equals(id)) {
