@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/session/session_service.dart';
-import 'package:try_neuro/core/utils/phone_utils.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/contacts/contact_edit_screen.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
@@ -107,7 +107,6 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
               padding: EdgeInsets.only(left: 4, bottom: 8),
               child: Text('КОНТАКТНЫЕ НОМЕРА', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
             ),
-            // --- ИЗМЕНЕНИЕ: Форматируем каждый номер через PhoneUtils ---
             ..._contact.phones.map((phone) => _buildDetailCard(PhoneUtils.format(phone), Icons.phone)),
             
             const SizedBox(height: 16),
@@ -158,20 +157,29 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     final timeFormat = DateFormat.Hm();
     final timeStr = timeFormat.format(DateTime(0).add(Duration(hours: appointment.time.hour, minutes: appointment.time.minute)));
 
+    // --- ИСПРАВЛЕННЫЙ СВИТЧ С НОВОЙ ПАЛИТРОЙ ---
     Color statusColor;
     String statusText;
     switch (appointment.status) {
+      case AppointmentStatus.scheduled:
+        statusColor = const Color(0xFF42A5F5); // Синий
+        statusText = 'Ожидает';
+        break;
+      case AppointmentStatus.confirmed:
+        statusColor = const Color(0xFF26A69A); // Бирюзовый
+        statusText = 'Подтверждено';
+        break;
+      case AppointmentStatus.needs_call:
+        statusColor = const Color(0xFFFFA726); // Янтарный
+        statusText = 'Перезвонить';
+        break;
       case AppointmentStatus.completed:
-        statusColor = Colors.green;
+        statusColor = const Color(0xFF90A4AE); // Серо-синий
         statusText = 'Выполнено';
         break;
       case AppointmentStatus.cancelled:
-        statusColor = Colors.red;
+        statusColor = const Color(0xFFEF5350); // Красный
         statusText = 'Отменено';
-        break;
-      case AppointmentStatus.scheduled:
-        statusColor = Colors.blue;
-        statusText = 'Ожидает';
         break;
     }
 

@@ -41,12 +41,13 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                // Разрешаем системные эндпоинты, регистрацию и логин всем
-                .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**").permitAll() // <<< ИСПРАВЛЕНИЕ ТУТ
+                // Разрешаем системные пути и ошибки всем
+                .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/error").permitAll() 
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/manager/**").hasRole("MANAGER")
+                .requestMatchers("/api/manager/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/employee/**").hasRole("EMPLOYEE")
                 .requestMatchers("/api/comments/**").hasAnyRole("ADMIN", "MANAGER", "EMPLOYEE")
+                .requestMatchers("/api/contacts/**").hasAnyRole("ADMIN", "MANAGER", "EMPLOYEE")
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -69,7 +70,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "tenantId", "X-Requested-With"));
+        configuration.setExposedHeaders(List.of("Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

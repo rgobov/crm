@@ -6,9 +6,11 @@ import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentComment;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.User;
+import com.tryneuro.backend.model.WappiSettings;
 import com.tryneuro.backend.service.CommentService;
 import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
+import com.tryneuro.backend.service.WappiService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,12 +30,29 @@ public class ManagerController {
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
     private final CommentService commentService;
+    private final WappiService wappiService; // <<< ДОБАВЛЯЕМ СЕРВИС
 
     @Autowired
-    public ManagerController(StaffMemberService staffMemberService, ScheduleService scheduleService, CommentService commentService) {
+    public ManagerController(StaffMemberService staffMemberService, 
+                             ScheduleService scheduleService, 
+                             CommentService commentService,
+                             WappiService wappiService) { // <<< ДОБАВЛЯЕМ В КОНСТРУКТОР
         this.staffMemberService = staffMemberService;
         this.scheduleService = scheduleService;
         this.commentService = commentService;
+        this.wappiService = wappiService;
+    }
+
+    // --- ЭНДПОИНТЫ ДЛЯ WAPPI ---
+    @GetMapping("/settings/wappi")
+    public WappiSettings getWappiSettings(@RequestAttribute("tenantId") String tenantId) {
+        return wappiService.getSettings(tenantId);
+    }
+
+    @PutMapping("/settings/wappi")
+    public WappiSettings updateWappiSettings(@RequestAttribute("tenantId") String tenantId, 
+                                             @RequestBody WappiSettings settings) {
+        return wappiService.saveSettings(tenantId, settings);
     }
 
     @GetMapping("/appointments/day")
@@ -48,7 +67,6 @@ public class ManagerController {
 
     @GetMapping("/schedule/staff")
     public List<StaffMember> getStaffForSchedule(@RequestAttribute("tenantId") String tenantId) {
-        // --- ИЗМЕНЕНИЕ: Возвращаем только рядовых сотрудников ---
         List<StaffMember> allStaff = staffMemberService.getAllStaff(tenantId);
         return allStaff.stream()
                 .filter(staff -> "EMPLOYEE".equals(staff.getRole()))

@@ -10,7 +10,7 @@ DateTime _parseDate(String dateString) {
   return DateTime.parse(dateString);
 }
 
-enum AppointmentStatus { scheduled, completed, cancelled }
+enum AppointmentStatus { scheduled, confirmed, needs_call, completed, cancelled }
 
 class Appointment {
   final String id;
@@ -24,8 +24,9 @@ class Appointment {
   final String? staffMemberId;
   final AppointmentStatus status;
   final String? tenantId;
-  // --- НОВОЕ ПОЛЕ: Мировое время создания ---
   final DateTime? createdAt;
+  // --- НОВОЕ ПОЛЕ ---
+  final bool reminderSent;
 
   Appointment({
     required this.id,
@@ -40,6 +41,7 @@ class Appointment {
     required this.status,
     this.tenantId,
     this.createdAt,
+    this.reminderSent = false, // По умолчанию false
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
@@ -54,12 +56,13 @@ class Appointment {
       resourceId: json['resourceId'],
       staffMemberId: json['staffMemberId'],
       status: AppointmentStatus.values.firstWhere(
-        (e) => e.name == (json['status'] as String?)?.toLowerCase(),
+        (e) => e.name.toUpperCase() == (json['status'] as String?)?.toUpperCase(),
         orElse: () => AppointmentStatus.scheduled,
       ),
       tenantId: json['tenantId'],
-      // Парсим createdAt из формата ISO 8601
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt'] as String) : null,
+      // Читаем из JSON
+      reminderSent: json['reminderSent'] ?? false,
     );
   }
 
@@ -76,11 +79,14 @@ class Appointment {
       'staffMemberId': staffMemberId,
       'status': status.name.toUpperCase(),
       'tenantId': tenantId,
-      // Мы не отправляем createdAt на сервер (он генерируется там автоматически)
+      'reminderSent': reminderSent,
     };
   }
 
-  Appointment copyWith({AppointmentStatus? status}) {
+  Appointment copyWith({
+    AppointmentStatus? status,
+    bool? reminderSent,
+  }) {
     return Appointment(
       id: id,
       date: date,
@@ -94,6 +100,7 @@ class Appointment {
       status: status ?? this.status,
       tenantId: tenantId,
       createdAt: createdAt,
+      reminderSent: reminderSent ?? this.reminderSent,
     );
   }
 }

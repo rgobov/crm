@@ -45,15 +45,19 @@ public class Appointment {
     private String staffMemberId;
 
     @Enumerated(EnumType.STRING)
-    private AppointmentStatus status;
+    private AppointmentStatus status = AppointmentStatus.SCHEDULED;
 
     private String comment;
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // --- НОВОЕ ПОЛЕ: Мировое время создания записи ---
+    // Сделаем поле nullable, чтобы старые записи не ломали бэкенд
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at")
     private OffsetDateTime createdAt;
+
+    // --- ИСПРАВЛЕНИЕ: Используем Boolean вместо boolean ---
+    @Column(name = "reminder_sent")
+    private Boolean reminderSent = false;
 }

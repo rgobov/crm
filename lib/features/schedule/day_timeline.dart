@@ -73,7 +73,7 @@ class _DayTimelineState extends State<DayTimeline> {
       final appointmentWithNewStatus = appointment.copyWith(status: newStatus);
       late final Appointment updatedAppointment;
       
-      if (_currentUser?.role == UserRole.manager) {
+      if (_currentUser?.role == UserRole.manager || _currentUser?.role == UserRole.admin) {
         updatedAppointment = await _managerService.updateAppointment(appointmentWithNewStatus);
       } else if (_currentUser?.role == UserRole.employee) {
         updatedAppointment = await _employeeService.updateAppointment(appointmentWithNewStatus);
@@ -98,14 +98,17 @@ class _DayTimelineState extends State<DayTimeline> {
   }
 
   Color _getStatusColor(AppointmentStatus status) {
-    final primaryColor = Theme.of(context).primaryColor;
     switch (status) {
       case AppointmentStatus.scheduled:
-        return primaryColor.withOpacity(0.9);
+        return const Color(0xFF42A5F5); 
+      case AppointmentStatus.confirmed:
+        return const Color(0xFF26A69A); 
+      case AppointmentStatus.needs_call:
+        return const Color(0xFFFFA726); 
       case AppointmentStatus.completed:
-        return Colors.green.withOpacity(0.9);
+        return const Color(0xFF90A4AE); 
       case AppointmentStatus.cancelled:
-        return Colors.red.withOpacity(0.9);
+        return const Color(0xFFEF5350); 
     }
   }
 
@@ -151,7 +154,7 @@ class _DayTimelineState extends State<DayTimeline> {
       child: Column(
         children: [
           SizedBox(
-            height: 50,
+            height: 60,
             child: Row(
               children: [
                 SizedBox(width: timeColumnWidth, child: const Center(child: Icon(Icons.access_time, size: 16))),
@@ -165,9 +168,22 @@ class _DayTimelineState extends State<DayTimeline> {
                             child: Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                                  Text(s.specialty, style: TextStyle(fontSize: 12, color: Colors.grey.shade600), textAlign: TextAlign.center),
+                                  Text(
+                                    s.name, 
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), 
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    s.specialty, 
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600), 
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ],
                               ),
                             ))),
@@ -222,12 +238,9 @@ class _DayTimelineState extends State<DayTimeline> {
           height: hourHeight,
           child: Align(
             alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 0.0), 
-              child: Text(
-                '$hour:00', 
-                style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)
-              ),
+            child: Text(
+              '$hour:00', 
+              style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)
             ),
           ),
         );
@@ -237,6 +250,14 @@ class _DayTimelineState extends State<DayTimeline> {
 
   Widget _buildStaffColumn(BuildContext context, StaffMember? staffMember, double totalHeight, int startHour, int endHour) {
     final columnAppointments = widget.appointments.where((a) => a.staffMemberId == staffMember?.id).toList();
+    
+    final sortedAppointments = List<Appointment>.from(columnAppointments);
+    sortedAppointments.sort((a, b) {
+      if (a.id == _selectedAppointmentId) return 1;
+      if (b.id == _selectedAppointmentId) return -1;
+      return 0;
+    });
+
     final double slotHeight = hourHeight / 4; 
 
     return Container(
@@ -244,6 +265,7 @@ class _DayTimelineState extends State<DayTimeline> {
       height: totalHeight,
       decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.shade300))),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           ..._buildWorkingHoursBackground(staffMember, totalHeight, startHour, endHour),
           
@@ -280,7 +302,7 @@ class _DayTimelineState extends State<DayTimeline> {
             ),
           ),
 
-          ...columnAppointments.map((appointment) => _buildAppointmentCard(appointment, startHour, endHour)),
+          ...sortedAppointments.map((appointment) => _buildAppointmentCard(appointment, startHour, endHour)),
           
           if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth, startHour, endHour),
         ],
@@ -291,65 +313,138 @@ class _DayTimelineState extends State<DayTimeline> {
   Widget _buildAppointmentCard(Appointment appointment, int startHour, int endHour) {
     final minutesFromStart = (appointment.time.hour - startHour) * 60 + appointment.time.minute;
     final top = minutesFromStart * (hourHeight / 60);
-    final height = appointment.durationInMinutes * (hourHeight / 60);
+    final double actualHeight = appointment.durationInMinutes * (hourHeight / 60);
     final isSelected = _selectedAppointmentId == appointment.id;
+    
+    // При выборе карточка расширяется до 95 пикселей
+    final double displayHeight = isSelected ? max(actualHeight, 95.0) : actualHeight;
 
-    return Positioned(
+    // Условие: показывать ли текст внутри карточки в обычном состоянии?
+    // Скрываем текст, если высота меньше 25 пикселей (типично для 15 мин и меньше)
+    final bool showContent = isSelected || actualHeight >= 25;
+
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
       top: top,
-      left: 2,
-      right: 2,
-      height: height > 0 ? height : 1,
+      left: isSelected ? -4 : 2, 
+      right: isSelected ? -4 : 2,
+      height: displayHeight,
       child: GestureDetector(
         onTap: () {
           setState(() {
-            if (isSelected) {
-              _selectedAppointmentId = null; 
-            } else {
-              _selectedAppointmentId = appointment.id;
-            }
+            _selectedAppointmentId = isSelected ? null : appointment.id;
           });
         },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Card(
-              color: _getStatusColor(appointment.status),
-              margin: EdgeInsets.zero,
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Text(appointment.clientName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                    Text(appointment.service, style: const TextStyle(color: Colors.white70, fontSize: 10), overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-            ),
-            if (isSelected)
-              AnimatedOpacity(
-                opacity: isSelected ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: Container(
-                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), borderRadius: BorderRadius.circular(4)),
-                  child: _isUpdatingStatus && _selectedAppointmentId == appointment.id
-                      ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        child: Container(
+          decoration: BoxDecoration(
+            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, spreadRadius: 2)] : [],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(isSelected ? 8 : 4),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Container(color: _getStatusColor(appointment.status)),
+                
+                // Отображаем контент только если он влезает или карточка развернута
+                if (showContent)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            IconButton(icon: const Icon(Icons.check_circle, color: Colors.greenAccent), onPressed: () => _updateStatus(appointment, AppointmentStatus.completed), tooltip: 'Выполнено'),
-                            IconButton(icon: const Icon(Icons.cancel, color: Colors.redAccent), onPressed: () => _updateStatus(appointment, AppointmentStatus.cancelled), tooltip: 'Клиент не пришел'),
-                            IconButton(icon: const Icon(Icons.info_outline, color: Colors.white), onPressed: () => widget.onAppointmentTap(appointment), tooltip: 'Детали'),
+                            Expanded(
+                              child: Text(
+                                appointment.clientName, 
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), 
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            if (appointment.reminderSent)
+                              const Icon(Icons.notifications_active, color: Colors.white, size: 9),
                           ],
                         ),
-                ),
-              ),
-          ],
+                        // Услугу показываем только на достаточно высоких карточках
+                        if (displayHeight > 40)
+                          Text(
+                            appointment.service, 
+                            style: const TextStyle(color: Colors.white70, fontSize: 9), 
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                      ],
+                    ),
+                  ),
+
+                // Оверлей с кнопками (только при выборе)
+                if (isSelected)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.black.withOpacity(0.0), Colors.black.withOpacity(0.8)],
+                        ),
+                      ),
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: _buildStatusButtons(appointment),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildStatusButtons(Appointment appointment) {
+    List<Widget> buttons = [];
+
+    Widget statusBtn(IconData icon, Color color, String tooltip, VoidCallback onPressed) {
+      return IconButton(
+        icon: Icon(icon, color: color, size: 24), 
+        onPressed: onPressed,
+        tooltip: tooltip,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+      );
+    }
+
+    if (appointment.status != AppointmentStatus.confirmed) {
+      buttons.add(statusBtn(Icons.check_circle, const Color(0xFF26A69A), 'Подтвердить', () => _updateStatus(appointment, AppointmentStatus.confirmed)));
+    }
+    if (appointment.status != AppointmentStatus.needs_call) {
+      buttons.add(statusBtn(Icons.call, const Color(0xFFFFA726), 'Нужно позвонить', () => _updateStatus(appointment, AppointmentStatus.needs_call)));
+    }
+    if (appointment.status == AppointmentStatus.confirmed) {
+      buttons.add(statusBtn(Icons.done_all, Colors.white, 'Завершить', () => _updateStatus(appointment, AppointmentStatus.completed)));
+    }
+    if (appointment.status != AppointmentStatus.cancelled) {
+      buttons.add(statusBtn(Icons.cancel, const Color(0xFFEF5350), 'Отменить', () => _updateStatus(appointment, AppointmentStatus.cancelled)));
+    }
+    if (appointment.status != AppointmentStatus.scheduled) {
+      buttons.add(statusBtn(Icons.restore, Colors.white70, 'В ожидание', () => _updateStatus(appointment, AppointmentStatus.scheduled)));
+    }
+    buttons.add(statusBtn(Icons.info_outline, Colors.white, 'Детали', () => widget.onAppointmentTap(appointment)));
+
+    return buttons;
   }
 
   List<Widget> _buildWorkingHoursBackground(StaffMember? staff, double totalHeight, int startHour, int endHour) {
