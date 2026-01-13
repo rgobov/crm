@@ -22,7 +22,6 @@ class EmployeeService {
     return data.map((json) => Appointment.fromJson(json)).toList();
   }
 
-  // --- НОВЫЙ МЕТОД: История визитов клиента ---
   Future<List<Appointment>> getContactAppointments(String contactId) async {
     final response = await _dio.get('/employee/contacts/$contactId/appointments');
     final List<dynamic> data = response.data;
@@ -35,6 +34,11 @@ class EmployeeService {
       data: appointment.toJson(),
     );
     return Appointment.fromJson(response.data);
+  }
+
+  // --- НОВЫЙ МЕТОД: Удаление записи ---
+  Future<void> deleteAppointment(String id) async {
+    await _dio.delete('/employee/appointments/$id');
   }
 
   Future<void> addAppointment(Appointment appointment) async {

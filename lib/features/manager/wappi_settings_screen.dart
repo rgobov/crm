@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/manager/domain/wappi_settings_model.dart';
 import 'package:try_neuro/service_locator.dart';
@@ -21,7 +22,7 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
   
   bool _isEnabled = false;
   String _messengerType = 'TELEGRAM';
-  int _leadTimeMinutes = 1440; // 24 часа по умолчанию
+  int _leadTimeMinutes = 1440; 
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -55,7 +56,6 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
   }
 
   void _showTimerPicker() {
-    // Вычисляем текущие часы и минуты из общего количества минут
     int initialHours = _leadTimeMinutes ~/ 60;
     int initialMinutes = _leadTimeMinutes % 60;
 
@@ -75,10 +75,7 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
                   children: [
                     TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
                     const Text('Время напоминания', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context), 
-                      child: const Text('Готово', style: TextStyle(fontWeight: FontWeight.bold))
-                    ),
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Готово', style: TextStyle(fontWeight: FontWeight.bold))),
                   ],
                 ),
               ),
@@ -98,6 +95,50 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _sendTest() async {
+    final TextEditingController phoneCtrl = TextEditingController();
+    
+    final phone = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Тестовая отправка'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Введите ваш номер телефона (только цифры) для получения тестового сообщения:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: phoneCtrl,
+              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: '79991234567'),
+              keyboardType: TextInputType.phone,
+              inputFormatters: [RussianPhoneInputFormatter()],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ОТМЕНА')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, phoneCtrl.text), child: const Text('ОТПРАВИТЬ')),
+        ],
+      ),
+    );
+
+    if (phone == null || phone.isEmpty) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await _managerService.sendTestWappiMessage(PhoneUtils.clean(phone));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Запрос на тестовую отправку выполнен! Проверьте логи бэкенда.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка теста: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -169,7 +210,6 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
                     ListTile(
                       tileColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
@@ -178,7 +218,6 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
                       trailing: const Icon(Icons.timer_outlined, color: Colors.blue),
                       onTap: _showTimerPicker,
                     ),
-                    
                     const SizedBox(height: 24),
                     const Text('ТЕХНИЧЕСКИЕ НАСТРОЙКИ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
                     const SizedBox(height: 8),
@@ -202,7 +241,6 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
                       ],
                       onChanged: (val) => setState(() => _messengerType = val!),
                     ),
-                    
                     const SizedBox(height: 24),
                     const Text('ШАБЛОН СООБЩЕНИЯ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
                     const SizedBox(height: 8),
@@ -211,28 +249,18 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
                       maxLines: 5,
                       decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'Текст напоминания...'),
                     ),
-                    const SizedBox(height: 8),
-                    const Wrap(
-                      spacing: 8,
-                      children: [
-                        _TagChip(tag: '{name}', label: 'Имя'),
-                        _TagChip(tag: '{service}', label: 'Услуга'),
-                        _TagChip(tag: '{date}', label: 'Дата'),
-                        _TagChip(tag: '{time}', label: 'Время'),
-                        _TagChip(tag: '{master}', label: 'Мастер'),
-                      ],
-                    ),
                     const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: _isSaving ? null : _saveSettings,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: _isSaving 
-                        ? const CircularProgressIndicator(color: Colors.white) 
-                        : const Text('СОХРАНИТЬ', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('СОХРАНИТЬ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _isSaving ? null : _sendTest,
+                      icon: const Icon(Icons.send),
+                      label: const Text('ОТПРАВИТЬ ТЕСТ'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                     ),
                   ],
                 ),

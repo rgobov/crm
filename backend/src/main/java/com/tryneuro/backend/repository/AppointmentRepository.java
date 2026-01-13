@@ -17,9 +17,19 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
     List<Appointment> findByResourceIdAndDate(String resourceId, LocalDate date);
     List<Appointment> findByTenantId(String tenantId);
 
+    // --- ОПТИМИЗИРОВАННЫЙ МЕТОД ДЛЯ ПЛАНИРОВЩИКА ---
+    // Ищет записи:
+    // 1. Для конкретной компании (tenantId)
+    // 2. У которых еще НЕ отправлено напоминание (reminderSent = false)
+    // 3. Дата которых сегодня или позже (date >= :today)
+    @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId " +
+           "AND (a.reminderSent IS NULL OR a.reminderSent = false) " +
+           "AND a.date >= :today " +
+           "AND a.contactId IS NOT NULL")
+    List<Appointment> findPendingReminders(@Param("tenantId") String tenantId, @Param("today") LocalDate today);
+
     List<Appointment> findByTenantIdAndStaffMemberIdAndDate(String tenantId, String staffMemberId, LocalDate date);
 
-    // --- НОВЫЙ МЕТОД: Поиск истории посещений клиента ---
     List<Appointment> findByContactIdAndTenantIdOrderByDateDesc(String contactId, String tenantId);
 
     @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.date), COUNT(a)) " +

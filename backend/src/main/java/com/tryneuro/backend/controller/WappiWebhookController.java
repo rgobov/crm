@@ -22,8 +22,7 @@ public class WappiWebhookController {
 
     @PostMapping
     public void handleWappiEvent(@RequestBody Map<String, Object> payload) {
-        System.out.println("WEBHOOK RECEIVED: " + payload);
-
+        // Логируем только важные события, чтобы не захламлять консоль
         Map<String, Object> data = (Map<String, Object>) payload.get("data");
         if (data == null) return;
 
@@ -32,7 +31,9 @@ public class WappiWebhookController {
 
         if (buttonId == null || phone == null) return;
 
-        // Ищем по всем компаниям для теста, так как tenant_id может прийти в другом формате
+        System.out.println("DEBUG: Wappi Webhook - Button '" + buttonId + "' clicked by " + phone);
+
+        // Поиск контакта по любому из номеров в массиве
         List<Contact> allContacts = contactRepository.findAll();
         Optional<Contact> contactOpt = allContacts.stream()
                 .filter(c -> c.getPhones().stream().anyMatch(p -> p.replaceAll("[^0-9]", "").equals(phone)))
@@ -40,6 +41,7 @@ public class WappiWebhookController {
 
         if (contactOpt.isPresent()) {
             Contact contact = contactOpt.get();
+            // Находим последнюю запись клиента (по которой пришло напоминание)
             List<Appointment> apps = appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contact.getId(), contact.getTenantId());
             
             if (!apps.isEmpty()) {
@@ -50,7 +52,7 @@ public class WappiWebhookController {
                     latestApp.setStatus(AppointmentStatus.NEEDS_CALL);
                 }
                 appointmentRepository.save(latestApp);
-                System.out.println("Status updated to " + latestApp.getStatus() + " for client " + contact.getName());
+                System.out.println("SUCCESS: Appointment status updated to " + latestApp.getStatus() + " for " + contact.getName());
             }
         }
     }

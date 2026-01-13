@@ -78,9 +78,39 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
   }
 
   Future<void> _deleteAppointment() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Функция удаления пока не реализована.')),
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удаление записи'),
+        content: const Text('Вы уверены, что хотите безвозвратно удалить эту запись?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ОТМЕНА')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            child: const Text('УДАЛИТЬ', style: TextStyle(color: Colors.red))
+          ),
+        ],
+      ),
     );
+
+    if (confirm != true) return;
+
+    try {
+      if (_currentUser?.role == UserRole.manager || _currentUser?.role == UserRole.admin) {
+        await _managerService.deleteAppointment(_appointment.id);
+      } else {
+        await _employeeService.deleteAppointment(_appointment.id);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Запись удалена')));
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка удаления: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 
   @override
@@ -98,7 +128,6 @@ class _AppointmentDetailScreenState extends State<AppointmentDetailScreen> {
           IconButton(icon: const Icon(Icons.delete_outline), onPressed: _deleteAppointment, tooltip: 'Удалить'),
         ],
       ),
-      // Оборачиваем только содержимое в SelectionArea для копирования имен и телефонов
       body: SelectionArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),

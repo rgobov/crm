@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/network/http_client.dart';
-import 'package:try_neuro/features/manager/domain/wappi_settings_model.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/features/manager/domain/wappi_settings_model.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_comment_model.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/schedule/domain/workload_model.dart';
@@ -51,7 +51,11 @@ class ManagerService {
     return Appointment.fromJson(response.data);
   }
 
-  // --- НОВЫЕ МЕТОДЫ ДЛЯ WAPPI ---
+  // --- НОВЫЙ МЕТОД: Удаление записи ---
+  Future<void> deleteAppointment(String id) async {
+    await _dio.delete('/manager/appointments/$id');
+  }
+
   Future<WappiSettings> getWappiSettings() async {
     final response = await _dio.get('/manager/settings/wappi');
     return WappiSettings.fromJson(response.data);
@@ -60,6 +64,10 @@ class ManagerService {
   Future<WappiSettings> updateWappiSettings(WappiSettings settings) async {
     final response = await _dio.put('/manager/settings/wappi', data: settings.toJson());
     return WappiSettings.fromJson(response.data);
+  }
+
+  Future<void> sendTestWappiMessage(String phone) async {
+    await _dio.post('/manager/settings/wappi/test', queryParameters: {'phone': phone});
   }
 
   Future<List<AppointmentComment>> getComments(String appointmentId) async {

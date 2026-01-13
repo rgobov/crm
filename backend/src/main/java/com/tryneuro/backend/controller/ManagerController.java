@@ -30,20 +30,19 @@ public class ManagerController {
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
     private final CommentService commentService;
-    private final WappiService wappiService; // <<< ДОБАВЛЯЕМ СЕРВИС
+    private final WappiService wappiService;
 
     @Autowired
     public ManagerController(StaffMemberService staffMemberService, 
                              ScheduleService scheduleService, 
                              CommentService commentService,
-                             WappiService wappiService) { // <<< ДОБАВЛЯЕМ В КОНСТРУКТОР
+                             WappiService wappiService) {
         this.staffMemberService = staffMemberService;
         this.scheduleService = scheduleService;
         this.commentService = commentService;
         this.wappiService = wappiService;
     }
 
-    // --- ЭНДПОИНТЫ ДЛЯ WAPPI ---
     @GetMapping("/settings/wappi")
     public WappiSettings getWappiSettings(@RequestAttribute("tenantId") String tenantId) {
         return wappiService.getSettings(tenantId);
@@ -55,9 +54,35 @@ public class ManagerController {
         return wappiService.saveSettings(tenantId, settings);
     }
 
+    @PostMapping("/settings/wappi/test")
+    public ResponseEntity<Void> sendTestReminder(@RequestAttribute("tenantId") String tenantId, 
+                                                 @RequestParam String phone) {
+        wappiService.sendTestMessage(tenantId, phone);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/appointments/day")
     public List<Appointment> getAppointmentsForDay(@RequestAttribute("tenantId") String tenantId, @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return scheduleService.getAppointmentsForDay(date, tenantId);
+    }
+
+    @PostMapping("/appointments")
+    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
+        appointment.setTenantId(tenantId);
+        return scheduleService.addAppointment(appointment);
+    }
+
+    @PutMapping("/appointments/{id}")
+    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
+        Appointment updatedAppointment = scheduleService.updateAppointment(id, appointmentDetails);
+        return ResponseEntity.ok(updatedAppointment);
+    }
+
+    // --- НОВЫЙ ЭНДПОИНТ: Удаление записи ---
+    @DeleteMapping("/appointments/{id}")
+    public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
+        scheduleService.deleteAppointment(id);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/workload")
@@ -71,18 +96,6 @@ public class ManagerController {
         return allStaff.stream()
                 .filter(staff -> "EMPLOYEE".equals(staff.getRole()))
                 .collect(Collectors.toList());
-    }
-
-    @PostMapping("/appointments")
-    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
-        appointment.setTenantId(tenantId);
-        return scheduleService.addAppointment(appointment);
-    }
-
-    @PutMapping("/appointments/{id}")
-    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
-        Appointment updatedAppointment = scheduleService.updateAppointment(id, appointmentDetails);
-        return ResponseEntity.ok(updatedAppointment);
     }
 
     @GetMapping("/staff/{staffMemberId}/availability")

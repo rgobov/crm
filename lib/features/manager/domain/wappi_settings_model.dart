@@ -6,7 +6,7 @@ class WappiSettings {
   final bool isEnabled;
   final String reminderTemplate;
   final String messengerType;
-  final int leadTimeMinutes; // Возвращаемся к минутам для точности
+  final int leadTimeMinutes;
 
   WappiSettings({
     this.id,
@@ -25,10 +25,11 @@ class WappiSettings {
       tenantId: json['tenantId'],
       apiKey: json['apiKey'] ?? '',
       profileId: json['profileId'] ?? '',
+      // Используем ключ 'enabled', как того ожидает бэкенд
       isEnabled: json['enabled'] ?? false,
       reminderTemplate: json['reminderTemplate'] ?? '',
       messengerType: json['messengerType'] ?? 'TELEGRAM',
-      leadTimeMinutes: json['leadTimeMinutes'] ?? 1440, // 24 часа по умолчанию
+      leadTimeMinutes: json['leadTimeMinutes'] ?? 1440,
     );
   }
 
@@ -38,7 +39,8 @@ class WappiSettings {
       'tenantId': tenantId,
       'apiKey': apiKey,
       'profileId': profileId,
-      'isEnabled': isEnabled,
+      // --- ИСПРАВЛЕНИЕ: Ключ должен быть 'enabled' ---
+      'enabled': isEnabled,
       'reminderTemplate': reminderTemplate,
       'messengerType': messengerType,
       'leadTimeMinutes': leadTimeMinutes,

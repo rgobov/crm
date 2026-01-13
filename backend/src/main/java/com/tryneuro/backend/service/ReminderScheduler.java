@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,35 +25,34 @@ public class ReminderScheduler {
 
     @Scheduled(fixedRateString = "${reminder.check.interval:60000}")
     public void checkAndSendReminders() {
-        System.out.println("Running reminder check...");
-        
         List<WappiSettings> allSettings = settingsRepository.findAll();
         
         for (WappiSettings settings : allSettings) {
             if (!settings.isEnabled() || settings.getApiKey() == null) continue;
 
-            List<Appointment> appointments = appointmentRepository.findByTenantId(settings.getTenantId());
+            List<Appointment> appointments = appointmentRepository.findPendingReminders(
+                settings.getTenantId(), 
+                LocalDate.now()
+            );
+            
             LocalDateTime now = LocalDateTime.now();
 
             for (Appointment app : appointments) {
-                // --- ИСПРАВЛЕНИЕ: Используем правильный геттер getReminderSent() и проверяем на null ---
-                boolean alreadySent = app.getReminderSent() != null && app.getReminderSent();
-                
-                if (alreadySent || app.getContactId() == null) continue;
-
                 LocalDateTime appointmentTime = app.getDate().atTime(app.getTime());
                 
-                if (appointmentTime.isBefore(now.plusMinutes(settings.getLeadTimeMinutes())) 
-                    && appointmentTime.isAfter(now)) {
+                // --- ИЗМЕНЕНИЕ: Не шлем напоминания, если до записи осталось меньше 10 минут ---
+                // Это защищает от спама по старым записям при перезагрузке сервера.
+                if (appointmentTime.isAfter(now.plusMinutes(10)) && 
+                    appointmentTime.isBefore(now.plusMinutes(settings.getLeadTimeMinutes()))) {
                     
                     contactRepository.findById(app.getContactId()).ifPresent(contact -> {
                         try {
                             wappiService.sendReminder(app, contact);
                             app.setReminderSent(true);
                             appointmentRepository.save(app);
-                            System.out.println("SUCCESS: Reminder sent to " + contact.getName());
+                            System.out.println("SUCCESS: TAPI reminder queued for: " + contact.getName());
                         } catch (Exception e) {
-                            System.err.println("ERROR: Failed to send reminder: " + e.getMessage());
+                            System.err.println("ERROR: Failed to send TAPI reminder: " + e.getMessage());
                         }
                     });
                 }

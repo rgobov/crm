@@ -316,11 +316,7 @@ class _DayTimelineState extends State<DayTimeline> {
     final double actualHeight = appointment.durationInMinutes * (hourHeight / 60);
     final isSelected = _selectedAppointmentId == appointment.id;
     
-    // При выборе карточка расширяется до 95 пикселей
     final double displayHeight = isSelected ? max(actualHeight, 95.0) : actualHeight;
-
-    // Условие: показывать ли текст внутри карточки в обычном состоянии?
-    // Скрываем текст, если высота меньше 25 пикселей (типично для 15 мин и меньше)
     final bool showContent = isSelected || actualHeight >= 25;
 
     return AnimatedPositioned(
@@ -347,7 +343,6 @@ class _DayTimelineState extends State<DayTimeline> {
               children: [
                 Container(color: _getStatusColor(appointment.status)),
                 
-                // Отображаем контент только если он влезает или карточка развернута
                 if (showContent)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
@@ -366,11 +361,11 @@ class _DayTimelineState extends State<DayTimeline> {
                                 maxLines: 1,
                               ),
                             ),
-                            if (appointment.reminderSent)
-                              const Icon(Icons.notifications_active, color: Colors.white, size: 9),
+                            // --- ИНДИКАТОР: Колокольчик ---
+                            if (appointment.reminderSent == true)
+                              const Icon(Icons.notifications_active, color: Colors.white, size: 12),
                           ],
                         ),
-                        // Услугу показываем только на достаточно высоких карточках
                         if (displayHeight > 40)
                           Text(
                             appointment.service, 
@@ -382,7 +377,6 @@ class _DayTimelineState extends State<DayTimeline> {
                     ),
                   ),
 
-                // Оверлей с кнопками (только при выборе)
                 if (isSelected)
                   Positioned(
                     bottom: 0,

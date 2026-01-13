@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:try_neuro/features/admin/admin_dashboard_view_model.dart';
+import 'package:try_neuro/features/manager/wappi_settings_screen.dart';
 import 'package:try_neuro/features/resources/resources_screen.dart';
 import 'package:try_neuro/features/services/services_screen.dart';
 import 'package:try_neuro/features/staff/staff_screen.dart';
@@ -60,6 +61,16 @@ class _AdminManagementTabState extends State<AdminManagementTab> {
                   title: 'Услуги',
                   icon: Icons.cut,
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ServicesScreen())),
+                ),
+                
+                const SizedBox(height: 24),
+                Text('Интеграции', style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 8),
+                _buildManagementButton(
+                  context,
+                  title: 'Напоминания Wappi.pro',
+                  icon: Icons.notifications_active, // <<< ЗАМЕНЕНО С Icons.whatsapp
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WappiSettingsScreen())),
                 ),
               ],
             ),
