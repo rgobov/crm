@@ -1,7 +1,9 @@
+import 'package:try_neuro/core/utils/phone_utils.dart'; // <<< ИМПОРТ
+
 class Contact {
   final String id;
   final String name;
-  final List<String> phones; // --- ИЗМЕНЕНИЕ: Список строк ---
+  final List<String> phones;
   final String? email;
   final String? notes;
 
@@ -17,7 +19,6 @@ class Contact {
     return Contact(
       id: json['id'] as String,
       name: json['name'] as String,
-      // Приводим динамический список к списку строк
       phones: (json['phones'] as List<dynamic>).map((e) => e as String).toList(),
       email: json['email'] as String?,
       notes: json['notes'] as String?,
@@ -28,12 +29,12 @@ class Contact {
     return {
       'id': id,
       'name': name,
-      'phones': phones, // Список автоматически сериализуется в JSON-массив
+      'phones': phones,
       'email': email,
       'notes': notes,
     };
   }
 
-  // Вспомогательный геттер для отображения основного номера
-  String get displayPhone => phones.isNotEmpty ? phones.first : 'Нет номера';
+  // --- ИЗМЕНЕНИЕ: Теперь возвращает красиво отформатированный номер ---
+  String get displayPhone => phones.isNotEmpty ? PhoneUtils.format(phones.first) : 'Нет номера';
 }

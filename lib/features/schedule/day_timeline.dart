@@ -16,7 +16,7 @@ class DayTimeline extends StatefulWidget {
   final List<StaffMember> staff;
   final Function(Appointment) onAppointmentTap;
   final Function(TimeOfDay, String?) onEmptySlotTap;
-  final Function(Appointment) onAppointmentUpdated; // <<< ИЗМЕНЕНИЕ
+  final Function(Appointment) onAppointmentUpdated;
 
   const DayTimeline({
     super.key,
@@ -25,7 +25,7 @@ class DayTimeline extends StatefulWidget {
     required this.staff,
     required this.onAppointmentTap,
     required this.onEmptySlotTap,
-    required this.onAppointmentUpdated, // <<< ИЗМЕНЕНИЕ
+    required this.onAppointmentUpdated,
   });
 
   @override
@@ -191,7 +191,7 @@ class _DayTimelineState extends State<DayTimeline> {
                   SizedBox(
                     width: timeColumnWidth,
                     height: totalHeight,
-                    child: _buildTimeColumn(totalHeight, startHour, endHour),
+                    child: _buildTimeColumn(startHour, endHour),
                   ),
                   Expanded(
                     child: SingleChildScrollView(
@@ -214,13 +214,22 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  Widget _buildTimeColumn(double totalHeight, int startHour, int endHour) {
+  Widget _buildTimeColumn(int startHour, int endHour) {
     return Column(
       children: List.generate(endHour - startHour, (index) {
         final hour = startHour + index;
         return SizedBox(
           height: hourHeight,
-          child: Center(child: Text('$hour:00', style: const TextStyle(fontSize: 12, color: Colors.grey))),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 0.0), 
+              child: Text(
+                '$hour:00', 
+                style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)
+              ),
+            ),
+          ),
         );
       }),
     );
@@ -228,6 +237,7 @@ class _DayTimelineState extends State<DayTimeline> {
 
   Widget _buildStaffColumn(BuildContext context, StaffMember? staffMember, double totalHeight, int startHour, int endHour) {
     final columnAppointments = widget.appointments.where((a) => a.staffMemberId == staffMember?.id).toList();
+    final double slotHeight = hourHeight / 4; 
 
     return Container(
       width: staffColumnWidth,
@@ -236,26 +246,42 @@ class _DayTimelineState extends State<DayTimeline> {
       child: Stack(
         children: [
           ..._buildWorkingHoursBackground(staffMember, totalHeight, startHour, endHour),
-          Column(
-            children: List.generate(endHour - startHour, (hourIndex) {
-              final hour = startHour + hourIndex;
-              return SizedBox(
-                height: hourHeight,
-                child: Column(
-                  children: List.generate(4, (minuteIndex) {
-                    final minute = minuteIndex * 15;
-                    return Expanded(
-                      child: InkWell(
-                        onTap: () => widget.onEmptySlotTap(TimeOfDay(hour: hour, minute: minute), staffMember?.id),
-                        child: Container(decoration: BoxDecoration(border: Border(top: BorderSide(color: minute == 0 ? Colors.grey.shade200 : Colors.grey.shade100, width: 0.5)))),
+          
+          Positioned.fill(
+            child: Column(
+              children: List.generate((endHour - startHour) * 4, (slotIndex) {
+                final int hourOffset = slotIndex ~/ 4;
+                final int minuteOffset = (slotIndex % 4) * 15;
+                final int currentHour = startHour + hourOffset;
+
+                return SizedBox(
+                  height: slotHeight,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => widget.onEmptySlotTap(
+                        TimeOfDay(hour: currentHour, minute: minuteOffset), 
+                        staffMember?.id
                       ),
-                    );
-                  }),
-                ),
-              );
-            }),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                              color: minuteOffset == 0 ? Colors.grey.shade300 : Colors.grey.shade100, 
+                              width: minuteOffset == 0 ? 1.0 : 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
           ),
+
           ...columnAppointments.map((appointment) => _buildAppointmentCard(appointment, startHour, endHour)),
+          
           if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth, startHour, endHour),
         ],
       ),

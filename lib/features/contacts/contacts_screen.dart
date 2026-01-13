@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:try_neuro/features/contacts/contact_edit_screen.dart';
 import 'package:try_neuro/features/contacts/contact_detail_screen.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
@@ -39,7 +40,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Future<void> _loadContacts({String? query}) async {
     setState(() => _isLoading = true);
     try {
-      final contacts = await _contactService.getContacts(query: query);
+      // Очищаем поисковой запрос от символа '+', если это похоже на номер телефона
+      String? cleanQuery = query;
+      if (query != null && query.startsWith('+')) {
+        cleanQuery = query.replaceAll('+', '');
+      }
+
+      final contacts = await _contactService.getContacts(query: cleanQuery);
       if (mounted) {
         setState(() {
           _contacts = contacts;
@@ -109,6 +116,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: Colors.grey.shade100,
+                // --- ДОБАВЛЕНО: Подсказка для пользователя ---
+                helperText: 'Номер телефона вводите без +',
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/contacts/add_contact_screen.dart'; 
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
@@ -53,6 +54,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   final _phoneSearchController = TextEditingController();
   late final TextEditingController _durationController;
   Timer? _phoneDebounce;
+  bool _isAutoUpdating = false;
 
   List<Contact> _contacts = [];
   List<Resource> _resources = [];
@@ -93,54 +95,55 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   }
 
   void _onPhoneChanged() {
-    final phoneInput = _phoneSearchController.text.trim();
+    if (_isAutoUpdating) return;
+
+    final currentText = _phoneSearchController.text;
+    final digits = PhoneUtils.clean(currentText);
     
-    if (phoneInput.isEmpty) {
+    if (digits.isEmpty) {
       if (_selectedContact != null) {
         setState(() => _selectedContact = null);
       }
       return;
     }
 
-    // --- ИСПРАВЛЕНИЕ: Проверяем наличие номера в списке телефона выбранного контакта ---
-    if (_selectedContact != null && _selectedContact!.phones.contains(phoneInput)) {
+    if (_selectedContact != null && 
+        _selectedContact!.phones.any((p) => PhoneUtils.clean(p) == digits)) {
       return;
     }
 
     if (_phoneDebounce?.isActive ?? false) _phoneDebounce!.cancel();
-    _phoneDebounce = Timer(const Duration(milliseconds: 700), () async {
-      final currentPhone = _phoneSearchController.text.trim();
+    _phoneDebounce = Timer(const Duration(milliseconds: 800), () async {
+      final latestDigits = PhoneUtils.clean(_phoneSearchController.text);
+      if (latestDigits.length < 5) return;
+
+      final contact = await _contactService.findContactByPhone(latestDigits);
       
-      if (currentPhone.length >= 5) {
-        final contact = await _contactService.findContactByPhone(currentPhone);
-        
-        if (contact != null && mounted) {
-          if (_selectedContact?.id == contact.id) return;
+      if (contact != null && mounted) {
+        if (_selectedContact?.id == contact.id) return;
 
-          setState(() {
-            final index = _contacts.indexWhere((c) => c.id == contact.id);
-            if (index != -1) {
-              _selectedContact = _contacts[index];
-            } else {
-              _contacts.insert(0, contact);
-              _selectedContact = contact;
-            }
-            
-            _phoneSearchController.removeListener(_onPhoneChanged);
-            // Ставим номер телефона из найденного контакта (тот который искали)
-            _phoneSearchController.text = currentPhone;
-            _phoneSearchController.addListener(_onPhoneChanged);
-          });
+        setState(() {
+          _isAutoUpdating = true;
+          final index = _contacts.indexWhere((c) => c.id == contact.id);
+          if (index != -1) {
+            _selectedContact = _contacts[index];
+          } else {
+            _contacts.insert(0, contact);
+            _selectedContact = contact;
+          }
+          
+          _phoneSearchController.text = PhoneUtils.format(contact.phones.first);
+          _isAutoUpdating = false;
+        });
 
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Клиент найден: ${contact.name}'), 
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Клиент найден: ${contact.name}'), 
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     });
   }
@@ -181,10 +184,9 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
           if (widget.initialAppointment!.staffMemberId != null) _selectedStaffMember = _staff.firstWhere((s) => s.id == widget.initialAppointment!.staffMemberId);
           
           if (_selectedContact != null) {
-            _phoneSearchController.removeListener(_onPhoneChanged);
-            // --- ИСПРАВЛЕНИЕ: Используем displayPhone ---
+            _isAutoUpdating = true;
             _phoneSearchController.text = _selectedContact!.displayPhone;
-            _phoneSearchController.addListener(_onPhoneChanged);
+            _isAutoUpdating = false;
           }
         } catch (e) { /* ignore */ }
       } else if (widget.preselectedStaffId != null) {
@@ -220,7 +222,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
         time: _selectedTime!,
         durationInMinutes: int.tryParse(_durationController.text) ?? 60,
         clientName: _selectedContact!.name,
-        contactId: _selectedContact!.id, // Сохраняем ID клиента
+        contactId: _selectedContact!.id, 
         service: _serviceController.text,
         resourceId: _selectedResource?.id,
         staffMemberId: _selectedStaffMember?.id,
@@ -315,20 +317,23 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   }
 
   void _quickAddContact() async {
+    // --- ИЗМЕНЕНИЕ: Передаем текущий введенный номер ---
     final dynamic result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const AddContactScreen()),
+      MaterialPageRoute(
+        builder: (context) => AddContactScreen(
+          initialPhone: PhoneUtils.clean(_phoneSearchController.text),
+        ),
+      ),
     );
     
     if (result is Contact) {
       setState(() {
+        _isAutoUpdating = true;
         _contacts.insert(0, result);
         _selectedContact = result;
-        
-        _phoneSearchController.removeListener(_onPhoneChanged);
-        // --- ИСПРАВЛЕНИЕ: Используем displayPhone ---
         _phoneSearchController.text = result.displayPhone;
-        _phoneSearchController.addListener(_onPhoneChanged);
+        _isAutoUpdating = false;
       });
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -372,9 +377,10 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                               controller: _phoneSearchController,
                               decoration: InputDecoration(
                                 labelText: 'Поиск по телефону',
-                                hintText: '+7...',
+                                hintText: '+7 (___) ___-__-__',
                                 prefixIcon: const Icon(Icons.phone),
                                 border: const OutlineInputBorder(),
+                                helperText: 'Введите цифры для поиска',
                                 suffixIcon: IconButton(
                                   icon: const Icon(Icons.person_add_alt_1, color: Colors.blue),
                                   tooltip: 'Новый клиент',
@@ -382,6 +388,9 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                                 ),
                               ),
                               keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                RussianPhoneInputFormatter(),
+                              ],
                             ),
                             const SizedBox(height: 16),
                             DropdownButtonFormField<Contact>(
@@ -391,11 +400,10 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                               onChanged: (v) {
                                 if (v != null && _selectedContact?.id != v.id) {
                                   setState(() {
+                                    _isAutoUpdating = true;
                                     _selectedContact = v;
-                                    _phoneSearchController.removeListener(_onPhoneChanged);
-                                    // --- ИСПРАВЛЕНИЕ: Используем displayPhone ---
                                     _phoneSearchController.text = v.displayPhone;
-                                    _phoneSearchController.addListener(_onPhoneChanged);
+                                    _isAutoUpdating = false;
                                   });
                                 }
                               },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/core/utils/phone_utils.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/contacts/contact_edit_screen.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
@@ -106,8 +107,8 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
               padding: EdgeInsets.only(left: 4, bottom: 8),
               child: Text('КОНТАКТНЫЕ НОМЕРА', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
             ),
-            // --- ИЗМЕНЕНИЕ: Выводим все номера из списка ---
-            ..._contact.phones.map((phone) => _buildDetailCard(phone, Icons.phone)),
+            // --- ИЗМЕНЕНИЕ: Форматируем каждый номер через PhoneUtils ---
+            ..._contact.phones.map((phone) => _buildDetailCard(PhoneUtils.format(phone), Icons.phone)),
             
             const SizedBox(height: 16),
             const Padding(

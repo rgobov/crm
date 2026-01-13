@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class AddContactScreen extends StatefulWidget {
-  const AddContactScreen({super.key});
+  // --- ИЗМЕНЕНИЕ: Принимаем начальный телефон ---
+  final String? initialPhone;
+  const AddContactScreen({super.key, this.initialPhone});
 
   @override
   State<AddContactScreen> createState() => _AddContactScreenState();
@@ -15,11 +19,22 @@ class _AddContactScreenState extends State<AddContactScreen> {
   final _contactService = sl<ContactService>();
   
   final _nameController = TextEditingController();
-  final List<TextEditingController> _phoneControllers = [TextEditingController()];
+  late final List<TextEditingController> _phoneControllers;
   final _emailController = TextEditingController();
   final _notesController = TextEditingController();
   
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Инициализируем контроллер первым номером, если он передан
+    _phoneControllers = [
+      TextEditingController(
+        text: widget.initialPhone != null ? PhoneUtils.format(widget.initialPhone) : null
+      )
+    ];
+  }
 
   @override
   void dispose() {
@@ -51,7 +66,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final phones = _phoneControllers
-        .map((c) => c.text.trim())
+        .map((c) => PhoneUtils.clean(c.text))
         .where((text) => text.isNotEmpty)
         .toList();
 
@@ -99,6 +114,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
             children: [
               TextFormField(
                 controller: _nameController,
+                textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
                   labelText: 'Имя фамилия*',
                   prefixIcon: Icon(Icons.person),
@@ -108,7 +124,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
               ),
               const SizedBox(height: 24),
               
-              const Text('Телефоны*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text('ТЕЛЕФОНЫ*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
               const SizedBox(height: 8),
               ..._phoneControllers.asMap().entries.map((entry) {
                 int index = entry.key;
@@ -122,11 +138,21 @@ class _AddContactScreenState extends State<AddContactScreen> {
                           controller: controller,
                           decoration: InputDecoration(
                             labelText: index == 0 ? 'Основной телефон' : 'Дополнительный',
+                            hintText: '+7 (___) ___-__-__',
                             prefixIcon: const Icon(Icons.phone),
                             border: const OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.phone,
-                          validator: (v) => index == 0 && (v == null || v.trim().isEmpty) ? 'Введите телефон' : null,
+                          inputFormatters: [
+                            RussianPhoneInputFormatter(),
+                          ],
+                          validator: (v) {
+                            if (index == 0) {
+                              if (v == null || v.trim().isEmpty) return 'Введите телефон';
+                              if (PhoneUtils.clean(v).length < 10) return 'Номер слишком короткий';
+                            }
+                            return null;
+                          },
                         ),
                       ),
                       if (_phoneControllers.length > 1)
