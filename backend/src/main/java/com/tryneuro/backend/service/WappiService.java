@@ -31,8 +31,6 @@ public class WappiService {
 
     private final WappiSettingsRepository settingsRepository;
     private final StaffMemberRepository staffMemberRepository;
-    
-    // Создаем RestTemplate с обходом SSL и Hostname для локальных тестов
     private final RestTemplate restTemplate = createUnsecureRestTemplate();
 
     public WappiSettings saveSettings(String tenantId, WappiSettings newSettings) {
@@ -49,50 +47,41 @@ public class WappiService {
     }
 
     public WappiSettings getSettings(String tenantId) {
-        WappiSettings settings = settingsRepository.findByTenantId(tenantId)
-                .orElse(new WappiSettings());
-        settings.setTenantId(tenantId);
-        return settings;
+        return settingsRepository.findByTenantId(tenantId).orElse(new WappiSettings());
     }
 
     public void sendTestMessage(String tenantId, String phone) {
         WappiSettings settings = settingsRepository.findByTenantId(tenantId)
                 .orElseThrow(() -> new RuntimeException("Настройки не найдены"));
         
-        String testText = "🚀 Тестовое сообщение. Нажмите на /confirm для проверки связи!";
-        sendToWappiTAPI(settings, phone.replaceAll("[^0-9]", ""), testText);
+        String testText = "🚀 Проверка связи! Ответьте на это сообщение словом 'Да' или 'Нет' для теста системы подтверждений.";
+        sendMessage(settings, phone.replaceAll("[^0-9]", ""), testText);
     }
 
     public void sendReminder(Appointment appointment, Contact contact) {
-        WappiSettings settings = settingsRepository.findByTenantId(appointment.getTenantId())
-                .orElse(null);
-
+        WappiSettings settings = settingsRepository.findByTenantId(appointment.getTenantId()).orElse(null);
         if (settings == null || !settings.isEnabled()) return;
 
-        String message = buildMessage(appointment, contact, settings.getReminderTemplate());
-        if (contact.getPhones().isEmpty()) return;
-        
-        String phone = contact.getPhones().get(0).replaceAll("[^0-9]", "");
-        sendToWappiTAPI(settings, phone, message);
-    }
-
-    private String buildMessage(Appointment appointment, Contact contact, String template) {
         String masterName = staffMemberRepository.findById(appointment.getStaffMemberId())
                 .map(StaffMember::getName).orElse("Специалист");
 
-        return template
+        String text = settings.getReminderTemplate()
                 .replace("{name}", contact.getName())
                 .replace("{service}", appointment.getService())
                 .replace("{date}", appointment.getDate().format(DateTimeFormatter.ofPattern("dd.MM")))
                 .replace("{time}", appointment.getTime().toString())
                 .replace("{master}", masterName);
+
+        // Добавляем инструкцию по ответу
+        text += "\n\nПожалуйста, подтвердите визит ответным сообщением:\n✅ Да (буду)\n❌ Нет (отменить)";
+
+        if (!contact.getPhones().isEmpty()) {
+            sendMessage(settings, contact.getPhones().get(0).replaceAll("[^0-9]", ""), text);
+        }
     }
 
-    private void sendToWappiTAPI(WappiSettings settings, String phone, String text) {
-        // Добавляем «команды-кнопки» в конец сообщения
-        String finalMessage = text + "\n\n✅ Подтвердить: /confirm\n❌ Отмена: /cancel";
-
-        // Используем асинхронный эндпоинт TAPI для текста
+    // Универсальный метод отправки сообщения (без лишних оберток кнопок)
+    public void sendMessage(WappiSettings settings, String phone, String text) {
         String url = UriComponentsBuilder.fromHttpUrl("https://api.wappi.pro/tapi/async/message/send")
                 .queryParam("profile_id", settings.getProfileId())
                 .queryParam("timeout_from", 1)
@@ -105,20 +94,14 @@ public class WappiService {
 
         Map<String, Object> body = new HashMap<>();
         body.put("recipient", phone);
-        body.put("body", finalMessage);
+        body.put("body", text);
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        System.out.println("DEBUG: Sending TAPI text command to: " + phone);
-        
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(url, entity, String.class);
-            System.out.println("DEBUG: Wappi Response: " + response.getStatusCode());
-        } catch (HttpStatusCodeException e) {
-            System.err.println("DEBUG: Wappi API Error: " + e.getResponseBodyAsString());
-            throw new RuntimeException("TAPI error: " + e.getStatusCode());
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            restTemplate.postForEntity(url, entity, String.class);
+            System.out.println("DEBUG: Message sent to " + phone);
         } catch (Exception e) {
-            System.err.println("DEBUG: Connection Error: " + e.getMessage());
-            throw new RuntimeException("Connection error");
+            System.err.println("DEBUG: Send error: " + e.getMessage());
         }
     }
 
@@ -144,8 +127,6 @@ public class WappiService {
                 }
             };
             return new RestTemplate(factory);
-        } catch (Exception e) {
-            return new RestTemplate();
-        }
+        } catch (Exception e) { return new RestTemplate(); }
     }
 }

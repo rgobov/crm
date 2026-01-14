@@ -316,18 +316,18 @@ class _DayTimelineState extends State<DayTimeline> {
     final double actualHeight = appointment.durationInMinutes * (hourHeight / 60);
     final isSelected = _selectedAppointmentId == appointment.id;
     
-    // ПРИ ВЫБОРЕ КАРТОЧКА РАСШИРЯЕТСЯ
+    // При выборе карточка расширяется до 95 пикселей для кнопок
     final double displayHeight = isSelected ? max(actualHeight, 95.0) : actualHeight;
 
-    // --- ФИНАЛЬНАЯ ЗАЩИТА: Скрываем контент, если высота меньше 35 пикселей ---
-    final bool canShowContent = isSelected || actualHeight >= 35;
+    // --- СТРОГАЯ ЗАЩИТА: Скрываем дочерние виджеты, если высота меньше 35 пикселей ---
+    final bool canRenderChildren = isSelected || actualHeight >= 35;
 
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
       top: top,
-      left: isSelected ? -4 : 2, 
-      right: isSelected ? -4 : 2,
+      left: isSelected ? -2 : 0, 
+      right: isSelected ? -2 : 0,
       height: displayHeight,
       child: GestureDetector(
         onTap: () {
@@ -340,40 +340,43 @@ class _DayTimelineState extends State<DayTimeline> {
             boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, spreadRadius: 2)] : [],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(isSelected ? 8 : 4),
+            borderRadius: BorderRadius.circular(isSelected ? 8 : 0),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Цветной фон
+                // Цветная подложка
                 Container(color: _getStatusColor(appointment.status)),
                 
-                // Текст и индикаторы (рисуем только если есть место)
-                if (canShowContent)
+                // Рендерим содержимое ТОЛЬКО если есть место
+                if (canRenderChildren)
                   Padding(
                     padding: const EdgeInsets.all(4.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min, // ВАЖНО
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              child: Text(
-                                appointment.clientName, 
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold), 
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  appointment.clientName, 
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, height: 1.1), 
+                                ),
                               ),
                             ),
                             if (appointment.reminderSent == true)
                               const Icon(Icons.notifications_active, color: Colors.white, size: 10),
                           ],
                         ),
+                        // Услугу показываем только на высоких карточках
                         if (displayHeight > 45)
                           Text(
                             appointment.service, 
-                            style: const TextStyle(color: Colors.white70, fontSize: 9), 
+                            style: const TextStyle(color: Colors.white70, fontSize: 9, height: 1.0), 
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
@@ -381,7 +384,7 @@ class _DayTimelineState extends State<DayTimeline> {
                     ),
                   ),
 
-                // Панель кнопок (при выборе)
+                // Оверлей с кнопками
                 if (isSelected)
                   Positioned(
                     bottom: 0,

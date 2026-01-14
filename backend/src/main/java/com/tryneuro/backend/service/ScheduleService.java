@@ -6,7 +6,9 @@ import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -31,7 +33,6 @@ public class ScheduleService {
         return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
     }
 
-    // --- НОВЫЙ МЕТОД: История посещений клиента ---
     public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
         return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
     }
@@ -50,50 +51,48 @@ public class ScheduleService {
             return false;
         }
 
-        LocalTime appointmentStartTime = time;
-        LocalTime appointmentEndTime = time.plusMinutes(duration);
+        LocalTime start = time;
+        LocalTime end = time.plusMinutes(duration);
 
+        // 1. Проверка рабочего графика
         if (staffMember.getWorkStartTime() != null && staffMember.getWorkEndTime() != null) {
-            if (appointmentStartTime.isBefore(staffMember.getWorkStartTime())) {
-                return false;
-            }
-            if (appointmentEndTime.isAfter(staffMember.getWorkEndTime())) {
+            if (start.isBefore(staffMember.getWorkStartTime()) || end.isAfter(staffMember.getWorkEndTime())) {
                 return false;
             }
             if (staffMember.getBreakStartTime() != null && staffMember.getBreakEndTime() != null) {
-                if (appointmentStartTime.isBefore(staffMember.getBreakEndTime()) && appointmentEndTime.isAfter(staffMember.getBreakStartTime())) {
+                if (start.isBefore(staffMember.getBreakEndTime()) && end.isAfter(staffMember.getBreakStartTime())) {
                     return false;
                 }
             }
         }
 
+        // 2. Проверка пересечений с другими записями
         List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
-        for (Appointment existingAppointment : staffAppointments) {
-            if (currentAppointmentId != null && existingAppointment.getId().equals(currentAppointmentId)) {
-                continue;
-            }
-            LocalTime existingStart = existingAppointment.getTime();
-            LocalTime existingEnd = existingStart.plusMinutes(existingAppointment.getDurationInMinutes());
-            if (appointmentStartTime.isBefore(existingEnd) && appointmentEndTime.isAfter(existingStart)) {
+        for (Appointment existing : staffAppointments) {
+            if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
+            
+            LocalTime eStart = existing.getTime();
+            LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
+            if (start.isBefore(eEnd) && end.isAfter(eStart)) {
                 return false;
             }
         }
-
         return true;
     }
 
     public boolean isResourceAvailable(String resourceId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
-        List<Appointment> resourceAppointments = appointmentRepository.findByResourceIdAndDate(resourceId, date);
-        LocalTime newAppointmentStart = time;
-        LocalTime newAppointmentEnd = time.plusMinutes(duration);
+        if (resourceId == null) return true;
+        
+        List<Appointment> resourceApps = appointmentRepository.findByResourceIdAndDate(resourceId, date);
+        LocalTime start = time;
+        LocalTime end = time.plusMinutes(duration);
 
-        for (Appointment existingAppointment : resourceAppointments) {
-            if (currentAppointmentId != null && existingAppointment.getId().equals(currentAppointmentId)) {
-                continue;
-            }
-            LocalTime existingStart = existingAppointment.getTime();
-            LocalTime existingEnd = existingStart.plusMinutes(existingAppointment.getDurationInMinutes());
-            if (newAppointmentStart.isBefore(existingEnd) && newAppointmentEnd.isAfter(existingStart)) {
+        for (Appointment existing : resourceApps) {
+            if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
+            
+            LocalTime eStart = existing.getTime();
+            LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
+            if (start.isBefore(eEnd) && end.isAfter(eStart)) {
                 return false;
             }
         }
@@ -101,22 +100,42 @@ public class ScheduleService {
     }
     
     public Appointment addAppointment(Appointment appointment) {
+        // --- ЗАЩИТА: ПРОВЕРКА ПЕРЕД СОХРАНЕНИЕМ ---
+        validateAvailability(appointment);
         return appointmentRepository.save(appointment);
     }
 
-    public Appointment updateAppointment(String id, Appointment appointmentDetails) {
-        Appointment appointment = appointmentRepository.findById(id).orElseThrow(() -> new RuntimeException("Appointment not found"));
-        appointment.setDate(appointmentDetails.getDate());
-        appointment.setTime(appointmentDetails.getTime());
-        appointment.setDurationInMinutes(appointmentDetails.getDurationInMinutes());
-        appointment.setClientName(appointmentDetails.getClientName());
-        appointment.setContactId(appointmentDetails.getContactId()); // Не забываем про новое поле
-        appointment.setService(appointmentDetails.getService());
-        appointment.setStaffMemberId(appointmentDetails.getStaffMemberId());
-        appointment.setResourceId(appointmentDetails.getResourceId());
-        appointment.setStatus(appointmentDetails.getStatus());
-        appointment.setComment(appointmentDetails.getComment());
+    public Appointment updateAppointment(String id, Appointment details) {
+        Appointment appointment = appointmentRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
+        
+        // --- ЗАЩИТА: ПРОВЕРКА ПЕРЕД ОБНОВЛЕНИЕМ ---
+        validateAvailability(details);
+
+        appointment.setDate(details.getDate());
+        appointment.setTime(details.getTime());
+        appointment.setDurationInMinutes(details.getDurationInMinutes());
+        appointment.setClientName(details.getClientName());
+        appointment.setContactId(details.getContactId());
+        appointment.setService(details.getService());
+        appointment.setStaffMemberId(details.getStaffMemberId());
+        appointment.setResourceId(details.getResourceId());
+        appointment.setStatus(details.getStatus());
+        appointment.setComment(details.getComment());
+        
         return appointmentRepository.save(appointment);
+    }
+
+    private void validateAvailability(Appointment app) {
+        if (app.getStaffMemberId() != null) {
+            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), app.getId().equals("new") ? null : app.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Сотрудник занят в это время");
+            }
+        }
+        if (app.getResourceId() != null) {
+            if (!isResourceAvailable(app.getResourceId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), app.getId().equals("new") ? null : app.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Ресурс (кабинет) занят в это время");
+            }
+        }
     }
 
     public Appointment updateAppointment(Appointment appointmentDetails) {

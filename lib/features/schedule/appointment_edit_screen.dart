@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart'; // <<< Для обработки DioException
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -207,6 +208,29 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     }
   }
 
+  // --- МЕТОД ДЛЯ КРАСИВОГО ОТОБРАЖЕНИЯ КОНФЛИКТА ---
+  void _showConflictDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Конфликт времени'),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ПОНЯТНО', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveForm() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedTime == null || _selectedContact == null) {
@@ -230,22 +254,32 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
       );
 
       if (widget.initialAppointment != null) {
-        if (_currentUser?.role == UserRole.manager) {
+        if (_currentUser?.role == UserRole.manager || _currentUser?.role == UserRole.admin) {
           await _managerService.updateAppointment(newAppointment);
         } else {
           await _employeeService.updateAppointment(newAppointment);
         }
       } else {
-        if (_currentUser?.role == UserRole.manager) {
+        if (_currentUser?.role == UserRole.manager || _currentUser?.role == UserRole.admin) {
           await _managerService.addAppointment(newAppointment);
         } else {
           await _employeeService.addAppointment(newAppointment);
         }
       }
       if (mounted) Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      // --- ИСПРАВЛЕНИЕ: Обработка конфликта 409 ---
+      if (e.response?.statusCode == 409) {
+        String errorMsg = e.response?.data?['message'] ?? 'Это время уже занято';
+        if (mounted) _showConflictDialog(errorMsg);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка сохранения: ${e.toString()}'), backgroundColor: Colors.red));
+        }
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка сохранения: ${e.toString()}'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Непредвиденная ошибка: ${e.toString()}'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -317,7 +351,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   }
 
   void _quickAddContact() async {
-    // --- ИЗМЕНЕНИЕ: Передаем текущий введенный номер ---
     final dynamic result = await Navigator.push(
       context,
       MaterialPageRoute(
