@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:try_neuro/core/network/time_service.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/network/time_service.dart';
+import 'package:try_neuro/core/network/websocket_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
@@ -19,23 +21,40 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final ManagerService _managerService = sl<ManagerService>();
-  final TimeService _timeService = sl<TimeService>(); // <<< ДОБАВЛЯЕМ
+  final TimeService _timeService = sl<TimeService>();
+  final WebSocketService _wsService = sl<WebSocketService>(); // <<< СЕРВИС
 
   late DateTime _selectedDay;
   List<Appointment> _appointmentsForDay = [];
   List<StaffMember> _staff = [];
   bool _isLoading = true;
+  
+  // Подписка на обновления
+  StreamSubscription? _wsSubscription;
 
   @override
   void initState() {
     super.initState();
-    // --- ИЗМЕНЕНИЕ: Используем серверное время ---
     _selectedDay = widget.initialDate ?? _timeService.now();
     _loadData();
+    
+    // --- ПОДПИСКА НА ОБНОВЛЕНИЯ В РЕАЛЬНОМ ВРЕМЕНИ ---
+    _wsSubscription = _wsService.scheduleUpdates.listen((event) {
+      if (event == 'refresh' && mounted) {
+        print('ScheduleScreen: Automatic refresh triggered by WebSocket');
+        _loadData(silent: true); // Обновляем тихо, не показывая лоадер на весь экран
+      }
+    });
   }
 
-  Future<void> _loadData() async {
-    if (!_isLoading) setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _wsSubscription?.cancel(); // Обязательно отписываемся
+    super.dispose();
+  }
+
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
     
     try {
       final results = await Future.wait([
@@ -54,7 +73,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: ${e.toString()}')));
+        // Не показываем ошибки при тихом обновлении, чтобы не пугать пользователя
+        if (!silent) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: ${e.toString()}')));
+        }
       }
     }
   }
@@ -115,7 +137,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _isLoading
+            child: _isLoading && _appointmentsForDay.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : DayTimeline(
                     day: _selectedDay,

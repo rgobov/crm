@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:try_neuro/core/network/time_service.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/network/time_service.dart';
+import 'package:try_neuro/core/network/websocket_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
@@ -20,23 +22,40 @@ class EmployeeScheduleScreen extends StatefulWidget {
 
 class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
   final EmployeeService _employeeService = sl<EmployeeService>();
-  final TimeService _timeService = sl<TimeService>(); // <<< ДОБАВЛЯЕМ
+  final TimeService _timeService = sl<TimeService>();
+  final WebSocketService _wsService = sl<WebSocketService>(); // <<< СЕРВИС
 
   late DateTime _selectedDay;
   List<Appointment> _appointmentsForDay = [];
   List<StaffMember> _self = [];
   bool _isLoading = true;
+  
+  // Подписка
+  StreamSubscription? _wsSubscription;
 
   @override
   void initState() {
     super.initState();
-    // --- ИЗМЕНЕНИЕ: Используем серверное время ---
     _selectedDay = _timeService.now();
     _loadData();
+
+    // --- ПОДПИСКА НА ОБНОВЛЕНИЯ В РЕАЛЬНОМ ВРЕМЕНИ ---
+    _wsSubscription = _wsService.scheduleUpdates.listen((event) {
+      if (event == 'refresh' && mounted) {
+        print('EmployeeScheduleScreen: Refreshing due to WebSocket');
+        _loadData(silent: true);
+      }
+    });
   }
 
-  Future<void> _loadData() async {
-    if(!_isLoading) setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _wsSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadData({bool silent = false}) async {
+    if(!silent) setState(() => _isLoading = true);
 
     try {
       final results = await Future.wait([
@@ -48,14 +67,16 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
         setState(() {
           _appointmentsForDay = results[0] as List<Appointment>;
           _self = [results[1] as StaffMember];
+          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
+        setState(() => _isLoading = false);
+        if (!silent) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
+        }
       }
-    } finally {
-      if(mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -115,7 +136,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _isLoading
+            child: _isLoading && _appointmentsForDay.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : DayTimeline(
                     day: _selectedDay,

@@ -7,6 +7,7 @@ import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -18,11 +19,15 @@ import java.util.List;
 public class ScheduleService {
     private final AppointmentRepository appointmentRepository;
     private final StaffMemberRepository staffMemberRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
-    public ScheduleService(AppointmentRepository appointmentRepository, StaffMemberRepository staffMemberRepository) {
+    public ScheduleService(AppointmentRepository appointmentRepository, 
+                           StaffMemberRepository staffMemberRepository,
+                           SimpMessagingTemplate messagingTemplate) {
         this.appointmentRepository = appointmentRepository;
         this.staffMemberRepository = staffMemberRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId) {
@@ -54,7 +59,6 @@ public class ScheduleService {
         LocalTime start = time;
         LocalTime end = time.plusMinutes(duration);
 
-        // 1. Проверка рабочего графика
         if (staffMember.getWorkStartTime() != null && staffMember.getWorkEndTime() != null) {
             if (start.isBefore(staffMember.getWorkStartTime()) || end.isAfter(staffMember.getWorkEndTime())) {
                 return false;
@@ -66,7 +70,6 @@ public class ScheduleService {
             }
         }
 
-        // 2. Проверка пересечений с другими записями
         List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
         for (Appointment existing : staffAppointments) {
             if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
@@ -100,15 +103,20 @@ public class ScheduleService {
     }
     
     public Appointment addAppointment(Appointment appointment) {
-        // --- ЗАЩИТА: ПРОВЕРКА ПЕРЕД СОХРАНЕНИЕМ ---
         validateAvailability(appointment);
-        return appointmentRepository.save(appointment);
+        Appointment saved = appointmentRepository.save(appointment);
+        notifyChange(saved.getTenantId());
+        return saved;
     }
 
     public Appointment updateAppointment(String id, Appointment details) {
-        Appointment appointment = appointmentRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
         
-        // --- ЗАЩИТА: ПРОВЕРКА ПЕРЕД ОБНОВЛЕНИЕМ ---
+        // Гарантируем наличие данных для валидации
+        details.setId(id);
+        details.setTenantId(appointment.getTenantId());
+        
         validateAvailability(details);
 
         appointment.setDate(details.getDate());
@@ -122,17 +130,35 @@ public class ScheduleService {
         appointment.setStatus(details.getStatus());
         appointment.setComment(details.getComment());
         
-        return appointmentRepository.save(appointment);
+        Appointment updated = appointmentRepository.save(appointment);
+        notifyChange(updated.getTenantId());
+        return updated;
+    }
+
+    public void deleteAppointment(String id) {
+        appointmentRepository.findById(id).ifPresent(app -> {
+            String tenantId = app.getTenantId();
+            appointmentRepository.deleteById(id);
+            notifyChange(tenantId);
+        });
+    }
+
+    private void notifyChange(String tenantId) {
+        if (tenantId != null) {
+            messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, "refresh");
+        }
     }
 
     private void validateAvailability(Appointment app) {
+        String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
+        
         if (app.getStaffMemberId() != null) {
-            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), app.getId().equals("new") ? null : app.getId())) {
+            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Сотрудник занят в это время");
             }
         }
         if (app.getResourceId() != null) {
-            if (!isResourceAvailable(app.getResourceId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), app.getId().equals("new") ? null : app.getId())) {
+            if (!isResourceAvailable(app.getResourceId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Ресурс (кабинет) занят в это время");
             }
         }
@@ -140,9 +166,5 @@ public class ScheduleService {
 
     public Appointment updateAppointment(Appointment appointmentDetails) {
         return updateAppointment(appointmentDetails.getId(), appointmentDetails);
-    }
-
-    public void deleteAppointment(String id) {
-        appointmentRepository.deleteById(id);
     }
 }

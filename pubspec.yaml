@@ -23,8 +23,9 @@ dependencies:
   
   dio: ^5.4.0
   flutter_secure_storage: ^9.0.0
-  shared_preferences: ^2.2.3 # Добавили зависимость
+  shared_preferences: ^2.2.3
   jwt_decoder: ^2.0.1
+  stomp_dart_client: ^3.0.1 # <<< ОБНОВИЛИ ВЕРСИЮ
 
 dev_dependencies:
   flutter_test:

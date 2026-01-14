@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/config/app_config.dart';
+import 'package:try_neuro/core/network/websocket_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/admin/admin_dashboard_screen.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
@@ -42,6 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (user != null && mounted) {
+      // --- ИНИЦИАЛИЗАЦИЯ WEBSOCKET ---
+      sl<WebSocketService>().init();
+
       Widget homeScreen;
       switch (user.role) {
         case UserRole.admin:
