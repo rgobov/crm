@@ -18,10 +18,14 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contactService = sl<ContactService>();
 
-  late final TextEditingController _nameController;
+  // Разделенные контроллеры для ФИО
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _middleNameController = TextEditingController();
+  
   final List<TextEditingController> _phoneControllers = [];
-  late final TextEditingController _emailController;
-  late final TextEditingController _notesController;
+  final _emailController = TextEditingController();
+  final _notesController = TextEditingController();
 
   bool _isSaving = false;
   bool get _isEditing => widget.initialContact != null;
@@ -29,23 +33,33 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.initialContact?.name);
     
-    if (_isEditing && widget.initialContact!.phones.isNotEmpty) {
-      for (var phone in widget.initialContact!.phones) {
-        _phoneControllers.add(TextEditingController(text: PhoneUtils.format(phone)));
+    if (_isEditing) {
+      // --- ЛОГИКА РАЗБИЕНИЯ ИМЕНИ ПРИ ЗАГРУЗКЕ ---
+      final parts = widget.initialContact!.name.split(' ');
+      if (parts.isNotEmpty) _lastNameController.text = parts[0];
+      if (parts.length > 1) _firstNameController.text = parts[1];
+      if (parts.length > 2) _middleNameController.text = parts.sublist(2).join(' ');
+
+      if (widget.initialContact!.phones.isNotEmpty) {
+        for (var phone in widget.initialContact!.phones) {
+          _phoneControllers.add(TextEditingController(text: PhoneUtils.format(phone)));
+        }
       }
-    } else {
-      _phoneControllers.add(TextEditingController());
+      _emailController.text = widget.initialContact?.email ?? '';
+      _notesController.text = widget.initialContact?.notes ?? '';
     }
 
-    _emailController = TextEditingController(text: widget.initialContact?.email);
-    _notesController = TextEditingController(text: widget.initialContact?.notes);
+    if (_phoneControllers.isEmpty) {
+      _phoneControllers.add(TextEditingController());
+    }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _middleNameController.dispose();
     for (var controller in _phoneControllers) {
       controller.dispose();
     }
@@ -84,12 +98,19 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
       return;
     }
 
+    // --- ЛОГИКА ОБЪЕДИНЕНИЯ ФИО ПЕРЕД СОХРАНЕНИЕМ ---
+    final String fullName = [
+      _lastNameController.text.trim(),
+      _firstNameController.text.trim(),
+      _middleNameController.text.trim(),
+    ].where((s) => s.isNotEmpty).join(' ');
+
     setState(() => _isSaving = true);
 
     try {
       final contactData = Contact(
         id: _isEditing ? widget.initialContact!.id : '',
-        name: _nameController.text.trim(),
+        name: fullName,
         phones: phones,
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
@@ -120,106 +141,212 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
+      backgroundColor: colorScheme.surfaceVariant.withOpacity(0.3),
       appBar: AppBar(
         title: Text(_isEditing ? 'Изменить клиента' : 'Новый клиент'),
-        actions: [
-          if (_isSaving)
-            const Padding(
-              padding: EdgeInsets.only(right: 16.0),
-              child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3))),
-            )
-          else
-            IconButton(icon: const Icon(Icons.save), onPressed: _saveForm, tooltip: 'Сохранить'),
-        ],
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      body: SafeArea(
         child: Form(
           key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: ListView(
+            padding: const EdgeInsets.all(24.0),
             children: [
-              TextFormField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Имя фамилия*',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя' : null,
-              ),
-              const SizedBox(height: 24),
-              const Text('ТЕЛЕФОНЫ*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
-              const SizedBox(height: 8),
-              ..._phoneControllers.asMap().entries.map((entry) {
-                int index = entry.key;
-                TextEditingController controller = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: controller,
-                          decoration: InputDecoration(
-                            labelText: index == 0 ? 'Основной телефон' : 'Дополнительный',
-                            prefixIcon: const Icon(Icons.phone),
-                            border: const OutlineInputBorder(),
-                            hintText: '+7 (___) ___-__-__',
-                          ),
-                          keyboardType: TextInputType.phone,
-                          // --- ОСТАВЛЯЕМ ТОЛЬКО НАШУ МАСКУ ---
-                          inputFormatters: [
-                            RussianPhoneInputFormatter(),
-                          ],
-                          validator: (v) {
-                            if (index == 0) {
-                              if (v == null || v.trim().isEmpty) return 'Введите телефон';
-                              if (PhoneUtils.clean(v).length < 10) return 'Номер слишком короткий';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      if (_phoneControllers.length > 1)
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                          onPressed: () => _removePhoneField(index),
-                        ),
-                    ],
+              // --- СЕКЦИЯ: ЛИЧНЫЕ ДАННЫЕ ---
+              _buildFormSection(
+                title: 'Личные данные',
+                icon: Icons.person_outline,
+                colorScheme: colorScheme,
+                children: [
+                  _buildTextField(
+                    controller: _lastNameController,
+                    label: 'Фамилия *',
+                    hint: 'Введите фамилию',
+                    validator: (v) => v?.trim().isEmpty ?? true ? 'Введите фамилию' : null,
                   ),
-                );
-              }),
-              TextButton.icon(
-                onPressed: _addPhoneField,
-                icon: const Icon(Icons.add),
-                label: const Text('ДОБАВИТЬ ЕЩЕ НОМЕР'),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _firstNameController,
+                    label: 'Имя *',
+                    hint: 'Введите имя',
+                    validator: (v) => v?.trim().isEmpty ?? true ? 'Введите имя' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _middleNameController,
+                    label: 'Отчество',
+                    hint: 'Необязательно',
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email),
+
+              const SizedBox(height: 24),
+
+              // --- СЕКЦИЯ: КОНТАКТЫ ---
+              _buildFormSection(
+                title: 'Контакты',
+                icon: Icons.contact_phone_outlined,
+                colorScheme: colorScheme,
+                children: [
+                  ..._phoneControllers.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final controller = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey('edit_phone_field_$index'),
+                              controller: controller,
+                              decoration: InputDecoration(
+                                labelText: index == 0 ? 'Основной телефон' : 'Дополнительный',
+                                prefixIcon: const Icon(Icons.phone, size: 20),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [RussianPhoneInputFormatter()],
+                              validator: (v) {
+                                final cleaned = PhoneUtils.clean(v ?? '');
+                                if (index == 0 && cleaned.isEmpty) return 'Обязательное поле';
+                                if (cleaned.isNotEmpty && cleaned.length < 10) return 'Номер слишком короткий';
+                                return null;
+                              },
+                            ),
+                          ),
+                          if (_phoneControllers.length > 1)
+                            IconButton(
+                              icon: Icon(Icons.remove_circle_outline, color: colorScheme.error),
+                              onPressed: () => _removePhoneField(index),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  TextButton.icon(
+                    onPressed: _addPhoneField,
+                    icon: const Icon(Icons.add),
+                    label: const Text('ДОБАВИТЬ НОМЕР'),
+                  ),
+                  const Divider(height: 32),
+                  _buildTextField(
+                    controller: _emailController,
+                    label: 'Email',
+                    hint: 'example@mail.com',
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // --- ПРОЧЕЕ ---
+              _buildFormSection(
+                title: 'Дополнительно',
+                icon: Icons.note_alt_outlined,
+                colorScheme: colorScheme, 
+                children: [
+                  _buildTextField(
+                    controller: _notesController,
+                    label: 'Заметки',
+                    hint: 'Дополнительная информация о клиенте...',
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 40),
+
+              // --- КНОПКА СОХРАНЕНИЯ ---
+              FilledButton(
+                onPressed: _isSaving ? null : _saveForm,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  minimumSize: const Size(double.infinity, 56),
                 ),
-                keyboardType: TextInputType.emailAddress,
+                child: _isSaving 
+                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text(_isEditing ? 'ОБНОВИТЬ КЛИЕНТА' : 'СОХРАНИТЬ КЛИЕНТА', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Заметки',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.note),
-                ),
-                maxLines: 3,
-              ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFormSection({
+    required String title,
+    required IconData icon,
+    required ColorScheme colorScheme,
+    required List<Widget> children,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      textCapitalization: TextCapitalization.words,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
