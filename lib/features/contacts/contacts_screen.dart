@@ -1,7 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:try_neuro/features/contacts/contact_edit_screen.dart';
+import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/core/utils/phone_utils.dart';
+import 'package:try_neuro/features/auth/domain/user_model.dart';
+import 'package:try_neuro/features/contacts/add_contact_screen.dart';
 import 'package:try_neuro/features/contacts/contact_detail_screen.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
@@ -15,38 +16,25 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
-  final ContactService _contactService = sl<ContactService>();
+  final _contactService = sl<ContactService>();
+  final _sessionService = sl<SessionService>();
   final _searchController = TextEditingController();
-  Timer? _debounce;
-
+  
   List<Contact> _contacts = [];
   bool _isLoading = true;
+  User? _currentUser;
 
   @override
   void initState() {
     super.initState();
-    _loadContacts();
-    _searchController.addListener(_onSearchChanged);
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-    _debounce?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _loadContacts({String? query}) async {
+  Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      // Очищаем поисковой запрос от символа '+', если это похоже на номер телефона
-      String? cleanQuery = query;
-      if (query != null && query.startsWith('+')) {
-        cleanQuery = query.replaceAll('+', '');
-      }
-
-      final contacts = await _contactService.getContacts(query: cleanQuery);
+      _currentUser = await _sessionService.getCurrentUser();
+      final contacts = await _contactService.getContacts(query: _searchController.text);
       if (mounted) {
         setState(() {
           _contacts = contacts;
@@ -56,123 +44,110 @@ class _ContactsScreenState extends State<ContactsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
       }
     }
   }
 
-  void _onSearchChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _loadContacts(query: _searchController.text);
-    });
-  }
-
-  void _navigateToEditScreen({Contact? contact}) async {
+  void _navigateToAddContact() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ContactEditScreen(initialContact: contact),
-      ),
+      MaterialPageRoute(builder: (context) => const AddContactScreen()),
     );
     if (result != null) {
-      _loadContacts(query: _searchController.text);
-    }
-  }
-
-  void _navigateToDetailScreen(Contact contact) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ContactDetailScreen(contact: contact),
-      ),
-    );
-    if (result == true) {
-      _loadContacts(query: _searchController.text);
+      _loadData();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
+      backgroundColor: colorScheme.surfaceVariant.withOpacity(0.2),
       appBar: AppBar(
         title: const Text('Клиенты'),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Поиск по имени или телефону...',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => _searchController.clear(),
-                      )
-                    : null,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                suffixIcon: _searchController.text.isNotEmpty 
+                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () { _searchController.clear(); _loadData(); }) 
+                  : null,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                 filled: true,
-                fillColor: Colors.grey.shade100,
-                // --- ДОБАВЛЕНО: Подсказка для пользователя ---
-                helperText: 'Номер телефона вводите без +',
+                fillColor: Colors.white,
               ),
+              onChanged: (v) => _loadData(),
             ),
           ),
           Expanded(
-            child: _isLoading && _contacts.isEmpty 
+            child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: () => _loadContacts(query: _searchController.text),
-                    child: SelectionArea(
-                      child: _contacts.isEmpty
-                          ? Center(child: Text(_searchController.text.isEmpty ? 'Список клиентов пуст' : 'Клиенты не найдены'))
-                          : ListView.builder(
-                              itemCount: _contacts.length,
-                              itemBuilder: (context, index) {
-                                final contact = _contacts[index];
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                                    child: Text(contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?'),
-                                  ),
-                                  title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Row(
-                                    children: [
-                                      Text(contact.displayPhone),
-                                      if (contact.phones.length > 1) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            '+${contact.phones.length - 1}',
-                                            style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  trailing: const Icon(Icons.chevron_right),
-                                  onTap: () => _navigateToDetailScreen(contact),
+                : _contacts.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.people_outline, size: 64, color: colorScheme.outline),
+                            const SizedBox(height: 16),
+                            const Text('Клиенты не найдены'),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _contacts.length,
+                        itemBuilder: (context, index) {
+                          final contact = _contacts[index];
+                          return Card(
+                            elevation: 0,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: colorScheme.outlineVariant),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              leading: CircleAvatar(
+                                backgroundColor: colorScheme.primaryContainer,
+                                foregroundColor: colorScheme.onPrimaryContainer,
+                                child: Text(contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?'),
+                              ),
+                              title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text(
+                                contact.phones.isNotEmpty ? PhoneUtils.format(contact.phones.first) : 'Нет телефона',
+                                style: TextStyle(color: colorScheme.onSurfaceVariant),
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => ContactDetailScreen(contact: contact)),
                                 );
+                                if (result == true) _loadData();
                               },
                             ),
-                    ),
-                  ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'contacts_fab',
-        onPressed: () => _navigateToEditScreen(),
-        tooltip: 'Добавить клиента',
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _navigateToAddContact,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Новый клиент'),
       ),
     );
   }

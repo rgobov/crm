@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/network/time_service.dart';
-import 'package:try_neuro/core/network/websocket_service.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/network/websocket_service.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
@@ -22,14 +22,12 @@ class ScheduleScreen extends StatefulWidget {
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final ManagerService _managerService = sl<ManagerService>();
   final TimeService _timeService = sl<TimeService>();
-  final WebSocketService _wsService = sl<WebSocketService>(); // <<< СЕРВИС
+  final WebSocketService _wsService = sl<WebSocketService>();
 
   late DateTime _selectedDay;
   List<Appointment> _appointmentsForDay = [];
   List<StaffMember> _staff = [];
   bool _isLoading = true;
-  
-  // Подписка на обновления
   StreamSubscription? _wsSubscription;
 
   @override
@@ -38,18 +36,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     _selectedDay = widget.initialDate ?? _timeService.now();
     _loadData();
     
-    // --- ПОДПИСКА НА ОБНОВЛЕНИЯ В РЕАЛЬНОМ ВРЕМЕНИ ---
     _wsSubscription = _wsService.scheduleUpdates.listen((event) {
       if (event == 'refresh' && mounted) {
-        print('ScheduleScreen: Automatic refresh triggered by WebSocket');
-        _loadData(silent: true); // Обновляем тихо, не показывая лоадер на весь экран
+        _loadData(silent: true);
       }
     });
   }
 
   @override
   void dispose() {
-    _wsSubscription?.cancel(); // Обязательно отписываемся
+    _wsSubscription?.cancel();
     super.dispose();
   }
 
@@ -73,7 +69,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        // Не показываем ошибки при тихом обновлении, чтобы не пугать пользователя
         if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: ${e.toString()}')));
         }
@@ -130,12 +125,27 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('Расписание'),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _loadData(),
+            tooltip: 'Обновить',
+          ),
+        ],
       ),
       body: Column(
         children: [
+          // 1. Таймлайн занимает всё основное пространство
           Expanded(
             child: _isLoading && _appointmentsForDay.isEmpty
                 ? const Center(child: CircularProgressIndicator())
@@ -148,21 +158,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     onAppointmentUpdated: _onAppointmentUpdated,
                   ),
           ),
+          
+          // 2. Разделитель и Календарь ПЕРЕМЕЩЕНЫ ВНИЗ
           const Divider(height: 1),
-          HorizontalDatePicker(
-            initialDate: _selectedDay,
-            onDateSelected: (date) {
-              setState(() => _selectedDay = date);
-              _loadData();
-            },
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant.withOpacity(0.3),
+            ),
+            child: HorizontalDatePicker(
+              initialDate: _selectedDay,
+              onDateSelected: (date) {
+                setState(() => _selectedDay = date);
+                _loadData();
+              },
+            ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         heroTag: 'schedule_fab',
         onPressed: () => _navigateToEdit(),
-        tooltip: 'Создать запись',
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add),
+        label: const Text('Записать'),
+        backgroundColor: colorScheme.primaryContainer,
+        foregroundColor: colorScheme.onPrimaryContainer,
+        elevation: 2,
       ),
     );
   }

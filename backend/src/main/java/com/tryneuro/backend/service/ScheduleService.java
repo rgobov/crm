@@ -13,7 +13,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class ScheduleService {
@@ -52,52 +54,44 @@ public class ScheduleService {
 
     public boolean isStaffMemberAvailable(String tenantId, String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
         StaffMember staffMember = staffMemberRepository.findById(staffMemberId).orElse(null);
-        if (staffMember == null || !staffMember.isAvailable()) {
-            return false;
-        }
+        if (staffMember == null || !staffMember.isAvailable()) return false;
 
-        LocalTime start = time;
-        LocalTime end = time.plusMinutes(duration);
+        // Сравнение только до минут
+        LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
+        LocalTime end = start.plusMinutes(duration);
 
         if (staffMember.getWorkStartTime() != null && staffMember.getWorkEndTime() != null) {
-            if (start.isBefore(staffMember.getWorkStartTime()) || end.isAfter(staffMember.getWorkEndTime())) {
-                return false;
-            }
+            LocalTime workStart = staffMember.getWorkStartTime().truncatedTo(ChronoUnit.MINUTES);
+            LocalTime workEnd = staffMember.getWorkEndTime().truncatedTo(ChronoUnit.MINUTES);
+            if (start.isBefore(workStart) || end.isAfter(workEnd)) return false;
+            
             if (staffMember.getBreakStartTime() != null && staffMember.getBreakEndTime() != null) {
-                if (start.isBefore(staffMember.getBreakEndTime()) && end.isAfter(staffMember.getBreakStartTime())) {
-                    return false;
-                }
+                LocalTime breakStart = staffMember.getBreakStartTime().truncatedTo(ChronoUnit.MINUTES);
+                LocalTime breakEnd = staffMember.getBreakEndTime().truncatedTo(ChronoUnit.MINUTES);
+                if (start.isBefore(breakEnd) && end.isAfter(breakStart)) return false;
             }
         }
 
         List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
         for (Appointment existing : staffAppointments) {
             if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
-            
-            LocalTime eStart = existing.getTime();
+            LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
             LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
-            if (start.isBefore(eEnd) && end.isAfter(eStart)) {
-                return false;
-            }
+            if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
         }
         return true;
     }
 
     public boolean isResourceAvailable(String resourceId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
         if (resourceId == null) return true;
-        
         List<Appointment> resourceApps = appointmentRepository.findByResourceIdAndDate(resourceId, date);
-        LocalTime start = time;
-        LocalTime end = time.plusMinutes(duration);
-
+        LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
+        LocalTime end = start.plusMinutes(duration);
         for (Appointment existing : resourceApps) {
             if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
-            
-            LocalTime eStart = existing.getTime();
+            LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
             LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
-            if (start.isBefore(eEnd) && end.isAfter(eStart)) {
-                return false;
-            }
+            if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
         }
         return true;
     }
@@ -113,11 +107,21 @@ public class ScheduleService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
         
-        // Гарантируем наличие данных для валидации
-        details.setId(id);
-        details.setTenantId(appointment.getTenantId());
+        // Сравнение времени СТРОГО до минут
+        boolean isTimeChanged = !appointment.getTime().truncatedTo(ChronoUnit.MINUTES)
+                                 .equals(details.getTime().truncatedTo(ChronoUnit.MINUTES));
         
-        validateAvailability(details);
+        boolean isScheduleChanged = isTimeChanged ||
+                                     !appointment.getDate().equals(details.getDate()) ||
+                                     !appointment.getDurationInMinutes().equals(details.getDurationInMinutes()) ||
+                                     !Objects.equals(appointment.getStaffMemberId(), details.getStaffMemberId()) ||
+                                     !Objects.equals(appointment.getResourceId(), details.getResourceId());
+
+        if (isScheduleChanged) {
+            details.setId(id);
+            details.setTenantId(appointment.getTenantId());
+            validateAvailability(details);
+        }
 
         appointment.setDate(details.getDate());
         appointment.setTime(details.getTime());
@@ -151,15 +155,15 @@ public class ScheduleService {
 
     private void validateAvailability(Appointment app) {
         String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
-        
         if (app.getStaffMemberId() != null) {
             if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Сотрудник занят в это время");
+                String name = staffMemberRepository.findById(app.getStaffMemberId()).map(StaffMember::getName).orElse("Сотрудник");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер " + name + " уже занят в это время");
             }
         }
         if (app.getResourceId() != null) {
             if (!isResourceAvailable(app.getResourceId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Ресурс (кабинет) занят в это время");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Выбранный кабинет/ресурс занят");
             }
         }
     }

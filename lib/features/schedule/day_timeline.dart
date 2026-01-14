@@ -97,18 +97,18 @@ class _DayTimelineState extends State<DayTimeline> {
     }
   }
 
-  Color _getStatusColor(AppointmentStatus status) {
+  Color _getStatusColor(AppointmentStatus status, ColorScheme colorScheme) {
     switch (status) {
       case AppointmentStatus.scheduled:
-        return const Color(0xFF42A5F5); 
+        return colorScheme.primary.withOpacity(0.8); 
       case AppointmentStatus.confirmed:
-        return const Color(0xFF26A69A); 
+        return Colors.teal.shade300; 
       case AppointmentStatus.needs_call:
-        return const Color(0xFFFFA726); 
+        return Colors.amber.shade400; 
       case AppointmentStatus.completed:
-        return const Color(0xFF90A4AE); 
+        return colorScheme.outline.withOpacity(0.6); 
       case AppointmentStatus.cancelled:
-        return const Color(0xFFEF5350); 
+        return colorScheme.error.withOpacity(0.7); 
     }
   }
 
@@ -119,6 +119,7 @@ class _DayTimelineState extends State<DayTimeline> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     int startHour = 23;
     int endHour = 0;
 
@@ -153,11 +154,15 @@ class _DayTimelineState extends State<DayTimeline> {
       onTap: () => setState(() => _selectedAppointmentId = null),
       child: Column(
         children: [
-          SizedBox(
+          Container(
             height: 60,
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              border: Border(bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5)),
+            ),
             child: Row(
               children: [
-                SizedBox(width: timeColumnWidth, child: const Center(child: Icon(Icons.access_time, size: 16))),
+                SizedBox(width: timeColumnWidth, child: Icon(Icons.access_time, size: 18, color: colorScheme.outline)),
                 Expanded(
                   child: ListView(
                     scrollDirection: Axis.horizontal,
@@ -168,22 +173,9 @@ class _DayTimelineState extends State<DayTimeline> {
                             child: Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    s.name, 
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), 
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    s.specialty, 
-                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600), 
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                  Text(s.name, style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface, fontSize: 13)),
+                                  Text(s.specialty, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                                 ],
                               ),
                             ))),
@@ -198,7 +190,7 @@ class _DayTimelineState extends State<DayTimeline> {
               ],
             ),
           ),
-          const Divider(height: 1),
+          
           Expanded(
             child: SingleChildScrollView(
               child: Row(
@@ -207,16 +199,16 @@ class _DayTimelineState extends State<DayTimeline> {
                   SizedBox(
                     width: timeColumnWidth,
                     height: totalHeight,
-                    child: _buildTimeColumn(startHour, endHour),
+                    child: _buildTimeColumn(startHour, endHour, colorScheme),
                   ),
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          ...widget.staff.map((s) => _buildStaffColumn(context, s, totalHeight, startHour, endHour)),
+                          ...widget.staff.map((s) => _buildStaffColumn(context, s, totalHeight, startHour, endHour, colorScheme)),
                           if (hasUnassigned)
-                            _buildStaffColumn(context, null, totalHeight, startHour, endHour),
+                            _buildStaffColumn(context, null, totalHeight, startHour, endHour, colorScheme),
                         ],
                       ),
                     ),
@@ -230,7 +222,7 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  Widget _buildTimeColumn(int startHour, int endHour) {
+  Widget _buildTimeColumn(int startHour, int endHour, ColorScheme colorScheme) {
     return Column(
       children: List.generate(endHour - startHour, (index) {
         final hour = startHour + index;
@@ -238,9 +230,12 @@ class _DayTimelineState extends State<DayTimeline> {
           height: hourHeight,
           child: Align(
             alignment: Alignment.topCenter,
-            child: Text(
-              '$hour:00', 
-              style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                '$hour:00', 
+                style: TextStyle(fontSize: 11, color: colorScheme.outline, fontWeight: FontWeight.w500)
+              ),
             ),
           ),
         );
@@ -248,7 +243,7 @@ class _DayTimelineState extends State<DayTimeline> {
     );
   }
 
-  Widget _buildStaffColumn(BuildContext context, StaffMember? staffMember, double totalHeight, int startHour, int endHour) {
+  Widget _buildStaffColumn(BuildContext context, StaffMember? staffMember, double totalHeight, int startHour, int endHour, ColorScheme colorScheme) {
     final columnAppointments = widget.appointments.where((a) => a.staffMemberId == staffMember?.id).toList();
     
     final sortedAppointments = List<Appointment>.from(columnAppointments);
@@ -263,7 +258,7 @@ class _DayTimelineState extends State<DayTimeline> {
     return Container(
       width: staffColumnWidth,
       height: totalHeight,
-      decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey.shade300))),
+      decoration: BoxDecoration(border: Border(left: BorderSide(color: colorScheme.outlineVariant, width: 0.5))),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -289,8 +284,8 @@ class _DayTimelineState extends State<DayTimeline> {
                         decoration: BoxDecoration(
                           border: Border(
                             top: BorderSide(
-                              color: minuteOffset == 0 ? Colors.grey.shade300 : Colors.grey.shade100, 
-                              width: minuteOffset == 0 ? 1.0 : 0.5,
+                              color: minuteOffset == 0 ? colorScheme.outlineVariant : colorScheme.outlineVariant.withOpacity(0.3), 
+                              width: 0.5,
                             ),
                           ),
                         ),
@@ -302,25 +297,22 @@ class _DayTimelineState extends State<DayTimeline> {
             ),
           ),
 
-          ...sortedAppointments.map((appointment) => _buildAppointmentCard(appointment, startHour, endHour)),
+          ...sortedAppointments.map((appointment) => _buildAppointmentCard(appointment, startHour, endHour, colorScheme)),
           
-          if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth, startHour, endHour),
+          if (_isToday) _buildCurrentTimeIndicator(staffColumnWidth, startHour, endHour, colorScheme),
         ],
       ),
     );
   }
 
-  Widget _buildAppointmentCard(Appointment appointment, int startHour, int endHour) {
+  Widget _buildAppointmentCard(Appointment appointment, int startHour, int endHour, ColorScheme colorScheme) {
     final minutesFromStart = (appointment.time.hour - startHour) * 60 + appointment.time.minute;
     final top = minutesFromStart * (hourHeight / 60);
     final double actualHeight = appointment.durationInMinutes * (hourHeight / 60);
     final isSelected = _selectedAppointmentId == appointment.id;
     
-    // При выборе карточка расширяется до 95 пикселей для кнопок
     final double displayHeight = isSelected ? max(actualHeight, 95.0) : actualHeight;
-
-    // --- СТРОГАЯ ЗАЩИТА: Скрываем дочерние виджеты, если высота меньше 35 пикселей ---
-    final bool canRenderChildren = isSelected || actualHeight >= 35;
+    final bool showContent = isSelected || actualHeight >= 35;
 
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 250),
@@ -337,54 +329,55 @@ class _DayTimelineState extends State<DayTimeline> {
         },
         child: Container(
           decoration: BoxDecoration(
-            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, spreadRadius: 2)] : [],
+            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12, spreadRadius: 2)] : [],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(isSelected ? 8 : 0),
+            borderRadius: BorderRadius.circular(isSelected ? 12 : 0),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Цветная подложка
-                Container(color: _getStatusColor(appointment.status)),
+                // 1. ФОН (самый нижний слой)
+                Container(color: _getStatusColor(appointment.status, colorScheme)),
                 
-                // Рендерим содержимое ТОЛЬКО если есть место
-                if (canRenderChildren)
-                  Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  appointment.clientName, 
-                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, height: 1.1), 
+                // 2. КОНТЕНТ (только если есть место)
+                if (showContent)
+                  IgnorePointer( // Делаем текст прозрачным для кликов, чтобы не мешать кнопкам
+                    child: Padding(
+                      padding: const EdgeInsets.all(6.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    appointment.clientName, 
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold), 
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (appointment.reminderSent == true)
-                              const Icon(Icons.notifications_active, color: Colors.white, size: 10),
-                          ],
-                        ),
-                        // Услугу показываем только на высоких карточках
-                        if (displayHeight > 45)
-                          Text(
-                            appointment.service, 
-                            style: const TextStyle(color: Colors.white70, fontSize: 9, height: 1.0), 
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+                              if (appointment.reminderSent == true)
+                                const Icon(Icons.notifications_active, color: Colors.white, size: 10),
+                            ],
                           ),
-                      ],
+                          if (displayHeight > 45)
+                            Text(
+                              appointment.service, 
+                              style: const TextStyle(color: Colors.white70, fontSize: 10), 
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
 
-                // Оверлей с кнопками
+                // 3. ОВЕРЛЕЙ С КНОПКАМИ (должен быть ВЫШЕ контента для обработки нажатий)
                 if (isSelected)
                   Positioned(
                     bottom: 0,
@@ -396,15 +389,16 @@ class _DayTimelineState extends State<DayTimeline> {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Colors.black.withOpacity(0.0), Colors.black.withOpacity(0.8)],
+                          colors: [Colors.black.withOpacity(0.0), Colors.black.withOpacity(0.75)],
                         ),
                       ),
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: _buildStatusButtons(appointment),
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: _buildStatusButtons(appointment),
+                          ),
                         ),
                       ),
                     ),
@@ -421,11 +415,14 @@ class _DayTimelineState extends State<DayTimeline> {
     List<Widget> buttons = [];
 
     Widget statusBtn(IconData icon, Color color, String tooltip, VoidCallback onPressed) {
-      return IconButton(
-        icon: Icon(icon, color: color, size: 24), 
-        onPressed: onPressed,
-        tooltip: tooltip,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+      return Material( // Добавляем Material для визуального отклика нажатия
+        color: Colors.transparent,
+        child: IconButton(
+          icon: Icon(icon, color: color, size: 26), // Слегка увеличил размер
+          onPressed: onPressed,
+          tooltip: tooltip,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
       );
     }
 
@@ -456,7 +453,7 @@ class _DayTimelineState extends State<DayTimeline> {
     }
 
     if (staff == null || staff.workStartTime == null || staff.workEndTime == null) {
-      return [Positioned.fill(child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.08)))];
+      return [Positioned.fill(child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.05)))];
     }
 
     final List<Widget> backgroundBlocks = [];
@@ -471,7 +468,7 @@ class _DayTimelineState extends State<DayTimeline> {
           left: 0,
           right: 0,
           height: workStartPos,
-          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.08)),
+          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.05)),
         ),
       );
     }
@@ -486,7 +483,7 @@ class _DayTimelineState extends State<DayTimeline> {
             left: 0,
             right: 0,
             height: breakEndPos - breakStartPos,
-            child: const StripedBackground(backgroundColor: Color(0xFFE0E0E0), stripeColor: Colors.black26),
+            child: const StripedBackground(backgroundColor: Color(0xFFF5F5F5), stripeColor: Colors.black12),
           ),
         );
       }
@@ -499,7 +496,7 @@ class _DayTimelineState extends State<DayTimeline> {
           left: 0,
           right: 0,
           bottom: 0,
-          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.08)),
+          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.05)),
         ),
       );
     }
@@ -507,7 +504,7 @@ class _DayTimelineState extends State<DayTimeline> {
     return backgroundBlocks;
   }
 
-  Widget _buildCurrentTimeIndicator(double width, int startHour, int endHour) {
+  Widget _buildCurrentTimeIndicator(double width, int startHour, int endHour, ColorScheme colorScheme) {
     final now = DateTime.now();
     if (now.hour < startHour || now.hour >= endHour) {
       return const SizedBox.shrink();
@@ -519,9 +516,19 @@ class _DayTimelineState extends State<DayTimeline> {
       top: top,
       left: 0,
       width: width,
-      child: Container(
-        height: 2,
-        color: Colors.red.withOpacity(0.5),
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          Container(
+            height: 2,
+            color: colorScheme.error.withOpacity(0.5),
+          ),
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: colorScheme.error, shape: BoxShape.circle),
+          ),
+        ],
       ),
     );
   }

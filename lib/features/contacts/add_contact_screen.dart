@@ -6,7 +6,6 @@ import 'package:try_neuro/features/contacts/domain/contact_model.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class AddContactScreen extends StatefulWidget {
-  // --- ИЗМЕНЕНИЕ: Принимаем начальный телефон ---
   final String? initialPhone;
   const AddContactScreen({super.key, this.initialPhone});
 
@@ -18,7 +17,10 @@ class _AddContactScreenState extends State<AddContactScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contactService = sl<ContactService>();
   
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _middleNameController = TextEditingController();
+  
   late final List<TextEditingController> _phoneControllers;
   final _emailController = TextEditingController();
   final _notesController = TextEditingController();
@@ -28,7 +30,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
   @override
   void initState() {
     super.initState();
-    // Инициализируем контроллер первым номером, если он передан
     _phoneControllers = [
       TextEditingController(
         text: widget.initialPhone != null ? PhoneUtils.format(widget.initialPhone) : null
@@ -38,7 +39,9 @@ class _AddContactScreenState extends State<AddContactScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _middleNameController.dispose();
     for (var controller in _phoneControllers) {
       controller.dispose();
     }
@@ -77,10 +80,16 @@ class _AddContactScreenState extends State<AddContactScreen> {
       return;
     }
 
+    final String fullName = [
+      _lastNameController.text.trim(),
+      _firstNameController.text.trim(),
+      _middleNameController.text.trim(),
+    ].where((s) => s.isNotEmpty).join(' ');
+
     setState(() => _isSaving = true);
     try {
       final newContact = await _contactService.addContact(
-        name: _nameController.text.trim(),
+        name: fullName,
         phones: phones,
         email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
@@ -91,7 +100,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка сохранения: ${e.toString()}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Ошибка: ${e.toString()}'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -101,109 +110,205 @@ class _AddContactScreenState extends State<AddContactScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
+      backgroundColor: colorScheme.surfaceVariant.withOpacity(0.3),
       appBar: AppBar(
         title: const Text('Новый клиент'),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(24.0),
             children: [
-              TextFormField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Имя фамилия*',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Введите имя' : null,
-              ),
-              const SizedBox(height: 24),
-              
-              const Text('ТЕЛЕФОНЫ*', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blueGrey)),
-              const SizedBox(height: 8),
-              ..._phoneControllers.asMap().entries.map((entry) {
-                int index = entry.key;
-                TextEditingController controller = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: controller,
-                          decoration: InputDecoration(
-                            labelText: index == 0 ? 'Основной телефон' : 'Дополнительный',
-                            hintText: '+7 (___) ___-__-__',
-                            prefixIcon: const Icon(Icons.phone),
-                            border: const OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            RussianPhoneInputFormatter(),
-                          ],
-                          validator: (v) {
-                            if (index == 0) {
-                              if (v == null || v.trim().isEmpty) return 'Введите телефон';
-                              if (PhoneUtils.clean(v).length < 10) return 'Номер слишком короткий';
-                            }
-                            return null;
-                          },
-                        ),
-                      ),
-                      if (_phoneControllers.length > 1)
-                        IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-                          onPressed: () => _removePhoneField(index),
-                        ),
-                    ],
+              // --- СЕКЦИЯ: ЛИЧНЫЕ ДАННЫЕ ---
+              _buildFormSection(
+                title: 'Личные данные',
+                icon: Icons.person_outline,
+                colorScheme: colorScheme,
+                children: [
+                  _buildTextField(
+                    controller: _lastNameController,
+                    label: 'Фамилия *',
+                    hint: 'Введите фамилию',
+                    validator: (v) => v?.trim().isEmpty ?? true ? 'Введите фамилию' : null,
                   ),
-                );
-              }),
-              TextButton.icon(
-                onPressed: _addPhoneField,
-                icon: const Icon(Icons.add),
-                label: const Text('ДОБАВИТЬ НОМЕР'),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _firstNameController,
+                    label: 'Имя *',
+                    hint: 'Введите имя',
+                    validator: (v) => v?.trim().isEmpty ?? true ? 'Введите имя' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _middleNameController,
+                    label: 'Отчество',
+                    hint: 'Необязательно',
+                  ),
+                ],
               ),
-              
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.email),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
+
+              const SizedBox(height: 24),
+
+              // --- СЕКЦИЯ: ТЕЛЕФОНЫ ---
+              _buildFormSection(
+                title: 'Контакты',
+                icon: Icons.contact_phone_outlined,
+                colorScheme: colorScheme,
+                children: [
+                  ..._phoneControllers.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final controller = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey('phone_field_$index'),
+                              controller: controller,
+                              decoration: InputDecoration(
+                                labelText: index == 0 ? 'Основной телефон' : 'Дополнительный',
+                                prefixIcon: const Icon(Icons.phone, size: 20),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [RussianPhoneInputFormatter()],
+                              validator: (v) {
+                                final cleaned = PhoneUtils.clean(v ?? '');
+                                if (index == 0 && cleaned.isEmpty) return 'Обязательное поле';
+                                if (cleaned.isNotEmpty && cleaned.length < 10) return 'Номер слишком короткий';
+                                return null;
+                              },
+                            ),
+                          ),
+                          if (_phoneControllers.length > 1)
+                            IconButton(
+                              icon: Icon(Icons.remove_circle_outline, color: colorScheme.error),
+                              onPressed: () => _removePhoneField(index),
+                            ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  TextButton.icon(
+                    onPressed: _addPhoneField,
+                    icon: const Icon(Icons.add),
+                    label: const Text('ДОБАВИТЬ НОМЕР'),
+                  ),
+                  const Divider(height: 32),
+                  _buildTextField(
+                    controller: _emailController,
+                    label: 'Email',
+                    hint: 'example@mail.com',
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextFormField(
+
+              const SizedBox(height: 24),
+
+              // --- ПРОЧЕЕ ---
+              _buildTextField(
                 controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Заметки',
-                  prefixIcon: Icon(Icons.note),
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Заметки',
+                hint: 'Дополнительная информация о клиенте...',
                 maxLines: 3,
               ),
-              const SizedBox(height: 32),
-              ElevatedButton(
+
+              const SizedBox(height: 40),
+
+              // --- КНОПКА СОХРАНЕНИЯ ---
+              FilledButton(
                 onPressed: _isSaving ? null : _saveContact,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  minimumSize: const Size(double.infinity, 56),
                 ),
                 child: _isSaving 
-                  ? const CircularProgressIndicator(color: Colors.white) 
-                  : const Text('СОХРАНИТЬ КЛИЕНТА', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('СОХРАНИТЬ КЛИЕНТА', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFormSection({
+    required String title,
+    required IconData icon,
+    required ColorScheme colorScheme,
+    required List<Widget> children,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    TextInputType? keyboardType,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      textCapitalization: TextCapitalization.words,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
