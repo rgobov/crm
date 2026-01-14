@@ -100,11 +100,11 @@ class _DayTimelineState extends State<DayTimeline> {
   Color _getStatusColor(AppointmentStatus status, ColorScheme colorScheme) {
     switch (status) {
       case AppointmentStatus.scheduled:
-        return colorScheme.primary.withOpacity(0.8); 
+        return colorScheme.primary.withOpacity(0.85); 
       case AppointmentStatus.confirmed:
-        return Colors.teal.shade300; 
+        return Colors.teal.shade400; 
       case AppointmentStatus.needs_call:
-        return Colors.amber.shade400; 
+        return Colors.orange.shade400; 
       case AppointmentStatus.completed:
         return colorScheme.outline.withOpacity(0.6); 
       case AppointmentStatus.cancelled:
@@ -311,12 +311,16 @@ class _DayTimelineState extends State<DayTimeline> {
     final double actualHeight = appointment.durationInMinutes * (hourHeight / 60);
     final isSelected = _selectedAppointmentId == appointment.id;
     
+    // ПАРАМЕТРЫ АНИМАЦИИ
+    const duration = Duration(milliseconds: 400); // Сделали дольше
+    const curve = Curves.fastOutSlowIn; // Более премиальная кривая
+
     final double displayHeight = isSelected ? max(actualHeight, 95.0) : actualHeight;
     final bool showContent = isSelected || actualHeight >= 35;
 
     return AnimatedPositioned(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeInOut,
+      duration: duration,
+      curve: curve,
       top: top,
       left: isSelected ? -2 : 0, 
       right: isSelected ? -2 : 0,
@@ -327,77 +331,88 @@ class _DayTimelineState extends State<DayTimeline> {
             _selectedAppointmentId = isSelected ? null : appointment.id;
           });
         },
-        child: Container(
+        child: AnimatedContainer( // Добавили плавную анимацию тени и углов
+          duration: duration,
+          curve: curve,
           decoration: BoxDecoration(
-            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12, spreadRadius: 2)] : [],
+            boxShadow: isSelected 
+              ? [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, spreadRadius: 2, offset: const Offset(0, 4))] 
+              : [],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(isSelected ? 12 : 0),
+            borderRadius: BorderRadius.circular(isSelected ? 16 : 0),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // 1. ФОН (самый нижний слой)
+                // 1. ФОН
                 Container(color: _getStatusColor(appointment.status, colorScheme)),
                 
-                // 2. КОНТЕНТ (только если есть место)
+                // 2. КОНТЕНТ (с защитой от Overflow во время роста)
                 if (showContent)
-                  IgnorePointer( // Делаем текст прозрачным для кликов, чтобы не мешать кнопкам
+                  IgnorePointer(
                     child: Padding(
-                      padding: const EdgeInsets.all(6.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    appointment.clientName, 
-                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold), 
+                      padding: const EdgeInsets.all(8.0),
+                      child: SingleChildScrollView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      appointment.clientName, 
+                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, height: 1.1), 
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (appointment.reminderSent == true)
-                                const Icon(Icons.notifications_active, color: Colors.white, size: 10),
-                            ],
-                          ),
-                          if (displayHeight > 45)
-                            Text(
-                              appointment.service, 
-                              style: const TextStyle(color: Colors.white70, fontSize: 10), 
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                                if (appointment.reminderSent == true)
+                                  const Icon(Icons.notifications_active, color: Colors.white, size: 10),
+                              ],
                             ),
-                        ],
+                            if (displayHeight > 45)
+                              Text(
+                                appointment.service, 
+                                style: const TextStyle(color: Colors.white70, fontSize: 10, height: 1.0), 
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
 
-                // 3. ОВЕРЛЕЙ С КНОПКАМИ (должен быть ВЫШЕ контента для обработки нажатий)
+                // 3. ПАНЕЛЬ КНОПОК
                 if (isSelected)
                   Positioned(
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    child: Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.black.withOpacity(0.0), Colors.black.withOpacity(0.75)],
+                    child: AnimatedOpacity(
+                      opacity: 1.0,
+                      duration: const Duration(milliseconds: 500),
+                      child: Container(
+                        height: 54,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.black.withOpacity(0.0), Colors.black.withOpacity(0.8)],
+                          ),
                         ),
-                      ),
-                      child: Center(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: _buildStatusButtons(appointment),
+                        child: Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: _buildStatusButtons(appointment),
+                            ),
                           ),
                         ),
                       ),
@@ -415,13 +430,13 @@ class _DayTimelineState extends State<DayTimeline> {
     List<Widget> buttons = [];
 
     Widget statusBtn(IconData icon, Color color, String tooltip, VoidCallback onPressed) {
-      return Material( // Добавляем Material для визуального отклика нажатия
+      return Material(
         color: Colors.transparent,
         child: IconButton(
-          icon: Icon(icon, color: color, size: 26), // Слегка увеличил размер
+          icon: Icon(icon, color: color, size: 28), 
           onPressed: onPressed,
           tooltip: tooltip,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
         ),
       );
     }
@@ -496,7 +511,7 @@ class _DayTimelineState extends State<DayTimeline> {
           left: 0,
           right: 0,
           bottom: 0,
-          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.05)),
+          child: StripedBackground(backgroundColor: Colors.black.withOpacity(0.08)),
         ),
       );
     }
