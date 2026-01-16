@@ -27,61 +27,102 @@ public class WappiWebhookController {
 
     @PostMapping
     public void handleWappiEvent(@RequestBody Map<String, Object> payload) {
-        Map<String, Object> data = (Map<String, Object>) payload.get("data");
-        if (data == null) return;
+        // ЛОГ №1: Видим ВЕСЬ входящий запрос (очень важно для отладки)
+        System.out.println("WEBHOOK DEBUG: Received payload: " + payload);
 
-        // Игнорируем файлы и медиа
-        if (data.containsKey("file") || data.containsKey("media")) return;
+        // 1. Извлекаем данные сообщения
+        Map<String, Object> data = extractMessageData(payload);
+        if (data == null) {
+            System.out.println("WEBHOOK DEBUG: No message data found.");
+            return;
+        }
 
-        String phone = (String) data.get("sender");
+        // 2. Ищем profile_id (критично для Multi-tenancy)
+        String profileId = extractProfileId(payload, data);
+        if (profileId == null) {
+            System.out.println("WEBHOOK DEBUG: profile_id not found in JSON.");
+            return;
+        }
+
+        // 3. Находим компанию по профилю
+        Optional<WappiSettings> settingsOpt = settingsRepository.findByProfileId(profileId);
+        if (settingsOpt.isEmpty()) {
+            System.out.println("WEBHOOK DEBUG: Profile " + profileId + " not registered in our CRM.");
+            return;
+        }
+        WappiSettings settings = settingsOpt.get();
+        String tenantId = settings.getTenantId();
+
+        // 4. Извлекаем номер телефона и текст (приоритет полю phone)
+        String rawPhone = (String) data.getOrDefault("phone", data.get("sender"));
         String messageBody = (String) data.get("body");
 
-        if (phone == null || messageBody == null || messageBody.trim().isEmpty()) return;
+        if (rawPhone == null || messageBody == null || messageBody.trim().isEmpty()) {
+            System.out.println("WEBHOOK DEBUG: Phone or body is null/empty.");
+            return;
+        }
 
-        // ПАРСИНГ ОТВЕТА (Регистронезависимый)
+        String cleanPhone = rawPhone.replaceAll("[^0-9]", "");
         String text = messageBody.toLowerCase().trim();
-        
-        boolean isConfirm = text.contains("да") || text.contains("буду") || 
-                           text.contains("подтвержд") || text.contains("confirm") || 
-                           text.contains("✅");
-        
-        boolean isCancel = text.contains("нет") || text.contains("не смогу") || 
-                          text.contains("отмен") || text.contains("cancel") || 
-                          text.contains("❌");
 
-        if (!isConfirm && !isCancel) return;
+        // 5. Парсинг команд
+        boolean isConfirm = text.contains("да") || text.contains("буду") || text.contains("confirm") || text.contains("✅");
+        boolean isCancel = text.contains("нет") || text.contains("отмен") || text.contains("cancel") || text.contains("❌");
 
-        // Поиск клиента
-        List<Contact> allContacts = contactRepository.findAll();
-        Optional<Contact> contactOpt = allContacts.stream()
-                .filter(c -> c.getPhones().stream().anyMatch(p -> p.replaceAll("[^0-9]", "").equals(phone)))
+        if (!isConfirm && !isCancel) {
+            System.out.println("WEBHOOK DEBUG: No keywords in text: " + text);
+            return;
+        }
+
+        // 6. Ищем контакт внутри этой компании
+        List<Contact> tenantContacts = contactRepository.findByTenantId(tenantId);
+        Optional<Contact> contactOpt = tenantContacts.stream()
+                .filter(c -> c.getPhones().stream().anyMatch(p -> p.replaceAll("[^0-9]", "").equals(cleanPhone)))
                 .findFirst();
 
         if (contactOpt.isPresent()) {
             Contact contact = contactOpt.get();
-            List<Appointment> apps = appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contact.getId(), contact.getTenantId());
+            System.out.println("WEBHOOK DEBUG: Found contact " + contact.getName() + " for phone " + cleanPhone);
+
+            // 7. Находим ПОСЛЕДНЮЮ запись клиента
+            List<Appointment> apps = appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contact.getId(), tenantId);
             
             if (!apps.isEmpty()) {
                 Appointment latestApp = apps.get(0);
-                
-                // Настройки для авто-ответа
-                WappiSettings settings = settingsRepository.findByTenantId(contact.getTenantId()).orElse(null);
-                
+                System.out.println("WEBHOOK DEBUG: Found latest app " + latestApp.getId() + " with status " + latestApp.getStatus());
+
+                // ОБНОВЛЯЕМ (Убрали проверку на SCHEDULED для гибкости)
                 if (isConfirm) {
                     latestApp.setStatus(AppointmentStatus.CONFIRMED);
-                    if (settings != null) {
-                        wappiService.sendMessage(settings, phone, "Спасибо! Ваша запись подтверждена. До встречи! 💅✨");
-                    }
+                    wappiService.sendMessage(settings, cleanPhone, "Спасибо! Запись подтверждена. 👍");
                 } else {
                     latestApp.setStatus(AppointmentStatus.NEEDS_CALL);
-                    if (settings != null) {
-                        wappiService.sendMessage(settings, phone, "Запись отменена. Мы скоро свяжемся с вами, чтобы подобрать другое время. 📞");
-                    }
+                    wappiService.sendMessage(settings, cleanPhone, "Запись отменена. Мы свяжемся с вами. 📞");
                 }
                 
                 appointmentRepository.save(latestApp);
-                System.out.println("SUCCESS: Processed keyword response from " + contact.getName() + ": " + text);
+                System.out.println("WEBHOOK SUCCESS: Updated status for " + contact.getName() + " to " + latestApp.getStatus());
+            } else {
+                System.out.println("WEBHOOK DEBUG: No appointments found for contact " + contact.getName());
             }
+        } else {
+            System.out.println("WEBHOOK DEBUG: Phone " + cleanPhone + " not found in contacts for Tenant " + tenantId);
         }
+    }
+
+    private String extractProfileId(Map<String, Object> payload, Map<String, Object> data) {
+        if (payload.containsKey("profile_id")) return String.valueOf(payload.get("profile_id"));
+        if (data != null && data.containsKey("profile_id")) return String.valueOf(data.get("profile_id"));
+        return null;
+    }
+
+    private Map<String, Object> extractMessageData(Map<String, Object> payload) {
+        Object messagesObj = payload.get("messages");
+        if (messagesObj instanceof List && !((List<?>) messagesObj).isEmpty()) {
+            return (Map<String, Object>) ((List<?>) messagesObj).get(0);
+        } else if (messagesObj instanceof Map) {
+            return (Map<String, Object>) messagesObj;
+        }
+        return (Map<String, Object>) payload.get("data");
     }
 }

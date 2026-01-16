@@ -9,4 +9,7 @@ import java.util.Optional;
 @Repository
 public interface WappiSettingsRepository extends JpaRepository<WappiSettings, String> {
     Optional<WappiSettings> findByTenantId(String tenantId);
+    
+    // --- НОВОЕ: Поиск компании по идентификатору Wappi профиля ---
+    Optional<WappiSettings> findByProfileId(String profileId);
 }

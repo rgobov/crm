@@ -9,8 +9,7 @@ class AppConfig {
 
   // --- АДРЕСА СЕРВЕРОВ ---
   // Убрали порт :8080, так как Nginx сам перенаправляет запросы
-  static const String productionUrl = 'http://738629.cloud4box.ru/api';
-  
+  static const String productionUrl = 'https://738629.cloud4box.ru/api';
   // Адрес для локальной разработки на Android эмуляторе
   static const String developmentUrlAndroid = 'http://10.0.2.2:8080/api';
   // Адрес для локальной разработки в браузере (Chrome) или iOS симуляторе

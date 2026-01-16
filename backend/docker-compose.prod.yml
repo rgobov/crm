@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   frontend:
-    image: roma1975/try_neuro_frontend:1.0.11 # Финальная версия с платформо-зависимым хранилищем
+    image: roma1975/try_neuro_frontend:1.0.11
     container_name: tryneuro_frontend
 
   backend:
@@ -30,8 +30,13 @@ services:
     container_name: tryneuro_proxy
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ${PWD}/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    # Позволяет Nginx обращаться к хосту (туннелю)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - frontend
       - backend

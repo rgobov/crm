@@ -2,6 +2,7 @@ package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
+import com.tryneuro.backend.model.AppointmentStatus;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
@@ -52,29 +53,27 @@ public class ScheduleService {
         return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
     }
 
+    /**
+     * Проверка доступности мастера. 
+     * Теперь проверяет ТОЛЬКО наложение записей. 
+     * Рабочий график игнорируется (он только для визуального отображения).
+     */
     public boolean isStaffMemberAvailable(String tenantId, String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
         StaffMember staffMember = staffMemberRepository.findById(staffMemberId).orElse(null);
         if (staffMember == null || !staffMember.isAvailable()) return false;
 
-        // Сравнение только до минут
         LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
         LocalTime end = start.plusMinutes(duration);
 
-        if (staffMember.getWorkStartTime() != null && staffMember.getWorkEndTime() != null) {
-            LocalTime workStart = staffMember.getWorkStartTime().truncatedTo(ChronoUnit.MINUTES);
-            LocalTime workEnd = staffMember.getWorkEndTime().truncatedTo(ChronoUnit.MINUTES);
-            if (start.isBefore(workStart) || end.isAfter(workEnd)) return false;
-            
-            if (staffMember.getBreakStartTime() != null && staffMember.getBreakEndTime() != null) {
-                LocalTime breakStart = staffMember.getBreakStartTime().truncatedTo(ChronoUnit.MINUTES);
-                LocalTime breakEnd = staffMember.getBreakEndTime().truncatedTo(ChronoUnit.MINUTES);
-                if (start.isBefore(breakEnd) && end.isAfter(breakStart)) return false;
-            }
-        }
+        // --- ИЗМЕНЕНИЕ: УБРАЛИ ПРОВЕРКУ РАБОЧЕГО ГРАФИКА И ПЕРЕРЫВОВ ---
+        // Менеджер может ставить записи в любое время.
 
+        // Проверяем только пересечение с другими (не отмененными) записями
         List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
         for (Appointment existing : staffAppointments) {
             if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
+            if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
+            
             LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
             LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
             if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
@@ -89,6 +88,8 @@ public class ScheduleService {
         LocalTime end = start.plusMinutes(duration);
         for (Appointment existing : resourceApps) {
             if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
+            if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
+
             LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
             LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
             if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
@@ -107,7 +108,6 @@ public class ScheduleService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
         
-        // Сравнение времени СТРОГО до минут
         boolean isTimeChanged = !appointment.getTime().truncatedTo(ChronoUnit.MINUTES)
                                  .equals(details.getTime().truncatedTo(ChronoUnit.MINUTES));
         
@@ -158,12 +158,12 @@ public class ScheduleService {
         if (app.getStaffMemberId() != null) {
             if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
                 String name = staffMemberRepository.findById(app.getStaffMemberId()).map(StaffMember::getName).orElse("Сотрудник");
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер " + name + " уже занят в это время");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер " + name + " уже занят на это время");
             }
         }
         if (app.getResourceId() != null) {
             if (!isResourceAvailable(app.getResourceId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Выбранный кабинет/ресурс занят");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Этот кабинет или ресурс уже занят");
             }
         }
     }
