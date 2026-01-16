@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/config/app_config.dart';
-import 'package:try_neuro/core/network/websocket_service.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/network/websocket_service.dart';
 import 'package:try_neuro/features/admin/admin_dashboard_screen.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
+import 'package:try_neuro/features/auth/data/telegram_auth_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/auth/register_company_screen.dart';
 import 'package:try_neuro/features/manager/manager_home_screen.dart';
@@ -25,7 +26,57 @@ class _LoginScreenState extends State<LoginScreen> {
   );
 
   final _authService = sl<AuthService>(); 
+  final _tgAuthService = sl<TelegramAuthService>(); // <<< СЕРВИС
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // При старте экрана пытаемся войти через Telegram автоматически
+    _checkTelegramLogin();
+  }
+
+  Future<void> _checkTelegramLogin() async {
+    setState(() => _isLoading = true);
+    
+    final success = await _tgAuthService.tryAutoLogin();
+    
+    if (success && mounted) {
+      // Если авто-вход удался, получаем данные пользователя и идем в систему
+      final user = await _authService.getCurrentUser();
+      if (user != null && mounted) {
+        _onLoginSuccess(user);
+        return;
+      }
+    }
+    
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _onLoginSuccess(User user) {
+    sl<WebSocketService>().init();
+
+    Widget homeScreen;
+    switch (user.role) {
+      case UserRole.admin:
+        homeScreen = const AdminDashboardScreen();
+        break;
+      case UserRole.manager:
+        homeScreen = const ManagerHomeScreen();
+        break;
+      case UserRole.employee:
+        homeScreen = EmployeeHomeScreen(user: user);
+        break;
+      default:
+        homeScreen = const ManagerHomeScreen();
+    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => homeScreen),
+    );
+  }
 
   Future<void> _login() async {
     setState(() {
@@ -43,27 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (user != null && mounted) {
-      // --- ИНИЦИАЛИЗАЦИЯ WEBSOCKET ---
-      sl<WebSocketService>().init();
-
-      Widget homeScreen;
-      switch (user.role) {
-        case UserRole.admin:
-          homeScreen = const AdminDashboardScreen();
-          break;
-        case UserRole.manager:
-          homeScreen = const ManagerHomeScreen();
-          break;
-        case UserRole.employee:
-          homeScreen = EmployeeHomeScreen(user: user);
-          break;
-        default:
-          homeScreen = const ManagerHomeScreen();
-      }
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => homeScreen),
-      );
+      _onLoginSuccess(user);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -106,40 +137,48 @@ class _LoginScreenState extends State<LoginScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32.0),
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
+            if (_isLoading)
+              const Column(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Проверка Telegram-аккаунта...'),
+                ],
+              )
+            else ...[
+              TextField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_isLoading,
               ),
-              keyboardType: TextInputType.emailAddress,
-              enabled: !_isLoading,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(
-                labelText: 'Пароль',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'Пароль',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+                enabled: !_isLoading,
               ),
-              obscureText: true,
-              enabled: !_isLoading,
-            ),
-            const SizedBox(height: 24),
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ElevatedButton(
-                    onPressed: _login,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
-                    child: const Text('Войти'),
-                  ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: _navigateToRegister,
-              child: const Text('Зарегистрировать компанию'),
-            ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _login,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                child: const Text('Войти'),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: _navigateToRegister,
+                child: const Text('Зарегистрировать компанию'),
+              ),
+            ],
           ],
         ),
       ),

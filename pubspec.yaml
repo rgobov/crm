@@ -22,10 +22,14 @@ dependencies:
   async: ^2.11.0
   
   dio: ^5.4.0
-  flutter_secure_storage: ^9.0.0
+  # Обновили до совместимой версии 10.0.0
+  flutter_secure_storage: ^10.0.0
   shared_preferences: ^2.2.3
   jwt_decoder: ^2.0.1
-  stomp_dart_client: ^3.0.1 # <<< ОБНОВИЛИ ВЕРСИЮ
+  stomp_dart_client: ^3.0.1
+  
+  # Обновили до современной версии 0.3.3
+  telegram_web_app: ^0.3.3
 
 dev_dependencies:
   flutter_test:
