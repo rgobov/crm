@@ -1,4 +1,4 @@
-import 'package:try_neuro/core/utils/phone_utils.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/utils/phone_utils.dart';
 
 class Contact {
   final String id;
@@ -35,6 +35,14 @@ class Contact {
     };
   }
 
-  // --- ИЗМЕНЕНИЕ: Теперь возвращает красиво отформатированный номер ---
   String get displayPhone => phones.isNotEmpty ? PhoneUtils.format(phones.first) : 'Нет номера';
+
+  // Переопределяем сравнение, чтобы Flutter понимал, что клиенты с одинаковыми id - это один и тот же объект
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Contact && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

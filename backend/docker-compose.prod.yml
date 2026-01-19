@@ -11,9 +11,12 @@ services:
     depends_on:
       - postgres
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tryneuro_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: k918ddBi10e8_db_pass_secure
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/tryneuro_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=k918ddBi10e8_db_pass_secure
+      # --- ДОБАВЛЕНО: Секреты, которые мы вынесли из кода ---
+      - TELEGRAM_BOT_TOKEN=8316493879:AAEyoe0GWxa9-L7nr6KPzdS6na_zjL2_IlU
+      - JWT_SECRET=gjdsgj436[t[ewKJK435df]
 
   postgres:
     image: postgres:15-alpine
@@ -34,7 +37,6 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
-    # Позволяет Nginx обращаться к хосту (туннелю)
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

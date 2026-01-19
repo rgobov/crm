@@ -4,27 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:telegram_web_app/telegram_web_app.dart';
 import 'package:try_neuro/core/network/time_service.dart';
 import 'package:try_neuro/core/offline/sync_service.dart';
 import 'package:try_neuro/features/auth/login_screen.dart';
 import 'package:try_neuro/service_locator.dart';
+import 'package:try_neuro/core/utils/platform_utils.dart'; // Наш новый враппер
 
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     setupServiceLocator();
     
-    // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM (ПОПЫТКА 1) ---
-    if (kIsWeb) {
+    // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM ЧЕРЕЗ ВРАППЕР ---
+    final platform = PlatformUtils.instance;
+    if (platform.isTelegramSupported) {
       try {
-        final tg = TelegramWebApp.instance;
-        if (tg.isSupported) {
-          tg.ready();
-          tg.expand();
-        }
+        platform.ready();
+        platform.expand();
       } catch (e) {
-        print('Initial TG error: $e');
+        debugPrint('Initial TG error: $e');
       }
     }
 
@@ -36,7 +34,7 @@ void main() {
     runApp(const MyApp());
 
   }, (error, stackTrace) {
-    print('Caught error: $error');
+    debugPrint('Caught error: $error');
   });
 }
 
@@ -51,36 +49,29 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM (ПОПЫТКА 2 - когда Flutter готов) ---
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          final tg = TelegramWebApp.instance;
-          if (tg.isSupported) {
-            tg.ready();
-            print('Telegram Ready signal sent from FrameCallback');
-          }
-        } catch (e) {
-          print('Post-frame TG error: $e');
-        }
-      });
-    }
+    // Повторный вызов ready через враппер
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final platform = PlatformUtils.instance;
+      if (platform.isTelegramSupported) {
+        platform.ready();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final tg = TelegramWebApp.instance;
-    final isTg = tg.isSupported;
+    final platform = PlatformUtils.instance;
+    final isTg = platform.isTelegramSupported;
     
     return MaterialApp(
       title: 'Try Neuro CRM',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: (isTg && tg.themeParams.buttonColor != null) 
-              ? tg.themeParams.buttonColor! 
+          seedColor: (isTg && platform.telegramButtonColor != null) 
+              ? platform.telegramButtonColor! 
               : Colors.blue,
-          brightness: (isTg && tg.colorScheme == TelegramColorScheme.dark) 
+          brightness: (isTg && platform.isTelegramDarkMode)
               ? Brightness.dark 
               : Brightness.light,
         ),

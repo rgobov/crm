@@ -3,10 +3,9 @@ package com.tryneuro.backend.controller;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.service.ContactService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/contacts")
@@ -20,11 +19,21 @@ public class ContactController {
     }
 
     @GetMapping
-    public List<Contact> getAllContacts(@RequestAttribute("tenantId") String tenantId, @RequestParam(required = false) String query) {
-        return contactService.getAllContacts(tenantId, query);
+    public Page<Contact> getAllContacts(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return contactService.getContactsPaged(tenantId, query, page, size);
     }
 
-    // --- НОВОЕ: Эндпоинт для подсчета клиентов ---
+    @GetMapping("/{id}")
+    public ResponseEntity<Contact> getContactById(@PathVariable String id) {
+        return contactService.getContactById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/count")
     public long getContactsCount(@RequestAttribute("tenantId") String tenantId) {
         return contactService.countContacts(tenantId);

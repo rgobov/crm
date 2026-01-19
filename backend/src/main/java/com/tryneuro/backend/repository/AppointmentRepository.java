@@ -13,33 +13,34 @@ import java.util.List;
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, String> {
 
-    List<Appointment> findByDateAndTenantId(LocalDate date, String tenantId);
-    List<Appointment> findByResourceIdAndDate(String resourceId, LocalDate date);
+    @Query("SELECT a FROM Appointment a WHERE CAST(a.startTime AS date) = :date AND a.tenantId = :tenantId")
+    List<Appointment> findByDateAndTenantId(@Param("date") LocalDate date, @Param("tenantId") String tenantId);
+
+    @Query("SELECT a FROM Appointment a WHERE a.resourceId = :resourceId AND CAST(a.startTime AS date) = :date")
+    List<Appointment> findByResourceIdAndDate(@Param("resourceId") String resourceId, @Param("date") LocalDate date);
+
     List<Appointment> findByTenantId(String tenantId);
 
-    // --- ОПТИМИЗИРОВАННЫЙ МЕТОД ДЛЯ ПЛАНИРОВЩИКА ---
-    // Ищет записи:
-    // 1. Для конкретной компании (tenantId)
-    // 2. У которых еще НЕ отправлено напоминание (reminderSent = false)
-    // 3. Дата которых сегодня или позже (date >= :today)
     @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId " +
            "AND (a.reminderSent IS NULL OR a.reminderSent = false) " +
-           "AND a.date >= :today " +
+           "AND CAST(a.startTime AS date) >= :today " +
            "AND a.contactId IS NOT NULL")
     List<Appointment> findPendingReminders(@Param("tenantId") String tenantId, @Param("today") LocalDate today);
 
-    List<Appointment> findByTenantIdAndStaffMemberIdAndDate(String tenantId, String staffMemberId, LocalDate date);
+    @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId AND a.staffMemberId = :staffId AND CAST(a.startTime AS date) = :date")
+    List<Appointment> findByTenantIdAndStaffMemberIdAndDate(@Param("tenantId") String tenantId, @Param("staffId") String staffId, @Param("date") LocalDate date);
 
-    List<Appointment> findByContactIdAndTenantIdOrderByDateDesc(String contactId, String tenantId);
+    @Query("SELECT a FROM Appointment a WHERE a.contactId = :contactId AND a.tenantId = :tenantId ORDER BY a.startTime DESC")
+    List<Appointment> findByContactIdAndTenantIdOrderByDateDesc(@Param("contactId") String contactId, @Param("tenantId") String tenantId);
 
-    @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.date), COUNT(a)) " +
-           "FROM Appointment a WHERE a.tenantId = :tenantId AND YEAR(a.date) = :year AND MONTH(a.date) = :month " +
-           "GROUP BY DAY(a.date)")
+    @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.startTime), COUNT(a)) " +
+           "FROM Appointment a WHERE a.tenantId = :tenantId AND YEAR(a.startTime) = :year AND MONTH(a.startTime) = :month " +
+           "GROUP BY DAY(a.startTime)")
     List<WorkloadDto> getWorkloadForMonth(@Param("tenantId") String tenantId, @Param("year") int year, @Param("month") int month);
 
-    @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.date), COUNT(a)) " +
-           "FROM Appointment a WHERE a.staffMemberId = :staffId AND YEAR(a.date) = :year AND MONTH(a.date) = :month " +
-           "GROUP BY DAY(a.date)")
+    @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.startTime), COUNT(a)) " +
+           "FROM Appointment a WHERE a.staffMemberId = :staffId AND YEAR(a.startTime) = :year AND MONTH(a.startTime) = :month " +
+           "GROUP BY DAY(a.startTime)")
     List<WorkloadDto> getWorkloadForStaffAndMonth(@Param("staffId") String staffId, @Param("year") int year, @Param("month") int month);
 
 }
