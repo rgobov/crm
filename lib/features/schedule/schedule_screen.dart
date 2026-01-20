@@ -58,13 +58,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     try {
       final results = await Future.wait([
         _managerService.getAppointmentsForDay(_selectedDay),
-        _managerService.getStaffForSchedule(), 
+        // ПЕРЕДАЕМ ДАТУ: Чтобы получить смены на конкретный день
+        _managerService.getStaffForSchedule(_selectedDay), 
       ]);
 
       if (mounted) {
         setState(() {
           _appointmentsForDay = results[0] as List<Appointment>;
           final allStaff = results[1] as List<StaffMember>;
+          // Фильтруем только сотрудников (EMPLOYEE)
           _staff = allStaff.where((s) => s.role == 'EMPLOYEE').toList(); 
           _isLoading = false;
         });

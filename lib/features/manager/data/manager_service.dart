@@ -11,8 +11,10 @@ import 'package:try_neuro/service_locator.dart';
 class ManagerService {
   final Dio _dio = sl<HttpClient>().dio;
 
-  Future<List<StaffMember>> getStaffForSchedule() async {
-    final response = await _dio.get('/manager/schedule/staff');
+  // Обновлено: теперь принимает дату для получения актуальных смен мастеров
+  Future<List<StaffMember>> getStaffForSchedule(DateTime date) async {
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final response = await _dio.get('/manager/schedule/staff', queryParameters: {'date': dateStr});
     final List<dynamic> data = response.data;
     return data.map((json) => StaffMember.fromJson(json)).toList();
   }
@@ -51,7 +53,6 @@ class ManagerService {
     return Appointment.fromJson(response.data);
   }
 
-  // --- НОВЫЙ МЕТОД: Удаление записи ---
   Future<void> deleteAppointment(String id) async {
     await _dio.delete('/manager/appointments/$id');
   }

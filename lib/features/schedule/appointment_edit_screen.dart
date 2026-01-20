@@ -114,8 +114,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     if (_phoneDebounce?.isActive ?? false) _phoneDebounce!.cancel();
     _phoneDebounce = Timer(const Duration(milliseconds: 800), () async {
       final latestDigits = PhoneUtils.clean(_phoneSearchController.text);
-      
-      // --- ИЗМЕНЕНИЕ: Ищем только если введено достаточно цифр ---
       if (latestDigits.length < 6) return;
 
       final contact = await _contactService.findContactByPhone(latestDigits);
@@ -146,15 +144,16 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
 
       late final List<StaffMember> staffList;
       if (_currentUser?.role == UserRole.manager || _currentUser?.role == UserRole.admin) {
-        staffList = await _managerService.getStaffForSchedule();
+        // ПЕРЕДАЕМ ДАТУ
+        staffList = await _managerService.getStaffForSchedule(_selectedDate);
       } else if (_currentUser?.role == UserRole.employee) {
-        final self = await _employeeService.getMyProfile();
+        // ПЕРЕДАЕМ ДАТУ
+        final self = await _employeeService.getMyProfile(date: _selectedDate);
         staffList = [self];
       } else {
         staffList = await _staffService.getStaff();
       }
 
-      // --- ОПТИМИЗАЦИЯ: Убрали загрузку всех контактов ---
       final otherData = await Future.wait([
         _resourceService.getResources(),
         _appService.getServices(),
@@ -165,7 +164,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
       _resources = otherData[0] as List<Resource>;
       _staff = staffList;
 
-      // При редактировании подгружаем только одного клиента
       if (widget.initialAppointment != null && widget.initialAppointment!.contactId != null) {
         final contact = await _contactService.getContactById(widget.initialAppointment!.contactId!);
         if (contact != null) {
@@ -397,7 +395,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // --- СЕКЦИЯ: КЛИЕНТ ---
                     _buildSectionCard(
                       title: 'Информация о клиенте',
                       icon: Icons.person_search_outlined,
@@ -449,7 +446,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- СЕКЦИЯ: ДЕТАЛИ ---
                     _buildSectionCard(
                       title: 'Детали визита',
                       icon: Icons.event_note_outlined,
@@ -518,7 +514,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- СЕКЦИЯ: ИСПОЛНЕНИЕ ---
                     _buildSectionCard(
                       title: 'Исполнение',
                       icon: Icons.badge_outlined,

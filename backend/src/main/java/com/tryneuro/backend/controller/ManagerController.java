@@ -78,7 +78,6 @@ public class ManagerController {
         return ResponseEntity.ok(updatedAppointment);
     }
 
-    // --- НОВЫЙ ЭНДПОИНТ: Удаление записи ---
     @DeleteMapping("/appointments/{id}")
     public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
         scheduleService.deleteAppointment(id);
@@ -90,12 +89,12 @@ public class ManagerController {
         return scheduleService.getWorkloadForMonth(tenantId, year, month);
     }
 
+    // Обновлено: теперь принимает дату для получения актуального графика смен
     @GetMapping("/schedule/staff")
-    public List<StaffMember> getStaffForSchedule(@RequestAttribute("tenantId") String tenantId) {
-        List<StaffMember> allStaff = staffMemberService.getAllStaff(tenantId);
-        return allStaff.stream()
-                .filter(staff -> "EMPLOYEE".equals(staff.getRole()))
-                .collect(Collectors.toList());
+    public List<StaffMember> getStaffForSchedule(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return staffMemberService.getStaffForDate(tenantId, date);
     }
 
     @GetMapping("/staff/{staffMemberId}/availability")

@@ -2,9 +2,11 @@ package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.dto.CreateStaffRequest;
 import com.tryneuro.backend.model.StaffMember;
+import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.model.UserRole;
 import com.tryneuro.backend.repository.StaffMemberRepository;
+import com.tryneuro.backend.repository.StaffShiftRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,23 +15,30 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class StaffMemberService {
     private final StaffMemberRepository staffMemberRepository;
+    private final StaffShiftRepository staffShiftRepository;
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder; // ВОССТАНАВЛИВАЕМ ПОЛЕ
+    private final PasswordEncoder passwordEncoder;
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
     @Autowired
-    public StaffMemberService(StaffMemberRepository staffMemberRepository, UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public StaffMemberService(StaffMemberRepository staffMemberRepository,
+                              StaffShiftRepository staffShiftRepository,
+                              UserRepository userRepository,
+                              PasswordEncoder passwordEncoder) {
         this.staffMemberRepository = staffMemberRepository;
+        this.staffShiftRepository = staffShiftRepository;
         this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder; // Теперь эта строка корректна
+        this.passwordEncoder = passwordEncoder;
     }
 
     private LocalTime parseTime(String time) {
@@ -43,24 +52,53 @@ public class StaffMemberService {
     
     public Optional<StaffMember> getStaffMemberById(String id) {
         Optional<StaffMember> staffOpt = staffMemberRepository.findById(id);
-        staffOpt.ifPresent(staff -> {
-            userRepository.findByStaffId(staff.getId()).ifPresent(user -> {
-                staff.setRole(user.getRole().name());
-                staff.setEmail(user.getEmail());
-            });
-        });
+        staffOpt.ifPresent(this::enrichWithUserData);
         return staffOpt;
     }
 
-    public List<StaffMember> getAllStaff(String tenantId) {
-        List<StaffMember> staffMembers = staffMemberRepository.findByTenantId(tenantId);
-        for (StaffMember staff : staffMembers) {
-            userRepository.findByStaffId(staff.getId()).ifPresent(user -> {
-                staff.setRole(user.getRole().name());
-                staff.setEmail(user.getEmail());
+    public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
+        return staffMemberRepository.findById(id).map(staff -> {
+            enrichWithUserData(staff);
+            staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresent(shift -> {
+                staff.setDayOff(shift.isDayOff());
+                staff.setWorkStartTime(shift.getWorkStartTime());
+                staff.setWorkEndTime(shift.getWorkEndTime());
+                staff.setBreakStartTime(shift.getBreakStartTime());
+                staff.setBreakEndTime(shift.getBreakEndTime());
             });
-        }
-        return staffMembers;
+            // Если смены нет, в "чистой системе смен" считаем за выходной
+            if (!staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).isPresent()) {
+                staff.setDayOff(true);
+            }
+            return staff;
+        });
+    }
+
+    public List<StaffMember> getStaffForDate(String tenantId, LocalDate date) {
+        List<StaffMember> allStaff = staffMemberRepository.findByTenantId(tenantId);
+
+        return allStaff.stream()
+                .filter(StaffMember::isActive)
+                .map(staff -> {
+                    enrichWithUserData(staff);
+                    staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresentOrElse(shift -> {
+                        staff.setDayOff(shift.isDayOff());
+                        staff.setWorkStartTime(shift.getWorkStartTime());
+                        staff.setWorkEndTime(shift.getWorkEndTime());
+                        staff.setBreakStartTime(shift.getBreakStartTime());
+                        staff.setBreakEndTime(shift.getBreakEndTime());
+                    }, () -> {
+                        staff.setDayOff(true);
+                    });
+                    return staff;
+                }).collect(Collectors.toList());
+    }
+
+    private void enrichWithUserData(StaffMember staff) {
+        userRepository.findByStaffId(staff.getId()).ifPresent(user -> {
+            staff.setRole(user.getRole().name());
+            staff.setEmail(user.getEmail());
+        });
     }
 
     @Transactional
@@ -75,29 +113,33 @@ public class StaffMemberService {
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
         staffMember.setTenantId(tenantId);
-        staffMember.setAvailable(request.isAvailable());
-        staffMember.setWorkStartTime(parseTime(request.getWorkStartTime()));
-        staffMember.setWorkEndTime(parseTime(request.getWorkEndTime()));
-        staffMember.setBreakStartTime(parseTime(request.getBreakStartTime()));
-        staffMember.setBreakEndTime(parseTime(request.getBreakEndTime()));
+        staffMember.setActive(true);
         
-        StaffMember savedStaff = staffMemberRepository.save(staffMember);
-
-        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
-            User user = new User();
-            user.setEmail(request.getEmail());
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-            user.setTenantId(tenantId);
-            user.setStaffId(savedStaff.getId());
-            user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
-            userRepository.save(user);
-            savedStaff.setRole(user.getRole().name());
-            savedStaff.setEmail(user.getEmail());
-        }
-
-        return savedStaff;
+        return staffMemberRepository.save(staffMember);
     }
-    
+
+    @Transactional
+    public StaffShift saveShift(StaffShift shift) {
+        return staffShiftRepository.findByStaffIdAndDate(shift.getStaffId(), shift.getDate())
+                .map(existing -> {
+                    shift.setId(existing.getId());
+                    return staffShiftRepository.save(shift);
+                })
+                .orElseGet(() -> staffShiftRepository.save(shift));
+    }
+
+    @Transactional
+    public void deleteShift(String staffId, LocalDate date) {
+        staffShiftRepository.findByStaffIdAndDate(staffId, date)
+                .ifPresent(shift -> staffShiftRepository.deleteById(shift.getId()));
+    }
+
+    public List<StaffMember> getAllStaff(String tenantId) {
+        return staffMemberRepository.findByTenantId(tenantId).stream()
+                .map(s -> { enrichWithUserData(s); return s; })
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public StaffMember updateStaffMember(String id, CreateStaffRequest request, String tenantId) {
         StaffMember staffMember = staffMemberRepository.findById(id)
@@ -109,36 +151,14 @@ public class StaffMemberService {
 
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
-        staffMember.setAvailable(request.isAvailable());
-        staffMember.setWorkStartTime(parseTime(request.getWorkStartTime()));
-        staffMember.setWorkEndTime(parseTime(request.getWorkEndTime()));
-        staffMember.setBreakStartTime(parseTime(request.getBreakStartTime()));
-        staffMember.setBreakEndTime(parseTime(request.getBreakEndTime()));
-        
+
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         
         userRepository.findByStaffId(id).ifPresent(user -> {
-            boolean userNeedsUpdate = false;
-
-            if (request.getRole() != null) {
-                user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
-                userNeedsUpdate = true;
-            }
-
-            if (request.getEmail() != null && !request.getEmail().isEmpty()) {
-                user.setEmail(request.getEmail());
-                userNeedsUpdate = true;
-            }
-
-            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-                user.setPassword(passwordEncoder.encode(request.getPassword()));
-                userNeedsUpdate = true;
-            }
-
-            if (userNeedsUpdate) {
-                userRepository.save(user);
-            }
-
+            if (request.getRole() != null) user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
+            if (request.getEmail() != null && !request.getEmail().isEmpty()) user.setEmail(request.getEmail());
+            if (request.getPassword() != null && !request.getPassword().isEmpty()) user.setPassword(passwordEncoder.encode(request.getPassword()));
+            userRepository.save(user);
             savedStaff.setRole(user.getRole().name());
             savedStaff.setEmail(user.getEmail());
         });

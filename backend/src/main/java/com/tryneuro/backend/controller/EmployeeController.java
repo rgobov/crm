@@ -5,6 +5,7 @@ import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentComment;
 import com.tryneuro.backend.model.StaffMember;
+import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.service.CommentService;
 import com.tryneuro.backend.service.ScheduleService;
@@ -36,13 +37,47 @@ public class EmployeeController {
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<StaffMember> getMyProfile(@AuthenticationPrincipal User user) {
+    public ResponseEntity<StaffMember> getMyProfile(@AuthenticationPrincipal User user, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         if (user.getStaffId() == null) {
             return ResponseEntity.notFound().build();
         }
-        return staffMemberService.getStaffMemberById(user.getStaffId())
+        LocalDate targetDate = (date != null) ? date : LocalDate.now();
+        return staffMemberService.getStaffByIdAndDate(user.getStaffId(), targetDate)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/profile/shift")
+    public ResponseEntity<StaffShift> updateMyShift(@AuthenticationPrincipal User user, @RequestBody StaffShift shift) {
+        if (user.getStaffId() == null) {
+            return ResponseEntity.status(403).build();
+        }
+        shift.setStaffId(user.getStaffId());
+        shift.setTenantId(user.getTenantId());
+        StaffShift saved = staffMemberService.saveShift(shift);
+        return ResponseEntity.ok(saved);
+    }
+
+    // --- НОВЫЙ ЭНДПОИНТ: Копирование графика на период ---
+    @PostMapping("/profile/shift/copy")
+    public ResponseEntity<Void> copyShift(@AuthenticationPrincipal User user,
+                                          @RequestBody StaffShift sourceShift,
+                                          @RequestParam int days) {
+        if (user.getStaffId() == null) return ResponseEntity.status(403).build();
+
+        for (int i = 1; i <= days; i++) {
+            StaffShift newShift = new StaffShift();
+            newShift.setStaffId(user.getStaffId());
+            newShift.setTenantId(user.getTenantId());
+            newShift.setDate(sourceShift.getDate().plusDays(i));
+            newShift.setWorkStartTime(sourceShift.getWorkStartTime());
+            newShift.setWorkEndTime(sourceShift.getWorkEndTime());
+            newShift.setBreakStartTime(sourceShift.getBreakStartTime());
+            newShift.setBreakEndTime(sourceShift.getBreakEndTime());
+            newShift.setDayOff(sourceShift.isDayOff());
+            staffMemberService.saveShift(newShift);
+        }
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/appointments")
@@ -59,7 +94,6 @@ public class EmployeeController {
         return ResponseEntity.ok(updatedAppointment);
     }
 
-    // --- НОВЫЙ ЭНДПОИНТ: Удаление записи ---
     @DeleteMapping("/appointments/{id}")
     public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
         scheduleService.deleteAppointment(id);

@@ -4,8 +4,10 @@ import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentStatus;
 import com.tryneuro.backend.model.StaffMember;
+import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
+import com.tryneuro.backend.repository.StaffShiftRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -17,19 +19,23 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class ScheduleService {
     private final AppointmentRepository appointmentRepository;
     private final StaffMemberRepository staffMemberRepository;
+    private final StaffShiftRepository staffShiftRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     public ScheduleService(AppointmentRepository appointmentRepository, 
                            StaffMemberRepository staffMemberRepository,
+                           StaffShiftRepository staffShiftRepository,
                            SimpMessagingTemplate messagingTemplate) {
         this.appointmentRepository = appointmentRepository;
         this.staffMemberRepository = staffMemberRepository;
+        this.staffShiftRepository = staffShiftRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -54,21 +60,22 @@ public class ScheduleService {
     }
 
     /**
-     * Проверка доступности мастера. 
-     * Теперь проверяет ТОЛЬКО наложение записей. 
-     * Рабочий график игнорируется (он только для визуального отображения).
+     * Проверка доступности мастера с учетом системы смен.
      */
     public boolean isStaffMemberAvailable(String tenantId, String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
         StaffMember staffMember = staffMemberRepository.findById(staffMemberId).orElse(null);
-        if (staffMember == null || !staffMember.isAvailable()) return false;
+        if (staffMember == null || !staffMember.isActive()) return false;
+
+        // В чистой системе смен: если смены нет или это выходной - мастер недоступен
+        Optional<StaffShift> shiftOpt = staffShiftRepository.findByStaffIdAndDate(staffMemberId, date);
+        if (shiftOpt.isEmpty() || shiftOpt.get().isDayOff()) {
+            return false;
+        }
 
         LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
         LocalTime end = start.plusMinutes(duration);
 
-        // --- ИЗМЕНЕНИЕ: УБРАЛИ ПРОВЕРКУ РАБОЧЕГО ГРАФИКА И ПЕРЕРЫВОВ ---
-        // Менеджер может ставить записи в любое время.
-
-        // Проверяем только пересечение с другими (не отмененными) записями
+        // Проверяем наложение на другие записи
         List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
         for (Appointment existing : staffAppointments) {
             if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
@@ -158,7 +165,7 @@ public class ScheduleService {
         if (app.getStaffMemberId() != null) {
             if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
                 String name = staffMemberRepository.findById(app.getStaffMemberId()).map(StaffMember::getName).orElse("Сотрудник");
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер " + name + " уже занят на это время");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер " + name + " недоступен или уже занят на это время");
             }
         }
         if (app.getResourceId() != null) {

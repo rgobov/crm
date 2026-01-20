@@ -25,17 +25,26 @@ public class StaffMember {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    private LocalTime workStartTime;
-    private LocalTime workEndTime;
-    private LocalTime breakStartTime;
-    private LocalTime breakEndTime;
-
+    // Глобальный флаг активности (работает ли человек в компании вообще)
     @Column(nullable = false, columnDefinition = "boolean default true")
-    private boolean available = true;
+    private boolean active = true;
 
-    @Transient // Это поле не будет сохраняться в БД
+    // Эти поля теперь используются только для передачи данных на фронтенд (DTO-like)
+    // Они будут заполняться из таблицы staff_shifts в зависимости от выбранной даты
+    @Transient
+    private LocalTime workStartTime;
+    @Transient
+    private LocalTime workEndTime;
+    @Transient
+    private LocalTime breakStartTime;
+    @Transient
+    private LocalTime breakEndTime;
+    @Transient
+    private boolean isDayOff;
+
+    @Transient
     private String role;
 
-    @Transient // И это поле тоже не будет сохраняться в БД
+    @Transient
     private String email;
 }
