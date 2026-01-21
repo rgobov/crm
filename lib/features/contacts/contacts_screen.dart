@@ -53,8 +53,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 600), () {
-      if (_currentQuery != query) {
+    _debounce = Timer(const Duration(milliseconds: 800), () {
+      final cleanDigits = PhoneUtils.clean(query);
+      
+      bool shouldSearch = false;
+      if (query.isEmpty) {
+        shouldSearch = true; 
+      } else if (cleanDigits.isNotEmpty) {
+        if (cleanDigits.length >= 6) shouldSearch = true;
+      } else {
+        if (query.trim().length >= 3) shouldSearch = true;
+      }
+
+      if (shouldSearch && _currentQuery != query) {
         _loadInitialData();
       }
     });
@@ -70,9 +81,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
     });
     
     try {
-      final searchQuery = _isPhoneQuery(_currentQuery) 
-          ? PhoneUtils.clean(_currentQuery) 
-          : _currentQuery;
+      final cleanDigits = PhoneUtils.clean(_currentQuery);
+      final searchQuery = cleanDigits.isNotEmpty ? cleanDigits : _currentQuery;
 
       final result = await _contactService.getContactsPaged(
         query: searchQuery,
@@ -90,7 +100,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: $e')));
       }
     }
   }
@@ -101,9 +111,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
     
     try {
       final nextPage = _currentPage + 1;
-      final searchQuery = _isPhoneQuery(_currentQuery) 
-          ? PhoneUtils.clean(_currentQuery) 
-          : _currentQuery;
+      final cleanDigits = PhoneUtils.clean(_currentQuery);
+      final searchQuery = cleanDigits.isNotEmpty ? cleanDigits : _currentQuery;
 
       final result = await _contactService.getContactsPaged(
         query: searchQuery,
@@ -131,8 +140,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
     }
   }
 
-  bool _isPhoneQuery(String v) => v.contains(RegExp(r'[0-9]'));
-
   void _navigateToAddContact() async {
     final result = await Navigator.push(
       context,
@@ -158,18 +165,18 @@ class _ContactsScreenState extends State<ContactsScreen> {
       ),
       body: Column(
         children: [
+          // --- ПОИСК: ПОДХОД КАК В НОВОЙ ЗАПИСИ ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
+            child: TextFormField(
               controller: _searchController,
-              // Переключаем тип клавиатуры динамически
-              keyboardType: _isPhoneQuery(_searchController.text) ? TextInputType.phone : TextInputType.text,
-              inputFormatters: [
-                // Если ввод похож на номер телефона, применяем маску
-                if (_isPhoneQuery(_searchController.text)) RussianPhoneInputFormatter(),
-              ],
+              // Фиксируем тип клавиатуры на text (она универсальна)
+              keyboardType: TextInputType.text,
+              // Всегда используем международный форматтер (он сам поймет, когда вводить цифры)
+              inputFormatters: [InternationalPhoneInputFormatter()],
               decoration: InputDecoration(
-                hintText: 'Имя или +7 (___) ___-__-__',
+                labelText: 'Поиск клиента',
+                hintText: 'Имя или +7 (___) ...',
                 prefixIcon: const Icon(Icons.person_search_outlined),
                 suffixIcon: _searchController.text.isNotEmpty 
                   ? IconButton(
@@ -177,21 +184,18 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       onPressed: () { 
                         _searchController.clear(); 
                         _loadInitialData(); 
+                        setState(() {});
                       }
                     ) 
                   : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: colorScheme.outlineVariant),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                 filled: true,
                 fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
               onChanged: (v) {
-                // Маленький хак: заставляем TextField перерисоваться для смены клавиатуры/форматтера
-                setState(() {});
                 _onSearchChanged(v);
+                // Обновляем только если нужно показать/скрыть кнопку очистки
+                if (v.length <= 1) setState(() {});
               },
             ),
           ),
@@ -273,7 +277,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           Icon(Icons.person_search_rounded, size: 80, color: colorScheme.outline.withOpacity(0.3)),
           const SizedBox(height: 16),
           Text(
-            'Клиенты не найдены',
+            _currentQuery.isEmpty ? 'На сегодня записей нет' : 'Клиенты не найдены',
             style: TextStyle(fontSize: 16, color: colorScheme.outline, fontWeight: FontWeight.w500),
           ),
         ],
@@ -287,7 +291,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 32),
         child: Center(
           child: Text(
-            'Всего: ${_contacts.length}',
+            _currentQuery.isEmpty 
+              ? 'Всего на сегодня: ${_contacts.length}' 
+              : 'Найдено клиентов: ${_contacts.length}',
             style: TextStyle(color: Colors.grey.shade500, fontSize: 12, letterSpacing: 1.1),
           ),
         ),

@@ -144,10 +144,8 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
 
       late final List<StaffMember> staffList;
       if (_currentUser?.role == UserRole.manager || _currentUser?.role == UserRole.admin) {
-        // ПЕРЕДАЕМ ДАТУ
         staffList = await _managerService.getStaffForSchedule(_selectedDate);
       } else if (_currentUser?.role == UserRole.employee) {
-        // ПЕРЕДАЕМ ДАТУ
         final self = await _employeeService.getMyProfile(date: _selectedDate);
         staffList = [self];
       } else {
@@ -416,7 +414,8 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                             ),
                           ),
                           keyboardType: TextInputType.phone,
-                          inputFormatters: [RussianPhoneInputFormatter()],
+                          // --- ПРАВКА: Используем международный форматтер ---
+                          inputFormatters: [InternationalPhoneInputFormatter()],
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<Contact>(
