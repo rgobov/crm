@@ -66,7 +66,6 @@ public class StaffMemberService {
                 staff.setBreakStartTime(shift.getBreakStartTime());
                 staff.setBreakEndTime(shift.getBreakEndTime());
             });
-            // Если смены нет, в "чистой системе смен" считаем за выходной
             if (!staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).isPresent()) {
                 staff.setDayOff(true);
             }
@@ -112,6 +111,7 @@ public class StaffMemberService {
         StaffMember staffMember = new StaffMember();
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
+        staffMember.setPhone(request.getPhone()); // Учет телефона при создании
         staffMember.setTenantId(tenantId);
         staffMember.setActive(true);
         
@@ -151,6 +151,7 @@ public class StaffMemberService {
 
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
+        staffMember.setPhone(request.getPhone()); // Учет телефона при обновлении
 
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         

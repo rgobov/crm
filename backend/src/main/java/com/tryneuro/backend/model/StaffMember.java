@@ -25,12 +25,12 @@ public class StaffMember {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // Глобальный флаг активности (работает ли человек в компании вообще)
+    // Новое поле для телефона
+    private String phone;
+
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;
 
-    // Эти поля теперь используются только для передачи данных на фронтенд (DTO-like)
-    // Они будут заполняться из таблицы staff_shifts в зависимости от выбранной даты
     @Transient
     private LocalTime workStartTime;
     @Transient

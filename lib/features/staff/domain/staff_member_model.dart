@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:try_neuro/core/utils/phone_utils.dart';
 
 TimeOfDay? _parseTime(String? timeString) {
   if (timeString == null || timeString.isEmpty) return null;
@@ -21,13 +22,14 @@ class StaffMember {
   final String id;
   final String name;
   final String specialty;
+  final String? phone; // Добавлено поле телефона
   final String tenantId;
   final TimeOfDay? workStartTime;
   final TimeOfDay? workEndTime;
   final TimeOfDay? breakStartTime;
   final TimeOfDay? breakEndTime;
-  final bool available; // Это глобальный статус (активен/нет)
-  final bool isDayOff; // Это статус КОНКРЕТНОЙ смены
+  final bool available;
+  final bool isDayOff;
   final String? role;
   final String? email;
 
@@ -35,6 +37,7 @@ class StaffMember {
     required this.id,
     required this.name,
     required this.specialty,
+    this.phone,
     required this.tenantId,
     this.workStartTime,
     this.workEndTime,
@@ -51,6 +54,7 @@ class StaffMember {
       id: json['id'],
       name: json['name'],
       specialty: json['specialty'],
+      phone: json['phone'], // Читаем из JSON
       tenantId: json['tenantId'],
       available: json['available'] ?? json['active'] ?? false,
       isDayOff: json['dayOff'] ?? false,
@@ -68,6 +72,7 @@ class StaffMember {
       'id': id,
       'name': name,
       'specialty': specialty,
+      'phone': phone, // Отправляем в JSON
       'tenantId': tenantId,
       'active': available,
       'dayOff': isDayOff,
@@ -79,6 +84,7 @@ class StaffMember {
   }
 
   StaffMember copyWith({
+    String? phone,
     TimeOfDay? workStartTime,
     TimeOfDay? workEndTime,
     TimeOfDay? breakStartTime,
@@ -90,6 +96,7 @@ class StaffMember {
       id: id,
       name: name,
       specialty: specialty,
+      phone: phone ?? this.phone,
       tenantId: tenantId,
       workStartTime: workStartTime ?? this.workStartTime,
       workEndTime: workEndTime ?? this.workEndTime,
@@ -101,4 +108,7 @@ class StaffMember {
       email: email,
     );
   }
+
+  // Красивое форматирование для отображения
+  String get displayPhone => phone != null ? PhoneUtils.format(phone!) : 'Телефон не указан';
 }

@@ -6,7 +6,6 @@ import 'package:try_neuro/service_locator.dart';
 class StaffService {
   final Dio _dio = sl<HttpClient>().dio;
 
-  // Теперь getStaff обращается к эндпоинту админа
   Future<List<StaffMember>> getStaff() async {
     final response = await _dio.get('/admin/staff');
     final List<dynamic> data = response.data;
@@ -16,6 +15,7 @@ class StaffService {
   Future<void> addStaffMember({
     required String name,
     required String specialty,
+    String? phone, // Добавлено поле
     String? email,
     String? password,
     required String role,
@@ -28,6 +28,7 @@ class StaffService {
     await _dio.post('/admin/staff', data: {
       'name': name,
       'specialty': specialty,
+      'phone': phone, // Отправляем на сервер
       'email': email,
       'password': password,
       'role': role,
@@ -43,6 +44,7 @@ class StaffService {
     required String id,
     required String name,
     required String specialty,
+    String? phone, // Добавлено поле
     required String role,
     required bool available,
     String? workStartTime,
@@ -55,6 +57,7 @@ class StaffService {
     await _dio.put('/admin/staff/$id', data: {
       'name': name,
       'specialty': specialty,
+      'phone': phone, // Отправляем на сервер
       'role': role,
       'available': available,
       'workStartTime': workStartTime,

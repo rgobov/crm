@@ -7,8 +7,9 @@ public class CreateStaffRequest {
     // Данные сотрудника
     private String name;
     private String specialty;
+    private String phone; // Добавлено поле телефона
     private boolean available;
-    private String workStartTime; // Будем передавать как строку, например "09:00"
+    private String workStartTime;
     private String workEndTime;
     private String breakStartTime;
     private String breakEndTime;
