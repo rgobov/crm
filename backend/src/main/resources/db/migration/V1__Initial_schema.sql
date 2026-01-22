@@ -82,11 +82,12 @@ CREATE TABLE appointments (
     reminder_sent BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- 9. Создание таблицы комментариев к записям
+-- 9. Создание таблицы комментариев к записям (ИСПРАВЛЕНО)
 CREATE TABLE appointment_comments (
     id VARCHAR(36) PRIMARY KEY,
     appointment_id VARCHAR(36) NOT NULL,
-    user_id VARCHAR(36) NOT NULL,
+    author_id VARCHAR(36) NOT NULL,
+    author_name VARCHAR(255) NOT NULL,
     text TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     tenant_id VARCHAR(36) NOT NULL
