@@ -11,6 +11,7 @@ import com.tryneuro.backend.service.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,32 +35,38 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthResponse login(@RequestBody AuthRequest authRequest, @RequestHeader(value = "X-Telegram-Init-Data", required = false) String initData) {
-        authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
-        );
+        try {
+            authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
+            );
 
-        final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getEmail());
-        final User user = (User) userDetails;
+            final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getEmail());
+            final User user = (User) userDetails;
 
-        if (initData != null && !initData.isEmpty()) {
-            try {
-                Map<String, String> parsedData = telegramAuthService.validateAndParseData(initData);
-                String userJson = parsedData.get("user");
-                Map<String, Object> tgUser = objectMapper.readValue(userJson, Map.class);
-                Long telegramId = Long.valueOf(tgUser.get("id").toString());
-                
-                if (user.getTelegramId() == null || !user.getTelegramId().equals(telegramId)) {
-                    user.setTelegramId(telegramId);
-                    userRepository.save(user);
-                    System.out.println("LINK SUCCESS: Linked Telegram ID " + telegramId + " to user " + user.getEmail());
+            if (initData != null && !initData.isEmpty()) {
+                try {
+                    Map<String, String> parsedData = telegramAuthService.validateAndParseData(initData);
+                    String userJson = parsedData.get("user");
+                    Map<String, Object> tgUser = objectMapper.readValue(userJson, Map.class);
+                    Long telegramId = Long.valueOf(tgUser.get("id").toString());
+
+                    if (user.getTelegramId() == null || !user.getTelegramId().equals(telegramId)) {
+                        user.setTelegramId(telegramId);
+                        userRepository.save(user);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Auto-linking Telegram failed: " + e.getMessage());
                 }
-            } catch (Exception e) {
-                System.err.println("Auto-linking Telegram failed: " + e.getMessage());
             }
-        }
 
-        final String token = jwtUtil.generateToken(user, user.getTenantId(), user.getStaffId());
-        return new AuthResponse(token, user.getTenantId());
+            final String token = jwtUtil.generateToken(user, user.getTenantId(), user.getStaffId());
+            return new AuthResponse(token, user.getTenantId());
+
+        } catch (BadCredentialsException e) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Authentication error: " + e.getMessage());
+        }
     }
 
     @PostMapping("/telegram")
