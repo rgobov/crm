@@ -1,4 +1,5 @@
--- 1. Создание таблицы компаний (tenant_id)
+-- 1. СТРУКТУРА ТАБЛИЦ
+
 CREATE TABLE companies (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
@@ -6,16 +7,15 @@ CREATE TABLE companies (
     owner_email VARCHAR(255) NOT NULL
 );
 
--- 2. Создание таблицы сотрудников (мастеров)
 CREATE TABLE staff_members (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     specialty VARCHAR(255),
     tenant_id VARCHAR(36) NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    phone VARCHAR(20)
 );
 
--- 3. Создание таблицы пользователей
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -26,7 +26,6 @@ CREATE TABLE users (
     telegram_id BIGINT UNIQUE
 );
 
--- 4. Создание таблицы смен
 CREATE TABLE staff_shifts (
     id VARCHAR(36) PRIMARY KEY,
     staff_id VARCHAR(36) NOT NULL,
@@ -39,7 +38,6 @@ CREATE TABLE staff_shifts (
     tenant_id VARCHAR(36) NOT NULL
 );
 
--- 5. Создание таблицы контактов (клиентов)
 CREATE TABLE contacts (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -49,7 +47,6 @@ CREATE TABLE contacts (
     tenant_id VARCHAR(36) NOT NULL
 );
 
--- 6. Создание таблицы услуг
 CREATE TABLE services (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -57,7 +54,6 @@ CREATE TABLE services (
     tenant_id VARCHAR(36) NOT NULL
 );
 
--- 7. Создание таблицы ресурсов (кабинетов)
 CREATE TABLE resources (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -65,7 +61,6 @@ CREATE TABLE resources (
     tenant_id VARCHAR(36) NOT NULL
 );
 
--- 8. Создание таблицы записей (визитов)
 CREATE TABLE appointments (
     id VARCHAR(36) PRIMARY KEY,
     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -82,7 +77,6 @@ CREATE TABLE appointments (
     reminder_sent BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- 9. Создание таблицы комментариев к записям (ИСПРАВЛЕНО)
 CREATE TABLE appointment_comments (
     id VARCHAR(36) PRIMARY KEY,
     appointment_id VARCHAR(36) NOT NULL,
@@ -93,7 +87,6 @@ CREATE TABLE appointment_comments (
     tenant_id VARCHAR(36) NOT NULL
 );
 
--- 10. Создание таблицы настроек Wappi
 CREATE TABLE wappi_settings (
     id VARCHAR(36) PRIMARY KEY,
     tenant_id VARCHAR(36) NOT NULL,
@@ -104,3 +97,38 @@ CREATE TABLE wappi_settings (
     messenger_type VARCHAR(50) DEFAULT 'TELEGRAM',
     is_enabled BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+-- 2. НАПОЛНЕНИЕ ДАННЫМИ
+
+-- Компания
+INSERT INTO companies (id, name, address, owner_email)
+VALUES ('tenant-1', 'Try Neuro CRM', 'Moscow', 'forts@e1.ru');
+
+-- Администратор (Пароль: qwerty)
+INSERT INTO users (id, email, password, role, tenant_id)
+VALUES ('admin-id', 'forts@e1.ru', '$2a$10$XFMpS9H6xvNPKgSVv.uGxeSJVWJzpy07xd00DMxs.7u41W3uy.G', 'ADMIN', 'tenant-1');
+
+-- 25 Сотрудников и их пользователи
+DO $$
+BEGIN
+    FOR i IN 1..25 LOOP
+        INSERT INTO staff_members (id, name, specialty, tenant_id, active, phone)
+        VALUES ('staff-' || i, 'Мастер ' || i, 'Специалист', 'tenant-1', true, '+7900' || LPAD(i::text, 7, '0'));
+
+        INSERT INTO users (id, email, password, role, staff_id, tenant_id)
+        VALUES ('user-staff-' || i, 'forts' || i || '@e1.ru', '$2a$10$XFMpS9H6xvNPKgSVv.uGxeSJVWJzpy07xd00DMxs.7u41W3uy.G', 'EMPLOYEE', 'staff-' || i, 'tenant-1');
+    END LOOP;
+END $$;
+
+-- Роман Гобов
+INSERT INTO contacts (id, name, phones, email, notes, tenant_id)
+VALUES ('contact-roman', 'Гобов Роман Викторович', ARRAY['79022566116'], 'roman@example.com', 'Главный клиент', 'tenant-1');
+
+-- 100 тестовых клиентов
+DO $$
+BEGIN
+    FOR i IN 1..100 LOOP
+        INSERT INTO contacts (id, name, phones, email, notes, tenant_id)
+        VALUES ('test-c-' || i, 'Клиент Тестовый ' || i, ARRAY['+7' || LPAD((1000000000+i)::text, 10, '0')], 'c' || i || '@test.ru', 'Автотест', 'tenant-1');
+    END LOOP;
+END $$;
