@@ -36,7 +36,7 @@ class _MyAppState extends State<MyApp> {
     
     if (kIsWeb && PlatformUtils.instance.isTelegramSupported) {
       PlatformUtils.instance.ready();
-      PlatformUtils.instance.expand();
+      // Убрали принудительный expand() здесь, чтобы не блокировать клавиатуру
     }
     
     sl<SyncService>().start();
@@ -49,7 +49,7 @@ class _MyAppState extends State<MyApp> {
     final bool isDark = PlatformUtils.instance.isTelegramDarkMode;
 
     return MaterialApp(
-      title: '999 CRM', // ИЗМЕНЕНО: Новое название приложения
+      title: '999 CRM',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -58,6 +58,8 @@ class _MyAppState extends State<MyApp> {
           seedColor: primaryColor,
           brightness: isDark ? Brightness.dark : Brightness.light,
         ),
+        // ВАЖНО ДЛЯ КЛАВИАТУРЫ: отключаем автоматическое прокручивание
+        visualDensity: VisualDensity.adaptivePlatformDensity,
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: primaryColor,

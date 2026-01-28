@@ -7,7 +7,9 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="999 CRM">
 
-  <!-- Исправленные мета-теги для мобильных устройств -->
+  <!-- ВАЖНО: добавили interactive-widget=resizes-content для корректной работы клавиатуры -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="999 CRM">
@@ -18,13 +20,17 @@
   <title>999 CRM</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- 1. Сначала загружаем Telegram SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <!-- 2. Это единственный скрипт, нужный для загрузки Flutter 3.22+ -->
+  <!-- Хак для принудительного вызова клавиатуры в Telegram -->
+  <script>
+    window.addEventListener('touchstart', function() {
+      // Это "прогревает" движок браузера для возможности вызова клавиатуры
+    }, {passive: false});
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </head>
 <body>
-  <!-- Тело документа остается пустым, Flutter сам вставит сюда Canvas или HTML элементы -->
 </body>
 </html>
