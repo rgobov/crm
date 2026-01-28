@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart'; // Добавили импорт для FocusNode
 import 'dart:js' as js;
 
 class KeyboardUtils {
