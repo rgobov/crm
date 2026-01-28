@@ -34,10 +34,9 @@ class _MyAppState extends State<MyApp> {
     await initializeDateFormatting('ru_RU', null);
     Intl.defaultLocale = 'ru_RU';
     
-    // Если мы в Telegram, сообщаем ему, что приложение готово
     if (kIsWeb && PlatformUtils.instance.isTelegramSupported) {
       PlatformUtils.instance.ready();
-      PlatformUtils.instance.expand(); // Разворачиваем на весь экран
+      PlatformUtils.instance.expand();
     }
     
     sl<SyncService>().start();
@@ -46,12 +45,11 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Получаем цвет кнопки из Telegram или используем стандартный синий
     final Color primaryColor = PlatformUtils.instance.telegramButtonColor ?? Colors.blue;
     final bool isDark = PlatformUtils.instance.isTelegramDarkMode;
 
     return MaterialApp(
-      title: 'Try Neuro CRM',
+      title: '999 CRM', // ИЗМЕНЕНО: Новое название приложения
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -60,7 +58,6 @@ class _MyAppState extends State<MyApp> {
           seedColor: primaryColor,
           brightness: isDark ? Brightness.dark : Brightness.light,
         ),
-        // Стилизуем кнопки под стиль Telegram
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: primaryColor,
