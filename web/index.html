@@ -7,7 +7,7 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="999 CRM">
 
-  <!-- ВАЖНО: добавили interactive-widget=resizes-content для корректной работы клавиатуры -->
+  <!-- Улучшенный viewport для работы с клавиатурой -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 
   <meta name="mobile-web-app-capable" content="yes">
@@ -22,11 +22,25 @@
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <!-- Хак для принудительного вызова клавиатуры в Telegram -->
   <script>
-    window.addEventListener('touchstart', function() {
-      // Это "прогревает" движок браузера для возможности вызова клавиатуры
-    }, {passive: false});
+    // Этот скрипт помогает "пробросить" фокус от Flutter к системному браузеру
+    document.addEventListener('touchstart', function(e) {
+      // Ищем невидимые поля ввода, которые создает Flutter
+      var target = e.target;
+      while (target) {
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') {
+          target.focus();
+          break;
+        }
+        target = target.parentElement;
+      }
+    }, {passive: true});
+
+    // Функция, которую мы можем вызвать из Flutter если ничего не помогает
+    window.forceFocus = function() {
+      var input = document.querySelector('input');
+      if (input) input.focus();
+    };
   </script>
 
   <script src="flutter_bootstrap.js" async></script>
