@@ -2,12 +2,9 @@
 <html>
 <head>
   <base href="/">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="999 CRM">
-
-  <!-- Улучшенный viewport для работы с клавиатурой -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 
   <meta name="mobile-web-app-capable" content="yes">
@@ -23,9 +20,17 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <script>
-    // Этот скрипт помогает "пробросить" фокус от Flutter к системному браузеру
+    // Хак для принудительного вызова клавиатуры
+    window.triggerMobileKeyboard = function() {
+      var input = document.getElementById('hidden-telegram-input');
+      if (input) {
+        input.focus();
+        input.click();
+      }
+    };
+
+    // Слушатель тапов для проброса фокуса
     document.addEventListener('touchstart', function(e) {
-      // Ищем невидимые поля ввода, которые создает Flutter
       var target = e.target;
       while (target) {
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') {
@@ -35,16 +40,14 @@
         target = target.parentElement;
       }
     }, {passive: true});
-
-    // Функция, которую мы можем вызвать из Flutter если ничего не помогает
-    window.forceFocus = function() {
-      var input = document.querySelector('input');
-      if (input) input.focus();
-    };
   </script>
 
   <script src="flutter_bootstrap.js" async></script>
 </head>
 <body>
+  <!-- СКРЫТЫЙ ИНПУТ ДЛЯ ВЫЗОВА КЛАВИАТУРЫ -->
+  <input type="text" id="hidden-telegram-input"
+         style="position: absolute; left: -9999px; opacity: 0; height: 1px; width: 1px;"
+         autocapitalize="off" autocomplete="off" autocorrect="off" />
 </body>
 </html>
