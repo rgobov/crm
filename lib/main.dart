@@ -11,36 +11,64 @@ import 'package:try_neuro/core/utils/platform_utils.dart';
 import 'package:flutter/foundation.dart';
 
 void main() {
-  // Максимально стандартный запуск без лишних оберток
   WidgetsFlutterBinding.ensureInitialized();
   setupServiceLocator();
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _initApp();
+  }
+
+  Future<void> _initApp() async {
+    await initializeDateFormatting('ru_RU', null);
+    Intl.defaultLocale = 'ru_RU';
+    
+    // Если мы в Telegram, сообщаем ему, что приложение готово
+    if (kIsWeb && PlatformUtils.instance.isTelegramSupported) {
+      PlatformUtils.instance.ready();
+      PlatformUtils.instance.expand(); // Разворачиваем на весь экран
+    }
+    
+    sl<SyncService>().start();
+    sl<TimeService>().sync().catchError((e) => debugPrint('Sync error: $e'));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Фоновые задачи запускаем через минимальную задержку
-    Timer.run(() async {
-      await initializeDateFormatting('ru_RU', null);
-      Intl.defaultLocale = 'ru_RU';
-      
-      if (kIsWeb && PlatformUtils.instance.isTelegramSupported) {
-        PlatformUtils.instance.ready();
-      }
-      
-      sl<SyncService>().start();
-      sl<TimeService>().sync().catchError((e) => debugPrint('Sync error: $e'));
-    });
+    // Получаем цвет кнопки из Telegram или используем стандартный синий
+    final Color primaryColor = PlatformUtils.instance.telegramButtonColor ?? Colors.blue;
+    final bool isDark = PlatformUtils.instance.isTelegramDarkMode;
 
     return MaterialApp(
       title: 'Try Neuro CRM',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        brightness: isDark ? Brightness.dark : Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: primaryColor,
+          brightness: isDark ? Brightness.dark : Brightness.light,
+        ),
+        // Стилизуем кнопки под стиль Telegram
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
       ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -48,7 +76,7 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('ru', 'RU')],
-      home: const LoginScreen(), // Сразу идем на логин
+      home: const LoginScreen(),
     );
   }
 }
