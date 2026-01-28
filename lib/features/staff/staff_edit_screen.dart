@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/session/session_service.dart';
-import 'package:try_neuro/core/utils/phone_utils.dart'; // <<< Добавлен импорт
+import 'package:try_neuro/core/utils/keyboard_utils.dart'; // Добавили импорт
+import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
@@ -24,10 +25,18 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
 
   final _nameController = TextEditingController();
   final _specialtyController = TextEditingController();
-  final _phoneController = TextEditingController(); // <<< Новый контроллер
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _newPasswordController = TextEditingController();
+
+  // FocusNodes для всех полей
+  final _nameFocusNode = FocusNode();
+  final _specialtyFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+  final _newPasswordFocusNode = FocusNode();
 
   bool _hasAccount = false;
   bool _isAvailable = true;
@@ -52,7 +61,7 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
         if (member != null) {
           _nameController.text = member.name;
           _specialtyController.text = member.specialty;
-          _phoneController.text = member.phone != null ? PhoneUtils.format(member.phone) : ''; // <<< Заполнение телефона
+          _phoneController.text = member.phone != null ? PhoneUtils.format(member.phone) : '';
           _isAvailable = member.available;
           _selectedRole = member.role ?? 'EMPLOYEE';
           _workStartTime = member.workStartTime;
@@ -77,6 +86,13 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _newPasswordController.dispose();
+    // Dispose FocusNodes
+    _nameFocusNode.dispose();
+    _specialtyFocusNode.dispose();
+    _phoneFocusNode.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _newPasswordFocusNode.dispose();
     super.dispose();
   }
 
@@ -90,14 +106,14 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final String cleanPhone = PhoneUtils.clean(_phoneController.text); // <<< Очистка номера
+      final String cleanPhone = PhoneUtils.clean(_phoneController.text);
 
       if (_isEditing) {
         await _staffService.updateStaffMember(
           id: widget.staffMember!.id,
           name: _nameController.text,
           specialty: _specialtyController.text,
-          phone: cleanPhone, // <<< Отправка телефона
+          phone: cleanPhone,
           role: _selectedRole,
           available: _isAvailable,
           workStartTime: _formatTime(_workStartTime),
@@ -111,7 +127,7 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
         await _staffService.addStaffMember(
           name: _nameController.text,
           specialty: _specialtyController.text,
-          phone: cleanPhone, // <<< Отправка телефона
+          phone: cleanPhone,
           email: _hasAccount ? _emailController.text : null,
           password: _hasAccount ? _passwordController.text : null,
           role: _selectedRole,
@@ -144,20 +160,25 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
                 children: [
                   TextFormField(
                     controller: _nameController, 
+                    focusNode: _nameFocusNode,
+                    onTap: () => KeyboardUtils.onTextFieldTap(_nameFocusNode),
                     decoration: const InputDecoration(labelText: 'Имя', border: OutlineInputBorder()), 
                     validator: (v) => v!.isEmpty ? 'Введите имя' : null
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _specialtyController, 
+                    focusNode: _specialtyFocusNode,
+                    onTap: () => KeyboardUtils.onTextFieldTap(_specialtyFocusNode),
                     decoration: const InputDecoration(labelText: 'Специальность', border: OutlineInputBorder()), 
                     validator: (v) => v!.isEmpty ? 'Введите специальность' : null
                   ),
                   const SizedBox(height: 16),
                   
-                  // --- НОВОЕ ПОЛЕ: Телефон ---
                   TextFormField(
                     controller: _phoneController,
+                    focusNode: _phoneFocusNode,
+                    onTap: () => KeyboardUtils.onTextFieldTap(_phoneFocusNode),
                     decoration: const InputDecoration(
                       labelText: 'Телефон', 
                       border: OutlineInputBorder(),
@@ -177,15 +198,30 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
                   if (_hasAccount) ...[
                     TextFormField(
                       controller: _emailController, 
+                      focusNode: _emailFocusNode,
+                      onTap: () => KeyboardUtils.onTextFieldTap(_emailFocusNode),
                       decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()), 
                       validator: (v) => v!.isEmpty ? 'Введите email' : null, 
                       enabled: isEmailFieldEnabled,
                     ),
                     const SizedBox(height: 16),
                     if (!_isEditing)
-                      TextFormField(controller: _passwordController, decoration: const InputDecoration(labelText: 'Пароль', border: OutlineInputBorder()), obscureText: true, validator: (v) => (v!.isEmpty) ? 'Введите пароль' : null),
+                      TextFormField(
+                        controller: _passwordController, 
+                        focusNode: _passwordFocusNode,
+                        onTap: () => KeyboardUtils.onTextFieldTap(_passwordFocusNode),
+                        decoration: const InputDecoration(labelText: 'Пароль', border: OutlineInputBorder()), 
+                        obscureText: true, 
+                        validator: (v) => (v!.isEmpty) ? 'Введите пароль' : null
+                      ),
                     if (_isEditing && isAdmin)
-                      TextFormField(controller: _newPasswordController, decoration: const InputDecoration(labelText: 'Новый пароль (оставьте пустым)', border: OutlineInputBorder()), obscureText: true),
+                      TextFormField(
+                        controller: _newPasswordController, 
+                        focusNode: _newPasswordFocusNode,
+                        onTap: () => KeyboardUtils.onTextFieldTap(_newPasswordFocusNode),
+                        decoration: const InputDecoration(labelText: 'Новый пароль (оставьте пустым)', border: OutlineInputBorder()), 
+                        obscureText: true
+                      ),
                     const SizedBox(height: 16),
                   ],
                   DropdownButtonFormField<String>(
@@ -202,7 +238,6 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: _isLoading ? null : _saveForm, 
-                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
                     child: const Text('Сохранить')
                   ),
                 ],

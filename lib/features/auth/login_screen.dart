@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/config/app_config.dart';
 import 'package:try_neuro/core/network/websocket_service.dart';
+import 'package:try_neuro/core/utils/keyboard_utils.dart'; // Добавили импорт
 import 'package:try_neuro/features/admin/admin_dashboard_screen.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
 import 'package:try_neuro/features/auth/data/telegram_auth_service.dart';
@@ -117,12 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 focusNode: _emailFocusNode,
                 decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
                 keyboardType: TextInputType.emailAddress,
-                onTap: () {
-                  // Принудительный запрос фокуса для Telegram
-                  if (!_emailFocusNode.hasFocus) {
-                    _emailFocusNode.requestFocus();
-                  }
-                },
+                onTap: () => KeyboardUtils.onTextFieldTap(_emailFocusNode), // ИСПОЛЬЗУЕМ ХАК
               ),
               const SizedBox(height: 16),
               TextField(
@@ -130,11 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 focusNode: _passwordFocusNode,
                 decoration: const InputDecoration(labelText: 'Пароль', border: OutlineInputBorder()),
                 obscureText: true,
-                onTap: () {
-                  if (!_passwordFocusNode.hasFocus) {
-                    _passwordFocusNode.requestFocus();
-                  }
-                },
+                onTap: () => KeyboardUtils.onTextFieldTap(_passwordFocusNode), // ИСПОЛЬЗУЕМ ХАК
               ),
               const SizedBox(height: 24),
               _isLoading 
