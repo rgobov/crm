@@ -26,6 +26,9 @@ class _LoginScreenState extends State<LoginScreen> {
     text: AppConfig.isProduction ? null : 'qwerty',
   );
 
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+
   final _authService = sl<AuthService>(); 
   final _tgAuthService = sl<TelegramAuthService>();
   bool _isLoading = false;
@@ -33,7 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Запускаем проверку Telegram только в Web
     if (kIsWeb) {
       _checkTelegramLogin();
     }
@@ -84,6 +86,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -99,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 60.0),
             const Text('Добро пожаловать!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             const SizedBox(height: 32.0),
-            if (_isLoading && kIsWeb) // Показываем загрузку TG только в вебе
+            if (_isLoading && kIsWeb)
               const Column(
                 children: [
                   CircularProgressIndicator(),
@@ -110,21 +114,33 @@ class _LoginScreenState extends State<LoginScreen> {
             else ...[
               TextField(
                 controller: _emailController,
+                focusNode: _emailFocusNode,
                 decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
                 keyboardType: TextInputType.emailAddress,
+                onTap: () {
+                  // Принудительный запрос фокуса для Telegram
+                  if (!_emailFocusNode.hasFocus) {
+                    _emailFocusNode.requestFocus();
+                  }
+                },
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
+                focusNode: _passwordFocusNode,
                 decoration: const InputDecoration(labelText: 'Пароль', border: OutlineInputBorder()),
                 obscureText: true,
+                onTap: () {
+                  if (!_passwordFocusNode.hasFocus) {
+                    _passwordFocusNode.requestFocus();
+                  }
+                },
               ),
               const SizedBox(height: 24),
               _isLoading 
                 ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(
                     onPressed: _login,
-                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
                     child: const Text('Войти'),
                   ),
               const SizedBox(height: 16),
