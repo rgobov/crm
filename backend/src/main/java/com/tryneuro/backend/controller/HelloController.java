@@ -13,17 +13,15 @@ public class HelloController {
 
     @GetMapping("/hello")
     public String hello() {
+        System.out.println("RECEIVED REQUEST: /api/system/hello at " + ZonedDateTime.now());
         return "Hello from TryNeuro Backend!";
     }
 
-    // --- НОВЫЙ ЭНДПОИНТ ДЛЯ СИНХРОНИЗАЦИИ ВРЕМЕНИ ---
     @GetMapping("/time")
     public Map<String, Object> getServerTime() {
-        ZonedDateTime now = ZonedDateTime.now();
         return Map.of(
-            "iso", now.toString(),
-            "timestamp", now.toInstant().toEpochMilli(),
-            "offset", now.getOffset().toString()
+            "iso", ZonedDateTime.now().toString(),
+            "timestamp", System.currentTimeMillis()
         );
     }
 }
