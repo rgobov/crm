@@ -1,7 +1,8 @@
-# ЭТАП 1: Сборка (Node.js)
+# ЭТАП 1: Сборка
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
+# Используем --include=dev чтобы точно захватить всё для сборки
 RUN npm install
 COPY . .
 RUN npm run build
@@ -9,9 +10,9 @@ RUN npm run build
 # ЭТАП 2: Запуск
 FROM node:20-alpine
 WORKDIR /app
-# Копируем результаты сборки и нужные модули
 COPY --from=build /app/package*.json ./
-COPY --from=build /app/node_modules ./
+# Копируем вообще все модули для надежности
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 
 ENV PORT=3000
