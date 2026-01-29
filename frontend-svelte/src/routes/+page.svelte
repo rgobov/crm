@@ -8,8 +8,8 @@
 	let isLoading = false;
 	let isTelegram = false;
 
-	// Адрес бэкенда (как в Flutter)
-	const API_URL = 'https://tryneuro-backend.t6xfbd.easypanel.host/api';
+	// Адрес бэкенда (теперь используем ваш IP)
+	const API_URL = 'http://109.248.203.156:8080/api';
 
 	onMount(() => {
 		// Проверяем Telegram WebApp
@@ -41,6 +41,7 @@
 				// В будущем здесь будет редирект на расписание
 			}
 		} catch (e) {
+			console.error('Login error:', e);
 			error = e.response?.data?.message || 'Ошибка входа. Проверьте данные.';
 		} finally {
 			isLoading = false;
@@ -72,7 +73,7 @@
 		</button>
 
 		<div class="footer">
-			© 2026 TryNeuro
+			© 999
 		</div>
 	</div>
 </div>

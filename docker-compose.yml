@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # БАЗА ДАННЫХ
   database:
     image: postgres:15-alpine
     container_name: tryneuro_db
@@ -14,6 +15,7 @@ services:
     networks:
       - tryneuro_network
 
+  # БЭКЕНД (JAVA)
   backend:
     build:
       context: ./backend
@@ -30,9 +32,11 @@ services:
       - database
     networks:
       - tryneuro_network
-    ports:
-      - "8080:8080"
+    # Порт 8080 теперь только внутри сети Docker
+    expose:
+      - 8080
 
+  # ФРОНТЕНД (SVELTE)
   frontend-svelte:
     build:
       context: ./frontend-svelte
@@ -46,9 +50,23 @@ services:
       - backend
     networks:
       - tryneuro_network
-    # МЕНЯЕМ ВНЕШНИЙ ПОРТ НА 3001, чтобы не конфликтовать с Easypanel
+    expose:
+      - 3000
+
+  # ДИСПЕТЧЕР (NGINX PROXY MANAGER)
+  nginx-proxy:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: tryneuro_proxy
+    restart: always
     ports:
-      - "3001:3000"
+      - '80:80'   # Публичный HTTP
+      - '81:81'   # Админка прокси
+      - '443:443' # Публичный HTTPS
+    volumes:
+      - ./proxy/data:/data
+      - ./proxy/letsencrypt:/etc/letsencrypt
+    networks:
+      - tryneuro_network
 
 networks:
   tryneuro_network:

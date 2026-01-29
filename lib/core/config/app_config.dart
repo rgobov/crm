@@ -7,9 +7,8 @@ class AppConfig {
   // false: использовать 10.0.2.2 (для эмулятора)
   static const bool isMobileTest = true;
 
-  // Адрес вашего бэкенда в Easypanel
-  static const String productionUrl = 'https://tryneuro-backend.t6xfbd.easypanel.host/api';
-  
+  // Адрес вашего бэкенда
+  static const String productionUrl = 'http://109.248.203.156:8080/api'; // Наш новый IP
   // IP вашего компьютера в Wi-Fi сети
   static const String computerIp = '192.168.100.5';
 
