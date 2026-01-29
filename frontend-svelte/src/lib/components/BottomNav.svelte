@@ -2,24 +2,22 @@
     import { page } from '$app/stores';
     import { user } from '$lib/stores/auth.js';
 
-    // Автоматически определяем, какой пункт меню активен по URL
+    // Определяем активный путь для подсветки
     $: activePath = $page.url.pathname;
 </script>
 
 <nav class="bottom-nav">
-    <a href="/{$user?.role?.toLowerCase() || 'employee'}" class:active={activePath.endsWith('admin') || activePath.endsWith('manager') || activePath.endsWith('employee')}>
+    <!-- Точное соответствие Flutter: 'Управление' -->
+    <a href="/{$user?.role?.toLowerCase() || 'employee'}"
+       class:active={activePath.endsWith('admin') || activePath.endsWith('manager') || activePath.endsWith('employee')}>
         <span class="icon">📊</span>
-        <span class="label">Главная</span>
+        <span class="label">Управление</span>
     </a>
 
+    <!-- Точное соответствие Flutter: 'Календарь' -->
     <a href="/calendar" class:active={activePath.includes('/calendar')}>
         <span class="icon">📅</span>
         <span class="label">Календарь</span>
-    </a>
-
-    <a href="/profile" class:active={activePath.includes('/profile')}>
-        <span class="icon">👤</span>
-        <span class="label">Профиль</span>
     </a>
 </nav>
 
@@ -41,8 +39,8 @@
     }
 
     :global(body.tg) .bottom-nav {
-        background: var(--tg-theme-secondary-bg-color);
-        border-top: 0.5px solid var(--tg-theme-hint-color);
+        background: var(--tg-theme-secondary-bg-color, #ffffff);
+        border-top: 0.5px solid var(--tg-theme-hint-color, #dbdbdb);
     }
 
     a {
@@ -53,12 +51,11 @@
         align-items: center;
         gap: 4px;
         color: #94a3b8;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.2s ease;
     }
 
     a.active {
         color: var(--primary-color);
-        transform: translateY(-2px);
     }
 
     .icon {
@@ -68,7 +65,6 @@
     .label {
         font-size: 11px;
         font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.2px;
     }
 </style>
