@@ -13,10 +13,11 @@ public class HelloController {
 
     @GetMapping("/hello")
     public String hello() {
+        // ЭТОТ ЛОГ ПОЯВИТСЯ В ПАНЕЛИ EASYPANEL, ЕСЛИ ЗАПРОС ДОШЕЛ
+        System.out.println(">>> CLOUD_DEBUG: Request received at /api/system/hello");
         return "Hello from TryNeuro Backend!";
     }
 
-    // --- НОВЫЙ ЭНДПОИНТ ДЛЯ СИНХРОНИЗАЦИИ ВРЕМЕНИ ---
     @GetMapping("/time")
     public Map<String, Object> getServerTime() {
         ZonedDateTime now = ZonedDateTime.now();
