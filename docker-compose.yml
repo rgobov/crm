@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Называем сервис в точности как в логах
   tryneuro_database:
     image: postgres:15-alpine
     container_name: tryneuro_db
@@ -22,12 +21,12 @@ services:
     container_name: tryneuro_backend
     restart: always
     environment:
-      # Теперь хост совпадает с именем сервиса выше
       SPRING_DATASOURCE_URL: jdbc:postgresql://tryneuro_database:5432/tryneuro_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      JWT_SECRET: ${JWT_SECRET:-SecureKey1234567890}
+      # КЛЮЧ ОБНОВЛЕН: теперь он достаточно длинный (более 32 символов)
+      JWT_SECRET: ${JWT_SECRET:-9a4f98bed2f032b38cd98f9b5560ca2fd691225db05e61247b91285284cc56a0}
     depends_on:
       - tryneuro_database
     networks:
