@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  # БАЗА ДАННЫХ
-  database:
+  # Называем сервис в точности как в логах
+  tryneuro_database:
     image: postgres:15-alpine
     container_name: tryneuro_db
     restart: always
@@ -15,7 +15,6 @@ services:
     networks:
       - tryneuro_network
 
-  # БЭКЕНД (JAVA)
   backend:
     build:
       context: ./backend
@@ -23,20 +22,19 @@ services:
     container_name: tryneuro_backend
     restart: always
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/tryneuro_db
+      # Теперь хост совпадает с именем сервиса выше
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tryneuro_database:5432/tryneuro_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       JWT_SECRET: ${JWT_SECRET:-SecureKey1234567890}
     depends_on:
-      - database
+      - tryneuro_database
     networks:
       - tryneuro_network
-    # Порт 8080 теперь только внутри сети Docker
-    expose:
-      - 8080
+    ports:
+      - "8080:8080"
 
-  # ФРОНТЕНД (SVELTE)
   frontend-svelte:
     build:
       context: ./frontend-svelte
@@ -50,18 +48,17 @@ services:
       - backend
     networks:
       - tryneuro_network
-    expose:
-      - 3000
+    ports:
+      - "3001:3000"
 
-  # ДИСПЕТЧЕР (NGINX PROXY MANAGER)
   nginx-proxy:
     image: 'jc21/nginx-proxy-manager:latest'
     container_name: tryneuro_proxy
     restart: always
     ports:
-      - '80:80'   # Публичный HTTP
-      - '81:81'   # Админка прокси
-      - '443:443' # Публичный HTTPS
+      - '80:80'
+      - '81:81'
+      - '443:443'
     volumes:
       - ./proxy/data:/data
       - ./proxy/letsencrypt:/etc/letsencrypt
