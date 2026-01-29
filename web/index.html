@@ -2,64 +2,29 @@
 <html>
 <head>
   <base href="/">
+
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="999 CRM">
+  <meta name="description" content="Try Neuro CRM">
 
-  <!-- Viewport с поддержкой изменения размера при открытии клавиатуры -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
-
-  <style>
-    /* Глобальный запрет системного контекстного меню (кроме полей ввода) */
-    * { -webkit-touch-callout: none; -webkit-user-select: none; }
-    input, textarea { -webkit-user-select: text; user-select: text; }
-    body { background-color: #ffffff; }
-  </style>
-
+  <!-- Исправленные мета-теги для мобильных устройств -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="999 CRM">
+  <meta name="apple-mobile-web-app-title" content="try_neuro">
   
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>999 CRM</title>
+  <title>Try Neuro CRM</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- 1. Сначала загружаем Telegram SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <script>
-    // 1. Сообщаем Телеграму что мы готовы
-    Telegram.WebApp.ready();
-    Telegram.WebApp.expand();
-
-    // 2. Хак для принудительного вызова клавиатуры
-    window.triggerMobileKeyboard = function() {
-      // Кратковременно "дергаем" интерфейс через кнопку Telegram
-      // Это заставляет WebView переключить фокус на системный уровень
-      Telegram.WebApp.MainButton.setParams({ text: '...', is_visible: true });
-      Telegram.WebApp.MainButton.hide();
-
-      var input = document.getElementById('hidden-telegram-input');
-      if (input) {
-        input.focus();
-        input.click();
-      }
-    };
-
-    // 3. Авто-фокус при касании (для iOS)
-    document.addEventListener('touchstart', function(e) {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        e.target.focus();
-      }
-    }, {passive: true});
-  </script>
-
+  <!-- 2. Это единственный скрипт, нужный для загрузки Flutter 3.22+ -->
   <script src="flutter_bootstrap.js" async></script>
 </head>
 <body>
-  <input type="text" id="hidden-telegram-input"
-         style="position: absolute; left: -9999px; opacity: 0; height: 1px; width: 1px;"
-         autocapitalize="off" autocomplete="off" autocorrect="off" />
+  <!-- Тело документа остается пустым, Flutter сам вставит сюда Canvas или HTML элементы -->
 </body>
 </html>

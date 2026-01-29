@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/config/app_config.dart';
 import 'package:try_neuro/core/network/websocket_service.dart';
-import 'package:try_neuro/core/utils/keyboard_utils.dart'; // Добавили импорт
 import 'package:try_neuro/features/admin/admin_dashboard_screen.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
 import 'package:try_neuro/features/auth/data/telegram_auth_service.dart';
@@ -27,9 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
     text: AppConfig.isProduction ? null : 'qwerty',
   );
 
-  final _emailFocusNode = FocusNode();
-  final _passwordFocusNode = FocusNode();
-
   final _authService = sl<AuthService>(); 
   final _tgAuthService = sl<TelegramAuthService>();
   bool _isLoading = false;
@@ -37,6 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    // Запускаем проверку Telegram только в Web
     if (kIsWeb) {
       _checkTelegramLogin();
     }
@@ -87,15 +84,13 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _emailFocusNode.dispose();
-    _passwordFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Вход в CRM')),
+      app_bar: AppBar(title: const Text('Вход в CRM')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -104,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 60.0),
             const Text('Добро пожаловать!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             const SizedBox(height: 32.0),
-            if (_isLoading && kIsWeb)
+            if (_isLoading && kIsWeb) // Показываем загрузку TG только в вебе
               const Column(
                 children: [
                   CircularProgressIndicator(),
@@ -115,24 +110,21 @@ class _LoginScreenState extends State<LoginScreen> {
             else ...[
               TextField(
                 controller: _emailController,
-                focusNode: _emailFocusNode,
                 decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
                 keyboardType: TextInputType.emailAddress,
-                onTap: () => KeyboardUtils.onTextFieldTap(_emailFocusNode), // ИСПОЛЬЗУЕМ ХАК
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                focusNode: _passwordFocusNode,
                 decoration: const InputDecoration(labelText: 'Пароль', border: OutlineInputBorder()),
                 obscureText: true,
-                onTap: () => KeyboardUtils.onTextFieldTap(_passwordFocusNode), // ИСПОЛЬЗУЕМ ХАК
               ),
               const SizedBox(height: 24),
               _isLoading 
                 ? const Center(child: CircularProgressIndicator())
                 : ElevatedButton(
                     onPressed: _login,
+                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
                     child: const Text('Войти'),
                   ),
               const SizedBox(height: 16),

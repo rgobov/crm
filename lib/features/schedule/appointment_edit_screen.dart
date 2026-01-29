@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/session/session_service.dart';
-import 'package:try_neuro/core/utils/keyboard_utils.dart'; // Добавили импорт
 import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/contacts/add_contact_screen.dart'; 
@@ -54,12 +53,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   final _serviceController = TextEditingController();
   final _phoneSearchController = TextEditingController();
   late final TextEditingController _durationController;
-
-  // Добавляем FocusNode для всех полей
-  final _phoneFocusNode = FocusNode();
-  final _serviceFocusNode = FocusNode();
-  final _durationFocusNode = FocusNode();
-
   Timer? _phoneDebounce;
   bool _isAutoUpdating = false;
 
@@ -96,9 +89,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     _durationController.dispose();
     _phoneSearchController.removeListener(_onPhoneChanged);
     _phoneSearchController.dispose();
-    _phoneFocusNode.dispose();
-    _serviceFocusNode.dispose();
-    _durationFocusNode.dispose();
     _phoneDebounce?.cancel();
     super.dispose();
   }
@@ -410,8 +400,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                       children: [
                         TextFormField(
                           controller: _phoneSearchController,
-                          focusNode: _phoneFocusNode,
-                          onTap: () => KeyboardUtils.onTextFieldTap(_phoneFocusNode), // ХАК
                           decoration: InputDecoration(
                             labelText: 'Поиск по телефону',
                             hintText: '+7 (___) ___-__-__',
@@ -463,8 +451,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                       children: [
                         TextFormField(
                           controller: _serviceController,
-                          focusNode: _serviceFocusNode,
-                          onTap: () => KeyboardUtils.onTextFieldTap(_serviceFocusNode), // ХАК
                           decoration: InputDecoration(
                             labelText: 'Услуга',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -480,8 +466,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                               flex: 3,
                               child: TextFormField(
                                 controller: _durationController,
-                                focusNode: _durationFocusNode,
-                                onTap: () => KeyboardUtils.onTextFieldTap(_durationFocusNode), // ХАК
                                 decoration: InputDecoration(
                                   labelText: 'Длительность',
                                   suffixText: 'мин',
