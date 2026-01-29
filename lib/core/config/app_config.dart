@@ -2,7 +2,7 @@
 class AppConfig {
   static const bool isProduction = true; 
 
-  // --- ТЕСТИРОВАНИЕ НА РЕАЛЬНОМ ТЕЛЕФОНЕ ---
+  // --- ТЕСТИРОВАНИЕ НА РЕАЛЬНОМ ТЕЛЕФОНЕ!!! ---
   static const bool isMobileTest = true;
 
   // Исправленный адрес (точки вместо дефисов, чтобы совпадало с Nginx Proxy Manager)
