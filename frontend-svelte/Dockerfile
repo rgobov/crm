@@ -13,8 +13,8 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./
 COPY --from=build /app/build ./build
 
-# Указываем порт 3000 для внутренней работы Svelte
-ENV PORT=3000
-EXPOSE 3000
+# ПРИНУДИТЕЛЬНО СТАВИМ ПОРТ 80
+ENV PORT=80
+EXPOSE 80
 
 CMD ["node", "build"]

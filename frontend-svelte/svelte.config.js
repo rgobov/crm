@@ -5,8 +5,11 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
 	preprocess: vitePreprocess(),
 	kit: {
-		// Оставляем только самое необходимое для запуска в Docker
-		adapter: adapter()
+		adapter: adapter(),
+		// Разрешаем работу через прокси Easypanel (исправляет многие ошибки 403 и SIGTERM)
+		csrf: {
+			checkOrigin: false,
+		}
 	}
 };
 
