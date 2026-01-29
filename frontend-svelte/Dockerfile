@@ -13,8 +13,10 @@ COPY --from=build /app/package*.json ./
 COPY --from=build /app/node_modules ./
 COPY --from=build /app/build ./build
 
-# Используем порт 3000
-ENV PORT=3000
-EXPOSE 3000
+# Принудительно устанавливаем порт 80 для Node.js
+ENV PORT=80
+ENV HOST=0.0.0.0
+EXPOSE 80
 
+# Запускаем напрямую через node, чтобы избежать лишних слоев npm
 CMD ["node", "build"]
