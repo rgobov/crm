@@ -9,17 +9,22 @@
 	let error = '';
 	let isLoading = false;
 	let tg = null;
+	let isMiniApp = false; // Отдельный флаг для проверки нахождения в Telegram
 
 	onMount(async () => {
 		if (window.Telegram && window.Telegram.WebApp) {
 			tg = window.Telegram.WebApp;
 			tg.ready();
-			tg.MainButton.setText('ВОЙТИ В CRM');
-			tg.MainButton.onClick(handleLogin);
-			tg.MainButton.show();
+
+			// Проверяем, действительно ли мы в Telegram (есть данные пользователя)
+			if (tg.initData && tg.initData !== "") {
+				isMiniApp = true;
+				tg.MainButton.setText('ВОЙТИ В CRM');
+				tg.MainButton.onClick(handleLogin);
+				tg.MainButton.show();
+			}
 		}
 
-		// Авто-вход по токену
 		const savedToken = localStorage.getItem('token');
 		if (savedToken) {
 			token.set(savedToken);
@@ -31,13 +36,11 @@
 		try {
 			const response = await api.get('/auth/me');
 			user.set(response.data);
-
-			// Редирект в зависимости от роли
 			if (response.data.role === 'ADMIN') goto('/admin');
 			else if (response.data.role === 'MANAGER') goto('/manager');
 			else goto('/employee');
 
-			if (tg) tg.MainButton.hide();
+			if (tg && isMiniApp) tg.MainButton.hide();
 		} catch (e) {
 			console.error('Session expired');
 			localStorage.removeItem('token');
@@ -53,7 +56,7 @@
 
 		isLoading = true;
 		error = '';
-		if (tg) tg.MainButton.showProgress();
+		if (tg && isMiniApp) tg.MainButton.showProgress();
 
 		try {
 			const response = await api.post('/auth/login', {
@@ -74,7 +77,7 @@
 			if (tg) tg.HapticFeedback.notificationOccurred('error');
 		} finally {
 			isLoading = false;
-			if (tg) tg.MainButton.hideProgress();
+			if (tg && isMiniApp) tg.MainButton.hideProgress();
 		}
 	}
 </script>
@@ -114,7 +117,8 @@
 				/>
 			</div>
 
-			{#if !tg}
+			<!-- Кнопка теперь показывается, если это НЕ Telegram Mini App -->
+			{#if !isMiniApp}
 				<button class="login-btn" on:click={handleLogin} disabled={isLoading}>
 					{#if isLoading}
 						<span class="spinner"></span>
@@ -132,6 +136,7 @@
 </div>
 
 <style>
+	/* Стили остаются без изменений */
 	.auth-wrapper {
 		width: 100vw;
 		height: 100vh;
