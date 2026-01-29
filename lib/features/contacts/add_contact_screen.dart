@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:try_neuro/core/utils/keyboard_utils.dart'; // Добавили импорт
 import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/service_locator.dart';
@@ -22,42 +21,28 @@ class _AddContactScreenState extends State<AddContactScreen> {
   final _emailController = TextEditingController();
   final _notesController = TextEditingController();
 
-  // FocusNodes для полей
-  final _nameFocusNode = FocusNode();
-  final List<FocusNode> _phoneFocusNodes = [];
-  final _emailFocusNode = FocusNode();
-  final _notesFocusNode = FocusNode();
-  
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _phoneControllers.add(TextEditingController(text: widget.initialPhone));
-    _phoneFocusNodes.add(FocusNode());
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _nameFocusNode.dispose();
     for (var c in _phoneControllers) {
       c.dispose();
     }
-    for (var f in _phoneFocusNodes) {
-      f.dispose();
-    }
     _emailController.dispose();
-    _emailFocusNode.dispose();
     _notesController.dispose();
-    _notesFocusNode.dispose();
     super.dispose();
   }
 
   void _addPhoneField() {
     setState(() {
       _phoneControllers.add(TextEditingController());
-      _phoneFocusNodes.add(FocusNode());
     });
   }
 
@@ -106,28 +91,20 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 children: [
                   TextFormField(
                     controller: _nameController,
-                    focusNode: _nameFocusNode,
-                    onTap: () => KeyboardUtils.onTextFieldTap(_nameFocusNode), // ХАК
                     decoration: const InputDecoration(labelText: 'Имя*', border: OutlineInputBorder()),
                     validator: (v) => v == null || v.isEmpty ? 'Введите имя' : null,
                   ),
                   const SizedBox(height: 16),
                   ..._phoneControllers.asMap().entries.map((entry) {
-                    final index = entry.key;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
                       child: TextFormField(
                         controller: entry.value,
-                        focusNode: _phoneFocusNodes[index],
-                        onTap: () => KeyboardUtils.onTextFieldTap(_phoneFocusNodes[index]), // ХАК
                         decoration: InputDecoration(
-                          labelText: 'Телефон ${index + 1}*',
+                          labelText: 'Телефон ${entry.key + 1}*',
                           border: const OutlineInputBorder(),
-                          suffixIcon: index > 0 
-                            ? IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => setState(() {
-                                _phoneControllers.removeAt(index);
-                                _phoneFocusNodes.removeAt(index);
-                              }))
+                          suffixIcon: entry.key > 0
+                            ? IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => setState(() => _phoneControllers.removeAt(entry.key)))
                             : null,
                         ),
                         keyboardType: TextInputType.phone,
@@ -144,22 +121,19 @@ class _AddContactScreenState extends State<AddContactScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailController,
-                    focusNode: _emailFocusNode,
-                    onTap: () => KeyboardUtils.onTextFieldTap(_emailFocusNode), // ХАК
                     decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _notesController,
-                    focusNode: _notesFocusNode,
-                    onTap: () => KeyboardUtils.onTextFieldTap(_notesFocusNode), // ХАК
                     decoration: const InputDecoration(labelText: 'Заметки', border: OutlineInputBorder()),
                     maxLines: 3,
                   ),
                   const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: _save,
+                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
                     child: const Text('СОХРАНИТЬ'),
                   ),
                 ],
