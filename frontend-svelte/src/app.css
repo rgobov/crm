@@ -1,0 +1,39 @@
+:root {
+    /* Основные яркие цвета (Fallback для браузера) */
+    --primary-color: #0088cc;
+    --bg-color: #f0f2f5;
+    --card-bg: #ffffff;
+    --text-color: #222222;
+    --hint-color: #707579;
+    --accent-color: #4caf50;
+    --error-color: #ff4d4f;
+    --border-radius: 16px;
+}
+
+/* Если запущено в Telegram, перехватываем его переменные */
+:global(body.tg) {
+    --primary-color: var(--tg-theme-button-color, #0088cc);
+    --bg-color: var(--tg-theme-bg-color, #f0f2f5);
+    --card-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+    --text-color: var(--tg-theme-text-color, #222222);
+    --hint-color: var(--tg-theme-hint-color, #707579);
+    --accent-color: var(--tg-theme-link-color, #4caf50);
+}
+
+:global(body) {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease;
+}
+
+:global(.card) {
+    background: var(--card-bg);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-bottom: 16px;
+}

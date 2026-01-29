@@ -6,28 +6,30 @@
 	let password = '';
 	let error = '';
 	let isLoading = false;
-	let isTelegram = false;
+	let tg = null;
 
-	// ОБНОВЛЕННЫЙ АДРЕС: Используем защищенный домен через Nginx Proxy Manager
 	const API_URL = 'https://api.109.248.203.156.sslip.io/api';
 
 	onMount(() => {
-		// Проверяем Telegram WebApp
-		if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-			isTelegram = true;
-			window.Telegram.WebApp.expand();
-			console.log('Запущено в Telegram');
+		if (window.Telegram && window.Telegram.WebApp) {
+			tg = window.Telegram.WebApp;
+			// Настраиваем главную кнопку Telegram
+			tg.MainButton.setText('ВОЙТИ В CRM');
+			tg.MainButton.onClick(handleLogin);
+			tg.MainButton.show();
 		}
 	});
 
 	async function handleLogin() {
 		if (!email || !password) {
-			error = 'Заполните все поля';
+			error = 'Заполните Email и Пароль';
+			if (tg) tg.HapticFeedback.notificationOccurred('error');
 			return;
 		}
 
 		isLoading = true;
 		error = '';
+		if (tg) tg.MainButton.showProgress();
 
 		try {
 			const response = await axios.post(`${API_URL}/auth/login`, {
@@ -37,142 +39,157 @@
 
 			if (response.data && response.data.token) {
 				localStorage.setItem('token', response.data.token);
-				alert('Успешный вход! Связь с бэкендом установлена.');
-				// В будущем здесь будет переход к расписанию
+				if (tg) {
+					tg.HapticFeedback.notificationOccurred('success');
+					tg.MainButton.hide();
+				}
+				alert('Успешный вход!');
+				// Скоро здесь будет переход к расписанию
 			}
 		} catch (e) {
-			console.error('Login error:', e);
-			error = e.response?.data?.message || 'Ошибка входа. Проверьте соединение с API.';
+			error = e.response?.data?.message || 'Ошибка входа';
+			if (tg) tg.HapticFeedback.notificationOccurred('error');
 		} finally {
 			isLoading = false;
+			if (tg) tg.MainButton.hideProgress();
 		}
 	}
 </script>
 
-<div class="login-container">
-	<div class="card">
-		<h1>999 CRM</h1>
-		<p class="subtitle">{isTelegram ? 'Вход через Telegram' : 'Вход в систему'}</p>
+<div class="page">
+	<div class="header">
+		<div class="logo">999</div>
+		<h1>CRM Система</h1>
+		<p>Управление вашим бизнесом</p>
+	</div>
 
+	<div class="card">
 		{#if error}
-			<div class="error">{error}</div>
+			<div class="error-box">{error}</div>
 		{/if}
 
-		<div class="input-group">
-			<label for="email">Email</label>
-			<input type="email" id="email" bind:value={email} placeholder="example@mail.com" />
+		<div class="form-group">
+			<label for="email">Электронная почта</label>
+			<input type="email" id="email" bind:value={email} placeholder="name@company.com" />
 		</div>
 
-		<div class="input-group">
+		<div class="form-group">
 			<label for="password">Пароль</label>
 			<input type="password" id="password" bind:value={password} placeholder="••••••••" />
 		</div>
 
-		<button on:click={handleLogin} disabled={isLoading}>
-			{isLoading ? 'Загрузка...' : 'Войти'}
-		</button>
+		{#if !tg}
+			<button class="login-btn" on:click={handleLogin} disabled={isLoading}>
+				{isLoading ? 'Вход...' : 'Войти в систему'}
+			</button>
+		{/if}
+	</div>
 
-		<div class="footer">
-			© 999
-		</div>
+	<div class="info">
+		<p>Если вы зашли через Telegram, кнопка входа появится внизу экрана</p>
 	</div>
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-		background-color: #f4f7f9;
+	.page {
+		padding: 24px;
 		display: flex;
-		justify-content: center;
-		align-items: center;
-		height: 100vh;
+		flex-direction: column;
+		min-height: 90vh;
 	}
 
-	.login-container {
-		width: 100%;
-		max-width: 400px;
-		padding: 20px;
-	}
-
-	.card {
-		background: white;
-		padding: 32px;
-		border-radius: 24px;
-		box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+	.header {
 		text-align: center;
+		margin-bottom: 32px;
+		margin-top: 20px;
+	}
+
+	.logo {
+		font-size: 48px;
+		font-weight: 900;
+		color: var(--primary-color);
+		letter-spacing: -2px;
+		margin-bottom: 8px;
 	}
 
 	h1 {
-		color: #1a73e8;
-		margin: 0 0 8px 0;
-		font-size: 28px;
+		font-size: 24px;
+		font-weight: 700;
+		margin: 0;
 	}
 
-	.subtitle {
-		color: #5f6368;
-		margin-bottom: 32px;
+	.header p {
+		color: var(--hint-color);
+		margin: 4px 0 0 0;
 	}
 
-	.input-group {
-		text-align: left;
+	.form-group {
 		margin-bottom: 20px;
 	}
 
 	label {
 		display: block;
-		font-size: 14px;
-		color: #3c4043;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--primary-color);
 		margin-bottom: 8px;
 		margin-left: 4px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
 	}
 
 	input {
 		width: 100%;
-		padding: 14px;
-		border: 1.5px solid #dadce0;
-		border-radius: 12px;
+		padding: 16px;
+		border: 2px solid #eef0f2;
+		border-radius: 16px;
 		font-size: 16px;
+		background: #f8f9fb;
 		box-sizing: border-box;
-		transition: border-color 0.2s;
+		transition: all 0.2s;
 	}
 
 	input:focus {
 		outline: none;
-		border-color: #1a73e8;
+		border-color: var(--primary-color);
+		background: white;
+		box-shadow: 0 0 0 4px rgba(0, 136, 204, 0.1);
 	}
 
-	button {
+	.login-btn {
 		width: 100%;
-		padding: 16px;
-		background-color: #1a73e8;
+		padding: 18px;
+		background-color: var(--primary-color);
 		color: white;
 		border: none;
-		border-radius: 12px;
+		border-radius: 16px;
 		font-size: 16px;
-		font-weight: 600;
+		font-weight: 700;
 		cursor: pointer;
-		margin-top: 12px;
-		transition: background-color 0.2s;
+		margin-top: 10px;
+		box-shadow: 0 8px 16px rgba(0, 136, 204, 0.2);
 	}
 
-	button:disabled {
-		background-color: #ccc;
-	}
-
-	.error {
-		background-color: #fde8e8;
-		color: #c53030;
-		padding: 12px;
-		border-radius: 8px;
-		margin-bottom: 20px;
+	.error-box {
+		background-color: #fff1f0;
+		color: var(--error-color);
+		padding: 14px;
+		border-radius: 12px;
+		margin-bottom: 24px;
 		font-size: 14px;
+		border: 1px solid #ffa39e;
+		text-align: center;
 	}
 
-	.footer {
-		margin-top: 32px;
-		font-size: 12px;
-		color: #bdc1c6;
+	.info {
+		margin-top: auto;
+		text-align: center;
+		padding: 20px;
+	}
+
+	.info p {
+		color: var(--hint-color);
+		font-size: 13px;
+		line-height: 1.5;
 	}
 </style>
