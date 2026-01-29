@@ -1,11 +1,11 @@
 /// Центральный конфигурационный файл приложения.
 class AppConfig {
-  static const bool isProduction = true; // Установили в true для работы на сервере
+  static const bool isProduction = false; // Установили в true для работы на сервере
 
   // --- ТЕСТИРОВАНИЕ НА РЕАЛЬНОМ ТЕЛЕФОНЕ ---
   // true: использовать IP компьютера (для реального устройства)
   // false: использовать 10.0.2.2 (для эмулятора)
-  static const bool isMobileTest = false;
+  static const bool isMobileTest = true;
 
   // Адрес вашего бэкенда в Easypanel
   static const String productionUrl = 'https://tryneuro-backend.t6xfbd.easypanel.host/api';
