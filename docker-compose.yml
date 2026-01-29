@@ -21,7 +21,6 @@ services:
     container_name: tryneuro_backend
     restart: always
     environment:
-      # Внутренний URL для Docker-сети
       SPRING_DATASOURCE_URL: jdbc:postgresql://database:5432/tryneuro_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
@@ -31,7 +30,6 @@ services:
       - database
     networks:
       - tryneuro_network
-    # Пробрасываем порт для Nginx Proxy Manager
     ports:
       - "8080:8080"
 
@@ -42,15 +40,15 @@ services:
     container_name: tryneuro_svelte
     restart: always
     environment:
-      # Здесь будет адрес вашего Mini App
       ORIGIN: https://${SVELTE_DOMAIN:-localhost}
       PORT: 3000
     depends_on:
       - backend
     networks:
       - tryneuro_network
+    # МЕНЯЕМ ВНЕШНИЙ ПОРТ НА 3001, чтобы не конфликтовать с Easypanel
     ports:
-      - "3000:3000"
+      - "3001:3000"
 
 networks:
   tryneuro_network:
