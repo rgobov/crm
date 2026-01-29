@@ -1,6 +1,8 @@
 <script>
 	import { onMount } from 'svelte';
-	import axios from 'axios';
+	import api from '$lib/api.js';
+	import { user, token } from '$lib/stores/auth.js';
+	import { goto } from '$app/navigation';
 
 	let email = '';
 	let password = '';
@@ -8,16 +10,39 @@
 	let isLoading = false;
 	let tg = null;
 
-	const API_URL = 'https://api.109.248.203.156.sslip.io/api';
-
-	onMount(() => {
+	onMount(async () => {
 		if (window.Telegram && window.Telegram.WebApp) {
 			tg = window.Telegram.WebApp;
+			tg.ready();
 			tg.MainButton.setText('ВОЙТИ В CRM');
 			tg.MainButton.onClick(handleLogin);
 			tg.MainButton.show();
 		}
+
+		// Авто-вход по токену
+		const savedToken = localStorage.getItem('token');
+		if (savedToken) {
+			token.set(savedToken);
+			await fetchUserData();
+		}
 	});
+
+	async function fetchUserData() {
+		try {
+			const response = await api.get('/auth/me');
+			user.set(response.data);
+
+			// Редирект в зависимости от роли
+			if (response.data.role === 'ADMIN') goto('/admin');
+			else if (response.data.role === 'MANAGER') goto('/manager');
+			else goto('/employee');
+
+			if (tg) tg.MainButton.hide();
+		} catch (e) {
+			console.error('Session expired');
+			localStorage.removeItem('token');
+		}
+	}
 
 	async function handleLogin() {
 		if (!email || !password) {
@@ -31,21 +56,21 @@
 		if (tg) tg.MainButton.showProgress();
 
 		try {
-			const response = await axios.post(`${API_URL}/auth/login`, {
+			const response = await api.post('/auth/login', {
 				email: email.trim(),
 				password: password
 			});
 
 			if (response.data && response.data.token) {
-				localStorage.setItem('token', response.data.token);
-				if (tg) {
-					tg.HapticFeedback.notificationOccurred('success');
-					tg.MainButton.hide();
-				}
-				alert('Успешный вход!');
+				const newToken = response.data.token;
+				localStorage.setItem('token', newToken);
+				token.set(newToken);
+
+				if (tg) tg.HapticFeedback.notificationOccurred('success');
+				await fetchUserData();
 			}
 		} catch (e) {
-			error = e.response?.data?.message || 'Ошибка входа';
+			error = e.response?.data?.message || 'Неверный email или пароль';
 			if (tg) tg.HapticFeedback.notificationOccurred('error');
 		} finally {
 			isLoading = false;
@@ -59,7 +84,7 @@
 		<div class="header">
 			<div class="logo">999</div>
 			<h1>CRM Система</h1>
-			<p>Вход в панель управления</p>
+			<p>Добро пожаловать в вашу панель управления</p>
 		</div>
 
 		{#if error}
@@ -69,29 +94,44 @@
 		<div class="form">
 			<div class="form-group">
 				<label for="email">Email</label>
-				<input type="email" id="email" bind:value={email} placeholder="example@mail.com" />
+				<input
+					type="email"
+					id="email"
+					bind:value={email}
+					placeholder="name@example.com"
+					disabled={isLoading}
+				/>
 			</div>
 
 			<div class="form-group">
 				<label for="password">Пароль</label>
-				<input type="password" id="password" bind:value={password} placeholder="••••••••" />
+				<input
+					type="password"
+					id="password"
+					bind:value={password}
+					placeholder="••••••••"
+					disabled={isLoading}
+				/>
 			</div>
 
 			{#if !tg}
 				<button class="login-btn" on:click={handleLogin} disabled={isLoading}>
-					{isLoading ? 'Загрузка...' : 'Войти'}
+					{#if isLoading}
+						<span class="spinner"></span>
+					{:else}
+						Войти
+					{/if}
 				</button>
 			{/if}
 		</div>
 
 		<div class="footer">
-			© 999
+			© 999 • Версия 1.0.0
 		</div>
 	</div>
 </div>
 
 <style>
-	/* Обертка на весь экран для центрирования */
 	.auth-wrapper {
 		width: 100vw;
 		height: 100vh;
@@ -101,19 +141,17 @@
 		background-color: var(--bg-color);
 	}
 
-	/* Само модальное окно */
 	.auth-card {
 		width: 100%;
-		max-width: 400px;
+		max-width: 420px;
 		background: white;
-		padding: 40px;
-		border-radius: 28px;
-		box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+		padding: 48px;
+		border-radius: 32px;
+		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05);
 		box-sizing: border-box;
 		text-align: center;
 	}
 
-	/* Дизайн для мобилок (чтобы в ТГ выглядело нативно) */
 	@media (max-width: 480px) {
 		.auth-card {
 			max-width: 100%;
@@ -131,24 +169,27 @@
 	}
 
 	.logo {
-		font-size: 52px;
+		font-size: 64px;
 		font-weight: 900;
-		color: var(--primary-color);
-		letter-spacing: -2px;
-		margin-bottom: 8px;
+		background: var(--primary-gradient);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		letter-spacing: -3px;
+		margin-bottom: 12px;
 	}
 
 	h1 {
-		font-size: 22px;
-		font-weight: 700;
+		font-size: 24px;
+		font-weight: 800;
 		margin: 0;
-		color: #1a1a1a;
+		color: #0f172a;
 	}
 
 	.header p {
 		color: var(--hint-color);
 		font-size: 15px;
-		margin: 8px 0 32px 0;
+		margin: 12px 0 40px 0;
+		line-height: 1.5;
 	}
 
 	.form-group {
@@ -161,62 +202,85 @@
 		font-size: 12px;
 		font-weight: 700;
 		color: var(--primary-color);
-		margin-bottom: 8px;
+		margin-bottom: 10px;
 		margin-left: 4px;
 		text-transform: uppercase;
-		letter-spacing: 0.8px;
+		letter-spacing: 1px;
 	}
 
 	input {
 		width: 100%;
-		padding: 16px;
-		border: 2px solid #f0f2f5;
-		border-radius: 16px;
+		padding: 18px;
+		border: 2px solid #f1f5f9;
+		border-radius: 18px;
 		font-size: 16px;
-		background: #f8f9fb;
+		background: #f8fafc;
 		box-sizing: border-box;
-		transition: all 0.2s ease;
+		transition: all 0.25s ease;
 	}
 
 	input:focus {
 		outline: none;
 		border-color: var(--primary-color);
 		background: white;
-		box-shadow: 0 0 0 4px rgba(0, 136, 204, 0.1);
+		box-shadow: 0 0 0 5px rgba(56, 151, 240, 0.1);
 	}
 
 	.login-btn {
 		width: 100%;
 		padding: 18px;
-		background-color: var(--primary-color);
+		background: var(--primary-gradient);
 		color: white;
 		border: none;
-		border-radius: 16px;
-		font-size: 16px;
+		border-radius: 18px;
+		font-size: 17px;
 		font-weight: 700;
 		cursor: pointer;
-		margin-top: 8px;
-		box-shadow: 0 8px 20px rgba(0, 136, 204, 0.2);
-		transition: transform 0.1s;
+		margin-top: 12px;
+		box-shadow: 0 10px 25px rgba(56, 151, 240, 0.3);
+		transition: all 0.2s;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+	}
+
+	.login-btn:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 15px 30px rgba(56, 151, 240, 0.4);
 	}
 
 	.login-btn:active {
-		transform: scale(0.98);
+		transform: translateY(0);
 	}
 
 	.error-box {
-		background-color: #fff1f0;
+		background-color: #fef2f2;
 		color: var(--error-color);
-		padding: 14px;
-		border-radius: 14px;
+		padding: 16px;
+		border-radius: 16px;
 		margin-bottom: 24px;
 		font-size: 14px;
-		border: 1px solid #ffa39e;
+		font-weight: 500;
+		border: 1px solid #fee2e2;
 	}
 
 	.footer {
-		margin-top: 40px;
+		margin-top: 48px;
 		font-size: 13px;
-		color: #bdc1c6;
+		color: #94a3b8;
+		font-weight: 500;
+	}
+
+	.spinner {
+		width: 24px;
+		height: 24px;
+		border: 3px solid rgba(255,255,255,0.3);
+		border-radius: 50%;
+		border-top-color: white;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
 	}
 </style>
