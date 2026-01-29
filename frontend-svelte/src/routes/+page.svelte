@@ -8,8 +8,8 @@
 	let isLoading = false;
 	let isTelegram = false;
 
-	// Адрес бэкенда (теперь используем ваш IP)
-	const API_URL = 'http://109.248.203.156:8080/api';
+	// ОБНОВЛЕННЫЙ АДРЕС: Используем защищенный домен через Nginx Proxy Manager
+	const API_URL = 'https://api.109.248.203.156.sslip.io/api';
 
 	onMount(() => {
 		// Проверяем Telegram WebApp
@@ -37,12 +37,12 @@
 
 			if (response.data && response.data.token) {
 				localStorage.setItem('token', response.data.token);
-				alert('Успешный вход!');
-				// В будущем здесь будет редирект на расписание
+				alert('Успешный вход! Связь с бэкендом установлена.');
+				// В будущем здесь будет переход к расписанию
 			}
 		} catch (e) {
 			console.error('Login error:', e);
-			error = e.response?.data?.message || 'Ошибка входа. Проверьте данные.';
+			error = e.response?.data?.message || 'Ошибка входа. Проверьте соединение с API.';
 		} finally {
 			isLoading = false;
 		}
