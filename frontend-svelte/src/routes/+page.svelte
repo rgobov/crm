@@ -13,7 +13,6 @@
 	onMount(() => {
 		if (window.Telegram && window.Telegram.WebApp) {
 			tg = window.Telegram.WebApp;
-			// Настраиваем главную кнопку Telegram
 			tg.MainButton.setText('ВОЙТИ В CRM');
 			tg.MainButton.onClick(handleLogin);
 			tg.MainButton.show();
@@ -22,7 +21,7 @@
 
 	async function handleLogin() {
 		if (!email || !password) {
-			error = 'Заполните Email и Пароль';
+			error = 'Заполните все поля';
 			if (tg) tg.HapticFeedback.notificationOccurred('error');
 			return;
 		}
@@ -44,7 +43,6 @@
 					tg.MainButton.hide();
 				}
 				alert('Успешный вход!');
-				// Скоро здесь будет переход к расписанию
 			}
 		} catch (e) {
 			error = e.response?.data?.message || 'Ошибка входа';
@@ -56,56 +54,84 @@
 	}
 </script>
 
-<div class="page">
-	<div class="header">
-		<div class="logo">999</div>
-		<h1>CRM Система</h1>
-		<p>Управление вашим бизнесом</p>
-	</div>
+<div class="auth-wrapper">
+	<div class="auth-card">
+		<div class="header">
+			<div class="logo">999</div>
+			<h1>CRM Система</h1>
+			<p>Вход в панель управления</p>
+		</div>
 
-	<div class="card">
 		{#if error}
 			<div class="error-box">{error}</div>
 		{/if}
 
-		<div class="form-group">
-			<label for="email">Электронная почта</label>
-			<input type="email" id="email" bind:value={email} placeholder="name@company.com" />
+		<div class="form">
+			<div class="form-group">
+				<label for="email">Email</label>
+				<input type="email" id="email" bind:value={email} placeholder="example@mail.com" />
+			</div>
+
+			<div class="form-group">
+				<label for="password">Пароль</label>
+				<input type="password" id="password" bind:value={password} placeholder="••••••••" />
+			</div>
+
+			{#if !tg}
+				<button class="login-btn" on:click={handleLogin} disabled={isLoading}>
+					{isLoading ? 'Загрузка...' : 'Войти'}
+				</button>
+			{/if}
 		</div>
 
-		<div class="form-group">
-			<label for="password">Пароль</label>
-			<input type="password" id="password" bind:value={password} placeholder="••••••••" />
+		<div class="footer">
+			© 999
 		</div>
-
-		{#if !tg}
-			<button class="login-btn" on:click={handleLogin} disabled={isLoading}>
-				{isLoading ? 'Вход...' : 'Войти в систему'}
-			</button>
-		{/if}
-	</div>
-
-	<div class="info">
-		<p>Если вы зашли через Telegram, кнопка входа появится внизу экрана</p>
 	</div>
 </div>
 
 <style>
-	.page {
-		padding: 24px;
+	/* Обертка на весь экран для центрирования */
+	.auth-wrapper {
+		width: 100vw;
+		height: 100vh;
 		display: flex;
-		flex-direction: column;
-		min-height: 90vh;
+		justify-content: center;
+		align-items: center;
+		background-color: var(--bg-color);
 	}
 
-	.header {
+	/* Само модальное окно */
+	.auth-card {
+		width: 100%;
+		max-width: 400px;
+		background: white;
+		padding: 40px;
+		border-radius: 28px;
+		box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+		box-sizing: border-box;
 		text-align: center;
-		margin-bottom: 32px;
-		margin-top: 20px;
+	}
+
+	/* Дизайн для мобилок (чтобы в ТГ выглядело нативно) */
+	@media (max-width: 480px) {
+		.auth-card {
+			max-width: 100%;
+			height: 100vh;
+			border-radius: 0;
+			box-shadow: none;
+			padding: 24px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+		}
+		.auth-wrapper {
+			background-color: white;
+		}
 	}
 
 	.logo {
-		font-size: 48px;
+		font-size: 52px;
 		font-weight: 900;
 		color: var(--primary-color);
 		letter-spacing: -2px;
@@ -113,40 +139,43 @@
 	}
 
 	h1 {
-		font-size: 24px;
+		font-size: 22px;
 		font-weight: 700;
 		margin: 0;
+		color: #1a1a1a;
 	}
 
 	.header p {
 		color: var(--hint-color);
-		margin: 4px 0 0 0;
+		font-size: 15px;
+		margin: 8px 0 32px 0;
 	}
 
 	.form-group {
-		margin-bottom: 20px;
+		margin-bottom: 24px;
+		text-align: left;
 	}
 
 	label {
 		display: block;
-		font-size: 13px;
-		font-weight: 600;
+		font-size: 12px;
+		font-weight: 700;
 		color: var(--primary-color);
 		margin-bottom: 8px;
 		margin-left: 4px;
 		text-transform: uppercase;
-		letter-spacing: 0.5px;
+		letter-spacing: 0.8px;
 	}
 
 	input {
 		width: 100%;
 		padding: 16px;
-		border: 2px solid #eef0f2;
+		border: 2px solid #f0f2f5;
 		border-radius: 16px;
 		font-size: 16px;
 		background: #f8f9fb;
 		box-sizing: border-box;
-		transition: all 0.2s;
+		transition: all 0.2s ease;
 	}
 
 	input:focus {
@@ -166,30 +195,28 @@
 		font-size: 16px;
 		font-weight: 700;
 		cursor: pointer;
-		margin-top: 10px;
-		box-shadow: 0 8px 16px rgba(0, 136, 204, 0.2);
+		margin-top: 8px;
+		box-shadow: 0 8px 20px rgba(0, 136, 204, 0.2);
+		transition: transform 0.1s;
+	}
+
+	.login-btn:active {
+		transform: scale(0.98);
 	}
 
 	.error-box {
 		background-color: #fff1f0;
 		color: var(--error-color);
 		padding: 14px;
-		border-radius: 12px;
+		border-radius: 14px;
 		margin-bottom: 24px;
 		font-size: 14px;
 		border: 1px solid #ffa39e;
-		text-align: center;
 	}
 
-	.info {
-		margin-top: auto;
-		text-align: center;
-		padding: 20px;
-	}
-
-	.info p {
-		color: var(--hint-color);
+	.footer {
+		margin-top: 40px;
 		font-size: 13px;
-		line-height: 1.5;
+		color: #bdc1c6;
 	}
 </style>
