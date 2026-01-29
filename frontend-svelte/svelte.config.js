@@ -5,12 +5,8 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
 	preprocess: vitePreprocess(),
 	kit: {
-		// Адаптер для запуска в Node.js среде
-		adapter: adapter(),
-		// Отключаем строгую проверку происхождения для работы за прокси Easypanel
-		csrf: {
-			checkOrigin: false,
-		}
+		// Оставляем только самое необходимое для запуска в Docker
+		adapter: adapter()
 	}
 };
 
