@@ -51,6 +51,39 @@ public class StaffMemberService {
         return staffOpt;
     }
 
+    // ВОССТАНОВЛЕНО: Используется в EmployeeController
+    public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
+        return staffMemberRepository.findById(id).map(staff -> {
+            enrichWithUserData(staff);
+            staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresent(shift -> {
+                staff.setDayOff(shift.isDayOff());
+                staff.setWorkStartTime(shift.getWorkStartTime());
+                staff.setWorkEndTime(shift.getWorkEndTime());
+                staff.setBreakStartTime(shift.getBreakStartTime());
+                staff.setBreakEndTime(shift.getBreakEndTime());
+            });
+            return staff;
+        });
+    }
+
+    // ВОССТАНОВЛЕНО: Используется в ManagerController
+    public List<StaffMember> getStaffForDate(String tenantId, LocalDate date) {
+        List<StaffMember> allStaff = staffMemberRepository.findByTenantId(tenantId);
+        return allStaff.stream()
+                .filter(StaffMember::isActive)
+                .map(staff -> {
+                    enrichWithUserData(staff);
+                    staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresentOrElse(shift -> {
+                        staff.setDayOff(shift.isDayOff());
+                        staff.setWorkStartTime(shift.getWorkStartTime());
+                        staff.setWorkEndTime(shift.getWorkEndTime());
+                        staff.setBreakStartTime(shift.getBreakStartTime());
+                        staff.setBreakEndTime(shift.getBreakEndTime());
+                    }, () -> staff.setDayOff(true));
+                    return staff;
+                }).collect(Collectors.toList());
+    }
+
     private void enrichWithUserData(StaffMember staff) {
         userRepository.findByStaffId(staff.getId()).ifPresent(user -> {
             staff.setRole(user.getRole().name());
@@ -66,8 +99,18 @@ public class StaffMemberService {
         staffMember.setPhone(request.getPhone());
         staffMember.setTenantId(tenantId);
         staffMember.setActive(true);
-        
         return staffMemberRepository.save(staffMember);
+    }
+
+    // ВОССТАНОВЛЕНО: Используется в EmployeeController
+    @Transactional
+    public StaffShift saveShift(StaffShift shift) {
+        return staffShiftRepository.findByStaffIdAndDate(shift.getStaffId(), shift.getDate())
+                .map(existing -> {
+                    shift.setId(existing.getId());
+                    return staffShiftRepository.save(shift);
+                })
+                .orElseGet(() -> staffShiftRepository.save(shift));
     }
 
     public List<StaffMember> getAllStaff(String tenantId) {
