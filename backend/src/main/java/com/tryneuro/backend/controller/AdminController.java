@@ -32,6 +32,8 @@ public class AdminController {
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
+        // ДИАГНОСТИКА
+        System.out.println(">>> DEBUG: Admin API /staff called. Tenant: [" + tenantId + "], Query: [" + query + "]");
         return staffMemberService.getStaffPaged(tenantId, query, page, size);
     }
 

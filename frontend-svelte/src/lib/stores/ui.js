@@ -1,8 +1,7 @@
 import { writable } from 'svelte/store';
 
-// Поисковый запрос
+// ГАРАНТИРУЕМ, что начальное значение - пустая строка, а не undefined
 export const staffSearchQuery = writable('');
 
-// Кэш списка сотрудников, чтобы не показывать пустой экран при переходе
 export const cachedStaff = writable([]);
-export const staffMetadata = writable({ totalElements: 0, totalPages: 0 });
+export const staffMetadata = writable({ totalElements: 0, totalPages: 0, currentPage: 0 });
