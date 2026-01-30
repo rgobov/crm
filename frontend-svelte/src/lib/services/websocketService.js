@@ -1,12 +1,10 @@
-import SockJS from 'sockjs-client';
-import { Stomp } from '@stomp/stompjs';
+import SockJS from 'sockjs-client/dist/sockjs.js';
+import Stomp from 'stompjs';
 import { writable } from 'svelte/store';
 import { user } from '$lib/stores/auth.js';
 import { get } from 'svelte/store';
 
-// Стор для отслеживания состояния подключения
 export const wsConnected = writable(false);
-// Стор для входящих событий обновления
 export const scheduleUpdates = writable(null);
 
 let stompClient = null;
@@ -14,47 +12,41 @@ let reconnectTimeout = null;
 
 export const websocketService = {
     connect() {
+        // Проверка: работаем ли мы в браузере (для SSR безопасности)
+        if (typeof window === 'undefined') return;
+
         const currentUser = get(user);
         if (!currentUser || !currentUser.tenantId) return;
 
-        // Пытаемся подключиться к эндпоинту, настроенному в Spring Boot
-        const socket = new SockJS('/ws');
-        stompClient = Stomp.over(socket);
+        try {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null; // Отключаем логгирование в консоль
 
-        // Отключаем лишние логи в консоли
-        stompClient.debug = () => {};
+            stompClient.connect({}, (frame) => {
+                wsConnected.set(true);
+                console.log('WS: Connected');
 
-        stompClient.connect({}, (frame) => {
-            wsConnected.set(true);
-            console.log('WS: Connected to Spring Boot');
-
-            // Подписка на обновления расписания для конкретной компании (Tenant)
-            stompClient.subscribe(`/topic/schedule/${currentUser.tenantId}`, (message) => {
-                if (message.body) {
-                    console.log('WS: Received schedule update:', message.body);
-                    scheduleUpdates.set(message.body); // 'refresh' или JSON с данными
-                }
+                stompClient.subscribe(`/topic/schedule/${currentUser.tenantId}`, (message) => {
+                    if (message.body) scheduleUpdates.set(message.body);
+                });
+            }, (error) => {
+                console.error('WS Error:', error);
+                wsConnected.set(false);
+                this.reconnect();
             });
-        }, (error) => {
-            console.error('WS: Error', error);
-            wsConnected.set(false);
-            this.reconnect();
-        });
+        } catch (e) {
+            console.error('WS Setup failed:', e);
+        }
     },
 
     reconnect() {
         if (reconnectTimeout) clearTimeout(reconnectTimeout);
-        reconnectTimeout = setTimeout(() => {
-            console.log('WS: Trying to reconnect...');
-            this.connect();
-        }, 5000);
+        reconnectTimeout = setTimeout(() => this.connect(), 5000);
     },
 
     disconnect() {
-        if (stompClient) {
-            stompClient.disconnect();
-            wsConnected.set(false);
-        }
-        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        if (stompClient) stompClient.disconnect();
+        wsConnected.set(false);
     }
 };
