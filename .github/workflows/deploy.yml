@@ -18,6 +18,7 @@ jobs:
           script: |
             cd ~/crm
             git pull origin feature/telegram-mini-app
+            # Принудительная сборка без кэша для фронтенда, если изменился package.json
             docker-compose up -d --build
-            # Очистка старых образов после успешного запуска
-            docker image prune -f
+            # Глубокая очистка системы после деплоя
+            docker system prune -f
