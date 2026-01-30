@@ -1,13 +1,34 @@
 <script>
+    import { onMount } from 'svelte';
     import { user, logout } from '$lib/stores/auth.js';
+    import { adminService } from '$lib/services/adminService.js';
     import { goto } from '$app/navigation';
 
-    // Список разделов управления (как в AdminManagementTab)
-    const menuItems = [
-        { id: 'staff', title: 'Сотрудники', icon: '👥', color: '#3897f0', desc: 'Управление командой' },
-        { id: 'clients', title: 'Клиенты', icon: '💎', color: '#10b981', desc: 'База ваших клиентов' },
-        { id: 'services', title: 'Услуги', icon: '🛠️', color: '#f59e0b', desc: 'Настройка прайс-листа' },
-        { id: 'stats', title: 'Статистика', icon: '📈', color: '#8b5cf6', desc: 'Аналитика записей' }
+    let stats = {
+        totalClients: 0,
+        todaysAppointmentsCount: 0,
+        totalResources: 0
+    };
+    let isLoading = true;
+
+    onMount(async () => {
+        try {
+            stats = await adminService.getDashboardStats();
+        } catch (e) {
+            console.error('Failed to load dashboard stats');
+        } finally {
+            isLoading = false;
+        }
+    });
+
+    const directories = [
+        { id: 'staff', title: 'Персонал', icon: '👤', desc: 'Сотрудники и роли' },
+        { id: 'resources', title: 'Ресурсы', icon: '🛠️', desc: 'Оборудование и залы' },
+        { id: 'services', title: 'Услуги', icon: '✂️', desc: 'Ваш прайс-лист' }
+    ];
+
+    const integrations = [
+        { id: 'wappi', title: 'Напоминания Wappi.pro', icon: '🔔', desc: 'Автоматизация уведомлений' }
     ];
 
     function handleLogout() {
@@ -18,141 +39,179 @@
 
 <div class="page">
     <div class="header">
-        <div class="user-info">
-            <span class="avatar">{$user?.name?.charAt(0) || 'A'}</span>
-            <div class="text">
+        <div class="user-card">
+            <div class="avatar">{$user?.name?.charAt(0) || 'A'}</div>
+            <div class="user-text">
                 <h2>{$user?.name || 'Администратор'}</h2>
                 <p>Панель управления 999</p>
             </div>
         </div>
-        <button class="logout-mini" on:click={handleLogout}>Выйти</button>
+        <button class="logout-btn" on:click={handleLogout}>Выйти</button>
     </div>
 
-    <div class="grid">
-        {#each menuItems as item}
-            <button class="card menu-card" on:click={() => goto(`/admin/${item.id}`)}>
-                <div class="icon-box" style="background-color: {item.color}15; color: {item.color}">
-                    {item.icon}
-                </div>
-                <div class="card-content">
-                    <h3>{item.title}</h3>
-                    <p>{item.desc}</p>
-                </div>
-                <span class="arrow">→</span>
-            </button>
-        {/each}
-    </div>
+    {#if isLoading}
+        <div class="loading-overlay">
+            <span class="spinner"></span>
+            <p>Загрузка статистики...</p>
+        </div>
+    {:else}
+        <!-- Сетка статистики (Stats Grid из Flutter) -->
+        <div class="stats-grid">
+            <div class="stat-card blue">
+                <span class="stat-icon">👥</span>
+                <span class="stat-value">{stats.totalClients}</span>
+                <span class="stat-label">Клиенты</span>
+            </div>
+            <div class="stat-card orange">
+                <span class="stat-icon">📅</span>
+                <span class="stat-value">{stats.todaysAppointmentsCount}</span>
+                <span class="stat-label">Сегодня</span>
+            </div>
+            <div class="stat-card green">
+                <span class="stat-icon">🛠️</span>
+                <span class="stat-value">{stats.totalResources}</span>
+                <span class="stat-label">Ресурсы</span>
+            </div>
+        </div>
+
+        <section class="menu-section">
+            <h3>Управление справочниками</h3>
+            <div class="menu-list">
+                {#each directories as item}
+                    <button class="menu-item" on:click={() => goto(`/admin/${item.id}`)}>
+                        <span class="menu-icon">{item.icon}</span>
+                        <div class="menu-info">
+                            <h4>{item.title}</h4>
+                            <p>{item.desc}</p>
+                        </div>
+                        <span class="chevron">›</span>
+                    </button>
+                {/each}
+            </div>
+        </section>
+
+        <section class="menu-section">
+            <h3>Интеграции</h3>
+            <div class="menu-list">
+                {#each integrations as item}
+                    <button class="menu-item" on:click={() => goto(`/admin/settings/${item.id}`)}>
+                        <span class="menu-icon">{item.icon}</span>
+                        <div class="menu-info">
+                            <h4>{item.title}</h4>
+                            <p>{item.desc}</p>
+                        </div>
+                        <span class="chevron">›</span>
+                    </button>
+                {/each}
+            </div>
+        </section>
+    {/if}
 </div>
 
 <style>
     .page {
         padding: 20px;
         background-color: var(--bg-color);
+        max-width: 600px;
+        margin: 0 auto;
     }
 
     .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 32px;
-        margin-top: 10px;
+        margin-bottom: 24px;
     }
 
-    .user-info {
+    .user-card {
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 12px;
     }
 
     .avatar {
-        width: 50px;
-        height: 50px;
+        width: 44px;
+        height: 44px;
         background: var(--primary-gradient);
         color: white;
-        border-radius: 16px;
+        border-radius: 14px;
         display: flex;
         justify-content: center;
         align-items: center;
-        font-size: 20px;
         font-weight: 800;
-        box-shadow: 0 8px 16px rgba(56, 151, 240, 0.2);
-    }
-
-    h2 {
         font-size: 18px;
-        font-weight: 800;
-        margin: 0;
-        color: #0f172a;
     }
 
-    .text p {
-        margin: 4px 0 0 0;
-        font-size: 13px;
-        color: var(--hint-color);
-    }
+    h2 { font-size: 17px; margin: 0; color: #0f172a; }
+    .user-text p { margin: 2px 0 0 0; font-size: 12px; color: var(--hint-color); }
 
-    .logout-mini {
-        background: white;
-        border: 1.5px solid #f1f5f9;
-        padding: 8px 16px;
-        border-radius: 12px;
-        font-size: 13px;
-        font-weight: 600;
+    .logout-btn {
+        background: #fee2e2;
         color: #ef4444;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
         cursor: pointer;
     }
 
-    .grid {
+    /* Stats Grid */
+    .stats-grid {
         display: grid;
-        gap: 16px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 32px;
     }
 
-    .menu-card {
-        border: none;
+    .stat-card {
+        background: white;
+        padding: 16px 8px;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        box-shadow: var(--shadow);
+    }
+
+    .stat-icon { font-size: 20px; margin-bottom: 8px; }
+    .stat-value { font-size: 20px; font-weight: 800; color: #0f172a; }
+    .stat-label { font-size: 11px; color: var(--hint-color); margin-top: 2px; }
+
+    .stat-card.blue .stat-icon { color: #3897f0; }
+    .stat-card.orange .stat-icon { color: #f59e0b; }
+    .stat-card.green .stat-icon { color: #10b981; }
+
+    /* Sections */
+    .menu-section { margin-bottom: 24px; }
+    h3 { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding-left: 4px; }
+
+    .menu-list { background: white; border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
+
+    .menu-item {
         width: 100%;
         display: flex;
         align-items: center;
-        gap: 20px;
-        padding: 20px;
-        text-align: left;
+        padding: 16px;
+        background: white;
+        border: none;
+        border-bottom: 1px solid #f1f5f9;
         cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
+        text-align: left;
+        transition: background 0.2s;
     }
 
-    .menu-card:active {
-        transform: scale(0.98);
-    }
+    .menu-item:last-child { border-bottom: none; }
+    .menu-item:active { background: #f8fafc; }
 
-    .icon-box {
-        width: 56px;
-        height: 56px;
-        border-radius: 18px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 24px;
-    }
+    .menu-icon { font-size: 24px; margin-right: 16px; }
+    .menu-info { flex: 1; }
+    h4 { font-size: 15px; margin: 0; color: #1e293b; font-weight: 600; }
+    .menu-info p { margin: 2px 0 0 0; font-size: 12px; color: var(--hint-color); }
+    .chevron { font-size: 20px; color: #cbd5e1; margin-left: 8px; }
 
-    .card-content {
-        flex: 1;
-    }
-
-    .card-content h3 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 700;
-        color: #1e293b;
-    }
-
-    .card-content p {
-        margin: 4px 0 0 0;
-        font-size: 13px;
-        color: var(--hint-color);
-    }
-
-    .arrow {
-        color: #cbd5e1;
-        font-size: 20px;
-        font-weight: 300;
-    }
+    .loading-overlay { text-align: center; padding: 40px; }
+    .spinner { width: 30px; height: 30px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 </style>
