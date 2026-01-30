@@ -3,7 +3,6 @@
     import api from '$lib/api.js';
     import { contactService } from '$lib/services/contactService.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
-    import { goto } from '$app/navigation';
 
     export let contactId;
     const dispatch = createEventDispatcher();
@@ -14,9 +13,9 @@
     let isLoading = true;
     let isHistoryLoading = false;
 
-    // Реактивное состояние редактирования
-    let editMode = { name: false, email: false, notes: false, phoneIdx: -1 };
-    let tempValues = { name: '', phones: [], email: '', notes: '' };
+    // Состояния редактирования
+    let editMode = { name: false, email: false, notes: false, phoneIdx: -1, isAddingPhone: false };
+    let tempValues = { name: '', phones: [], email: '', notes: '', newPhone: '' };
 
     onMount(async () => {
         await loadContact();
@@ -36,63 +35,59 @@
         }
     }
 
-    // Просто синхронизируем временные переменные с данными из базы
     function syncTempValues() {
         if (!contact) return;
         tempValues = {
             name: contact.name,
             phones: [...(contact.phones || [])],
             email: contact.email || '',
-            notes: contact.notes || ''
+            notes: contact.notes || '',
+            newPhone: ''
         };
     }
 
-    // Сброс всех режимов редактирования
     function cancelAllEdits() {
-        editMode = { name: false, email: false, notes: false, phoneIdx: -1 };
+        editMode = { name: false, email: false, notes: false, phoneIdx: -1, isAddingPhone: false };
         syncTempValues();
     }
 
-    async function saveField(fieldName) {
+    async function saveField(type) {
         try {
+            const finalPhones = type === 'addPhone'
+                ? [...tempValues.phones, phoneUtils.clean(tempValues.newPhone)]
+                : tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p);
+
+            // Валидация
+            if (!tempValues.name) return alert('Имя обязательно');
+            if (finalPhones.length === 0) return alert('У клиента должен быть минимум один телефон');
+
             const payload = {
                 ...contact,
-                ...tempValues,
-                phones: tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p)
+                name: tempValues.name,
+                email: tempValues.email || null,
+                notes: tempValues.notes || null,
+                phones: finalPhones
             };
+
             const res = await api.put(`/admin/clients/${contactId}`, payload);
             contact = res.data;
             cancelAllEdits();
             dispatch('loaded', { name: contact.name });
         } catch (e) {
-            alert('Ошибка сохранения');
+            alert('Ошибка: ' + (e.response?.data?.message || 'Не удалось сохранить'));
             cancelAllEdits();
         }
     }
 
-    async function loadHistory() {
-        if (appointments.length > 0) return;
-        isHistoryLoading = true;
-        try {
-            appointments = await contactService.getContactAppointments(contactId);
-        } catch (e) {
-            console.error('History failed', e);
-        } finally {
-            isHistoryLoading = false;
+    async function removePhone(idx) {
+        if (contact.phones.length <= 1) {
+            alert('Нельзя удалить единственный номер. Добавьте другой номер перед удалением этого.');
+            return;
         }
-    }
-
-    $: if (activeTab === 'history') loadHistory();
-
-    function getStatusInfo(status) {
-        const map = {
-            'SCHEDULED': { text: 'Ожидает', color: '#42A5F5' },
-            'CONFIRMED': { text: 'Подтверждено', color: '#26A69A' },
-            'NEEDS_CALL': { text: 'Перезвонить', color: '#FFA726' },
-            'COMPLETED': { text: 'Выполнено', color: '#90A4AE' },
-            'CANCELLED': { text: 'Отменено', color: '#EF5350' }
-        };
-        return map[status] || { text: status, color: '#64748b' };
+        if (confirm('Удалить этот номер?')) {
+            tempValues.phones = tempValues.phones.filter((_, i) => i !== idx);
+            await saveField('phones');
+        }
     }
 </script>
 
@@ -109,6 +104,7 @@
             {#if activeTab === 'info'}
                 <div class="info-section">
 
+                    <!-- ИМЯ -->
                     <div class="card hero-card">
                         {#if editMode.name}
                             <div class="edit-box">
@@ -123,6 +119,7 @@
                         {/if}
                     </div>
 
+                    <!-- ТЕЛЕФОНЫ -->
                     <label class="section-title">КОНТАКТНЫЕ НОМЕРА</label>
                     <div class="card p-0">
                         {#each contact.phones as phone, i}
@@ -141,17 +138,41 @@
                                     </div>
                                 {:else}
                                     <span class="icon">📱</span>
-                                    <span class="value" on:click={() => editMode.phoneIdx = i}>
-                                        {phoneUtils.format(phone)} <small>✎</small>
-                                    </span>
+                                    <div class="value-col" on:click={() => editMode.phoneIdx = i}>
+                                        <span class="value">{phoneUtils.format(phone)}</span>
+                                        <small>изменить ✎</small>
+                                    </div>
+                                    <button class="icon-btn-del" on:click={() => removePhone(i)}>🗑</button>
                                     <a href="tel:+{phoneUtils.clean(phone)}" class="call-btn">Вызов</a>
                                 {/if}
                             </div>
                         {/each}
-                        <button class="add-btn-full" on:click={() => goto(`/admin/clients/${contactId}/edit`)}>+ Добавить номер</button>
+
+                        <!-- ДОБАВЛЕНИЕ: Теперь тоже реактивно внутри карточки -->
+                        <div class="detail-row add-row">
+                            {#if editMode.isAddingPhone}
+                                <div class="edit-box w-100">
+                                    <input
+                                        type="tel"
+                                        bind:value={tempValues.newPhone}
+                                        on:input={(e) => tempValues.newPhone = phoneUtils.format(e.target.value)}
+                                        placeholder="+7 (___) ___"
+                                        class="mid-input"
+                                        autofocus
+                                    />
+                                    <button class="save" on:click={() => saveField('addPhone')}>✓</button>
+                                    <button class="cancel" on:click={cancelAllEdits}>✕</button>
+                                </div>
+                            {:else}
+                                <button class="add-link" on:click={() => editMode.isAddingPhone = true}>
+                                    + Добавить еще один номер
+                                </button>
+                            {/if}
+                        </div>
                     </div>
 
-                    <label class="section-title">EMAIL</label>
+                    <!-- EMAIL & ЗАМЕТКИ (аналогично реактивно) -->
+                    <label class="section-title">ПРОЧЕЕ</label>
                     <div class="card p-16">
                         {#if editMode.email}
                             <div class="edit-box w-100">
@@ -161,47 +182,24 @@
                             </div>
                         {:else}
                             <div class="clickable-text" on:click={() => editMode.email = true}>
-                                {contact.email || 'Добавить почту'} <small>✎</small>
+                                ✉️ {contact.email || 'Добавить Email'} <small>✎</small>
                             </div>
                         {/if}
-                    </div>
-
-                    <label class="section-title">ЗАМЕТКИ</label>
-                    <div class="card p-16">
+                        <div class="divider"></div>
                         {#if editMode.notes}
                             <div class="edit-box column w-100">
                                 <textarea bind:value={tempValues.notes} rows="4" autofocus></textarea>
                                 <div class="actions right">
-                                    <button class="cancel" on:click={cancelAllEdits}>Отмена</button>
-                                    <button class="save-long" on:click={() => saveField('notes')}>Сохранить</button>
+                                    <button class="cancel" on:click={cancelAllEdits}>✕ Отмена</button>
+                                    <button class="save-long" on:click={() => saveField('notes')}>✓ Сохранить</button>
                                 </div>
                             </div>
                         {:else}
                             <div class="clickable-text pre" on:click={() => editMode.notes = true}>
-                                {contact.notes || 'Добавить заметки...'} <small>✎</small>
+                                📝 {contact.notes || 'Добавить заметки...'} <small>✎</small>
                             </div>
                         {/if}
                     </div>
-                </div>
-            {:else}
-                <div class="history-section">
-                    {#if isHistoryLoading}
-                        <div class="center-spinner"><span class="spinner mini"></span></div>
-                    {:else if appointments.length === 0}
-                        <div class="empty-state">История пуста</div>
-                    {:else}
-                        {#each appointments as appt}
-                            <div class="history-card card">
-                                <div class="main">
-                                    <h4>{appt.service}</h4>
-                                    <p>{new Date(appt.startTime).toLocaleDateString('ru-RU')} в {new Date(appt.startTime).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}</p>
-                                </div>
-                                <div class="status" style="color: {getStatusInfo(appt.status).color}; background: {getStatusInfo(appt.status).color}15">
-                                    {getStatusInfo(appt.status).text}
-                                </div>
-                            </div>
-                        {/each}
-                    {/if}
                 </div>
             {/if}
         </div>
@@ -215,43 +213,42 @@
     .tab-bar button.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); }
 
     .tab-content { padding: 16px; }
-    .card { background: white; border-radius: 20px; box-shadow: var(--shadow); margin-bottom: 12px; overflow: hidden; }
+    .card { background: white; border-radius: 20px; box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
     .p-0 { padding: 0; } .p-16 { padding: 16px; }
 
     .hero-card { padding: 24px; text-align: center; }
     .hero-card h2 { margin: 0; font-size: 22px; font-weight: 800; cursor: pointer; }
-    small { font-size: 14px; color: var(--primary-color); opacity: 0.6; }
+    small { font-size: 13px; color: var(--primary-color); opacity: 0.5; margin-left: 4px; font-weight: 400; }
 
-    .section-title { display: block; font-size: 11px; font-weight: 800; color: #94a3b8; letter-spacing: 1px; margin: 20px 0 10px 4px; text-transform: uppercase; }
+    .section-title { display: block; font-size: 11px; font-weight: 800; color: #94a3b8; letter-spacing: 1px; margin: 0 0 10px 4px; text-transform: uppercase; }
 
     .detail-row { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #f8fafc; }
-    .detail-row .icon { font-size: 20px; }
-    .detail-row .value { flex: 1; font-weight: 600; color: #1e293b; cursor: pointer; }
+    .detail-row:last-child { border-bottom: none; }
+    .value-col { flex: 1; display: flex; flex-direction: column; cursor: pointer; }
+    .value { font-weight: 600; color: #1e293b; font-size: 16px; }
+
+    .add-link { background: none; border: none; color: var(--primary-color); font-weight: 700; font-size: 14px; cursor: pointer; padding: 4px 0; }
 
     .edit-box { display: flex; align-items: center; gap: 8px; }
     .edit-box.column { flex-direction: column; align-items: stretch; }
     .w-100 { width: 100%; }
 
-    input, textarea { flex: 1; padding: 10px 14px; border: 2px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: white; }
+    input, textarea { flex: 1; padding: 10px 14px; border: 2px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc; }
     .big-input { font-size: 20px; font-weight: 800; text-align: center; }
 
     .actions { display: flex; gap: 8px; }
     .actions.right { justify-content: flex-end; margin-top: 8px; }
 
-    .save { background: #10b981; color: white; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
-    .save-long { background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+    .save { background: #10b981; color: white; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+    .save-long { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; }
     .cancel { background: #f1f5f9; color: #64748b; border: none; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700; }
 
-    .call-btn { font-size: 12px; font-weight: 700; color: var(--primary-color); text-decoration: none; padding: 6px 12px; background: #eff6ff; border-radius: 8px; }
-    .add-btn-full { width: 100%; padding: 12px; border: none; background: #f8fafc; color: #94a3b8; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .icon-btn-del { background: #fef2f2; color: #ef4444; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
+    .call-btn { font-size: 12px; font-weight: 700; color: var(--primary-color); text-decoration: none; padding: 8px 14px; background: #eff6ff; border-radius: 10px; }
 
-    .clickable-text { font-size: 15px; color: #1e293b; font-weight: 500; cursor: pointer; }
-    .clickable-text.pre { white-space: pre-wrap; font-weight: 400; line-height: 1.5; color: #475569; }
-
-    .history-card { display: flex; justify-content: space-between; align-items: center; padding: 16px; }
-    .history-card h4 { margin: 0; font-size: 15px; font-weight: 700; }
-    .history-card p { margin: 4px 0 0 0; font-size: 12px; color: #64748b; }
-    .status { padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+    .clickable-text { font-size: 15px; color: #1e293b; font-weight: 500; cursor: pointer; min-height: 32px; display: flex; align-items: center; }
+    .clickable-text.pre { white-space: pre-wrap; font-weight: 400; line-height: 1.5; color: #475569; padding: 8px 0; }
+    .divider { height: 1px; background: #f1f5f9; margin: 12px 0; }
 
     .center-spinner { display: flex; justify-content: center; padding: 60px; }
     .spinner { width: 28px; height: 28px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
