@@ -1,24 +1,28 @@
 <script>
+    import { activeTab } from '$lib/stores/dashboardStore.js';
     import { page } from '$app/stores';
-    import { user } from '$lib/stores/auth.js';
 
-    // Определяем активный путь для подсветки
-    $: activePath = $page.url.pathname;
+    // Меню работает как переключатель вкладок, если мы на главной странице роли
+    // Или как обычные ссылки, если мы ушли глубоко в настройки
+    $: isOnMainDashboard = $page.url.pathname.match(/^\/(admin|manager|employee)$/);
 </script>
 
 <nav class="bottom-nav">
-    <!-- Точное соответствие Flutter: 'Управление' -->
-    <a href="/{$user?.role?.toLowerCase() || 'employee'}"
-       class:active={activePath.endsWith('admin') || activePath.endsWith('manager') || activePath.endsWith('employee')}>
+    <button
+        class:active={$activeTab === 'management'}
+        on:click={() => isOnMainDashboard ? activeTab.set('management') : window.location.href='/admin'}
+    >
         <span class="icon">📊</span>
         <span class="label">Управление</span>
-    </a>
+    </button>
 
-    <!-- Точное соответствие Flutter: 'Календарь' -->
-    <a href="/calendar" class:active={activePath.includes('/calendar')}>
+    <button
+        class:active={$activeTab === 'calendar'}
+        on:click={() => isOnMainDashboard ? activeTab.set('calendar') : window.location.href='/admin'}
+    >
         <span class="icon">📅</span>
         <span class="label">Календарь</span>
-    </a>
+    </button>
 </nav>
 
 <style>
@@ -38,33 +42,23 @@
         z-index: 1000;
     }
 
-    :global(body.tg) .bottom-nav {
-        background: var(--tg-theme-secondary-bg-color, #ffffff);
-        border-top: 0.5px solid var(--tg-theme-hint-color, #dbdbdb);
-    }
-
-    a {
+    button {
         flex: 1;
-        text-decoration: none;
+        background: none;
+        border: none;
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 4px;
         color: #94a3b8;
+        cursor: pointer;
         transition: all 0.2s ease;
     }
 
-    a.active {
+    button.active {
         color: var(--primary-color);
     }
 
-    .icon {
-        font-size: 22px;
-    }
-
-    .label {
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.2px;
-    }
+    .icon { font-size: 22px; }
+    .label { font-size: 11px; font-weight: 700; letter-spacing: 0.2px; }
 </style>
