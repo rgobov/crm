@@ -3,9 +3,14 @@
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
 
+    let isTelegram = false;
+
     onMount(() => {
-        // Каждый раз при открытии вкладки проверяем актуальность данных
-        // Если прошло более 1 минуты с последнего обновления - обновляем
+        // Проверка: запущен ли проект в Telegram (наличие initData)
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
+            isTelegram = true;
+        }
+
         const oneMinute = 60 * 1000;
         if (!$dashboardStore.lastUpdated || (new Date() - $dashboardStore.lastUpdated > oneMinute)) {
             dashboardStore.refresh();
@@ -15,7 +20,12 @@
     const directories = [
         { id: 'staff', title: 'Персонал', icon: '👤', desc: 'Сотрудники и роли' },
         { id: 'resources', title: 'Ресурсы', icon: '🛠️', desc: 'Оборудование и залы' },
-        { id: 'services', title: 'Услуги', icon: '✂️', desc: 'Ваш прайс-лист' }
+        { id: 'services', title: 'Услуги', icon: '✂️', desc: 'Ваш прайс-лист' },
+        { id: 'clients', title: 'Клиенты', icon: '💎', desc: 'База клиентов' }
+    ];
+
+    const integrations = [
+        { id: 'wappi', title: 'Напоминания Wappi.pro', icon: '🔔', desc: 'Настройка уведомлений в мессенджеры' }
     ];
 </script>
 
@@ -56,11 +66,30 @@
                 {/each}
             </div>
         </section>
+
+        <!-- ОТОБРАЖАЕМ ИНТЕГРАЦИИ ТОЛЬКО В БРАУЗЕРЕ (НЕ В ТЕЛЕГРАМЕ) -->
+        {#if !isTelegram}
+            <section class="menu-section">
+                <h3>Интеграции и настройки</h3>
+                <div class="menu-list shadow-card">
+                    {#each integrations as item}
+                        <button class="menu-item" on:click={() => goto(`/admin/settings/${item.id}`)}>
+                            <span class="menu-icon">{item.icon}</span>
+                            <div class="menu-info">
+                                <h4>{item.title}</h4>
+                                <p>{item.desc}</p>
+                            </div>
+                            <span class="chevron">›</span>
+                        </button>
+                    {/each}
+                </div>
+            </section>
+        {/if}
     {/if}
 </div>
 
 <style>
-    .tab-content { padding: 20px; animation: fadeIn 0.3s ease-out; }
+    .tab-content { padding: 20px; animation: fadeIn 0.3s ease-out; padding-bottom: 40px; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
@@ -68,6 +97,7 @@
     .stat-value { font-size: 20px; font-weight: 800; color: #0f172a; }
     .stat-label { font-size: 11px; color: var(--hint-color); margin-top: 2px; }
 
+    .menu-section { margin-bottom: 24px; }
     .menu-section h3 { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px; padding-left: 4px; }
     .menu-list { background: white; border-radius: 24px; overflow: hidden; }
     .shadow-card { box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.02); }
