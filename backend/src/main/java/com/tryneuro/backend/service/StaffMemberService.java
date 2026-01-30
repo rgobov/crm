@@ -10,6 +10,10 @@ import com.tryneuro.backend.repository.StaffShiftRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -41,56 +45,10 @@ public class StaffMemberService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    private LocalTime parseTime(String time) {
-        if (time == null || time.isEmpty()) return null;
-        try {
-            return LocalTime.parse(time, timeFormatter);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-    
     public Optional<StaffMember> getStaffMemberById(String id) {
         Optional<StaffMember> staffOpt = staffMemberRepository.findById(id);
         staffOpt.ifPresent(this::enrichWithUserData);
         return staffOpt;
-    }
-
-    public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
-        return staffMemberRepository.findById(id).map(staff -> {
-            enrichWithUserData(staff);
-            staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresent(shift -> {
-                staff.setDayOff(shift.isDayOff());
-                staff.setWorkStartTime(shift.getWorkStartTime());
-                staff.setWorkEndTime(shift.getWorkEndTime());
-                staff.setBreakStartTime(shift.getBreakStartTime());
-                staff.setBreakEndTime(shift.getBreakEndTime());
-            });
-            if (!staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).isPresent()) {
-                staff.setDayOff(true);
-            }
-            return staff;
-        });
-    }
-
-    public List<StaffMember> getStaffForDate(String tenantId, LocalDate date) {
-        List<StaffMember> allStaff = staffMemberRepository.findByTenantId(tenantId);
-
-        return allStaff.stream()
-                .filter(StaffMember::isActive)
-                .map(staff -> {
-                    enrichWithUserData(staff);
-                    staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresentOrElse(shift -> {
-                        staff.setDayOff(shift.isDayOff());
-                        staff.setWorkStartTime(shift.getWorkStartTime());
-                        staff.setWorkEndTime(shift.getWorkEndTime());
-                        staff.setBreakStartTime(shift.getBreakStartTime());
-                        staff.setBreakEndTime(shift.getBreakEndTime());
-                    }, () -> {
-                        staff.setDayOff(true);
-                    });
-                    return staff;
-                }).collect(Collectors.toList());
     }
 
     private void enrichWithUserData(StaffMember staff) {
@@ -102,42 +60,27 @@ public class StaffMemberService {
 
     @Transactional
     public StaffMember addStaffMember(CreateStaffRequest request, String tenantId) {
-        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
-            userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Пользователь с email " + request.getEmail() + " уже существует.");
-            });
-        }
-
         StaffMember staffMember = new StaffMember();
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
-        staffMember.setPhone(request.getPhone()); // Учет телефона при создании
+        staffMember.setPhone(request.getPhone());
         staffMember.setTenantId(tenantId);
         staffMember.setActive(true);
         
         return staffMemberRepository.save(staffMember);
     }
 
-    @Transactional
-    public StaffShift saveShift(StaffShift shift) {
-        return staffShiftRepository.findByStaffIdAndDate(shift.getStaffId(), shift.getDate())
-                .map(existing -> {
-                    shift.setId(existing.getId());
-                    return staffShiftRepository.save(shift);
-                })
-                .orElseGet(() -> staffShiftRepository.save(shift));
-    }
-
-    @Transactional
-    public void deleteShift(String staffId, LocalDate date) {
-        staffShiftRepository.findByStaffIdAndDate(staffId, date)
-                .ifPresent(shift -> staffShiftRepository.deleteById(shift.getId()));
-    }
-
     public List<StaffMember> getAllStaff(String tenantId) {
         return staffMemberRepository.findByTenantId(tenantId).stream()
                 .map(s -> { enrichWithUserData(s); return s; })
                 .collect(Collectors.toList());
+    }
+
+    public Page<StaffMember> getStaffPaged(String tenantId, String query, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+        Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, pageable);
+        staffPage.forEach(this::enrichWithUserData);
+        return staffPage;
     }
 
     @Transactional
@@ -151,7 +94,8 @@ public class StaffMemberService {
 
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
-        staffMember.setPhone(request.getPhone()); // Учет телефона при обновлении
+        staffMember.setPhone(request.getPhone());
+        staffMember.setTenantId(tenantId);
 
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         

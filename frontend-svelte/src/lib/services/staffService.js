@@ -1,8 +1,12 @@
 import api from '$lib/api.js';
 
 export const staffService = {
-    async getStaff() {
-        const response = await api.get('/admin/staff');
+    // Обновленный метод с поддержкой поиска и пагинации
+    async getStaff(query = '', page = 0, size = 100) {
+        const response = await api.get('/admin/staff', {
+            params: { query, page, size }
+        });
+        // Spring Data Page возвращает объект с полем 'content'
         return response.data;
     },
 

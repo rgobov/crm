@@ -5,6 +5,7 @@ import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -26,10 +27,14 @@ public class AdminController {
         this.scheduleService = scheduleService;
     }
 
-    // --- Staff Management ---
+    // --- Staff Management with Pagination and Search ---
     @GetMapping("/staff")
-    public List<StaffMember> getAllStaff(@RequestAttribute("tenantId") String tenantId) {
-        return staffMemberService.getAllStaff(tenantId);
+    public Page<StaffMember> getStaffPaged(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return staffMemberService.getStaffPaged(tenantId, query, page, size);
     }
 
     @GetMapping("/staff/{id}")
@@ -38,7 +43,7 @@ public class AdminController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
 
         if (!staff.getTenantId().equals(tenantId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен к данным другой компании");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
         }
         return staff;
     }
