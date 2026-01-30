@@ -6,7 +6,9 @@ import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -30,6 +32,17 @@ public class AdminController {
         return staffMemberService.getAllStaff(tenantId);
     }
 
+    @GetMapping("/staff/{id}")
+    public StaffMember getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        StaffMember staff = staffMemberService.getStaffMemberById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
+
+        if (!staff.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен к данным другой компании");
+        }
+        return staff;
+    }
+
     @PostMapping("/staff")
     public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
         return staffMemberService.addStaffMember(request, tenantId);
@@ -47,13 +60,12 @@ public class AdminController {
 
     // --- Availability Check ---
     @GetMapping("/staff/{staffMemberId}/availability")
-    public boolean isStaffMemberAvailable(@RequestAttribute("tenantId") String tenantId, // Получаем tenantId
+    public boolean isStaffMemberAvailable(@RequestAttribute("tenantId") String tenantId,
                                             @PathVariable String staffMemberId,
                                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime time,
                                             @RequestParam int duration,
                                             @RequestParam(required = false) String currentAppointmentId) {
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
         return scheduleService.isStaffMemberAvailable(tenantId, staffMemberId, date, time, duration, currentAppointmentId);
     }
 }

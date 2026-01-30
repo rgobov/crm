@@ -6,8 +6,12 @@ export const staffService = {
         return response.data;
     },
 
+    async getStaffMember(id) {
+        const response = await api.get(`/admin/staff/${id}`);
+        return response.data;
+    },
+
     async addStaffMember(data) {
-        // data включает name, specialty, phone, role, available, email, password и др.
         await api.post('/admin/staff', data);
     },
 
