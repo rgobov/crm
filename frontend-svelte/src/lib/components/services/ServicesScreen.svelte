@@ -49,7 +49,7 @@
         <div class="center"><span class="spinner"></span></div>
     {:else if services.length === 0}
         <div class="empty-state">
-            <span class="icon">✂️</span>
+            <span class="icon">✨</span>
             <p>У вас пока нет услуг</p>
             <button class="add-btn" on:click={() => goto('/admin/services/new')}>Добавить услугу</button>
         </div>
@@ -57,7 +57,7 @@
         <div class="service-list">
             {#each services as service}
                 <div class="service-card card" on:click={() => goto(`/admin/services/${service.id}`)}>
-                    <div class="icon-box">✂️</div>
+                    <div class="icon-box">✨</div>
                     <div class="info">
                         <h3>{service.name}</h3>
                         <p>{service.durationInMinutes} минут</p>
@@ -82,7 +82,7 @@
     .service-card { display: flex; align-items: center; gap: 16px; padding: 16px; background: white; border-radius: 20px; cursor: pointer; transition: transform 0.1s; }
     .service-card:active { transform: scale(0.98); }
 
-    .icon-box { width: 44px; height: 44px; background: #eff6ff; color: var(--primary-color); border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 20px; }
+    .icon-box { width: 44px; height: 44px; background: #fef9c3; color: #ca8a04; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 20px; }
 
     .info { flex: 1; }
     .info h3 { margin: 0; font-size: 16px; color: #1e293b; font-weight: 700; }
