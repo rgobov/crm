@@ -17,9 +17,9 @@
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
 | `admin_dashboard_screen.dart` | `admin/+page.svelte`<br>`BottomNav.svelte` | ✅ | ✅ | ✅ | **Done** | - [x] Tab-System (Бесшовность)<br>- [x] Переключение вкладок |
 | `admin_management_tab.dart` | `admin/ManagementTab.svelte`| ✅ | ✅ | ✅ | **Done** | - [x] Карточки статистики<br>- [x] Справочники |
-| `staff_screen.dart` | `admin/staff/+page.svelte` | ✅ | ✅ | ✅ | **Done** | - [x] Поиск (2 симв/6 цифр)<br>- [x] Пагинация бэкенда |
-| `staff_edit_screen.dart` | `admin/staff/[id]/+page.svelte`| ✅ | ✅ | ✅ | **Done** | - [x] UUID/TenantID Sync<br>- [x] Account Creation |
-| `contacts_screen.dart` | `admin/clients/+page.svelte` | ✅ | ✅ | ✅ | **Done** | - [x] Infinite Scroll<br>- [x] Smart Search |
+| `staff_screen.dart` | `admin/staff/+page.svelte` | ✅ | ✅ | ✅ | **Done** | - [x] Глобальный поиск (Backend)<br>- [x] Autocomplete (Dropdown 5 чел)<br>- [x] Пагинация по 25 чел |
+| `staff_edit_screen.dart` | `admin/staff/[id]/+page.svelte`| ✅ | ✅ | ✅ | **Done** | - [x] **Smart Delete**: Физическое если нет записей, Soft-Delete если есть<br>- [x] Блокировка входа для неактивных<br>- [x] Смена Email/Password (только Админ) |
+| `contacts_screen.dart` | `admin/clients/+page.svelte` | ✅ | ✅ | ✅ | **Done** | - [x] Пагинация (25 чел)<br>- [x] Smart Search |
 | `contact_detail_screen.dart`<br>`contact_edit_screen.dart` | `admin/clients/[id]/+page.svelte`| ❌ | ❌ | ❌ | Pending | - [ ] История визитов клиента<br>- [ ] Общая сумма покупок |
 | `services_screen.dart` | `admin/services/+page.svelte` | ❌ | ❌ | ❌ | Pending | - [ ] Список услуг, Длительность |
 | `service_edit_screen.dart` | `admin/services/[id]/+page.svelte`| ❌ | ❌ | ❌ | Pending | - [ ] Редактирование услуги |
