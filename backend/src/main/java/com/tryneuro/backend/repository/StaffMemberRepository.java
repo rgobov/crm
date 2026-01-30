@@ -15,7 +15,7 @@ public interface StaffMemberRepository extends JpaRepository<StaffMember, String
     List<StaffMember> findByTenantId(String tenantId);
 
     @Query("SELECT s FROM StaffMember s WHERE s.tenantId = :tenantId AND s.active = true " +
-           "AND (:query IS NULL OR LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "AND (:query IS NULL OR :query = '' OR LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
            "OR s.phone LIKE CONCAT('%', :query, '%') " +
            "OR LOWER(s.specialty) LIKE LOWER(CONCAT('%', :query, '%')))")
     Page<StaffMember> findByTenantIdAndQuery(@Param("tenantId") String tenantId,

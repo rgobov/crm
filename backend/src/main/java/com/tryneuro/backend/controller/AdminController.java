@@ -26,7 +26,6 @@ public class AdminController {
         this.scheduleService = scheduleService;
     }
 
-    // --- Staff Management with Pagination and Search ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -62,7 +61,6 @@ public class AdminController {
         staffMemberService.deleteStaffMember(id);
     }
 
-    // --- Availability Check ---
     @GetMapping("/staff/{staffMemberId}/availability")
     public boolean isStaffMemberAvailable(@RequestAttribute("tenantId") String tenantId,
                                             @PathVariable String staffMemberId,

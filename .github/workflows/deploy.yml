@@ -19,3 +19,5 @@ jobs:
             cd ~/crm
             git pull origin feature/telegram-mini-app
             docker-compose up -d --build
+            # Очистка старых образов после успешного запуска
+            docker image prune -f
