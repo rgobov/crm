@@ -21,6 +21,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
     List<Appointment> findByTenantId(String tenantId);
 
+    // ПРОВЕРКА НАЛИЧИЯ ЗАПИСЕЙ У СОТРУДНИКА
+    boolean existsByStaffMemberId(String staffId);
+
     @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId " +
            "AND (a.reminderSent IS NULL OR a.reminderSent = false) " +
            "AND CAST(a.startTime AS date) >= :today " +
@@ -42,5 +45,4 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
            "FROM Appointment a WHERE a.staffMemberId = :staffId AND YEAR(a.startTime) = :year AND MONTH(a.startTime) = :month " +
            "GROUP BY DAY(a.startTime)")
     List<WorkloadDto> getWorkloadForStaffAndMonth(@Param("staffId") String staffId, @Param("year") int year, @Param("month") int month);
-
 }

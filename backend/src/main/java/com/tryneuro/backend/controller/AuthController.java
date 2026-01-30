@@ -3,7 +3,9 @@ package com.tryneuro.backend.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tryneuro.backend.dto.AuthRequest;
 import com.tryneuro.backend.dto.AuthResponse;
+import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.User;
+import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import com.tryneuro.backend.security.JwtUtil;
 import com.tryneuro.backend.service.TelegramAuthService;
@@ -13,8 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,6 +31,7 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final TelegramAuthService telegramAuthService;
     private final UserRepository userRepository;
+    private final StaffMemberRepository staffMemberRepository; // Добавлено для проверки активности
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostMapping("/login")
@@ -43,37 +44,30 @@ public class AuthController {
             final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getEmail());
             final User user = (User) userDetails;
 
-            if (initData != null && !initData.isEmpty()) {
-                try {
-                    Map<String, String> parsedData = telegramAuthService.validateAndParseData(initData);
-                    String userJson = parsedData.get("user");
-                    Map<String, Object> tgUser = objectMapper.readValue(userJson, Map.class);
-                    Long telegramId = Long.valueOf(tgUser.get("id").toString());
-
-                    if (user.getTelegramId() == null || !user.getTelegramId().equals(telegramId)) {
-                        user.setTelegramId(telegramId);
-                        userRepository.save(user);
-                    }
-                } catch (Exception e) {
-                    System.err.println("Auto-linking Telegram failed: " + e.getMessage());
+            // КРИТИЧЕСКАЯ ПРОВЕРКА: Если это сотрудник, проверяем активен ли он
+            if (user.getStaffId() != null) {
+                StaffMember staff = staffMemberRepository.findById(user.getStaffId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Профиль сотрудника удален"));
+                if (!staff.isActive()) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ваш аккаунт заблокирован");
                 }
+            }
+
+            if (initData != null && !initData.isEmpty()) {
+                linkTelegram(initData, user);
             }
 
             final String token = jwtUtil.generateToken(user, user.getTenantId(), user.getStaffId());
             return new AuthResponse(token, user.getTenantId());
 
         } catch (BadCredentialsException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Authentication error: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Неверный email или пароль");
         }
     }
 
     @PostMapping("/telegram")
     public AuthResponse loginViaTelegram(@RequestBody Map<String, String> request) {
         String initData = request.get("initData");
-        if (initData == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing initData");
-
         try {
             Map<String, String> parsedData = telegramAuthService.validateAndParseData(initData);
             String userJson = parsedData.get("user");
@@ -81,27 +75,42 @@ public class AuthController {
             Long telegramId = Long.valueOf(tgUser.get("id").toString());
 
             User user = userRepository.findByTelegramId(telegramId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Telegram account not linked"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Аккаунт не связан с Telegram"));
+
+            // КРИТИЧЕСКАЯ ПРОВЕРКА: Если это сотрудник, проверяем активен ли он
+            if (user.getStaffId() != null) {
+                StaffMember staff = staffMemberRepository.findById(user.getStaffId()).orElse(null);
+                if (staff == null || !staff.isActive()) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ заблокирован");
+                }
+            }
 
             final String token = jwtUtil.generateToken(user, user.getTenantId(), user.getStaffId());
             return new AuthResponse(token, user.getTenantId());
-
-        } catch (SecurityException e) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid Telegram signature");
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Auth error: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Ошибка входа через Telegram");
+        }
+    }
+
+    private void linkTelegram(String initData, User user) {
+        try {
+            Map<String, String> parsedData = telegramAuthService.validateAndParseData(initData);
+            String userJson = parsedData.get("user");
+            Map<String, Object> tgUser = objectMapper.readValue(userJson, Map.class);
+            Long telegramId = Long.valueOf(tgUser.get("id").toString());
+
+            if (user.getTelegramId() == null || !user.getTelegramId().equals(telegramId)) {
+                user.setTelegramId(telegramId);
+                userRepository.save(user);
+            }
+        } catch (Exception e) {
+            System.err.println("Auto-linking failed: " + e.getMessage());
         }
     }
 
     @GetMapping("/me")
-    public User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        }
-        
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    public User getCurrentUser(@RequestAttribute("tenantId") String tenantId) {
+        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email).orElseThrow();
     }
 }

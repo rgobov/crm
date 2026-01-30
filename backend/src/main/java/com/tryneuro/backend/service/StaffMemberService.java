@@ -5,6 +5,7 @@ import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.model.UserRole;
+import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.StaffShiftRepository;
 import com.tryneuro.backend.repository.UserRepository;
@@ -32,6 +33,7 @@ public class StaffMemberService {
     private final StaffMemberRepository staffMemberRepository;
     private final StaffShiftRepository staffShiftRepository;
     private final UserRepository userRepository;
+    private final AppointmentRepository appointmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -39,10 +41,12 @@ public class StaffMemberService {
     public StaffMemberService(StaffMemberRepository staffMemberRepository,
                               StaffShiftRepository staffShiftRepository,
                               UserRepository userRepository,
+                              AppointmentRepository appointmentRepository,
                               PasswordEncoder passwordEncoder) {
         this.staffMemberRepository = staffMemberRepository;
         this.staffShiftRepository = staffShiftRepository;
         this.userRepository = userRepository;
+        this.appointmentRepository = appointmentRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -53,16 +57,10 @@ public class StaffMemberService {
     }
 
     public Page<StaffMember> getStaffPaged(String tenantId, String query, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
-
-        // Глобальный поиск (синхронизация с логикой клиентов)
-        if (query != null && query.trim().length() >= 2) {
-            return staffMemberRepository.findByTenantIdAndQuery(tenantId, query.trim(), pageable)
-                    .map(s -> { enrichWithUserData(s); return s; });
-        }
-
-        return staffMemberRepository.findByTenantIdAndQuery(tenantId, "", pageable)
-                .map(s -> { enrichWithUserData(s); return s; });
+        Pageable pageable = PageRequest.of(page, size, Sort.by("active").descending().and(Sort.by("name").ascending()));
+        Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, pageable);
+        staffPage.forEach(this::enrichWithUserData);
+        return staffPage;
     }
 
     private void enrichWithUserData(StaffMember staff) {
@@ -89,7 +87,6 @@ public class StaffMemberService {
 
         StaffMember saved = staffMemberRepository.save(staffMember);
 
-        // Создаем пользователя для Flutter-совместимости
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             User newUser = new User();
             newUser.setId(UUID.randomUUID().toString());
@@ -117,20 +114,14 @@ public class StaffMemberService {
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
         staffMember.setPhone(request.getPhone());
-        staffMember.setTenantId(tenantId);
+        staffMember.setActive(request.isAvailable());
 
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         
         userRepository.findByStaffId(id).ifPresent(user -> {
-            if (request.getRole() != null) {
-                user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
-            }
-            if (request.getEmail() != null && !request.getEmail().isEmpty()) {
-                user.setEmail(request.getEmail());
-            }
-            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-                user.setPassword(passwordEncoder.encode(request.getPassword()));
-            }
+            if (request.getRole() != null) user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
+            if (request.getEmail() != null && !request.getEmail().isEmpty()) user.setEmail(request.getEmail());
+            if (request.getPassword() != null && !request.getPassword().isEmpty()) user.setPassword(passwordEncoder.encode(request.getPassword()));
             userRepository.save(user);
         });
 
@@ -138,9 +129,31 @@ public class StaffMemberService {
         return savedStaff;
     }
 
+    // УМНОЕ УДАЛЕНИЕ: Физическое если нет записей, Soft-Delete если есть
+    @Transactional
     public void deleteStaffMember(String id) {
+        // 1. Удаляем доступ (User) в любом случае
         userRepository.findByStaffId(id).ifPresent(userRepository::delete);
-        staffMemberRepository.deleteById(id);
+
+        // 2. Проверяем наличие записей (Appointments)
+        boolean hasAppointments = appointmentRepository.existsByStaffMemberId(id);
+
+        if (hasAppointments) {
+            // Если записи есть - просто деактивируем (Soft Delete)
+            staffMemberRepository.findById(id).ifPresent(staff -> {
+                staff.setActive(false);
+                staffMemberRepository.save(staff);
+            });
+        } else {
+            // Если записей нет - удаляем физически (чистим базу)
+            staffMemberRepository.deleteById(id);
+        }
+    }
+
+    public List<StaffMember> getAllStaff(String tenantId) {
+        return staffMemberRepository.findByTenantId(tenantId).stream()
+                .map(s -> { enrichWithUserData(s); return s; })
+                .collect(Collectors.toList());
     }
 
     public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
