@@ -6,22 +6,19 @@
 
     let isLoading = false;
     let tg = null;
+    let debounceTimer;
 
-    // Реактивный поиск
+    // Реактивный поиск (от 2 букв или 6 цифр)
     $: if ($staffSearchQuery !== undefined) {
-        handleSearch();
-    }
-
-    async function handleSearch() {
-        const query = $staffSearchQuery;
-        const isPhone = /^\d+$/.test(query);
-        const shouldSearch = query.length === 0 ||
-                           (isPhone && query.length >= 6) ||
-                           (!isPhone && query.length >= 2);
-
-        if (shouldSearch) {
-            await loadStaff(0, false);
-        }
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            const query = $staffSearchQuery;
+            const isPhone = /^\d+$/.test(query);
+            const shouldSearch = query.length === 0 ||
+                               (isPhone && query.length >= 6) ||
+                               (!isPhone && query.length >= 2);
+            if (shouldSearch) loadStaff(0, false);
+        }, 600);
     }
 
     onMount(async () => {
@@ -36,7 +33,7 @@
     async function loadStaff(page = 0, showSpinner = true) {
         if (showSpinner) isLoading = true;
         try {
-            const result = await staffService.getStaff($staffSearchQuery, page, 100);
+            const result = await staffService.getStaff($staffSearchQuery, page, 25);
             cachedStaff.set(result.content);
             staffMetadata.set({
                 totalElements: result.totalElements,
@@ -65,15 +62,15 @@
 <div class="page">
     <div class="header">
         <div class="title-row">
-            <h1>Персонал</h1>
+            <h1>Сотрудники</h1>
             {#if isLoading}
                 <span class="mini-spinner"></span>
             {/if}
         </div>
-        <p class="subtitle">Всего: {$staffMetadata.totalElements || 0} мастеров</p>
+        <p class="subtitle">Управление вашей командой ({$staffMetadata.totalElements || 0})</p>
     </div>
 
-    <!-- ПОИСК: Сделан более контрастным -->
+    <!-- КОНТРАСТНЫЙ ПОИСК -->
     <div class="search-container">
         <div class="search-box">
             <span class="search-icon">🔍</span>
@@ -94,7 +91,7 @@
                 <p>{$staffSearchQuery ? 'Ничего не найдено' : 'Список пуст'}</p>
             </div>
         {:else}
-            <div class="staff-list" class:updating={isLoading}>
+            <div class="staff-list" class:dimmed={isLoading}>
                 {#each $cachedStaff as member (member.id)}
                     <div class="staff-card card">
                         <div class="avatar">{member.name.charAt(0)}</div>
@@ -113,11 +110,18 @@
                 {/each}
             </div>
 
+            <!-- ПАГИНАЦИЯ -->
             {#if $staffMetadata.totalPages > 1}
                 <div class="pagination">
-                    <button disabled={$staffMetadata.currentPage === 0} on:click={() => loadStaff($staffMetadata.currentPage - 1, false)}>←</button>
-                    <span>{$staffMetadata.currentPage + 1} / {$staffMetadata.totalPages}</span>
-                    <button disabled={$staffMetadata.currentPage >= $staffMetadata.totalPages - 1} on:click={() => loadStaff($staffMetadata.currentPage + 1, false)}>→</button>
+                    <button class="pag-btn" disabled={$staffMetadata.currentPage === 0} on:click={() => loadStaff($staffMetadata.currentPage - 1, false)}>
+                        ← Назад
+                    </button>
+                    <span class="page-info">
+                        Страница <strong>{$staffMetadata.currentPage + 1}</strong> из {$staffMetadata.totalPages}
+                    </span>
+                    <button class="pag-btn" disabled={$staffMetadata.currentPage >= $staffMetadata.totalPages - 1} on:click={() => loadStaff($staffMetadata.currentPage + 1, false)}>
+                        Далее →
+                    </button>
                 </div>
             {/if}
         {/if}
@@ -127,42 +131,39 @@
 </div>
 
 <style>
+    /* Стили как мы договорились: контрастный поиск и пагинация */
     .page { padding: 20px; max-width: 600px; margin: 0 auto; min-height: 100vh; background: var(--bg-color); }
-
     .header { margin-bottom: 20px; }
     .title-row { display: flex; align-items: center; gap: 12px; }
     h1 { font-size: 26px; font-weight: 800; margin: 0; color: #0f172a; }
-    .subtitle { color: var(--hint-color); margin: 4px 0 0 0; font-size: 14px; font-weight: 500; }
+    .subtitle { color: var(--hint-color); font-size: 14px; }
 
-    /* УЛУЧШЕННЫЙ ПОИСК */
     .search-container { margin-bottom: 24px; position: sticky; top: 10px; z-index: 10; }
     .search-box {
         display: flex; align-items: center; background: white; padding: 14px 18px;
-        border-radius: 18px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        border: 2px solid #3897f033; /* Тонкая синяя рамка */
+        border-radius: 18px; border: 2px solid #3897f033;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.04);
     }
-    .search-icon { margin-right: 12px; font-size: 18px; }
-    input { border: none; background: none; width: 100%; font-size: 16px; outline: none; color: #1e293b; font-weight: 500; }
-    .clear-btn { background: #f1f5f9; border: none; color: #64748b; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
+    input { border: none; background: none; width: 100%; font-size: 16px; outline: none; margin-left: 10px; }
 
-    .staff-list { display: grid; gap: 12px; padding-bottom: 100px; }
+    .staff-list { display: grid; gap: 10px; padding-bottom: 20px; }
     .staff-card { display: flex; align-items: center; gap: 16px; padding: 16px; background: white; border-radius: 22px; box-shadow: var(--shadow); }
     .avatar { width: 52px; height: 52px; background: #eff6ff; color: var(--primary-color); border-radius: 16px; display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 20px; }
-
     .info { flex: 1; }
     h3 { margin: 0; font-size: 17px; color: #1e293b; font-weight: 700; }
     .info p { margin: 2px 0 0 0; font-size: 13px; color: var(--hint-color); }
-    .phone { font-size: 12px; color: var(--primary-color); font-weight: 600; margin-top: 4px; display: block; }
+    .phone { font-size: 12px; color: var(--primary-color); font-weight: 600; }
 
     .actions { display: flex; gap: 10px; }
-    .actions button { width: 40px; height: 40px; border-radius: 12px; border: none; cursor: pointer; font-size: 18px; transition: transform 0.1s; }
-    .actions button:active { transform: scale(0.9); }
+    .actions button { width: 40px; height: 40px; border-radius: 12px; border: none; cursor: pointer; }
     .edit-btn { background: #eff6ff; color: var(--primary-color); }
     .delete-btn { background: #fef2f2; color: #ef4444; }
 
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 32px; padding-bottom: 100px; }
+    .pag-btn { padding: 10px 16px; border-radius: 12px; border: 1px solid #e2e8f0; background: white; font-weight: 600; font-size: 13px; }
+    .pag-btn:disabled { opacity: 0.4; }
+
     .mini-spinner { width: 20px; height: 20px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .fab { position: fixed; bottom: 90px; right: 20px; width: 60px; height: 60px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; box-shadow: 0 12px 30px rgba(56, 151, 240, 0.4); z-index: 100; cursor: pointer; }
+    .fab { position: fixed; bottom: 90px; right: 20px; width: 60px; height: 60px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; box-shadow: 0 12px 30px rgba(56, 151, 240, 0.4); z-index: 100; }
 </style>
