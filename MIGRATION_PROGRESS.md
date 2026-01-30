@@ -16,7 +16,8 @@
 | `staff_screen.dart` | `StaffScreen.svelte` | `routes/admin/staff/+page.svelte` | ✅ |
 | `staff_edit_screen.dart` | `StaffEditScreen.svelte` | `routes/admin/staff/[id]/+page.svelte` | ✅ |
 | `contacts_screen.dart` | `ContactsScreen.svelte` | `routes/admin/clients/+page.svelte` | ✅ |
-| `contact_detail_screen.dart` | `ContactDetailScreen.svelte` | `routes/admin/clients/[id]/+page.svelte`| ⏳ |
+| `contact_detail_screen.dart` | `ContactDetailScreen.svelte` | `routes/admin/clients/[id]/+page.svelte`| ✅ |
+| `contact_edit_screen.dart` | `ContactEditScreen.svelte` | `routes/admin/clients/[id]/edit` | ✅ |
 | `services_screen.dart` | `ServicesScreen.svelte` | `routes/admin/services/+page.svelte` | ❌ |
 | `service_edit_screen.dart` | `ServiceEditScreen.svelte` | `routes/admin/services/[id]/+page.svelte`| ❌ |
 | `resources_screen.dart` | `ResourcesScreen.svelte` | `routes/admin/resources/+page.svelte` | ❌ |

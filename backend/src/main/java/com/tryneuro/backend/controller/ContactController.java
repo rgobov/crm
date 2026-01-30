@@ -1,30 +1,37 @@
 package com.tryneuro.backend.controller;
 
+import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.service.ContactService;
+import com.tryneuro.backend.service.ScheduleService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/contacts")
 public class ContactController {
 
     private final ContactService contactService;
+    private final ScheduleService scheduleService;
 
     @Autowired
-    public ContactController(ContactService contactService) {
+    public ContactController(ContactService contactService, ScheduleService scheduleService) {
         this.contactService = contactService;
+        this.scheduleService = scheduleService;
     }
 
     @GetMapping
     public Page<Contact> getAllContacts(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "false") boolean showAll, // НОВЫЙ ПАРАМЕТР
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return contactService.getContactsPaged(tenantId, query, page, size);
+            @RequestParam(defaultValue = "25") int size) {
+        return contactService.getContactsPaged(tenantId, query, showAll, page, size);
     }
 
     @GetMapping("/{id}")
@@ -34,10 +41,15 @@ public class ContactController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/{id}/appointments")
+    public List<Appointment> getContactAppointments(
+            @RequestAttribute("tenantId") String tenantId,
+            @PathVariable String id) {
+        return scheduleService.getAppointmentsForContact(id, tenantId);
+    }
+
     @GetMapping("/count")
     public long getContactsCount(@RequestAttribute("tenantId") String tenantId) {
-        // ДИАГНОСТИКА: Печатаем tenantId из запроса
-        System.out.println(">>> DEBUG: API /contacts/count called with tenantId: [" + tenantId + "]");
         return contactService.countContacts(tenantId);
     }
 

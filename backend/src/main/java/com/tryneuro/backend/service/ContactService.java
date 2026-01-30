@@ -24,24 +24,23 @@ public class ContactService {
         this.contactRepository = contactRepository;
     }
 
-    public Page<Contact> getContactsPaged(String tenantId, String query, int page, int size) {
+    // ОБНОВЛЕНО: Добавлен параметр showAll
+    public Page<Contact> getContactsPaged(String tenantId, String query, boolean showAll, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
 
-        // 1. Если есть поисковый запрос (минимум 3 символа) - ищем по всей базе
+        // 1. Поиск всегда имеет приоритет (от 3-х символов)
         if (query != null && query.trim().length() >= 3) {
-            return contactRepository.searchContacts(tenantId, query, pageable);
+            return contactRepository.searchContacts(tenantId, query.trim(), pageable);
         }
 
-        // 2. Если запроса нет - возвращаем клиентов, у которых есть записи на СЕГОДНЯ
+        // 2. Если поиска нет, смотрим на переключатель
+        if (showAll) {
+            // Показываем абсолютно всех клиентов компании
+            return contactRepository.findByTenantId(tenantId, pageable);
+        }
+
+        // 3. По умолчанию (или если выбрано "Сегодня") - только клиенты с записями
         return contactRepository.findByAppointmentDate(tenantId, LocalDate.now(), pageable);
-    }
-
-    // Оставляем для совместимости (используем пагинацию для ограничения выборки)
-    public List<Contact> getAllContacts(String tenantId, String query) {
-        if (query != null && query.length() >= 3) {
-            return contactRepository.searchContacts(tenantId, query, PageRequest.of(0, 50)).getContent();
-        }
-        return contactRepository.findByAppointmentDate(tenantId, LocalDate.now(), PageRequest.of(0, 50)).getContent();
     }
 
     public long countContacts(String tenantId) {
@@ -62,31 +61,14 @@ public class ContactService {
             String cleanPhone = phone.replaceAll("[^0-9]", "");
             Optional<Contact> existing = contactRepository.findByCleanPhone(cleanPhone, tenantId);
             if (existing.isPresent()) {
-                throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, 
-                    "Клиент с номером " + phone + " уже существует: " + existing.get().getName()
-                );
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Клиент с номером " + phone + " уже существует.");
             }
         }
-
         contact.setTenantId(tenantId);
         return contactRepository.save(contact);
     }
 
     public Contact updateContact(String id, Contact contact, String tenantId) {
-        for (String phone : contact.getPhones()) {
-            String cleanPhone = phone.replaceAll("[^0-9]", "");
-            contactRepository.findByCleanPhone(cleanPhone, tenantId)
-                .ifPresent(existing -> {
-                    if (!existing.getId().equals(id)) {
-                        throw new ResponseStatusException(
-                            HttpStatus.CONFLICT, 
-                            "Номер " + phone + " уже закреплен за другим клиентом"
-                        );
-                    }
-                });
-        }
-
         contact.setId(id);
         contact.setTenantId(tenantId);
         return contactRepository.save(contact);
