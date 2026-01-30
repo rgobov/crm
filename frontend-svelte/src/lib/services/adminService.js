@@ -3,16 +3,18 @@ import api from '$lib/api.js';
 export const adminService = {
     async getDashboardStats() {
         const now = new Date();
-        const dateStr = now.toISOString().split('T')[0]; // ГГГГ-ММ-ДД
+        const dateStr = now.toISOString().split('T')[0];
 
         try {
-            // Выполняем запросы параллельно (как в Flutter через Future.wait)
+            console.log('Fetching dashboard stats...');
             const [staff, todayApps, contactsCount, resources] = await Promise.all([
-                api.get('/staff'),
-                api.get(`/appointments/day?date=${dateStr}`),
-                api.get('/contacts/count'),
-                api.get('/resources')
+                api.get('/staff').catch(e => ({ data: [] })),
+                api.get(`/appointments/day?date=${dateStr}`).catch(e => ({ data: [] })),
+                api.get('/contacts/count').catch(e => ({ data: 0 })),
+                api.get('/resources').catch(e => ({ data: [] }))
             ]);
+
+            console.log('API Response - Contacts Count:', contactsCount.data);
 
             return {
                 totalClients: contactsCount.data,

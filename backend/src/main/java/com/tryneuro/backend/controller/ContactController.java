@@ -36,6 +36,8 @@ public class ContactController {
 
     @GetMapping("/count")
     public long getContactsCount(@RequestAttribute("tenantId") String tenantId) {
+        // ДИАГНОСТИКА: Печатаем tenantId из запроса
+        System.out.println(">>> DEBUG: API /contacts/count called with tenantId: [" + tenantId + "]");
         return contactService.countContacts(tenantId);
     }
 
