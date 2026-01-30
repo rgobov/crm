@@ -4,27 +4,24 @@ export const adminService = {
     async getDashboardStats() {
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0];
+        const [staff, todayApps, contactsCount, resources] = await Promise.all([
+            api.get('/admin/staff').catch(() => ({ data: { content: [] } })),
+            api.get(`/manager/appointments/day?date=${dateStr}`).catch(() => ({ data: [] })),
+            api.get('/contacts/count').catch(() => ({ data: 0 })),
+            api.get('/resources').catch(() => ({ data: [] }))
+        ]);
 
-        try {
-            console.log('Fetching dashboard stats...');
-            const [staff, todayApps, contactsCount, resources] = await Promise.all([
-                api.get('/staff').catch(e => ({ data: [] })),
-                api.get(`/appointments/day?date=${dateStr}`).catch(e => ({ data: [] })),
-                api.get('/contacts/count').catch(e => ({ data: 0 })),
-                api.get('/resources').catch(e => ({ data: [] }))
-            ]);
+        return {
+            totalClients: contactsCount.data,
+            todaysAppointmentsCount: todayApps.data.length,
+            totalResources: resources.data.length,
+            staff: staff.data.content
+        };
+    },
 
-            console.log('API Response - Contacts Count:', contactsCount.data);
-
-            return {
-                totalClients: contactsCount.data,
-                todaysAppointmentsCount: todayApps.data.length,
-                totalResources: resources.data.length,
-                staff: staff.data
-            };
-        } catch (error) {
-            console.error('Error loading admin stats:', error);
-            throw error;
-        }
+    // НОВОЕ: История записей для админа (Синхронно с Flutter)
+    async getContactAppointments(contactId) {
+        const response = await api.get(`/admin/clients/${contactId}/appointments`);
+        return response.data;
     }
 };

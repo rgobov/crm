@@ -8,6 +8,7 @@ import 'package:try_neuro/features/contacts/domain/contact_model.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/staff/data/employee_service.dart';
+import 'package:try_neuro/features/admin/data/admin_service.dart'; // <<< НОВЫЙ ИМПОРТ
 import 'package:try_neuro/service_locator.dart';
 
 class ContactDetailScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
   final _sessionService = sl<SessionService>();
   final _managerService = sl<ManagerService>();
   final _employeeService = sl<EmployeeService>();
+  final _adminService = sl<AdminService>(); // <<< НОВЫЙ СЕРВИС
 
   late Contact _contact;
   late Future<List<Appointment>> _historyFuture;
@@ -42,7 +44,10 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
 
   void _loadHistory() {
     setState(() {
-      if (_currentUser?.role == UserRole.manager) {
+      // СИНХРОНИЗАЦИЯ ПО РОЛЯМ: Добавлен блок для Админа
+      if (_currentUser?.role == UserRole.admin) {
+        _historyFuture = _adminService.getContactAppointments(_contact.id);
+      } else if (_currentUser?.role == UserRole.manager) {
         _historyFuture = _managerService.getContactAppointments(_contact.id);
       } else {
         _historyFuture = _employeeService.getContactAppointments(_contact.id);
@@ -157,28 +162,27 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     final timeFormat = DateFormat.Hm();
     final timeStr = timeFormat.format(DateTime(0).add(Duration(hours: appointment.time.hour, minutes: appointment.time.minute)));
 
-    // --- ИСПРАВЛЕННЫЙ СВИТЧ С НОВОЙ ПАЛИТРОЙ ---
     Color statusColor;
     String statusText;
     switch (appointment.status) {
       case AppointmentStatus.scheduled:
-        statusColor = const Color(0xFF42A5F5); // Синий
+        statusColor = const Color(0xFF42A5F5);
         statusText = 'Ожидает';
         break;
       case AppointmentStatus.confirmed:
-        statusColor = const Color(0xFF26A69A); // Бирюзовый
+        statusColor = const Color(0xFF26A69A);
         statusText = 'Подтверждено';
         break;
       case AppointmentStatus.needs_call:
-        statusColor = const Color(0xFFFFA726); // Янтарный
+        statusColor = const Color(0xFFFFA726);
         statusText = 'Перезвонить';
         break;
       case AppointmentStatus.completed:
-        statusColor = const Color(0xFF90A4AE); // Серо-синий
+        statusColor = const Color(0xFF90A4AE);
         statusText = 'Выполнено';
         break;
       case AppointmentStatus.cancelled:
-        statusColor = const Color(0xFFEF5350); // Красный
+        statusColor = const Color(0xFFEF5350);
         statusText = 'Отменено';
         break;
     }

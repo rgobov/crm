@@ -1,6 +1,7 @@
 package com.tryneuro.backend.controller;
 
 import com.tryneuro.backend.dto.CreateStaffRequest;
+import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
@@ -13,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -26,14 +28,13 @@ public class AdminController {
         this.scheduleService = scheduleService;
     }
 
+    // --- Staff Management ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        // ДИАГНОСТИКА
-        System.out.println(">>> DEBUG: Admin API /staff called. Tenant: [" + tenantId + "], Query: [" + query + "]");
         return staffMemberService.getStaffPaged(tenantId, query, page, size);
     }
 
@@ -46,6 +47,15 @@ public class AdminController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
         }
         return staff;
+    }
+
+    // --- НОВОЕ: История записей клиента (специально для Админа) ---
+    @GetMapping("/clients/{contactId}/appointments")
+    public List<Appointment> getClientAppointmentsAsAdmin(
+            @RequestAttribute("tenantId") String tenantId,
+            @PathVariable String contactId) {
+        // Мы используем общий ScheduleService, но эндпоинт защищен префиксом /api/admin
+        return scheduleService.getAppointmentsForContact(contactId, tenantId);
     }
 
     @PostMapping("/staff")
