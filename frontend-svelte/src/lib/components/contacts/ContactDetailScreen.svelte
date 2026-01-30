@@ -14,6 +14,7 @@
     let isLoading = true;
     let isHistoryLoading = false;
 
+    // Реактивное состояние редактирования
     let editMode = { name: false, email: false, notes: false, phoneIdx: -1 };
     let tempValues = { name: '', phones: [], email: '', notes: '' };
 
@@ -26,7 +27,7 @@
         try {
             const response = await api.get(`/contacts/${contactId}`);
             contact = response.data;
-            resetTempValues();
+            syncTempValues();
             dispatch('loaded', { name: contact.name });
         } catch (e) {
             console.error('Load contact failed', e);
@@ -35,7 +36,8 @@
         }
     }
 
-    function resetTempValues() {
+    // Просто синхронизируем временные переменные с данными из базы
+    function syncTempValues() {
         if (!contact) return;
         tempValues = {
             name: contact.name,
@@ -43,17 +45,16 @@
             email: contact.email || '',
             notes: contact.notes || ''
         };
-        editMode = { name: false, email: false, notes: false, phoneIdx: -1 };
     }
 
-    // Обработка ввода телефона с маской (реактивно как во Flutter)
-    function onPhoneInput(idx, value) {
-        tempValues.phones[idx] = phoneUtils.format(value);
+    // Сброс всех режимов редактирования
+    function cancelAllEdits() {
+        editMode = { name: false, email: false, notes: false, phoneIdx: -1 };
+        syncTempValues();
     }
 
     async function saveField(fieldName) {
         try {
-            // Перед сохранением очищаем телефоны от маски для БД
             const payload = {
                 ...contact,
                 ...tempValues,
@@ -61,11 +62,11 @@
             };
             const res = await api.put(`/admin/clients/${contactId}`, payload);
             contact = res.data;
-            resetTempValues();
+            cancelAllEdits();
             dispatch('loaded', { name: contact.name });
         } catch (e) {
             alert('Ошибка сохранения');
-            resetTempValues();
+            cancelAllEdits();
         }
     }
 
@@ -111,10 +112,10 @@
                     <div class="card hero-card">
                         {#if editMode.name}
                             <div class="edit-box">
-                                <input type="text" bind:value={tempValues.name} class="big-input" />
+                                <input type="text" bind:value={tempValues.name} class="big-input" autofocus />
                                 <div class="actions">
                                     <button class="save" on:click={() => saveField('name')}>✓</button>
-                                    <button class="cancel" on:click={resetTempValues}>✕</button>
+                                    <button class="cancel" on:click={cancelAllEdits}>✕</button>
                                 </div>
                             </div>
                         {:else}
@@ -131,18 +132,18 @@
                                         <input
                                             type="tel"
                                             value={tempValues.phones[i]}
-                                            on:input={(e) => onPhoneInput(i, e.target.value)}
+                                            on:input={(e) => tempValues.phones[i] = phoneUtils.format(e.target.value)}
                                             class="mid-input"
+                                            autofocus
                                         />
                                         <button class="save" on:click={() => saveField('phones')}>✓</button>
-                                        <button class="cancel" on:click={resetTempValues}>✕</button>
+                                        <button class="cancel" on:click={cancelAllEdits}>✕</button>
                                     </div>
                                 {:else}
                                     <span class="icon">📱</span>
-                                    <span class="value" on:click={() => { editMode.phoneIdx = i; resetTempValues(); }}>
+                                    <span class="value" on:click={() => editMode.phoneIdx = i}>
                                         {phoneUtils.format(phone)} <small>✎</small>
                                     </span>
-                                    <!-- ГАРАНТИЯ ПЛЮСА: ссылка всегда с + перед чистыми цифрами -->
                                     <a href="tel:+{phoneUtils.clean(phone)}" class="call-btn">Вызов</a>
                                 {/if}
                             </div>
@@ -154,9 +155,9 @@
                     <div class="card p-16">
                         {#if editMode.email}
                             <div class="edit-box w-100">
-                                <input type="email" bind:value={tempValues.email} class="mid-input" />
+                                <input type="email" bind:value={tempValues.email} class="mid-input" autofocus />
                                 <button class="save" on:click={() => saveField('email')}>✓</button>
-                                <button class="cancel" on:click={resetTempValues}>✕</button>
+                                <button class="cancel" on:click={cancelAllEdits}>✕</button>
                             </div>
                         {:else}
                             <div class="clickable-text" on:click={() => editMode.email = true}>
@@ -169,9 +170,9 @@
                     <div class="card p-16">
                         {#if editMode.notes}
                             <div class="edit-box column w-100">
-                                <textarea bind:value={tempValues.notes} rows="4"></textarea>
+                                <textarea bind:value={tempValues.notes} rows="4" autofocus></textarea>
                                 <div class="actions right">
-                                    <button class="cancel" on:click={resetTempValues}>Отмена</button>
+                                    <button class="cancel" on:click={cancelAllEdits}>Отмена</button>
                                     <button class="save-long" on:click={() => saveField('notes')}>Сохранить</button>
                                 </div>
                             </div>
