@@ -1,6 +1,7 @@
 package com.tryneuro.backend.controller;
 
 import com.tryneuro.backend.dto.CreateStaffRequest;
+import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.model.Resource;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -43,7 +45,46 @@ public class AdminController {
         this.resourceService = resourceService;
     }
 
-    // --- Управление персоналом (Staff) ---
+    // --- Календарь и Расписание (Синхронно с Manager) ---
+    @GetMapping("/workload")
+    public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId,
+                                         @RequestParam int year,
+                                         @RequestParam int month) {
+        return scheduleService.getWorkloadForMonth(tenantId, year, month);
+    }
+
+    @GetMapping("/appointments/day")
+    public List<Appointment> getAppointmentsForDay(@RequestAttribute("tenantId") String tenantId,
+                                                   @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return scheduleService.getAppointmentsForDay(date, tenantId);
+    }
+
+    @GetMapping("/schedule/staff")
+    public List<StaffMember> getStaffForSchedule(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return staffMemberService.getStaffForDate(tenantId, date);
+    }
+
+    @PostMapping("/appointments")
+    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
+        appointment.setTenantId(tenantId);
+        return scheduleService.addAppointment(appointment);
+    }
+
+    @PutMapping("/appointments/{id}")
+    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
+        Appointment updatedAppointment = scheduleService.updateAppointment(id, appointmentDetails);
+        return ResponseEntity.ok(updatedAppointment);
+    }
+
+    @DeleteMapping("/appointments/{id}")
+    public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
+        scheduleService.deleteAppointment(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // --- Staff Management ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -53,45 +94,33 @@ public class AdminController {
         return staffMemberService.getStaffPaged(tenantId, query, page, size);
     }
 
+    @GetMapping("/staff/{id}")
+    public StaffMember getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        StaffMember staff = staffMemberService.getStaffMemberById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
+
+        if (!staff.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
+        }
+        return staff;
+    }
+
     @PostMapping("/staff")
     public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
         return staffMemberService.addStaffMember(request, tenantId);
     }
 
-    // --- Управление услугами (Services) ---
-    @GetMapping("/services")
-    public List<com.tryneuro.backend.model.Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
-        return appServiceService.getAllServices(tenantId);
+    @PutMapping("/staff/{id}")
+    public StaffMember updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
+        return staffMemberService.updateStaffMember(id, request, tenantId);
     }
 
-    @PostMapping("/services")
-    public com.tryneuro.backend.model.Service addService(@RequestAttribute("tenantId") String tenantId, 
-                                                         @RequestBody com.tryneuro.backend.model.Service service) {
-        return appServiceService.addService(service, tenantId);
+    @DeleteMapping("/staff/{id}")
+    public void deleteStaffMember(@PathVariable String id) {
+        staffMemberService.deleteStaffMember(id);
     }
 
-    @DeleteMapping("/services/{id}")
-    public void deleteService(@PathVariable String id) {
-        appServiceService.deleteService(id);
-    }
-
-    // --- Управление ресурсами (Resources) ---
-    @GetMapping("/resources")
-    public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
-        return resourceService.getAllResources(tenantId);
-    }
-
-    @PostMapping("/resources")
-    public Resource addResource(@RequestAttribute("tenantId") String tenantId, @RequestBody Resource resource) {
-        return resourceService.addResource(resource, tenantId);
-    }
-
-    @DeleteMapping("/resources/{id}")
-    public void deleteResource(@PathVariable String id) {
-        resourceService.deleteResource(id);
-    }
-
-    // --- Управление клиентами (Clients) ---
+    // --- Client Management ---
     @PutMapping("/clients/{id}")
     public Contact updateClientAsAdmin(
             @RequestAttribute("tenantId") String tenantId,
@@ -107,7 +136,37 @@ public class AdminController {
         return scheduleService.getAppointmentsForContact(contactId, tenantId);
     }
 
-    // --- Доступность мастеров ---
+    // --- Services & Resources ---
+    @GetMapping("/services")
+    public List<com.tryneuro.backend.model.Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
+        return appServiceService.getAllServices(tenantId);
+    }
+
+    @PostMapping("/services")
+    public com.tryneuro.backend.model.Service addService(@RequestAttribute("tenantId") String tenantId, @RequestBody com.tryneuro.backend.model.Service service) {
+        return appServiceService.addService(service, tenantId);
+    }
+
+    @DeleteMapping("/services/{id}")
+    public void deleteService(@PathVariable String id) {
+        appServiceService.deleteService(id);
+    }
+
+    @GetMapping("/resources")
+    public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
+        return resourceService.getAllResources(tenantId);
+    }
+
+    @PostMapping("/resources")
+    public Resource addResource(@RequestAttribute("tenantId") String tenantId, @RequestBody Resource resource) {
+        return resourceService.addResource(resource, tenantId);
+    }
+
+    @DeleteMapping("/resources/{id}")
+    public void deleteResource(@PathVariable String id) {
+        resourceService.deleteResource(id);
+    }
+
     @GetMapping("/staff/{staffMemberId}/availability")
     public boolean isStaffMemberAvailable(@RequestAttribute("tenantId") String tenantId,
                                             @PathVariable String staffMemberId,
