@@ -1,15 +1,20 @@
 import api from '$lib/api.js';
 
 export const contactService = {
-    async getContacts(query = '', page = 0, size = 25) {
-        // Убираем лишние символы из телефона для поиска (как во Flutter)
+    // ИСПРАВЛЕНО: Добавлен параметр showAll
+    async getContacts(query = '', showAll = false, page = 0, size = 25) {
+        // Очистка телефона для поиска
         const cleanQuery = query.replace(/\D/g, '').length >= 6 ? query.replace(/\D/g, '') : query;
 
         const response = await api.get('/contacts', {
-            params: { query: cleanQuery, page, size }
+            params: {
+                query: cleanQuery,
+                showAll: showAll, // Передаем флаг на бэкенд
+                page,
+                size
+            }
         });
 
-        // Маппинг ответа Spring Data Page под формат Flutter-сервиса
         return {
             contacts: response.data.content,
             isLast: response.data.last,
@@ -24,5 +29,11 @@ export const contactService = {
 
     async deleteContact(id) {
         await api.delete(`/contacts/${id}`);
+    },
+
+    // История записей (Синхронно с Flutter AdminService)
+    async getContactAppointments(contactId) {
+        const response = await api.get(`/contacts/${contactId}/appointments`);
+        return response.data;
     }
 };
