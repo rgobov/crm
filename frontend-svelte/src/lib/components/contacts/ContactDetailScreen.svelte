@@ -2,6 +2,7 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import api from '$lib/api.js';
     import { contactService } from '$lib/services/contactService.js';
+    import { phoneUtils } from '$lib/utils/phoneUtils.js';
     import { goto } from '$app/navigation';
 
     export let contactId;
@@ -13,7 +14,6 @@
     let isLoading = true;
     let isHistoryLoading = false;
 
-    // Реактивное состояние
     let editMode = { name: false, email: false, notes: false, phoneIdx: -1 };
     let tempValues = { name: '', phones: [], email: '', notes: '' };
 
@@ -46,9 +46,19 @@
         editMode = { name: false, email: false, notes: false, phoneIdx: -1 };
     }
 
+    // Обработка ввода телефона с маской (реактивно как во Flutter)
+    function onPhoneInput(idx, value) {
+        tempValues.phones[idx] = phoneUtils.format(value);
+    }
+
     async function saveField(fieldName) {
         try {
-            const payload = { ...contact, ...tempValues };
+            // Перед сохранением очищаем телефоны от маски для БД
+            const payload = {
+                ...contact,
+                ...tempValues,
+                phones: tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p)
+            };
             const res = await api.put(`/admin/clients/${contactId}`, payload);
             contact = res.data;
             resetTempValues();
@@ -98,7 +108,6 @@
             {#if activeTab === 'info'}
                 <div class="info-section">
 
-                    <!-- РЕАКТИВНОЕ ИМЯ -->
                     <div class="card hero-card">
                         {#if editMode.name}
                             <div class="edit-box">
@@ -113,28 +122,34 @@
                         {/if}
                     </div>
 
-                    <!-- РЕАКТИВНЫЕ ТЕЛЕФОНЫ -->
                     <label class="section-title">КОНТАКТНЫЕ НОМЕРА</label>
                     <div class="card p-0">
                         {#each contact.phones as phone, i}
                             <div class="detail-row">
                                 {#if editMode.phoneIdx === i}
                                     <div class="edit-box w-100">
-                                        <input type="tel" bind:value={tempValues.phones[i]} class="mid-input" />
+                                        <input
+                                            type="tel"
+                                            value={tempValues.phones[i]}
+                                            on:input={(e) => onPhoneInput(i, e.target.value)}
+                                            class="mid-input"
+                                        />
                                         <button class="save" on:click={() => saveField('phones')}>✓</button>
                                         <button class="cancel" on:click={resetTempValues}>✕</button>
                                     </div>
                                 {:else}
                                     <span class="icon">📱</span>
-                                    <span class="value" on:click={() => { editMode.phoneIdx = i; resetTempValues(); }}>{phone} <small>✎</small></span>
-                                    <a href="tel:{phone}" class="call-btn">Вызов</a>
+                                    <span class="value" on:click={() => { editMode.phoneIdx = i; resetTempValues(); }}>
+                                        {phoneUtils.format(phone)} <small>✎</small>
+                                    </span>
+                                    <!-- ГАРАНТИЯ ПЛЮСА: ссылка всегда с + перед чистыми цифрами -->
+                                    <a href="tel:+{phoneUtils.clean(phone)}" class="call-btn">Вызов</a>
                                 {/if}
                             </div>
                         {/each}
-                        <button class="add-btn-full" on:click={() => goto(`/admin/clients/${contactId}/edit`)}>+ Добавить или удалить номер</button>
+                        <button class="add-btn-full" on:click={() => goto(`/admin/clients/${contactId}/edit`)}>+ Добавить номер</button>
                     </div>
 
-                    <!-- РЕАКТИВНЫЙ EMAIL -->
                     <label class="section-title">EMAIL</label>
                     <div class="card p-16">
                         {#if editMode.email}
@@ -145,12 +160,11 @@
                             </div>
                         {:else}
                             <div class="clickable-text" on:click={() => editMode.email = true}>
-                                {contact.email || 'Нажмите, чтобы добавить почту'} <small>✎</small>
+                                {contact.email || 'Добавить почту'} <small>✎</small>
                             </div>
                         {/if}
                     </div>
 
-                    <!-- РЕАКТИВНЫЕ ЗАМЕТКИ -->
                     <label class="section-title">ЗАМЕТКИ</label>
                     <div class="card p-16">
                         {#if editMode.notes}
@@ -163,7 +177,7 @@
                             </div>
                         {:else}
                             <div class="clickable-text pre" on:click={() => editMode.notes = true}>
-                                {contact.notes || 'Нажмите, чтобы добавить заметки...'} <small>✎</small>
+                                {contact.notes || 'Добавить заметки...'} <small>✎</small>
                             </div>
                         {/if}
                     </div>
