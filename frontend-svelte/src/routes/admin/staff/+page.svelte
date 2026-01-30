@@ -10,38 +10,33 @@
     let showDropdown = false;
     let quickResults = [];
 
-    // --- СИНХРОНИЗИРОВАННАЯ ЛОГИКА ПОИСКА ---
+    // --- ГЛОБАЛЬНЫЙ ПОИСК (Sync с Flutter) ---
     $: if ($staffSearchQuery !== undefined) {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-            handleSearchLogic();
+            handleSearch();
         }, 600);
     }
 
-    async function handleSearchLogic() {
+    async function handleSearch() {
         const query = $staffSearchQuery.trim();
 
-        // 1. Если поле пустое - грузим всех (первые 25)
+        // Если пусто - грузим первую страницу всех сотрудников
         if (!query) {
             showDropdown = false;
             await loadStaffData(0, '');
             return;
         }
 
-        // 2. Проверка условий как во Flutter (2 буквы или 5 цифр)
-        const cleanDigits = query.replace(/\D/g, '');
-        const isPhone = cleanDigits.length > 0;
-        const isQueryValid = (isPhone && cleanDigits.length >= 5) || (!isPhone && query.length >= 2);
-
-        if (isQueryValid) {
-            // Запускаем ГЛОБАЛЬНЫЙ поиск по всей базе
+        // Логика активации поиска: 2 символа для любого ввода
+        if (query.length >= 2) {
             await loadStaffData(0, query);
 
-            // Обновляем быстрые результаты для выпадающего списка (топ 5)
+            // Если в результатах что-то есть - показываем выпадающий список (топ 5)
             quickResults = $cachedStaff.slice(0, 5);
             showDropdown = quickResults.length > 0;
-
-            // ОПЦИОНАЛЬНО: Если найден только один и запрос длинный - можно сразу подсветить его
+        } else {
+            showDropdown = false;
         }
     }
 
@@ -51,14 +46,13 @@
             tg.BackButton.show();
             tg.BackButton.onClick(() => goto('/admin'));
         }
-        // При входе используем текущий поисковый запрос из стора
         await loadStaffData(0, $staffSearchQuery);
     });
 
     async function loadStaffData(page = 0, query = '') {
         isLoading = true;
         try {
-            // Вызываем бэкенд с текущим запросом! Это и делает поиск глобальным.
+            // Запрашиваем данные напрямую с бэкенда по всему репозиторию
             const result = await staffService.getStaff(query, page, 25);
 
             cachedStaff.set(result.content);
@@ -68,14 +62,16 @@
                 currentPage: page
             });
         } catch (e) {
-            console.error('API Error:', e);
+            console.error('API Search Error:', e);
         } finally {
             isLoading = false;
         }
     }
 
-    function goToDetails(id) {
+    function selectStaff(id) {
         showDropdown = false;
+        // Очищаем поиск только если это был быстрый переход
+        // $staffSearchQuery = '';
         goto(`/admin/staff/${id}`);
     }
 </script>
@@ -90,33 +86,32 @@
         </div>
         <p class="subtitle">
             {#if $staffSearchQuery}
-                Найдено: {$staffMetadata.totalElements}
+                Найдено результатов: {$staffMetadata.totalElements}
             {:else}
-                Всего мастеров: {$staffMetadata.totalElements}
+                Всего в компании: {$staffMetadata.totalElements}
             {/if}
         </p>
     </div>
 
-    <!-- ПОИСК: Теперь он управляет всем списком -->
+    <!-- ПОИСК: Контрастное окно с автодополнением -->
     <div class="search-container" on:click|stopPropagation>
         <div class="search-box">
             <span class="search-icon">🔍</span>
             <input
                 type="text"
                 bind:value={$staffSearchQuery}
-                placeholder="Имя (от 2 букв) или тел. (от 5 цифр)..."
+                placeholder="Имя или номер телефона..."
                 on:focus={() => quickResults.length > 0 && (showDropdown = true)}
             />
             {#if $staffSearchQuery}
-                <button class="clear-btn" on:click={() => $staffSearchQuery = ''}>✕</button>
+                <button class="clear-btn" on:click={() => { $staffSearchQuery = ''; showDropdown = false; }}>✕</button>
             {/if}
         </div>
 
-        <!-- DROPDOWN: Для быстрого выбора -->
         {#if showDropdown && $staffSearchQuery}
-            <div class="search-dropdown card">
+            <div class="search-dropdown shadow-card">
                 {#each quickResults as res}
-                    <button class="dropdown-item" on:click={() => goToDetails(res.id)}>
+                    <button class="dropdown-item" on:click={() => selectStaff(res.id)}>
                         <div class="item-avatar">{res.name.charAt(0)}</div>
                         <div class="item-info">
                             <span class="item-name">{res.name}</span>
@@ -131,13 +126,13 @@
     <div class="content">
         {#if $cachedStaff.length === 0 && !isLoading}
             <div class="empty-state">
-                <p>По запросу "{$staffSearchQuery}" никто не найден</p>
+                <p>Сотрудник "{$staffSearchQuery}" не найден в базе</p>
             </div>
         {:else}
-            <!-- ОСНОВНОЙ СПИСОК (ТЕПЕРЬ ВСЕГДА ОТФИЛЬТРОВАН БЭКЕНДОМ) -->
+            <!-- ОСНОВНОЙ СПИСОК (ВСЕГДА СИНХРОНЕН С ПОИСКОМ) -->
             <div class="staff-list" class:dimmed={isLoading}>
                 {#each $cachedStaff as member (member.id)}
-                    <div class="staff-card card" on:click={() => goToDetails(member.id)}>
+                    <div class="staff-card card" on:click={() => selectStaff(member.id)}>
                         <div class="avatar">{member.name.charAt(0)}</div>
                         <div class="info">
                             <h3>{member.name}</h3>
@@ -166,8 +161,6 @@
 
 <style>
     .page { padding: 20px; max-width: 600px; margin: 0 auto; min-height: 100vh; background: var(--bg-color); }
-    .header { margin-bottom: 20px; }
-    .title-row { display: flex; align-items: center; gap: 12px; }
     h1 { font-size: 26px; font-weight: 800; margin: 0; color: #0f172a; }
     .subtitle { color: var(--hint-color); font-size: 14px; margin-top: 4px; }
 
@@ -177,7 +170,7 @@
         border-radius: 18px; border: 2px solid #3897f0;
         box-shadow: 0 10px 30px rgba(0,0,0,0.08);
     }
-    input { border: none; background: none; width: 100%; font-size: 16px; outline: none; margin-left: 10px; }
+    input { border: none; background: none; width: 100%; font-size: 16px; outline: none; margin-left: 10px; font-weight: 500; }
     .clear-btn { background: #f1f5f9; border: none; color: #64748b; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; }
 
     .search-dropdown { position: absolute; top: 105%; left: 0; right: 0; background: white; border-radius: 20px; padding: 8px; box-shadow: 0 15px 45px rgba(0,0,0,0.15); z-index: 1001; border: 1px solid #f1f5f9; }

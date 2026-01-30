@@ -51,7 +51,21 @@ public class StaffMemberService {
         return staffOpt;
     }
 
-    // ВОССТАНОВЛЕНО: Используется в EmployeeController
+    // СИНХРОНИЗИРОВАНО С ЛОГИКОЙ ПОИСКА КЛИЕНТОВ
+    public Page<StaffMember> getStaffPaged(String tenantId, String query, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
+
+        // 1. Если есть поисковый запрос (минимум 2 символа для текста или 5 для телефона)
+        if (query != null && query.trim().length() >= 2) {
+            return staffMemberRepository.findByTenantIdAndQuery(tenantId, query.trim(), pageable)
+                    .map(s -> { enrichWithUserData(s); return s; });
+        }
+
+        // 2. Если запроса нет - возвращаем список всех сотрудников (пагинированный)
+        return staffMemberRepository.findByTenantIdAndQuery(tenantId, "", pageable)
+                .map(s -> { enrichWithUserData(s); return s; });
+    }
+
     public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
         return staffMemberRepository.findById(id).map(staff -> {
             enrichWithUserData(staff);
@@ -66,7 +80,6 @@ public class StaffMemberService {
         });
     }
 
-    // ВОССТАНОВЛЕНО: Используется в ManagerController
     public List<StaffMember> getStaffForDate(String tenantId, LocalDate date) {
         List<StaffMember> allStaff = staffMemberRepository.findByTenantId(tenantId);
         return allStaff.stream()
@@ -102,7 +115,6 @@ public class StaffMemberService {
         return staffMemberRepository.save(staffMember);
     }
 
-    // ВОССТАНОВЛЕНО: Используется в EmployeeController
     @Transactional
     public StaffShift saveShift(StaffShift shift) {
         return staffShiftRepository.findByStaffIdAndDate(shift.getStaffId(), shift.getDate())
@@ -117,13 +129,6 @@ public class StaffMemberService {
         return staffMemberRepository.findByTenantId(tenantId).stream()
                 .map(s -> { enrichWithUserData(s); return s; })
                 .collect(Collectors.toList());
-    }
-
-    public Page<StaffMember> getStaffPaged(String tenantId, String query, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
-        Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, pageable);
-        staffPage.forEach(this::enrichWithUserData);
-        return staffPage;
     }
 
     @Transactional
