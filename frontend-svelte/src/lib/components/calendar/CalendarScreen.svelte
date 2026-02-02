@@ -78,61 +78,50 @@
     }
 </script>
 
-<div class="calendar-wrapper">
-    <div class="calendar-container">
-        <div class="cal-header">
-            <button on:click={() => changeMonth(-1)}>‹</button>
-            <h3>{monthNames[currMonth]} {currYear}</h3>
-            <button on:click={() => changeMonth(1)}>›</button>
-        </div>
+<div class="calendar-container">
+    <div class="cal-header">
+        <button on:click={() => changeMonth(-1)}>‹</button>
+        <h3>{monthNames[currMonth]} {currYear}</h3>
+        <button on:click={() => changeMonth(1)}>›</button>
+    </div>
 
-        <div class="weekdays">
-            <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
-        </div>
+    <div class="weekdays">
+        <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+    </div>
 
-        <div class="days-grid" class:loading={isLoading}>
-            {#each days as d}
-                <div
-                    class="day-cell"
-                    class:inactive={!d.current}
-                    class:is-today={d.today}
-                    on:click={() => d.current && selectDate(d.day)}
-                >
-                    <span class="day-num">{d.day}</span>
-                    {#if d.current && d.count > 0}
-                        <div class="workload-dot" style="background-color: {getWorkloadColor(d.count)}">
-                            {d.count}
-                        </div>
-                    {/if}
-                </div>
-            {/each}
-        </div>
+    <div class="days-grid" class:loading={isLoading}>
+        {#each days as d}
+            <div
+                class="day-cell"
+                class:inactive={!d.current}
+                class:is-today={d.today}
+                on:click={() => d.current && selectDate(d.day)}
+            >
+                <span class="day-num">{d.day}</span>
+                {#if d.current && d.count > 0}
+                    <div class="workload-dot" style="background-color: {getWorkloadColor(d.count)}">
+                        {d.count}
+                    </div>
+                {/if}
+            </div>
+        {/each}
+    </div>
 
-        <div class="legend">
-            <div class="item"><span class="dot green"></span> 1-2</div>
-            <div class="item"><span class="dot yellow"></span> 3-5</div>
-            <div class="item"><span class="dot orange"></span> 6-8</div>
-            <div class="item"><span class="dot red"></span> 9+</div>
-        </div>
+    <div class="legend">
+        <div class="item"><span class="dot green"></span> 1-2</div>
+        <div class="item"><span class="dot yellow"></span> 3-5</div>
+        <div class="item"><span class="dot orange"></span> 6-8</div>
+        <div class="item"><span class="dot red"></span> 9+</div>
     </div>
 </div>
 
 <style>
-    /* ОБЕРТКА ДЛЯ ЦЕНТРИРОВАНИЯ НА ПК */
-    .calendar-wrapper {
-        width: 100%;
-        max-width: 500px; /* Ограничиваем ширину как у мобильного приложения */
-        margin: 0 auto;   /* Центрируем */
-        padding: 10px;
-        box-sizing: border-box;
-    }
-
+    /* УБРАЛИ ВНЕШНИЕ ОБЕРТКИ, ТЕПЕРЬ ОНИ В LAYOUT */
     .calendar-container {
         padding: 20px;
         background: white;
         border-radius: 28px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-        border: 1px solid rgba(0,0,0,0.02);
+        border: 1px solid #f1f5f9;
     }
 
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
