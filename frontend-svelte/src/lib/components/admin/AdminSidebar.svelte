@@ -42,7 +42,7 @@
                     <span class="icon">{item.icon}</span>
                     <span class="label">{item.label}</span>
                 </button>
-            {#each}
+            {/each}
         </nav>
 
         <div class="sidebar-calendar-section">
@@ -52,7 +52,6 @@
             </div>
         </div>
 
-        <!-- КНОПКА ВЫХОДА ВНИЗУ САЙДБАРА -->
         <div class="sidebar-footer">
             <button class="logout-btn-desktop" on:click={handleLogout}>
                 <span class="icon">🚪</span>
@@ -103,7 +102,7 @@
     .sidebar-calendar-section {
         border-top: 1px solid #f1f5f9;
         padding-top: 24px;
-        flex: 1; /* Позволяем календарю занимать свободное место */
+        flex: 1;
         overflow-y: auto;
         scrollbar-width: none;
     }
@@ -125,9 +124,7 @@
         width: 100%; padding: 12px 16px; border: none;
         background: #fef2f2; color: #ef4444; border-radius: 12px;
         font-weight: 700; font-size: 13px; cursor: pointer;
-        transition: transform 0.1s;
     }
-    .logout-btn-desktop:active { transform: scale(0.98); }
 
     :global(.sidebar .calendar-container) { padding: 0 !important; border: none !important; box-shadow: none !important; }
     :global(.sidebar .calendar-page-limiter) { padding: 0 !important; max-width: 100% !important; }
