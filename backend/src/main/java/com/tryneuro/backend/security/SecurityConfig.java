@@ -33,8 +33,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // ОТКЛЮЧАЕМ CORS В SPRING, так как он настроен в Nginx.
-            // Это предотвращает ошибку дублирования заголовков в браузере.
+            // ПОЛНОСТЬЮ ОТКЛЮЧАЕМ CORS В SPRING
+            // Вся обработка теперь идет через Nginx Proxy Manager
             .cors(cors -> cors.disable())
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
