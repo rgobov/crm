@@ -7,8 +7,6 @@
     import ManagementTab from '$lib/components/admin/ManagementTab.svelte';
     import CalendarTab from '$lib/components/admin/CalendarTab.svelte';
 
-    // Для 'calendar' и 'timeline' используем один компонент,
-    // но с разным начальным состоянием внутри него
     const tabs = {
         management: ManagementTab,
         calendar: CalendarTab,
@@ -40,7 +38,7 @@
                 <h2>{$user?.name || 'Администратор'}</h2>
                 <p>
                     {#if $activeTab === 'management'}Панель управления{/if}
-                    {#if $activeTab === 'calendar'}Календарь месяца{/if}
+                    {#if $activeTab === 'calendar'}Сетка календаря{/if}
                     {#if $activeTab === 'timeline'}Расписание дня{/if}
                 </p>
             </div>
@@ -52,7 +50,6 @@
         <svelte:component this={tabs[$activeTab]} />
     </div>
 
-    <!-- НИЖНЯЯ НАВИГАЦИЯ -->
     <nav class="bottom-nav">
         <button
             class="nav-item"
@@ -68,7 +65,7 @@
             on:click={() => activeTab.set('calendar')}
         >
             <span class="icon">📅</span>
-            <span class="label">Месяц</span>
+            <span class="label">Календарь</span> <!-- ПЕРЕИМЕНОВАНО -->
         </button>
         <button
             class="nav-item"
@@ -82,11 +79,11 @@
 </div>
 
 <style>
-    .shell { display: flex; flex-direction: column; height: 100vh; background-color: var(--bg-color); }
+    .shell { display: flex; flex-direction: column; height: 100vh; background-color: var(--bg-color); width: 100%; }
 
     .header {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 16px 20px; background: white; border-bottom: 1px solid rgba(0,0,0,0.03);
+        padding: 16px 24px; background: white; border-bottom: 1px solid rgba(0,0,0,0.03);
         flex-shrink: 0;
     }
     .user-info { display: flex; align-items: center; gap: 12px; }
@@ -95,7 +92,7 @@
     .text p { margin: 0; font-size: 11px; color: var(--hint-color); font-weight: 600; text-transform: uppercase; }
     .logout-btn { background: #f1f5f9; color: #64748b; border: none; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
 
-    .tab-view { flex: 1; overflow-y: auto; padding-bottom: 80px; }
+    .tab-view { flex: 1; overflow-y: auto; padding-bottom: 80px; width: 100%; }
 
     .bottom-nav {
         position: fixed; bottom: 0; left: 0; right: 0;
