@@ -11,8 +11,6 @@ import com.tryneuro.backend.service.ContactService;
 import com.tryneuro.backend.service.ResourceService;
 import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -30,8 +28,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
-    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
-    
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
     private final ContactService contactService;
@@ -51,78 +47,106 @@ public class AdminController {
         this.resourceService = resourceService;
     }
 
-    private String validateTenant(String tenantId) {
+    private String getRequiredTenantId(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
-            log.error("CRITICAL: tenantId is MISSING in Request Attributes");
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ID компании не найден");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ошибка авторизации: не удалось определить компанию (Tenant ID)");
         }
         return tenantId;
     }
 
+    // --- DASHBOARD STATS ---
     @GetMapping("/dashboard/stats")
     public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
-        String tId = validateTenant(tenantId);
-        log.info("DEBUG: Getting stats for tenant [{}]", tId);
-        
+        String tId = getRequiredTenantId(tenantId);
         Map<String, Object> stats = new HashMap<>();
-        long clientCount = contactService.countContacts(tId);
-        long staffCount = staffMemberService.getStaffPaged(tId, null, 0, 1).getTotalElements();
-        int resourceCount = resourceService.getAllResources(tId).size();
         
-        log.info("DEBUG: Found in DB for {}: Clients={}, Staff={}, Resources={}", tId, clientCount, staffCount, resourceCount);
-        
-        stats.put("totalClients", clientCount);
-        stats.put("totalStaff", staffCount);
-        stats.put("totalResources", resourceCount);
-        stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
+        // Синхронизируем имена полей с AdminDashboardViewModel (Flutter)
+        stats.put("totalClients", contactService.countContacts(tId));
+        stats.put("totalStaff", staffMemberService.getAllStaff(tId).size());
+        stats.put("totalResources", resourceService.getAllResources(tId).size());
+        stats.put("todayAppointmentsCount", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
         
         return stats;
     }
 
+    // --- STAFF (С пагинацией для Svelte списков) ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
-        String tId = validateTenant(tenantId);
-        Page<StaffMember> result = staffMemberService.getStaffPaged(tId, query, page, size);
-        log.info("DEBUG: Staff query for {}: Found {} members", tId, result.getTotalElements());
-        return result;
+            @RequestParam(defaultValue = "50") int size) {
+        return staffMemberService.getStaffPaged(getRequiredTenantId(tenantId), query, page, size);
     }
 
+    // --- CLIENTS (С пагинацией для Svelte списков) ---
     @GetMapping("/clients")
     public Page<Contact> getClientsPaged(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "true") boolean showAll,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
-        String tId = validateTenant(tenantId);
-        Page<Contact> result = contactService.getContactsPaged(tId, query, false, page, size);
-        log.info("DEBUG: Clients query for {}: Found {} contacts", tId, result.getTotalElements());
-        return result;
+            @RequestParam(defaultValue = "50") int size) {
+        return contactService.getContactsPaged(getRequiredTenantId(tenantId), query, showAll, page, size);
     }
 
-    @GetMapping("/resources")
-    public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
-        String tId = validateTenant(tenantId);
-        List<Resource> result = resourceService.getAllResources(tId);
-        log.info("DEBUG: Resources query for {}: Found {} items", tId, result.size());
-        return result;
+    // --- STAFF CRUD ---
+    @PostMapping("/staff")
+    public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
+        return staffMemberService.addStaffMember(request, getRequiredTenantId(tenantId));
     }
 
+    @PutMapping("/staff/{id}")
+    public StaffMember updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
+        return staffMemberService.updateStaffMember(id, request, getRequiredTenantId(tenantId));
+    }
+
+    @DeleteMapping("/staff/{id}")
+    public void deleteStaffMember(@PathVariable String id) {
+        staffMemberService.deleteStaffMember(id);
+    }
+
+    // --- КАЛЕНДАРЬ И РАСПИСАНИЕ ---
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, @RequestParam int year, @RequestParam int month) {
-        return scheduleService.getWorkloadForMonth(validateTenant(tenantId), year, month);
+        return scheduleService.getWorkloadForMonth(getRequiredTenantId(tenantId), year, month);
     }
 
     @GetMapping("/appointments/day")
     public List<Appointment> getAppointmentsForDay(@RequestAttribute("tenantId") String tenantId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return scheduleService.getAppointmentsForDay(date, validateTenant(tenantId));
+        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId));
     }
 
     @GetMapping("/schedule/staff")
     public List<StaffMember> getStaffForSchedule(@RequestAttribute("tenantId") String tenantId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return staffMemberService.getStaffForDate(validateTenant(tenantId), date);
+        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date);
+    }
+
+    @PostMapping("/appointments")
+    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
+        appointment.setTenantId(getRequiredTenantId(tenantId));
+        return scheduleService.addAppointment(appointment);
+    }
+
+    @PutMapping("/appointments/{id}")
+    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
+        return ResponseEntity.ok(scheduleService.updateAppointment(id, appointmentDetails));
+    }
+
+    @DeleteMapping("/appointments/{id}")
+    public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
+        scheduleService.deleteAppointment(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // --- РЕСУРСЫ И УСЛУГИ ---
+    @GetMapping("/resources")
+    public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
+        return resourceService.getAllResources(getRequiredTenantId(tenantId));
+    }
+
+    @GetMapping("/services")
+    public List<com.tryneuro.backend.model.Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
+        return appServiceService.getAllServices(getRequiredTenantId(tenantId));
     }
 }

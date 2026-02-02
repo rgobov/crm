@@ -14,11 +14,14 @@ import java.util.List;
 public interface StaffMemberRepository extends JpaRepository<StaffMember, String> {
     List<StaffMember> findByTenantId(String tenantId);
 
-    @Query("SELECT s FROM StaffMember s WHERE s.tenantId = :tenantId AND s.active = true " +
+    // Добавлен параметр active. Если он null - фильтр не применяется.
+    @Query("SELECT s FROM StaffMember s WHERE s.tenantId = :tenantId " +
+           "AND (:active IS NULL OR s.active = :active) " +
            "AND (:query IS NULL OR :query = '' OR LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
            "OR s.phone LIKE CONCAT('%', :query, '%') " +
            "OR LOWER(s.specialty) LIKE LOWER(CONCAT('%', :query, '%')))")
     Page<StaffMember> findByTenantIdAndQuery(@Param("tenantId") String tenantId,
                                             @Param("query") String query,
+                                            @Param("active") Boolean active,
                                             Pageable pageable);
 }
