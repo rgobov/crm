@@ -21,8 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
-// убрать этот комент
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
@@ -45,74 +47,54 @@ public class AdminController {
         this.resourceService = resourceService;
     }
 
-    // --- Календарь и Расписание (Синхронно с Manager) ---
-    @GetMapping("/workload")
-    public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId,
-                                         @RequestParam int year,
-                                         @RequestParam int month) {
-        return scheduleService.getWorkloadForMonth(tenantId, year, month);
+    // Хелпер для проверки наличия тенанта
+    private String validateTenant(String tenantId) {
+        if (tenantId == null || tenantId.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ошибка авторизации: не удалось определить ID компании");
+        }
+        return tenantId;
     }
 
-    @GetMapping("/appointments/day")
-    public List<Appointment> getAppointmentsForDay(@RequestAttribute("tenantId") String tenantId,
-                                                   @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return scheduleService.getAppointmentsForDay(date, tenantId);
+    // --- DASHBOARD ---
+    @GetMapping("/dashboard/stats")
+    public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
+        String tId = validateTenant(tenantId);
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalClients", contactService.countContacts(tId));
+        stats.put("totalStaff", staffMemberService.getStaffPaged(tId, null, 0, 1).getTotalElements());
+        stats.put("totalResources", resourceService.getAllResources(tId).size());
+        stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
+        return stats;
     }
 
-    @GetMapping("/schedule/staff")
-    public List<StaffMember> getStaffForSchedule(
+    // --- CLIENTS ---
+    @GetMapping("/clients")
+    public Page<Contact> getClientsPaged(
             @RequestAttribute("tenantId") String tenantId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return staffMemberService.getStaffForDate(tenantId, date);
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        return contactService.getContactsPaged(validateTenant(tenantId), query, false, page, size);
     }
 
-    @PostMapping("/appointments")
-    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
-        appointment.setTenantId(tenantId);
-        return scheduleService.addAppointment(appointment);
-    }
-
-    @PutMapping("/appointments/{id}")
-    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
-        Appointment updatedAppointment = scheduleService.updateAppointment(id, appointmentDetails);
-        return ResponseEntity.ok(updatedAppointment);
-    }
-
-    @DeleteMapping("/appointments/{id}")
-    public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
-        scheduleService.deleteAppointment(id);
-        return ResponseEntity.ok().build();
-    }
-
-    // --- Staff Management ---
+    // --- STAFF ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        return staffMemberService.getStaffPaged(tenantId, query, page, size);
-    }
-
-    @GetMapping("/staff/{id}")
-    public StaffMember getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
-        StaffMember staff = staffMemberService.getStaffMemberById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
-
-        if (!staff.getTenantId().equals(tenantId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
-        }
-        return staff;
+        return staffMemberService.getStaffPaged(validateTenant(tenantId), query, page, size);
     }
 
     @PostMapping("/staff")
     public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
-        return staffMemberService.addStaffMember(request, tenantId);
+        return staffMemberService.addStaffMember(request, validateTenant(tenantId));
     }
 
     @PutMapping("/staff/{id}")
     public StaffMember updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
-        return staffMemberService.updateStaffMember(id, request, tenantId);
+        return staffMemberService.updateStaffMember(id, request, validateTenant(tenantId));
     }
 
     @DeleteMapping("/staff/{id}")
@@ -120,60 +102,41 @@ public class AdminController {
         staffMemberService.deleteStaffMember(id);
     }
 
-    // --- Client Management ---
-    @PutMapping("/clients/{id}")
-    public Contact updateClientAsAdmin(
+    // --- CALENDAR & SCHEDULE ---
+    @GetMapping("/workload")
+    public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId,
+                                         @RequestParam int year,
+                                         @RequestParam int month) {
+        return scheduleService.getWorkloadForMonth(validateTenant(tenantId), year, month);
+    }
+
+    @GetMapping("/appointments/day")
+    public List<Appointment> getAppointmentsForDay(@RequestAttribute("tenantId") String tenantId,
+                                                   @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return scheduleService.getAppointmentsForDay(date, validateTenant(tenantId));
+    }
+
+    @GetMapping("/schedule/staff")
+    public List<StaffMember> getStaffForSchedule(
             @RequestAttribute("tenantId") String tenantId,
-            @PathVariable String id,
-            @RequestBody Contact contact) {
-        return contactService.updateContact(id, contact, tenantId);
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return staffMemberService.getStaffForDate(validateTenant(tenantId), date);
     }
 
-    @GetMapping("/clients/{contactId}/appointments")
-    public List<Appointment> getClientAppointmentsAsAdmin(
-            @RequestAttribute("tenantId") String tenantId,
-            @PathVariable String contactId) {
-        return scheduleService.getAppointmentsForContact(contactId, tenantId);
+    @PostMapping("/appointments")
+    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
+        appointment.setTenantId(validateTenant(tenantId));
+        return scheduleService.addAppointment(appointment);
     }
 
-    // --- Services & Resources ---
-    @GetMapping("/services")
-    public List<com.tryneuro.backend.model.Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
-        return appServiceService.getAllServices(tenantId);
-    }
-
-    @PostMapping("/services")
-    public com.tryneuro.backend.model.Service addService(@RequestAttribute("tenantId") String tenantId, @RequestBody com.tryneuro.backend.model.Service service) {
-        return appServiceService.addService(service, tenantId);
-    }
-
-    @DeleteMapping("/services/{id}")
-    public void deleteService(@PathVariable String id) {
-        appServiceService.deleteService(id);
-    }
-
+    // --- RESOURCES & SERVICES ---
     @GetMapping("/resources")
     public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
-        return resourceService.getAllResources(tenantId);
+        return resourceService.getAllResources(validateTenant(tenantId));
     }
 
-    @PostMapping("/resources")
-    public Resource addResource(@RequestAttribute("tenantId") String tenantId, @RequestBody Resource resource) {
-        return resourceService.addResource(resource, tenantId);
-    }
-
-    @DeleteMapping("/resources/{id}")
-    public void deleteResource(@PathVariable String id) {
-        resourceService.deleteResource(id);
-    }
-
-    @GetMapping("/staff/{staffMemberId}/availability")
-    public boolean isStaffMemberAvailable(@RequestAttribute("tenantId") String tenantId,
-                                            @PathVariable String staffMemberId,
-                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime time,
-                                            @RequestParam int duration,
-                                            @RequestParam(required = false) String currentAppointmentId) {
-        return scheduleService.isStaffMemberAvailable(tenantId, staffMemberId, date, time, duration, currentAppointmentId);
+    @GetMapping("/services")
+    public List<com.tryneuro.backend.model.Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
+        return appServiceService.getAllServices(validateTenant(tenantId));
     }
 }

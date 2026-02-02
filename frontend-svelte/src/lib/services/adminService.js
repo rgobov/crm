@@ -3,20 +3,26 @@ import api from '$lib/api.js';
 export const adminService = {
     // --- DASHBOARD ---
     async getDashboardStats() {
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const [staffCountRes, todayApps, contactsCount, resources] = await Promise.all([
-            api.get('/admin/staff', { params: { size: 1 } }),
-            api.get('/admin/appointments/day', { params: { date: dateStr } }),
-            api.get('/contacts/count'),
-            api.get('/admin/resources')
-        ]);
-        return {
-            totalClients: contactsCount.data,
-            todaysAppointmentsCount: todayApps.data.length,
-            totalResources: resources.data.length,
-            totalStaff: staffCountRes.data.totalElements
-        };
+        // Запрашиваем всё одним махом через новый эндпоинт
+        const response = await api.get('/admin/dashboard/stats');
+        return response.data;
+    },
+
+    // --- STAFF (Сотрудники) ---
+    async getStaff(query = '', page = 0, size = 100) {
+        const response = await api.get('/admin/staff', {
+            params: { query, page, size }
+        });
+        return response.data; // Возвращает Page объект
+    },
+
+    // --- CLIENTS (Клиенты) ---
+    async getClients(query = '', page = 0, size = 100) {
+        // Используем админский путь для клиентов
+        const response = await api.get('/admin/clients', {
+            params: { query, page, size }
+        });
+        return response.data;
     },
 
     // --- CALENDAR & SCHEDULE ---
@@ -41,18 +47,5 @@ export const adminService = {
     },
     async deleteAppointment(id) {
         return await api.delete(`/admin/appointments/${id}`);
-    },
-
-    // --- COMMENTS (Синхронизировано с AdminController) ---
-    async getCommentsForAppointment(appointmentId) {
-        return (await api.get(`/admin/appointments/${appointmentId}/comments`)).data;
-    },
-    async addCommentToAppointment(appointmentId, text) {
-        return (await api.post(`/admin/appointments/${appointmentId}/comments`, { text })).data;
-    },
-
-    // --- CLIENTS ---
-    async getContactAppointments(contactId) {
-        return (await api.get(`/admin/clients/${contactId}/appointments`)).data;
     }
 };
