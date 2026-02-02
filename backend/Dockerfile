@@ -1,25 +1,26 @@
-# ЭТАП 1: Сборка (Maven)
+# ЭТАП 1: Сборка
 FROM maven:3.8.4-openjdk-17-slim AS build
 WORKDIR /app
 
-# Копируем настройки проекта
+# Кешируем зависимости (не скачиваем их каждый раз)
 COPY pom.xml .
-# Скачиваем зависимости (кешируем этот слой)
-RUN apple_mvn_dependency_go_offline_if_possible=true mvn dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline
 
 # Копируем исходный код
 COPY src ./src
-# Собираем проект (пропуская тесты для скорости)
-RUN mvn clean package -DskipTests
 
-# ЭТАП 2: Запуск (JRE)
+# ОПТИМИЗИРОВАННАЯ СБОРКА:
+# 1. Убираем 'clean', чтобы не удалять кэш скомпилированных классов
+# 2. Используем кэш BuildKit для папки .m2 (библиотеки)
+RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests
+
+# ЭТАП 2: Запуск (Минимальный JRE)
 FROM eclipse-temurin:17-jdk-alpine
 WORKDIR /app
 
-# Копируем только готовый JAR файл из первого этапа
+# Берем JAR файл из этапа сборки
 COPY --from=build /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
 
-# Стандартный порт Spring Boot
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
