@@ -53,7 +53,7 @@ public class AdminController {
 
     private String validateTenant(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
-            log.error("Security Alert: Missing tenantId in request!");
+            log.error("CRITICAL: tenantId is MISSING in Request Attributes");
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ID компании не найден");
         }
         return tenantId;
@@ -62,28 +62,21 @@ public class AdminController {
     @GetMapping("/dashboard/stats")
     public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
         String tId = validateTenant(tenantId);
-        log.info("API: Fetching stats for {}", tId);
+        log.info("DEBUG: Getting stats for tenant [{}]", tId);
         
         Map<String, Object> stats = new HashMap<>();
-        // Используем те же ключи, что и во фронтенде
-        stats.put("totalClients", contactService.countContacts(tId));
-        stats.put("totalStaff", staffMemberService.getStaffPaged(tId, null, 0, 1).getTotalElements());
-        stats.put("totalResources", resourceService.getAllResources(tId).size());
+        long clientCount = contactService.countContacts(tId);
+        long staffCount = staffMemberService.getStaffPaged(tId, null, 0, 1).getTotalElements();
+        int resourceCount = resourceService.getAllResources(tId).size();
+        
+        log.info("DEBUG: Found in DB for {}: Clients={}, Staff={}, Resources={}", tId, clientCount, staffCount, resourceCount);
+        
+        stats.put("totalClients", clientCount);
+        stats.put("totalStaff", staffCount);
+        stats.put("totalResources", resourceCount);
         stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
         
-        log.info("API: Stats ready -> {}", stats);
         return stats;
-    }
-
-    @GetMapping("/clients")
-    public Page<Contact> getClientsPaged(
-            @RequestAttribute("tenantId") String tenantId,
-            @RequestParam(required = false) String query,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
-        String tId = validateTenant(tenantId);
-        log.info("API: Fetching clients for {}, page: {}", tId, page);
-        return contactService.getContactsPaged(tId, query, false, page, size);
     }
 
     @GetMapping("/staff")
@@ -93,13 +86,29 @@ public class AdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
         String tId = validateTenant(tenantId);
-        log.info("API: Fetching staff for {}", tId);
-        return staffMemberService.getStaffPaged(tId, query, page, size);
+        Page<StaffMember> result = staffMemberService.getStaffPaged(tId, query, page, size);
+        log.info("DEBUG: Staff query for {}: Found {} members", tId, result.getTotalElements());
+        return result;
+    }
+
+    @GetMapping("/clients")
+    public Page<Contact> getClientsPaged(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size) {
+        String tId = validateTenant(tenantId);
+        Page<Contact> result = contactService.getContactsPaged(tId, query, false, page, size);
+        log.info("DEBUG: Clients query for {}: Found {} contacts", tId, result.getTotalElements());
+        return result;
     }
 
     @GetMapping("/resources")
     public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
-        return resourceService.getAllResources(validateTenant(tenantId));
+        String tId = validateTenant(tenantId);
+        List<Resource> result = resourceService.getAllResources(tId);
+        log.info("DEBUG: Resources query for {}: Found {} items", tId, result.size());
+        return result;
     }
 
     @GetMapping("/workload")
