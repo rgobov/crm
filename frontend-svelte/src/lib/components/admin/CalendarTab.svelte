@@ -6,14 +6,22 @@
     import { activeTab } from '$lib/stores/dashboardStore.js';
     import { onMount } from 'svelte';
 
-    let viewMode = 'month'; // 'month', 'day', 'edit', 'detail'
+    export let forcedDate = null; // Дата из сайдбара
+
+    let viewMode = 'month';
     let selectedDate = new Date();
     let currentAppointment = null;
     let preselectedData = null;
 
-    // СЛУШАЕМ ПЕРЕКЛЮЧЕНИЕ СНИЗУ
+    // РЕАКТИВНОСТЬ: Если пришла дата из сайдбара - применяем её
+    $: if (forcedDate) {
+        selectedDate = new Date(forcedDate);
+        viewMode = 'day';
+    }
+
     $: if ($activeTab === 'timeline') {
-        selectedDate = new Date();
+        // Если перешли по кнопке Таймлайн, но даты из сайдбара нет - ставим сегодня
+        if (!forcedDate) selectedDate = new Date();
         viewMode = 'day';
     } else if ($activeTab === 'calendar' && viewMode !== 'edit' && viewMode !== 'detail') {
         viewMode = 'month';
@@ -48,10 +56,6 @@
     function backToDay() {
         viewMode = 'day';
     }
-
-    function handleSaved() {
-        viewMode = 'day';
-    }
 </script>
 
 <div class="calendar-tab">
@@ -67,12 +71,13 @@
     {:else if viewMode === 'day'}
         <div class="day-view-container">
             <div class="day-header">
-                <button class="back-link" on:click={() => { viewMode = 'month'; activeTab.set('calendar'); }}>‹ Месяц</button>
+                <button class="back-link mobile-only" on:click={() => { viewMode = 'month'; activeTab.set('calendar'); }}>‹ Месяц</button>
                 <div class="date-title">
-                    {selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                    {selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
                 <button class="add-mini" on:click={() => openNewAppointment()}>+ Запись</button>
             </div>
+            <!-- Прокидываем информацию, что мы на десктопе, чтобы скрыть верхнюю ленту -->
             <ScheduleScreen
                 initialDate={selectedDate}
                 on:emptySlotTap={openNewAppointment}
@@ -90,7 +95,7 @@
                 appointment={currentAppointment}
                 preselected={preselectedData}
                 on:cancel={backToDay}
-                on:saved={handleSaved}
+                on:saved={backToDay}
             />
         </div>
 
@@ -123,6 +128,11 @@
     .back-link { background: none; border: none; color: var(--primary-color); font-weight: 700; font-size: 14px; cursor: pointer; }
     .date-title { font-weight: 800; color: #1e293b; font-size: 15px; }
     .add-mini { background: #eff6ff; color: var(--primary-color); border: none; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+
+    /* На ПК скрываем кнопку "Назад к месяцу", так как месяц всегда слева */
+    @media (min-width: 1024px) {
+        .mobile-only { display: none; }
+    }
 
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

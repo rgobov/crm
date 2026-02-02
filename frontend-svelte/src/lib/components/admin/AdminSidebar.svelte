@@ -12,7 +12,6 @@
     ];
 
     function handleDateSelected(event) {
-        // При выборе даты в сайдбаре - сообщаем главной странице
         dispatch('dateChange', event.detail);
     }
 </script>
@@ -20,10 +19,10 @@
 <aside class="sidebar">
     <div class="sidebar-top">
         <div class="logo">
-            <div class="logo-icon">TN</div>
+            <div class="logo-icon">999</div>
             <div class="logo-text">
-                <h1>Try Neuro</h1>
-                <span>CRM SYSTEM</span>
+                <h1>CRM Система</h1>
+                <span>ADMIN PANEL</span>
             </div>
         </div>
 
@@ -65,12 +64,13 @@
 
     .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
     .logo-icon {
-        width: 40px; height: 40px; background: var(--primary-gradient);
+        width: 44px; height: 44px; background: var(--primary-gradient);
         color: white; border-radius: 12px; display: flex;
         justify-content: center; align-items: center; font-weight: 900;
+        font-size: 18px; box-shadow: 0 4px 15px rgba(56, 151, 240, 0.2);
     }
     .logo-text h1 { font-size: 18px; margin: 0; color: #0f172a; font-weight: 800; }
-    .logo-text span { font-size: 10px; color: #94a3b8; font-weight: 700; letter-spacing: 1px; }
+    .logo-text span { font-size: 9px; color: #94a3b8; font-weight: 800; letter-spacing: 1px; }
 
     .nav-menu { display: flex; flex-direction: column; gap: 8px; }
     .nav-btn {
@@ -91,7 +91,6 @@
         margin-bottom: 16px; letter-spacing: 1px;
     }
 
-    /* Делаем календарь в сайдбаре еще компактнее */
     :global(.sidebar .calendar-container) { padding: 0 !important; box-shadow: none !important; border: none !important; }
     :global(.sidebar .calendar-page-limiter) { padding: 0 !important; }
 </style>
