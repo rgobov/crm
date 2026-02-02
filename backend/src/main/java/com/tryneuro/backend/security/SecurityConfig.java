@@ -42,8 +42,7 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // РАЗРЕШАЕМ ВСЕ ПРЕДЗАПРОСЫ
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/api/ws/**", "/error").permitAll()
                 .anyRequest().authenticated()
             )
@@ -65,12 +64,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // РАЗРЕШАЕМ ВСЕ (для отладки, потом сузим)
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        // Разрешаем фронтенд домен
+        configuration.setAllowedOrigins(Arrays.asList("https://crm.109.248.203.156.sslip.io"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Telegram-Init-Data"));
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("Authorization"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
