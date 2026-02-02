@@ -38,8 +38,6 @@ public class SecurityConfig {
         this.userDetailsService = userDetailsService;
     }
 
-    // НАИВЫСШИЙ ПРИОРИТЕТ: Этот фильтр сработает ПЕРВЫМ в системе.
-    // Он добавит CORS-заголовки даже если запрос будет отклонен безопасностью позже.
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     public CorsFilter corsFilter() {
@@ -54,7 +52,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Telegram-Init-Data", "X-Requested-With", "Accept", "Origin"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(List.of("Authorization"));
-
+        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return new CorsFilter(source);
@@ -66,7 +64,11 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // ОТКРЫТЫЕ ПУТИ
                 .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/api/ws/**", "/error").permitAll()
+                // ЗАКРЫТЫЕ ПУТИ (Админ и Менеджер)
+                .requestMatchers("/api/admin/**").hasAnyAuthority("ADMIN", "MANAGER")
+                .requestMatchers("/api/employee/**").hasAuthority("EMPLOYEE")
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
