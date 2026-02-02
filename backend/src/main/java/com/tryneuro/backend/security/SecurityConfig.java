@@ -4,6 +4,8 @@ import com.tryneuro.backend.service.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -64,10 +66,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Разрешаем только ваш фронтенд
-        configuration.setAllowedOrigins(Arrays.asList("https://crm.109.248.203.156.sslip.io"));
+        // Разрешаем все источники временно для диагностики, но с сохранением кук
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        // Разрешаем все стандартные и наши кастомные заголовки
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Telegram-Init-Data", "X-Requested-With"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(List.of("Authorization"));
