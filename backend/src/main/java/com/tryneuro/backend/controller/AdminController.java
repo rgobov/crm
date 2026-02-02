@@ -11,6 +11,8 @@ import com.tryneuro.backend.service.ContactService;
 import com.tryneuro.backend.service.ResourceService;
 import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -28,6 +30,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
+    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
+    
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
     private final ContactService contactService;
@@ -47,9 +51,9 @@ public class AdminController {
         this.resourceService = resourceService;
     }
 
-    // Хелпер для проверки наличия тенанта
     private String validateTenant(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
+            log.error("CORS/Security: tenantId is MISSING in request attributes!");
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ошибка авторизации: не удалось определить ID компании");
         }
         return tenantId;
@@ -59,10 +63,18 @@ public class AdminController {
     @GetMapping("/dashboard/stats")
     public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
         String tId = validateTenant(tenantId);
+        log.info("Fetching dashboard stats for tenant: {}", tId);
+        
         Map<String, Object> stats = new HashMap<>();
-        stats.put("totalClients", contactService.countContacts(tId));
-        stats.put("totalStaff", staffMemberService.getStaffPaged(tId, null, 0, 1).getTotalElements());
-        stats.put("totalResources", resourceService.getAllResources(tId).size());
+        long clients = contactService.countContacts(tId);
+        long staff = staffMemberService.getStaffPaged(tId, null, 0, 1).getTotalElements();
+        int resources = resourceService.getAllResources(tId).size();
+        
+        log.info("Stats result for {}: Clients={}, Staff={}, Resources={}", tId, clients, staff, resources);
+        
+        stats.put("totalClients", clients);
+        stats.put("totalStaff", staff);
+        stats.put("totalResources", resources);
         stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
         return stats;
     }
@@ -74,7 +86,9 @@ public class AdminController {
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        return contactService.getContactsPaged(validateTenant(tenantId), query, false, page, size);
+        String tId = validateTenant(tenantId);
+        log.info("Fetching clients for tenant: {}, query: {}", tId, query);
+        return contactService.getContactsPaged(tId, query, false, page, size);
     }
 
     // --- STAFF ---
@@ -84,7 +98,9 @@ public class AdminController {
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
-        return staffMemberService.getStaffPaged(validateTenant(tenantId), query, page, size);
+        String tId = validateTenant(tenantId);
+        log.info("Fetching staff for tenant: {}", tId);
+        return staffMemberService.getStaffPaged(tId, query, page, size);
     }
 
     @PostMapping("/staff")
