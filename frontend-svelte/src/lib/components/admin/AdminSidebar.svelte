@@ -5,7 +5,6 @@
 
     const dispatch = createEventDispatcher();
 
-    // Оставляем только Базу и Таймлайн. Календарь месяца теперь всегда виден ниже.
     const menuItems = [
         { id: 'management', label: 'База', icon: '📊' },
         { id: 'timeline', label: 'Таймлайн', icon: '🕒' }
@@ -17,8 +16,8 @@
 </script>
 
 <aside class="sidebar">
-    <div class="sidebar-content">
-        <div class="logo-section">
+    <div class="sidebar-top">
+        <div class="logo">
             <div class="logo-icon">999</div>
             <div class="logo-text">
                 <h1>CRM Система</h1>
@@ -38,13 +37,11 @@
                 </button>
             {/each}
         </nav>
+    </div>
 
-        <div class="sidebar-calendar-section">
-            <div class="cal-label">ВЫБОР ДАТЫ</div>
-            <div class="mini-calendar">
-                <CalendarScreen on:dateSelected={handleDateSelected} />
-            </div>
-        </div>
+    <div class="sidebar-calendar">
+        <div class="cal-label">ВЫБОР ДАТЫ</div>
+        <CalendarScreen on:dateSelected={handleDateSelected} />
     </div>
 </aside>
 
@@ -58,17 +55,14 @@
         flex-direction: column;
         position: sticky;
         top: 0;
-        flex-shrink: 0;
-    }
-
-    .sidebar-content {
         padding: 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 32px;
+        flex-shrink: 0;
+        box-sizing: border-box;
     }
 
-    .logo-section { display: flex; align-items: center; gap: 12px; }
+    .sidebar-top { flex: 0 0 auto; margin-bottom: 32px; }
+
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
     .logo-icon {
         width: 44px; height: 44px; background: var(--primary-gradient);
         color: white; border-radius: 12px; display: flex;
@@ -78,28 +72,27 @@
     .logo-text h1 { font-size: 18px; margin: 0; color: #0f172a; font-weight: 800; }
     .logo-text span { font-size: 9px; color: #94a3b8; font-weight: 800; letter-spacing: 1px; }
 
-    .nav-menu { display: flex; flex-direction: column; gap: 6px; }
+    .nav-menu { display: flex; flex-direction: column; gap: 8px; }
     .nav-btn {
         display: flex; align-items: center; gap: 12px; padding: 14px 16px;
         border: none; background: none; border-radius: 14px;
         color: #64748b; font-weight: 700; cursor: pointer; transition: all 0.2s;
-        text-align: left;
+        text-align: left; width: 100%;
     }
     .nav-btn:hover { background: #f8fafc; color: #0f172a; }
     .nav-btn.active { background: #eff6ff; color: var(--primary-color); }
 
-    .sidebar-calendar-section {
+    .sidebar-calendar {
+        flex: 1;
         border-top: 1px solid #f1f5f9;
         padding-top: 24px;
+        overflow: hidden;
     }
     .cal-label {
         font-size: 10px; font-weight: 800; color: #94a3b8;
         margin-bottom: 16px; letter-spacing: 1px;
     }
 
-    /* Делаем календарь максимально компактным для сайдбара */
-    :global(.sidebar .calendar-container) { padding: 0 !important; border: none !important; box-shadow: none !important; }
-    :global(.sidebar .calendar-page-limiter) { padding: 0 !important; max-width: 100% !important; }
-    :global(.sidebar .day-cell) { border-radius: 8px !important; }
-    :global(.sidebar .day-num) { font-size: 13px !important; }
+    /* Обеспечиваем, чтобы календарь не "схлопывался" */
+    :global(.sidebar .calendar-container) { padding: 0 !important; border: none !important; box-shadow: none !important; width: 100% !important; }
 </style>
