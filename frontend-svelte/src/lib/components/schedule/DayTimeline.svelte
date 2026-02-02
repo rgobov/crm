@@ -6,249 +6,226 @@
     export let appointments = [];
     export let staff = [];
 
-    // События
     export let onAppointmentTap = () => {};
     export let onEmptySlotTap = () => {};
-    export let onStatusUpdate = () => {};
 
-    const HOUR_HEIGHT = 80;
-    const STAFF_WIDTH = 150;
-    const TIME_COLUMN_WIDTH = 60;
+    // Размеры
+    const HOUR_HEIGHT = 100;
+    const SLOT_HEIGHT = HOUR_HEIGHT / 4;
+    const STAFF_WIDTH = 160;
+    const TIME_COL_WIDTH = 60;
 
+    // Динамическая шкала времени (как во Flutter)
     let startHour = 8;
     let endHour = 22;
-    let nowLinePosition = -1;
+    let hours = [];
+    let nowLinePos = -1;
     let timer;
 
     let scrollHeader;
     let scrollBody;
 
-    // Синхронизация горизонтального скролла шапки и тела
+    // Реактивный расчет шкалы при изменении данных
+    $: {
+        let minH = 8;
+        let maxH = 20;
+
+        if (staff.length > 0 || appointments.length > 0) {
+            // Ищем по сменам мастеров
+            staff.forEach(s => {
+                if (s.workStartTime) minH = Math.min(minH, parseInt(s.workStartTime.split(':')[0]));
+                if (s.workEndTime) maxH = Math.max(maxH, parseInt(s.workEndTime.split(':')[0]));
+            });
+            // Ищем по записям
+            appointments.forEach(a => {
+                const start = new Date(a.startTime).getHours();
+                const end = Math.ceil((new Date(a.startTime).getTime() + a.durationInMinutes * 60000) / (3600000)) % 24;
+                minH = Math.min(minH, start);
+                maxH = Math.max(maxH, end);
+            });
+        }
+
+        startHour = Math.max(0, minH - 1); // Зазор 1 час
+        endHour = Math.min(24, maxH + 1);   // Зазор 1 час
+
+        hours = [];
+        for (let i = startHour; i <= endHour; i++) {
+            hours.push(i);
+        }
+    }
+
     function syncScroll(e) {
-        if (e.target === scrollBody) {
+        if (scrollHeader && e.target === scrollBody) {
             scrollHeader.scrollLeft = scrollBody.scrollLeft;
         }
     }
 
     onMount(() => {
         updateNowLine();
-        timer = setInterval(updateNowLine, 60000); // Обновляем раз в минуту
+        timer = setInterval(updateNowLine, 60000);
+        setTimeout(scrollToCurrentTime, 300);
     });
 
-    onDestroy(() => {
-        clearInterval(timer);
-    });
+    onDestroy(() => clearInterval(timer));
 
     function updateNowLine() {
         const now = new Date();
         if (now.toDateString() === day.toDateString()) {
-            const minutes = (now.getHours() - startHour) * 60 + now.getMinutes();
-            nowLinePosition = minutes * (HOUR_HEIGHT / 60);
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+            const startMins = startHour * 60;
+            nowLinePos = (currentMins - startMins) * (HOUR_HEIGHT / 60);
         } else {
-            nowLinePosition = -1;
+            nowLinePos = -1;
+        }
+    }
+
+    function scrollToCurrentTime() {
+        if (scrollBody && nowLinePos > 150) {
+            scrollBody.scrollTo({ top: nowLinePos - 150, behavior: 'smooth' });
         }
     }
 
     function getApptStyle(appt) {
         const start = new Date(appt.startTime);
-        const minutesFromStart = (start.getHours() - startHour) * 60 + start.getMinutes();
-        const top = minutesFromStart * (HOUR_HEIGHT / 60);
+        const minsFromStart = (start.getHours() - startHour) * 60 + start.getMinutes();
+        const top = minsFromStart * (HOUR_HEIGHT / 60);
         const height = appt.durationInMinutes * (HOUR_HEIGHT / 60);
-
-        return `top: ${top}px; height: ${height}px;`;
+        return `top: ${top}px; height: ${height - 2}px;`;
     }
 
     function getStatusColor(status) {
         const colors = {
-            'SCHEDULED': '#3897f0',
-            'CONFIRMED': '#26A69A',
-            'NEEDS_CALL': '#FFA726',
-            'COMPLETED': '#94a3b8',
+            'SCHEDULED': '#3b82f6',
+            'CONFIRMED': '#10b981',
+            'NEEDS_CALL': '#f59e0b',
+            'COMPLETED': '#64748b',
             'CANCELLED': '#ef4444'
         };
-        return colors[status] || '#3897f0';
+        return colors[status] || '#3b82f6';
+    }
+
+    function getWorkZoneStyle(member) {
+        if (!member.workStartTime || !member.workEndTime) return '';
+        const [sH, sM] = member.workStartTime.split(':').map(Number);
+        const [eH, eM] = member.workEndTime.split(':').map(Number);
+        const startPos = ((sH - startHour) * 60 + sM) * (HOUR_HEIGHT / 60);
+        const endPos = ((eH - startHour) * 60 + eM) * (HOUR_HEIGHT / 60);
+        return `top: ${startPos}px; height: ${endPos - startPos}px;`;
     }
 </script>
 
-<div class="timeline-container">
-    <!-- ШАПКА МАСТЕРОВ -->
-    <div class="header-wrapper">
-        <div class="time-corner">
-            <span>🕒</span>
-        </div>
-        <div class="staff-header" bind:this={scrollHeader}>
-            {#each staff as s}
-                <div class="staff-cell" style="width: {STAFF_WIDTH}px">
-                    <span class="name">{s.name}</span>
-                    <span class="spec">{s.specialty}</span>
-                </div>
-            {/each}
+<div class="timeline">
+    <div class="header-row">
+        <div class="time-label-corner">🕒</div>
+        <div class="staff-row-scroll" bind:this={scrollHeader}>
+            <div class="staff-inner" style="width: {staff.length * STAFF_WIDTH}px">
+                {#each staff as s}
+                    <div class="staff-card" style="width: {STAFF_WIDTH}px">
+                        <div class="avatar-circle">{s.name.charAt(0)}</div>
+                        <div class="staff-meta">
+                            <span class="name">{s.name}</span>
+                            <span class="spec">{s.specialty}</span>
+                        </div>
+                    </div>
+                {/each}
+            </div>
         </div>
     </div>
 
-    <!-- ТЕЛО РАСПИСАНИЯ -->
-    <div class="body-wrapper" on:scroll={syncScroll} bind:this={scrollBody}>
-        <!-- Колонка времени (Sticky) -->
-        <div class="time-column" style="width: {TIME_COLUMN_WIDTH}px">
-            {#each Array(endHour - startHour + 1) as _, i}
-                <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
-                    {startHour + i}:00
+    <div class="grid-body" on:scroll={syncScroll} bind:this={scrollBody}>
+        <div class="time-axis" style="width: {TIME_COL_WIDTH}px">
+            {#each hours as h}
+                <div class="hour-mark" style="height: {HOUR_HEIGHT}px">
+                    <span>{h}:00</span>
                 </div>
             {/each}
         </div>
 
-        <!-- Сетка мастеров -->
-        <div class="grid-content" style="width: {staff.length * STAFF_WIDTH}px">
-            <!-- Горизонтальные линии времени -->
-            {#each Array(endHour - startHour + 1) as _, i}
-                <div class="grid-line" style="top: {i * HOUR_HEIGHT}px"></div>
-            {/each}
+        <div class="main-grid" style="width: {staff.length * STAFF_WIDTH}px; height: {hours.length * HOUR_HEIGHT}px">
+            <div class="off-hours-layer">
+                {#each staff as s, i}
+                    <div class="column-bg" style="left: {i * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
+                        {#if !s.dayOff}
+                            <div class="work-zone" style={getWorkZoneStyle(s)}></div>
+                        {/if}
+                    </div>
+                {/each}
+            </div>
 
-            <!-- Колонки мастеров -->
-            {#each staff as s, sIdx}
-                <div class="staff-column" style="left: {sIdx * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
-                    <!-- Записи мастера -->
-                    {#each appointments.filter(a => a.staffMemberId === s.id) as appt}
-                        <div
-                            class="appt-card"
-                            style="{getApptStyle(appt)} background-color: {getStatusColor(appt.status)}"
-                            on:click|stopPropagation={() => onAppointmentTap(appt)}
-                        >
-                            <span class="client">{appt.clientName}</span>
-                            <span class="service">{appt.service}</span>
-                        </div>
-                    {/each}
+            <div class="lines-layer">
+                {#each Array(hours.length * 4) as _, i}
+                    <div class="grid-line" class:bold={i % 4 === 0} style="top: {i * SLOT_HEIGHT}px"></div>
+                {/each}
+            </div>
 
-                    <!-- Индикатор текущего времени -->
-                    {#if nowLinePosition >= 0}
-                        <div class="now-line" style="top: {nowLinePosition}px"></div>
-                    {/if}
+            <div class="columns-layer">
+                {#each staff as s, sIdx}
+                    <div class="staff-column" style="left: {sIdx * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
+                        {#each Array(hours.length * 4) as _, i}
+                            <button class="slot-trigger"
+                                 style="height: {SLOT_HEIGHT}px"
+                                 on:click={() => onEmptySlotTap({ hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}>
+                            </button>
+                        {/each}
+
+                        {#each appointments.filter(a => a.staffMemberId === s.id) as appt}
+                            <div class="appt-card"
+                                 style="{getApptStyle(appt)} --status-color: {getStatusColor(appt.status)}"
+                                 on:click|stopPropagation={() => onAppointmentTap(appt)}>
+                                <div class="appt-inner">
+                                    <div class="appt-head">
+                                        <span class="client">{appt.clientName}</span>
+                                        {#if appt.reminderSent}<span class="bell">🔔</span>{/if}
+                                    </div>
+                                    <span class="service">{appt.service}</span>
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                {/each}
+            </div>
+
+            {#if nowLinePos >= 0}
+                <div class="time-now" style="top: {nowLinePos}px">
+                    <div class="pulse-dot"></div>
+                    <div class="line"></div>
                 </div>
-            {/each}
+            {/if}
         </div>
     </div>
 </div>
 
 <style>
-    .timeline-container {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        background: white;
-        overflow: hidden;
-    }
-
-    /* Header */
-    .header-wrapper {
-        display: flex;
-        height: 60px;
-        background: white;
-        border-bottom: 1px solid #f1f5f9;
-        z-index: 20;
-    }
-    .time-corner {
-        width: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #94a3b8;
-        border-right: 1px solid #f1f5f9;
-    }
-    .staff-header {
-        flex: 1;
-        display: flex;
-        overflow-x: hidden; /* Скроллится синхронно с телом */
-    }
-    .staff-cell {
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 0 10px;
-        border-right: 1px solid #f8fafc;
-    }
-    .staff-cell .name { font-size: 13px; font-weight: 800; color: #1e293b; }
-    .staff-cell .spec { font-size: 11px; color: #94a3b8; }
-
-    /* Body */
-    .body-wrapper {
-        flex: 1;
-        display: flex;
-        overflow: auto;
-        position: relative;
-    }
-
-    .time-column {
-        flex-shrink: 0;
-        background: #f8fafc;
-        border-right: 1px solid #f1f5f9;
-        position: sticky;
-        left: 0;
-        z-index: 10;
-    }
-    .hour-cell {
-        display: flex;
-        justify-content: center;
-        padding-top: 4px;
-        font-size: 11px;
-        font-weight: 700;
-        color: #94a3b8;
-    }
-
-    .grid-content {
-        position: relative;
-        background: white;
-    }
-    .grid-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 1px;
-        background: #f1f5f9;
-    }
-
-    .staff-column {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        border-right: 1px solid #f1f5f9;
-    }
-
-    /* Appointment Cards */
-    .appt-card {
-        position: absolute;
-        left: 4px;
-        right: 4px;
-        border-radius: 8px;
-        padding: 6px;
-        color: white;
-        font-size: 11px;
-        overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        cursor: pointer;
-        z-index: 5;
-    }
-    .appt-card .client { display: block; font-weight: 800; margin-bottom: 2px; }
-    .appt-card .service { opacity: 0.9; font-size: 10px; }
-
-    /* Indicators */
-    .now-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: #ef4444;
-        z-index: 15;
-    }
-    .now-line::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: -3px;
-        width: 8px;
-        height: 8px;
-        background: #ef4444;
-        border-radius: 50%;
-    }
+    /* Стили сохранены из предыдущего ответа с небольшими правками под динамическую шкалу */
+    .timeline { height: 100%; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden; }
+    .header-row { display: flex; height: 74px; background: white; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .time-label-corner { width: 60px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #f1f5f9; font-size: 18px; }
+    .staff-row-scroll { flex: 1; overflow: hidden; }
+    .staff-inner { display: flex; height: 100%; }
+    .staff-card { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid #f1f5f9; }
+    .avatar-circle { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 800; }
+    .staff-meta { display: flex; flex-direction: column; min-width: 0; }
+    .name { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .spec { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+    .grid-body { flex: 1; display: flex; overflow: auto; position: relative; }
+    .time-axis { flex-shrink: 0; background: white; border-right: 1px solid #f1f5f9; position: sticky; left: 0; z-index: 50; }
+    .hour-mark { display: flex; justify-content: center; padding-top: 8px; font-size: 11px; font-weight: 700; color: #94a3b8; }
+    .main-grid { position: relative; background: #f8fafc; }
+    .off-hours-layer, .lines-layer, .columns-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+    .column-bg { position: absolute; top: 0; bottom: 0; border-right: 1px solid #f1f5f9; }
+    .work-zone { position: absolute; left: 0; right: 0; background: white; }
+    .grid-line { position: absolute; left: 0; right: 0; height: 1px; background: #f1f5f9; }
+    .grid-line.bold { background: #e2e8f0; }
+    .staff-column { position: absolute; top: 0; bottom: 0; }
+    .slot-trigger { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
+    .slot-trigger:active { background: rgba(59, 130, 246, 0.05); }
+    .appt-card { position: absolute; left: 6px; right: 6px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 60; cursor: pointer; overflow: hidden; }
+    .appt-inner { height: 100%; border-left: 4px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+    .appt-head { display: flex; justify-content: space-between; align-items: flex-start; }
+    .client { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; }
+    .service { font-size: 10px; color: #64748b; font-weight: 500; }
+    .time-now { position: absolute; left: 0; right: 0; z-index: 80; pointer-events: none; }
+    .time-now .line { height: 2px; background: #ef4444; width: 100%; }
+    .time-now .pulse-dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 </style>
