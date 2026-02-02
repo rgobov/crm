@@ -18,6 +18,10 @@ jobs:
           script: |
             cd ~/crm
             git pull origin feature/telegram-mini-app
-            # ОПТИМИЗАЦИЯ: Убираем принудительный --build. 
-            # Docker сам решит, что нужно пересобрать на основе изменившихся файлов.
-            docker-compose up -d
+            # Гарантируем включение BuildKit для работы кеширования Maven
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+            # Собираем только изменившиеся слои
+            docker-compose up -d --build
+            # Очистка старых образов (не трогая кэш сборки)
+            docker image prune -f
