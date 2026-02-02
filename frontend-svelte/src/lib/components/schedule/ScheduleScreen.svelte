@@ -4,17 +4,16 @@
     import { scheduleUpdates } from '$lib/services/websocketService.js';
     import HorizontalDatePicker from './HorizontalDatePicker.svelte';
     import DayTimeline from './DayTimeline.svelte';
-    import { goto } from '$app/navigation';
 
     export let initialDate = new Date();
-    export let forcedDate = null; // Приходит из Sidebar на ПК
+    export let forcedDate = null;
 
     let selectedDate = initialDate;
     let appointments = [];
     let staff = [];
     let isLoading = true;
 
-    // Следим за изменением даты из Sidebar
+    // Реактивно обновляем дату при выборе в Sidebar (Desktop)
     $: if (forcedDate) {
         selectedDate = forcedDate;
         loadDayData();
@@ -50,12 +49,11 @@
 </script>
 
 <div class="schedule-screen">
-    <!-- ЛЕНТА ДАТ (Центрируем её, так как она узкая) -->
-    <div class="date-picker-header">
+    <!-- СКРЫВАЕМ ЛЕНТУ ДАТ НА ДЕСКТОПЕ (когда ширина > 1024px) -->
+    <div class="date-picker-container">
         <HorizontalDatePicker {selectedDate} on:dateSelected={handleDateChange} />
     </div>
 
-    <!-- ТАЙМЛАЙН (На всю ширину!) -->
     <div class="timeline-body">
         {#if isLoading && appointments.length === 0}
             <div class="center"><span class="spinner"></span></div>
@@ -72,31 +70,16 @@
 </div>
 
 <style>
-    .schedule-screen {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        width: 100%; /* Занимаем всё пространство */
-        background: white;
-        position: relative;
+    .schedule-screen { display: flex; flex-direction: column; height: 100%; width: 100%; background: white; overflow: hidden; }
+
+    .date-picker-container { flex-shrink: 0; z-index: 30; background: white; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: center; }
+
+    /* ПРЯЧЕМ ПОЛОСУ НА ПК */
+    @media (min-width: 1024px) {
+        .date-picker-container { display: none; }
     }
 
-    .date-picker-header {
-        flex-shrink: 0;
-        z-index: 30;
-        background: white;
-        border-bottom: 1px solid #f1f5f9;
-        /* На ПК ленту дат можно центрировать для красоты */
-        display: flex;
-        justify-content: center;
-    }
-
-    .timeline-body {
-        flex: 1;
-        overflow: hidden;
-        width: 100%;
-    }
-
+    .timeline-body { flex: 1; overflow: hidden; width: 100%; }
     .center { display: flex; justify-content: center; align-items: center; height: 100%; }
     .spinner { width: 30px; height: 30px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
