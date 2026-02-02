@@ -15,11 +15,9 @@
 
     const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 
-    // РЕАКТИВНОСТЬ: Перерисовываем сетку, когда меняются данные или месяц
-    $: {
-        if (workloadData || currMonth || currYear) {
-            renderCalendar();
-        }
+    // Реактивность для отрисовки
+    $: if (workloadData || currMonth || currYear) {
+        renderCalendar();
     }
 
     onMount(async () => {
@@ -48,11 +46,9 @@
         let lastDayOfLastMonth = new Date(currYear, currMonth, 0).getDate();
 
         let tempDays = [];
-        // Прошлый месяц
         for (let i = adjFirstDay; i > 0; i--) {
             tempDays.push({ day: lastDayOfLastMonth - i + 1, current: false });
         }
-        // Текущий месяц
         for (let i = 1; i <= lastDateOfMonth; i++) {
             let isToday = i === now.getDate() && currMonth === now.getMonth() && currYear === now.getFullYear();
             tempDays.push({
@@ -86,61 +82,74 @@
     }
 </script>
 
-<div class="calendar-container">
-    <div class="cal-header">
-        <button on:click={() => changeMonth(-1)}>‹</button>
-        <h3>{monthNames[currMonth]} {currYear}</h3>
-        <button on:click={() => changeMonth(1)}>›</button>
-    </div>
+<div class="calendar-page-limiter">
+    <div class="calendar-container">
+        <div class="cal-header">
+            <button on:click={() => changeMonth(-1)}>‹</button>
+            <h3>{monthNames[currMonth]} {currYear}</h3>
+            <button on:click={() => changeMonth(1)}>›</button>
+        </div>
 
-    <div class="weekdays">
-        <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
-    </div>
+        <div class="weekdays">
+            <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+        </div>
 
-    <div class="days-grid" class:loading={isLoading}>
-        {#each days as d}
-            <div
-                class="day-cell"
-                class:inactive={!d.current}
-                class:is-today={d.today}
-                on:click={() => d.current && selectDate(d.day)}
-            >
-                <span class="day-num">{d.day}</span>
-                {#if d.current && d.count > 0}
-                    <div class="workload-dot" style="background-color: {getWorkloadColor(d.count)}">
-                        {d.count}
-                    </div>
-                {/if}
-            </div>
-        {/each}
+        <div class="days-grid" class:loading={isLoading}>
+            {#each days as d}
+                <div
+                    class="day-cell"
+                    class:inactive={!d.current}
+                    class:is-today={d.today}
+                    on:click={() => d.current && selectDate(d.day)}
+                >
+                    <span class="day-num">{d.day}</span>
+                    {#if d.current && d.count > 0}
+                        <div class="workload-dot" style="background-color: {getWorkloadColor(d.count)}">
+                            {d.count}
+                        </div>
+                    {/if}
+                </div>
+            {/each}
+        </div>
+
+        <div class="legend">
+            <div class="item"><span class="dot green"></span> 1-2</div>
+            <div class="item"><span class="dot yellow"></span> 3-5</div>
+            <div class="item"><span class="dot orange"></span> 6-8</div>
+            <div class="item"><span class="dot red"></span> 9+</div>
+        </div>
     </div>
 </div>
 
 <style>
+    .calendar-page-limiter { width: 100%; box-sizing: border-box; }
+
     .calendar-container {
-        padding: 16px;
-        background: white;
-        border-radius: 20px;
-        width: 100%;
-        box-sizing: border-box;
+        padding: 20px; background: white; border-radius: 24px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;
     }
 
-    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    .cal-header h3 { margin: 0; font-size: 15px; font-weight: 800; color: #0f172a; }
-    .cal-header button { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 10px; font-size: 18px; cursor: pointer; color: var(--primary-color); }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .cal-header h3 { margin: 0; font-size: 17px; font-weight: 800; color: #0f172a; }
+    .cal-header button { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 12px; font-size: 20px; cursor: pointer; color: var(--primary-color); }
 
-    .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; }
+    .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 12px; }
 
-    .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; transition: opacity 0.2s; }
+    .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
     .loading { opacity: 0.5; }
 
-    .day-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; position: relative; }
+    .day-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; position: relative; }
     .day-cell:active { background: #f1f5f9; transform: scale(0.92); }
-    .day-num { font-size: 13px; font-weight: 600; color: #1e293b; z-index: 2; }
-    .inactive { opacity: 0.1; pointer-events: none; }
+    .day-num { font-size: 15px; font-weight: 600; color: #1e293b; z-index: 2; }
+    .inactive { opacity: 0.15; pointer-events: none; }
 
-    .is-today { background: #eff6ff; border: 1.5px solid var(--primary-color); }
+    .is-today { background: #eff6ff; border: 2px solid var(--primary-color); }
     .is-today .day-num { color: var(--primary-color); font-weight: 800; }
 
-    .workload-dot { position: absolute; bottom: 4px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #1e293b; border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .workload-dot { position: absolute; bottom: 4px; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #1e293b; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+    .legend { display: flex; justify-content: space-around; margin-top: 24px; padding-top: 16px; border-top: 1px solid #f1f5f9; }
+    .legend .item { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; color: #94a3b8; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.green { background: #dcfce7; } .dot.yellow { background: #fef9c3; } .dot.orange { background: #ffedd5; } .dot.red { background: #fee2e2; }
 </style>
