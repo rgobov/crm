@@ -64,16 +64,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Указываем список разрешенных доменов ЯВНО
-        configuration.setAllowedOrigins(Arrays.asList(
-            "https://crm.109.248.203.156.sslip.io",
-            "http://localhost:3000",
-            "http://localhost:5173"
-        ));
+        // Разрешаем фронтенд домен явно
+        configuration.setAllowedOrigins(Arrays.asList("https://crm.109.248.203.156.sslip.io", "http://localhost:3000"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Telegram-Init-Data", "X-Requested-With"));
         configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L); // Кешируем ответ на preflight на 1 час
+        configuration.setExposedHeaders(List.of("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
