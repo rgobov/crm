@@ -16,35 +16,22 @@
     });
 </script>
 
-<div class="app-shell">
-    <div class="main-viewport">
-        <slot />
-    </div>
+<div class="app-viewport">
+    <slot />
 </div>
 
 <style>
-    /* ПРИЛОЖЕНИЕ ТЕПЕРЬ АДАПТИВНОЕ */
-    .app-shell {
-        min-height: 100vh;
-        background-color: #f1f5f9;
-        display: flex;
-        flex-direction: column;
+    :global(body) {
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', -apple-system, sans-serif;
+        background-color: #f8fafc;
     }
 
-    .main-viewport {
+    .app-viewport {
+        min-height: 100vh;
         width: 100%;
-        /* УБРАЛИ max-width: 500px */
-        margin: 0 auto;
-        min-height: 100vh;
-        background-color: white;
         display: flex;
         flex-direction: column;
-        position: relative;
-    }
-
-    /* На ПК добавляем небольшие поля, чтобы контент не лип к краям,
-       кроме Таймлайна, который будет растягиваться */
-    @media (min-width: 1024px) {
-        .app-shell { padding: 0; }
     }
 </style>
