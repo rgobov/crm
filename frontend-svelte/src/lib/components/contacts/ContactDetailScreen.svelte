@@ -10,7 +10,6 @@
 
     let contact = null;
     let isLoading = true;
-    let currentStatus = 'SCHEDULED'; // По умолчанию
 
     // Состояния редактирования
     let editMode = { name: false, email: false, notes: false, phoneIdx: -1, isAddingPhone: false };
@@ -25,8 +24,6 @@
         try {
             const response = await api.get(`/admin/clients/${contactId}`);
             contact = response.data;
-            // Здесь можно было бы получить статус последнего визита,
-            // но пока используем локальное состояние для демонстрации дизайна
             syncTempValues();
             dispatch('loaded', { name: contact.name });
         } catch (e) {
@@ -58,7 +55,9 @@
                 ? [...tempValues.phones, phoneUtils.clean(tempValues.newPhone)]
                 : tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p);
 
+            // ВАЛИДАЦИЯ
             if (!tempValues.name) return alert('Имя обязательно');
+            if (finalPhones.length === 0) return alert('У клиента должен быть минимум один телефон');
 
             const payload = {
                 ...contact,
@@ -77,20 +76,16 @@
             cancelAllEdits();
         }
     }
-
-    function setStatus(status) {
-        currentStatus = status;
-    }
 </script>
 
-<div class="profile-card status-{currentStatus.toLowerCase()}" in:scale={{duration: 500, start: 0.9, easing: quintOut}}>
+<div class="profile-card" in:scale={{duration: 400, start: 0.95, easing: quintOut}}>
     {#if isLoading && !contact}
         <div class="center-loader"><span class="spinner"></span></div>
     {:else if contact}
         <header class="card-header" in:fade>
             <div class="avatar-section">
                 <div class="avatar-big">{contact.name.charAt(0).toUpperCase()}</div>
-                <div class="status-indicator"></div>
+                <div class="badge-role">КЛИЕНТ</div>
             </div>
 
             <div class="title-section">
@@ -102,20 +97,14 @@
                 {:else}
                     <h2 on:click={() => editMode.name = true}>{contact.name} <span>✎</span></h2>
                 {/if}
-
-                <div class="status-selector">
-                    <button class:active={currentStatus === 'SCHEDULED'} on:click={() => setStatus('SCHEDULED')}>Ожидается</button>
-                    <button class:active={currentStatus === 'NEEDS_CALL'} on:click={() => setStatus('NEEDS_CALL')}>Звонок</button>
-                    <button class:active={currentStatus === 'COMPLETED'} on:click={() => setStatus('COMPLETED')}>Оказана</button>
-                    <button class:active={currentStatus === 'CANCELLED'} on:click={() => setStatus('CANCELLED')}>Отмена</button>
-                </div>
+                <p class="id-hint">ID: {contact.id.split('-')[0]}</p>
             </div>
         </header>
 
         <div class="details-grid">
-            <!-- КОНТАКТЫ -->
+            <!-- ТЕЛЕФОНЫ -->
             <section class="info-group">
-                <label>Контактные данные</label>
+                <label>Контактные телефоны</label>
                 <div class="tiles-container">
                     {#each contact.phones as phone, i}
                         <div class="tile">
@@ -128,17 +117,29 @@
                                 <span class="phone-val" on:click={() => editMode.phoneIdx = i}>
                                     {phoneUtils.format(phone)}
                                 </span>
-                                <a href="tel:{phone}" class="btn-call">📞</a>
+                                <!-- ВОЗВРАЩЕН ФУНКЦИОНАЛ ЗВОНКА -->
+                                <a href="tel:+{phoneUtils.clean(phone)}" class="btn-call" title="Позвонить">📞</a>
                             {/if}
                         </div>
                     {/each}
-                    <button class="btn-add-tile" on:click={() => editMode.isAddingPhone = true}>+ Добавить</button>
+
+                    {#if !editMode.isAddingPhone}
+                        <button class="btn-add-tile" on:click={() => editMode.isAddingPhone = true}>+ Номер</button>
+                    {:else}
+                        <div class="tile full" transition:slide>
+                            <div class="tile-edit">
+                                <input type="tel" bind:value={tempValues.newPhone} placeholder="+7..." autofocus />
+                                <button class="save-mini" on:click={() => saveField('addPhone')}>✓</button>
+                                <button class="btn-close-mini" on:click={cancelAllEdits}>✕</button>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
             </section>
 
             <!-- EMAIL -->
             <section class="info-group">
-                <label>E-mail</label>
+                <label>E-mail адрес</label>
                 <div class="tile full">
                     {#if editMode.email}
                         <div class="tile-edit">
@@ -146,8 +147,8 @@
                             <button class="save-mini" on:click={() => saveField('email')}>✓</button>
                         </div>
                     {:else}
-                        <span class="email-val" on:click={() => editMode.email = true}>
-                            {contact.email || 'Нажмите, чтобы добавить почту'}
+                        <span class="val-text" on:click={() => editMode.email = true}>
+                            {contact.email || 'Добавить почту...'}
                         </span>
                     {/if}
                 </div>
@@ -155,18 +156,18 @@
 
             <!-- ЗАМЕТКИ -->
             <section class="info-group">
-                <label>Заметки о клиенте</label>
+                <label>Заметки и особенности</label>
                 <div class="tile full notes-area" on:click={() => !editMode.notes && (editMode.notes = true)}>
                     {#if editMode.notes}
                         <div class="notes-edit-box" transition:slide>
                             <textarea bind:value={tempValues.notes} rows="4" autofocus></textarea>
                             <div class="actions-row">
                                 <button class="btn-text" on:click|stopPropagation={cancelAllEdits}>Отмена</button>
-                                <button class="btn-save-pill" on:click|stopPropagation={() => saveField('notes')}>✓ Сохранить</button>
+                                <button class="btn-save-pill" on:click|stopPropagation={() => saveField('notes')}>Сохранить ✓</button>
                             </div>
                         </div>
                     {:else}
-                        <p class="notes-text">{contact.notes || 'Нет описания...'}</p>
+                        <p class="notes-text">{contact.notes || 'Нажмите, чтобы добавить описание...'}</p>
                     {/if}
                 </div>
             </section>
@@ -175,87 +176,35 @@
 </div>
 
 <style>
-    .profile-card {
-        background: white;
-        border-radius: 32px;
-        padding: 32px;
-        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 0 20px 50px rgba(0,0,0,0.05);
-        border: 1px solid #f1f5f9;
-        position: relative;
-        overflow: hidden;
-    }
-
-    /* ТЕМЫ В ЗАВИСИМОСТИ ОТ СТАТУСА */
-    .status-scheduled { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border-color: #3b82f6; }
-    .status-completed { background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%); border-color: #10b981; }
-    .status-needs_call { background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%); border-color: #f59e0b; }
-    .status-cancelled { background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%); border-color: #ef4444; }
-
+    .profile-card { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-radius: 32px; padding: 32px; transition: all 0.4s ease; box-shadow: 0 20px 50px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
     .card-header { display: flex; align-items: center; gap: 24px; margin-bottom: 32px; }
-
-    .avatar-big {
-        width: 84px; height: 84px; background: white; border-radius: 28px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 36px; font-weight: 900; color: var(--primary-color);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-    }
-
-    .title-section { flex: 1; }
+    .avatar-big { width: 84px; height: 84px; background: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 950; color: var(--primary-color); box-shadow: 0 10px 20px rgba(56, 151, 240, 0.1); border: 1px solid #eff6ff; }
+    .badge-role { margin-top: 8px; font-size: 9px; font-weight: 900; color: var(--primary-color); background: #eff6ff; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px; }
     .title-section h2 { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; cursor: pointer; }
     .title-section h2 span { font-size: 16px; opacity: 0.2; margin-left: 8px; }
-
-    .status-selector { display: flex; gap: 6px; margin-top: 12px; }
-    .status-selector button {
-        padding: 4px 10px; border-radius: 8px; border: 1px solid #e2e8f0;
-        background: white; font-size: 10px; font-weight: 800; color: #64748b;
-        cursor: pointer; text-transform: uppercase; transition: all 0.2s;
-    }
-    .status-selector button.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
-
+    .id-hint { margin: 4px 0 0 4px; font-size: 11px; color: #cbd5e1; font-weight: 700; }
     .details-grid { display: flex; flex-direction: column; gap: 24px; }
-    label {
-        display: block; font-size: 10px; font-weight: 800; color: #94a3b8;
-        text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; margin-left: 4px;
-    }
-
+    label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px; margin-left: 4px; }
     .tiles-container { display: flex; flex-wrap: wrap; gap: 12px; }
-    .tile {
-        background: white; padding: 14px 18px; border-radius: 18px;
-        border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
-    }
+    .tile { background: white; padding: 14px 18px; border-radius: 18px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
     .tile.full { width: 100%; box-sizing: border-box; }
-
     .phone-val { font-weight: 700; color: #1e293b; cursor: pointer; font-size: 16px; }
-    .btn-call { text-decoration: none; font-size: 16px; }
-
-    .btn-add-tile {
-        background: none; border: 2px dashed #e2e8f0; padding: 12px 20px;
-        border-radius: 18px; color: #94a3b8; font-weight: 700; cursor: pointer;
-    }
-
-    .notes-area { min-height: 100px; align-items: flex-start; cursor: pointer; }
+    .val-text { font-weight: 600; color: #1e293b; cursor: pointer; }
+    .btn-call { text-decoration: none; font-size: 18px; opacity: 0.8; transition: 0.2s; }
+    .btn-call:hover { opacity: 1; transform: scale(1.2); }
+    .btn-add-tile { background: none; border: 2px dashed #e2e8f0; padding: 12px 20px; border-radius: 18px; color: #94a3b8; font-weight: 700; cursor: pointer; transition: 0.2s; }
+    .btn-add-tile:hover { border-color: var(--primary-color); color: var(--primary-color); }
+    .notes-area { min-height: 90px; align-items: flex-start; cursor: pointer; }
     .notes-text { margin: 0; color: #64748b; font-size: 14px; line-height: 1.6; font-style: italic; }
-
     .edit-row, .tile-edit, .notes-edit-box { display: flex; gap: 10px; width: 100%; }
     .notes-edit-box { flex-direction: column; }
-
-    input, textarea {
-        width: 100%; padding: 10px 14px; border: 2px solid var(--primary-color);
-        border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc;
-    }
-
-    .save-btn-icon, .save-mini {
-        background: #10b981; color: white; border: none; width: 40px; height: 40px;
-        border-radius: 12px; cursor: pointer;
-    }
-
+    input, textarea { width: 100%; padding: 10px 14px; border: 2px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc; color: #0f172a; }
+    .save-btn-icon, .save-mini { background: #10b981; color: white; border: none; width: 40px; height: 40px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .btn-close-mini { background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; }
     .actions-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
     .btn-text { background: none; border: none; color: #94a3b8; font-weight: 700; cursor: pointer; }
     .btn-save-pill { background: var(--primary-color); color: white; border: none; padding: 10px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; }
-
+    .center-loader { display: flex; justify-content: center; padding: 60px; }
     .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .center-loader { display: flex; justify-content: center; padding: 60px; }
 </style>
