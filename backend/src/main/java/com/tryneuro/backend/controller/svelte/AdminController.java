@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,9 +53,52 @@ public class AdminController {
 
     private String getRequiredTenantId(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ошибка авторизации: не удалось определить ID компании");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ID компании не найден");
         }
         return tenantId;
+    }
+
+    // --- CLIENTS ---
+    @GetMapping("/clients")
+    public Page<Contact> getClientsPaged(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "true") boolean showAll,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return contactService.getContactsPaged(getRequiredTenantId(tenantId), query, showAll, page, size);
+    }
+
+    // НОВЫЙ МЕТОД: Получение конкретного клиента по ID
+    @GetMapping("/clients/{id}")
+    public Contact getContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        Contact contact = contactService.getContactById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Клиент не найден"));
+
+        if (!contact.getTenantId().equals(getRequiredTenantId(tenantId))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ к чужим данным запрещен");
+        }
+        return contact;
+    }
+
+    @PostMapping("/clients")
+    public Contact createContact(@RequestAttribute("tenantId") String tenantId, @RequestBody Contact contact) {
+        return contactService.addContact(contact, getRequiredTenantId(tenantId));
+    }
+
+    @PutMapping("/clients/{id}")
+    public Contact updateContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody Contact contact) {
+        return contactService.updateContact(id, contact, getRequiredTenantId(tenantId));
+    }
+
+    @DeleteMapping("/clients/{id}")
+    public void deleteContact(@PathVariable String id) {
+        contactService.deleteContact(id);
+    }
+
+    @GetMapping("/clients/{id}/appointments")
+    public List<Appointment> getContactAppointments(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        return scheduleService.getAppointmentsForContact(id, getRequiredTenantId(tenantId));
     }
 
     // --- DASHBOARD ---
@@ -95,17 +139,6 @@ public class AdminController {
         staffMemberService.deleteStaffMember(id);
     }
 
-    // --- CLIENTS ---
-    @GetMapping("/clients")
-    public Page<Contact> getClientsPaged(
-            @RequestAttribute("tenantId") String tenantId,
-            @RequestParam(required = false) String query,
-            @RequestParam(defaultValue = "true") boolean showAll,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
-        return contactService.getContactsPaged(getRequiredTenantId(tenantId), query, showAll, page, size);
-    }
-
     // --- SCHEDULE ---
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, @RequestParam int year, @RequestParam int month) {
@@ -120,6 +153,23 @@ public class AdminController {
     @GetMapping("/schedule/staff")
     public List<StaffMember> getStaffForSchedule(@RequestAttribute("tenantId") String tenantId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date);
+    }
+
+    @PostMapping("/appointments")
+    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
+        appointment.setTenantId(getRequiredTenantId(tenantId));
+        return scheduleService.addAppointment(appointment);
+    }
+
+    @PutMapping("/appointments/{id}")
+    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
+        return ResponseEntity.ok(scheduleService.updateAppointment(id, appointmentDetails));
+    }
+
+    @DeleteMapping("/appointments/{id}")
+    public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
+        scheduleService.deleteAppointment(id);
+        return ResponseEntity.ok().build();
     }
 
     // --- RESOURCES & SERVICES ---

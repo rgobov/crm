@@ -2,11 +2,13 @@
     import { onMount } from 'svelte';
     import { contactService } from '$lib/services/contactService.js';
     import { goto } from '$app/navigation';
-    import { fade } from 'svelte/transition';
+    import { fade, scale } from 'svelte/transition';
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
+    import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
 
     let clients = [];
     let searchQuery = '';
+    let lastQuery = ''; // Для предотвращения повторных запросов
     let showAll = true;
     let currentPage = 0;
     let totalPages = 0;
@@ -15,14 +17,24 @@
     let debounceTimer;
 
     let showAddModal = false;
+    let selectedClientId = null;
 
-    // УНИВЕРСАЛЬНЫЙ ПОИСК (Дебаунс 600мс)
+    // УМНЫЙ ПОИСК (Аналогично окну записи и Flutter)
     $: {
-        if (searchQuery !== undefined || showAll !== undefined) {
+        const query = searchQuery.trim();
+        const digits = query.replace(/\D/g, '');
+
+        // Условие: 6 цифр для телефона ИЛИ 3 буквы для имени
+        const isReadyToSearch = (digits.length >= 6) || (query.length >= 3 && digits.length < 3);
+
+        if (query !== lastQuery) {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-                loadPage(0);
-            }, 600);
+                if (query === '' || isReadyToSearch) {
+                    lastQuery = query;
+                    loadPage(0);
+                }
+            }, 800); // 800ms - эталонный дебаунс
         }
     }
 
@@ -51,11 +63,15 @@
 
     function handleAddSuccess() {
         showAddModal = false;
-        loadPage(0); // Перезагрузка с первой страницы
+        loadPage(0);
     }
 
-    function handleClearSearch() {
-        searchQuery = '';
+    function openDetails(id) {
+        selectedClientId = id;
+    }
+
+    function closeDetails() {
+        selectedClientId = null;
     }
 </script>
 
@@ -76,24 +92,23 @@
         </div>
     </div>
 
-    <!-- ПОИСК -->
     <div class="search-bar-fixed">
         <div class="search-inner">
             <span class="search-icon">🔍</span>
             <input
                 type="text"
                 bind:value={searchQuery}
-                placeholder="Поиск по имени или телефону..."
+                placeholder="Имя или телефон..."
             />
             {#if searchQuery}
-                <button class="btn-clear" on:click={handleClearSearch}>✕</button>
+                <button class="btn-clear" on:click={() => searchQuery = ''}>✕</button>
             {/if}
         </div>
     </div>
 
     <div class="results-stats">
         {#if !isLoading}
-            <span>Найдено: <b>{totalElements}</b></span>
+            <span>Найдено клиентов: <b>{totalElements}</b></span>
         {/if}
     </div>
 
@@ -107,7 +122,7 @@
         {:else}
             <div class="client-grid" class:is-loading={isLoading}>
                 {#each clients as client (client.id)}
-                    <button class="client-card-item" on:click={() => goto(`/admin/clients/${client.id}`)}>
+                    <button class="client-card-item" on:click={() => openDetails(client.id)}>
                         <div class="avatar-box">{client.name.charAt(0).toUpperCase()}</div>
                         <div class="info-meta">
                             <div class="name-line">{client.name}</div>
@@ -128,7 +143,6 @@
         {/if}
     </div>
 
-    <!-- КНОПКА ДОБАВЛЕНИЯ (FAB) -->
     <button class="fab-circle" on:click={() => showAddModal = true} title="Добавить клиента">+</button>
 
     {#if showAddModal}
@@ -136,6 +150,20 @@
             on:close={() => showAddModal = false}
             on:success={handleAddSuccess}
         />
+    {/if}
+
+    {#if selectedClientId}
+        <div class="modal-backdrop" on:click|self={closeDetails} transition:fade={{duration: 200}}>
+            <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
+                <header class="modal-header">
+                    <h2>Карточка клиента</h2>
+                    <button class="close-x" on:click={closeDetails}>✕</button>
+                </header>
+                <div class="modal-scroll-body">
+                    <ContactDetailScreen contactId={selectedClientId} />
+                </div>
+            </div>
+        </div>
     {/if}
 </div>
 
@@ -153,31 +181,36 @@
 
     .search-bar-fixed { padding: 16px 20px; }
     .search-inner { display: flex; align-items: center; background: white; padding: 12px 16px; border-radius: 18px; border: 1.5px solid #f1f5f9; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
-    .search-icon { font-size: 18px; margin-right: 12px; }
     input { border: none; background: none; width: 100%; font-size: 15px; outline: none; font-weight: 500; }
     .btn-clear { background: #f1f5f9; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; color: #94a3b8; cursor: pointer; }
 
     .results-stats { padding: 0 24px; font-size: 12px; color: #94a3b8; font-weight: 600; margin-bottom: 12px; }
 
     .scroll-container { padding: 0 20px; }
-    .client-grid { display: grid; gap: 10px; transition: opacity 0.2s; }
+    .client-grid { display: grid; gap: 10px; }
     .is-loading { opacity: 0.6; }
 
-    .client-card-item { display: flex; align-items: center; gap: 16px; padding: 14px; background: white; border-radius: 20px; border: 1px solid #f1f5f9; cursor: pointer; text-align: left; }
+    .client-card-item { display: flex; align-items: center; gap: 16px; padding: 14px; background: white; border-radius: 20px; border: 1px solid #f1f5f9; cursor: pointer; text-align: left; transition: transform 0.1s; }
+    .client-card-item:active { transform: scale(0.98); }
+
     .avatar-box { width: 44px; height: 44px; background: #eff6ff; color: var(--primary-color); border-radius: 14px; display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 18px; }
     .info-meta { flex: 1; min-width: 0; }
     .name-line { font-size: 15px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .phone-line { font-size: 13px; color: #94a3b8; font-weight: 500; margin-top: 2px; }
     .chevron-icon { color: #cbd5e1; font-size: 24px; font-weight: 300; }
 
+    .fab-circle { position: fixed; bottom: 100px; right: 24px; width: 56px; height: 56px; background: var(--primary-gradient); color: white; border: none; border-radius: 18px; font-size: 32px; font-weight: 300; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.4); cursor: pointer; z-index: 1000; }
+
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+    .modal-content { background: white; width: 100%; max-width: 500px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
+    .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; }
+    .modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; }
+    .close-x { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; font-weight: 800; cursor: pointer; color: #64748b; }
+    .modal-scroll-body { flex: 1; overflow-y: auto; background: #f8fafc; }
+
     .pager { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 32px; padding-bottom: 100px; }
     .btn-p { background: white; border: 1.5px solid #f1f5f9; padding: 8px 16px; border-radius: 12px; font-weight: 700; color: #64748b; cursor: pointer; }
     .btn-p:disabled { opacity: 0.4; }
-    .p-text { font-size: 13px; font-weight: 700; color: #94a3b8; }
-
-    .empty-view { text-align: center; padding: 60px 20px; color: #94a3b8; font-weight: 600; }
-
-    .fab-circle { position: fixed; bottom: 100px; right: 24px; width: 56px; height: 56px; background: var(--primary-gradient); color: white; border: none; border-radius: 18px; font-size: 32px; font-weight: 300; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.4); cursor: pointer; z-index: 1000; }
 
     .spinner { width: 24px; height: 24px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
