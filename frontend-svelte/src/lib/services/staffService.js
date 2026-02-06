@@ -1,29 +1,32 @@
 import api from '$lib/api.js';
 
 export const staffService = {
-    // Обновленный метод с поддержкой поиска и пагинации
+    // Получение списка с поиском
     async getStaff(query = '', page = 0, size = 100) {
         const response = await api.get('/admin/staff', {
             params: { query, page, size }
         });
-        // Spring Data Page возвращает объект с полем 'content'
         return response.data;
     },
 
-    async getStaffMember(id) {
+    // Метод для получения одного сотрудника по ID
+    async getStaffById(id) {
         const response = await api.get(`/admin/staff/${id}`);
         return response.data;
     },
 
-    async addStaffMember(data) {
-        await api.post('/admin/staff', data);
+    async addStaff(data) {
+        const response = await api.post('/admin/staff', data);
+        return response.data;
     },
 
-    async updateStaffMember(id, data) {
-        await api.put(`/admin/staff/${id}`, data);
+    // Метод для обновления сотрудника
+    async updateStaff(id, data) {
+        const response = await api.put(`/admin/staff/${id}`, data);
+        return response.data;
     },
 
-    async deleteStaffMember(id) {
+    async deleteStaff(id) {
         await api.delete(`/admin/staff/${id}`);
     }
 };

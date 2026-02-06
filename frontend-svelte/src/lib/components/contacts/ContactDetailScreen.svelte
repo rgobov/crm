@@ -57,9 +57,8 @@
                 ? [...tempValues.phones, phoneUtils.clean(tempValues.newPhone)]
                 : tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p);
 
-            // Валидация
             if (!tempValues.name) return alert('Имя обязательно');
-            if (finalPhones.length === 0) return alert('У клиента должен быть минимум один телефон');
+            if (finalPhones.length === 0) return alert('Нужен минимум один телефон');
 
             const payload = {
                 ...contact,
@@ -73,19 +72,18 @@
             contact = res.data;
             cancelAllEdits();
             dispatch('loaded', { name: contact.name });
-            // УВЕДОМЛЯЕМ РОДИТЕЛЯ ОБ ОБНОВЛЕНИИ (ДЛЯ ОБНОВЛЕНИЯ СПИСКА)
+
+            // РЕАКТИВНЫЙ СТЕК: Уведомляем список клиентов на фоне об обновлении
             dispatch('updated', contact);
+
         } catch (e) {
-            alert('Ошибка: ' + (e.response?.data?.message || 'Не удалось сохранить'));
+            alert('Ошибка при сохранении');
             cancelAllEdits();
         }
     }
 
     async function removePhone(idx) {
-        if (contact.phones.length <= 1) {
-            alert('Нельзя удалить единственный номер. Добавьте другой номер перед удалением этого.');
-            return;
-        }
+        if (contact.phones.length <= 1) return alert('Нельзя удалить единственный номер');
         if (confirm('Удалить этот номер?')) {
             tempValues.phones = tempValues.phones.filter((_, i) => i !== idx);
             await saveField('phones');
@@ -105,7 +103,6 @@
         <div class="tab-content">
             {#if activeTab === 'info'}
                 <div class="info-section">
-
                     <!-- ИМЯ -->
                     <div class="card hero-card">
                         {#if editMode.name}
@@ -121,20 +118,13 @@
                         {/if}
                     </div>
 
-                    <!-- ТЕЛЕФОНЫ -->
                     <label class="section-title">КОНТАКТНЫЕ НОМЕРА</label>
                     <div class="card p-0">
                         {#each contact.phones as phone, i}
                             <div class="detail-row">
                                 {#if editMode.phoneIdx === i}
                                     <div class="edit-box w-100">
-                                        <input
-                                            type="tel"
-                                            value={tempValues.phones[i]}
-                                            on:input={(e) => tempValues.phones[i] = phoneUtils.format(e.target.value)}
-                                            class="mid-input"
-                                            autofocus
-                                        />
+                                        <input type="tel" bind:value={tempValues.phones[i]} class="mid-input" autofocus />
                                         <button class="save" on:click={() => saveField('phones')}>✓</button>
                                         <button class="cancel" on:click={cancelAllEdits}>✕</button>
                                     </div>
@@ -145,35 +135,22 @@
                                         <small>изменить ✎</small>
                                     </div>
                                     <button class="icon-btn-del" on:click={() => removePhone(i)}>🗑</button>
-                                    <a href="tel:+{phoneUtils.clean(phone)}" class="call-btn">Вызов</a>
                                 {/if}
                             </div>
                         {/each}
-
-                        <!-- ДОБАВЛЕНИЕ -->
                         <div class="detail-row add-row">
                             {#if editMode.isAddingPhone}
                                 <div class="edit-box w-100">
-                                    <input
-                                        type="tel"
-                                        bind:value={tempValues.newPhone}
-                                        on:input={(e) => tempValues.newPhone = phoneUtils.format(e.target.value)}
-                                        placeholder="+7 (___) ___"
-                                        class="mid-input"
-                                        autofocus
-                                    />
+                                    <input type="tel" bind:value={tempValues.newPhone} placeholder="+7 (___) ___" class="mid-input" autofocus />
                                     <button class="save" on:click={() => saveField('addPhone')}>✓</button>
                                     <button class="cancel" on:click={cancelAllEdits}>✕</button>
                                 </div>
                             {:else}
-                                <button class="add-link" on:click={() => editMode.isAddingPhone = true}>
-                                    + Добавить еще один номер
-                                </button>
+                                <button class="add-link" on:click={() => editMode.isAddingPhone = true}>+ Добавить номер</button>
                             {/if}
                         </div>
                     </div>
 
-                    <!-- EMAIL & ЗАМЕТКИ -->
                     <label class="section-title">ПРОЧЕЕ</label>
                     <div class="card p-16">
                         {#if editMode.email}
@@ -183,9 +160,7 @@
                                 <button class="cancel" on:click={cancelAllEdits}>✕</button>
                             </div>
                         {:else}
-                            <div class="clickable-text" on:click={() => editMode.email = true}>
-                                ✉️ {contact.email || 'Добавить Email'} <small>✎</small>
-                            </div>
+                            <div class="clickable-text" on:click={() => editMode.email = true}>✉️ {contact.email || 'Добавить Email'} <small>✎</small></div>
                         {/if}
                         <div class="divider"></div>
                         {#if editMode.notes}
@@ -197,9 +172,7 @@
                                 </div>
                             </div>
                         {:else}
-                            <div class="clickable-text pre" on:click={() => editMode.notes = true}>
-                                📝 {contact.notes || 'Добавить заметки...'} <small>✎</small>
-                            </div>
+                            <div class="clickable-text pre" on:click={() => editMode.notes = true}>📝 {contact.notes || 'Добавить заметки...'} <small>✎</small></div>
                         {/if}
                     </div>
                 </div>
@@ -209,49 +182,28 @@
 </div>
 
 <style>
-    .screen { background: var(--bg-color); min-height: 100vh; padding-bottom: 40px; }
-    .tab-bar { display: flex; background: white; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; z-index: 10; }
+    .screen { background: #f8fafc; min-height: 100%; border-radius: 32px; overflow: hidden; }
+    .tab-bar { display: flex; background: white; border-bottom: 1px solid #f1f5f9; }
     .tab-bar button { flex: 1; padding: 16px; border: none; background: none; font-size: 13px; font-weight: 800; color: #94a3b8; cursor: pointer; }
     .tab-bar button.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); }
-
-    .tab-content { padding: 16px; }
-    .card { background: white; border-radius: 20px; box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+    .card { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); margin-bottom: 16px; border: 1px solid #f1f5f9; }
     .p-0 { padding: 0; } .p-16 { padding: 16px; }
-
     .hero-card { padding: 24px; text-align: center; }
     .hero-card h2 { margin: 0; font-size: 22px; font-weight: 800; cursor: pointer; }
-    small { font-size: 13px; color: var(--primary-color); opacity: 0.5; margin-left: 4px; font-weight: 400; }
-
-    .section-title { display: block; font-size: 11px; font-weight: 800; color: #94a3b8; letter-spacing: 1px; margin: 0 0 10px 4px; text-transform: uppercase; }
-
+    small { font-size: 13px; color: var(--primary-color); opacity: 0.5; margin-left: 4px; }
+    .section-title { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 1px; margin: 0 0 10px 4px; text-transform: uppercase; }
     .detail-row { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #f8fafc; }
-    .detail-row:last-child { border-bottom: none; }
     .value-col { flex: 1; display: flex; flex-direction: column; cursor: pointer; }
     .value { font-weight: 600; color: #1e293b; font-size: 16px; }
-
-    .add-link { background: none; border: none; color: var(--primary-color); font-weight: 700; font-size: 14px; cursor: pointer; padding: 4px 0; }
-
+    .add-link { background: none; border: none; color: var(--primary-color); font-weight: 700; font-size: 14px; cursor: pointer; }
     .edit-box { display: flex; align-items: center; gap: 8px; }
-    .edit-box.column { flex-direction: column; align-items: stretch; }
-    .w-100 { width: 100%; }
-
     input, textarea { flex: 1; padding: 10px 14px; border: 2px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc; }
-    .big-input { font-size: 20px; font-weight: 800; text-align: center; }
-
-    .actions { display: flex; gap: 8px; }
-    .actions.right { justify-content: flex-end; margin-top: 8px; }
-
-    .save { background: #10b981; color: white; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; font-weight: bold; }
-    .save-long { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+    .save { background: #10b981; color: white; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
+    .save-long { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; }
     .cancel { background: #f1f5f9; color: #64748b; border: none; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700; }
-
     .icon-btn-del { background: #fef2f2; color: #ef4444; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
-    .call-btn { font-size: 12px; font-weight: 700; color: var(--primary-color); text-decoration: none; padding: 8px 14px; background: #eff6ff; border-radius: 10px; }
-
     .clickable-text { font-size: 15px; color: #1e293b; font-weight: 500; cursor: pointer; min-height: 32px; display: flex; align-items: center; }
-    .clickable-text.pre { white-space: pre-wrap; font-weight: 400; line-height: 1.5; color: #475569; padding: 8px 0; }
     .divider { height: 1px; background: #f1f5f9; margin: 12px 0; }
-
     .center-spinner { display: flex; justify-content: center; padding: 60px; }
     .spinner { width: 28px; height: 28px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }

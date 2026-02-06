@@ -8,9 +8,9 @@
     export let staff = [];
 
     // Размеры
-    const HOUR_HEIGHT = 100;
+    const HOUR_HEIGHT = 120; // Увеличили для лучшей читаемости
     const SLOT_HEIGHT = HOUR_HEIGHT / 4;
-    const STAFF_WIDTH = 160;
+    const STAFF_WIDTH = 180;
     const TIME_COL_WIDTH = 60;
 
     let startHour = 8;
@@ -22,9 +22,9 @@
     let scrollHeader;
     let scrollBody;
 
-    // Реактивный расчет шкалы при изменении данных
+    // Реактивный расчет шкалы
     $: {
-        let minH = 8;
+        let minH = 9;
         let maxH = 20;
 
         if (staff.length > 0 || appointments.length > 0) {
@@ -58,7 +58,7 @@
     onMount(() => {
         updateNowLine();
         timer = setInterval(updateNowLine, 60000);
-        setTimeout(scrollToCurrentTime, 300);
+        setTimeout(scrollToCurrentTime, 500);
     });
 
     onDestroy(() => clearInterval(timer));
@@ -75,8 +75,8 @@
     }
 
     function scrollToCurrentTime() {
-        if (scrollBody && nowLinePos > 150) {
-            scrollBody.scrollTo({ top: nowLinePos - 150, behavior: 'smooth' });
+        if (scrollBody && nowLinePos > 200) {
+            scrollBody.scrollTo({ top: nowLinePos - 200, behavior: 'smooth' });
         }
     }
 
@@ -88,15 +88,20 @@
         return `top: ${top}px; height: ${height - 2}px;`;
     }
 
-    function getStatusColor(status) {
-        const colors = {
-            'SCHEDULED': '#3b82f6',
-            'CONFIRMED': '#10b981',
-            'NEEDS_CALL': '#f59e0b',
-            'COMPLETED': '#64748b',
-            'CANCELLED': '#ef4444'
+    function getStatusData(status) {
+        const config = {
+            'SCHEDULED': { color: '#3b82f6', label: 'Ожидается' },
+            'CONFIRMED': { color: '#10b981', label: 'Подтвержден' },
+            'NEEDS_CALL': { color: '#f59e0b', label: 'Нужен звонок' },
+            'COMPLETED': { color: '#64748b', label: 'Завершен' },
+            'CANCELLED': { color: '#ef4444', label: 'Отменен' }
         };
-        return colors[status] || '#3b82f6';
+        return config[status] || config['SCHEDULED'];
+    }
+
+    function getEndTime(startTime, duration) {
+        const end = new Date(new Date(startTime).getTime() + duration * 60000);
+        return end.toLocaleTimeString('ru', {hour: '2-digit', minute: '2-digit'});
     }
 
     function getWorkZoneStyle(member) {
@@ -157,7 +162,6 @@
                 {#each staff as s, sIdx}
                     <div class="staff-column" style="left: {sIdx * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
                         {#each Array(hours.length * 4) as _, i}
-                            <!-- ИСПРАВЛЕНО: Теперь используем dispatch для открытия окна создания -->
                             <button class="slot-trigger"
                                  style="height: {SLOT_HEIGHT}px"
                                  on:click={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}>
@@ -165,16 +169,25 @@
                         {/each}
 
                         {#each appointments.filter(a => a.staffMemberId === s.id) as appt}
-                            <!-- ИСПРАВЛЕНО: Теперь используем dispatch для открытия деталей записи -->
+                            {@const status = getStatusData(appt.status)}
                             <div class="appt-card"
-                                 style="{getApptStyle(appt)} --status-color: {getStatusColor(appt.status)}"
+                                 style="{getApptStyle(appt)} --status-color: {status.color}"
                                  on:click|stopPropagation={() => dispatch('appointmentTap', appt)}>
                                 <div class="appt-inner">
+                                    <div class="appt-time-range">
+                                        {new Date(appt.startTime).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'})}
+                                        - {getEndTime(appt.startTime, appt.durationInMinutes)}
+                                    </div>
                                     <div class="appt-head">
                                         <span class="client">{appt.clientName}</span>
                                         {#if appt.reminderSent}<span class="bell">🔔</span>{/if}
                                     </div>
                                     <span class="service">{appt.service}</span>
+
+                                    <div class="appt-footer">
+                                        <span class="status-label">{status.label}</span>
+                                        {#if appt.resourceId}<span class="res-tag">📦 Каб. {appt.resourceId.slice(-2)}</span>{/if}
+                                    </div>
                                 </div>
                             </div>
                         {/each}
@@ -214,12 +227,20 @@
     .grid-line.bold { background: #e2e8f0; }
     .staff-column { position: absolute; top: 0; bottom: 0; }
     .slot-trigger { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
-    .appt-card { position: absolute; left: 6px; right: 6px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 60; cursor: pointer; overflow: hidden; }
-    .appt-inner { height: 100%; border-left: 4px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+    .appt-card { position: absolute; left: 6px; right: 6px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 60; cursor: pointer; overflow: hidden; transition: transform 0.1s, box-shadow 0.1s; }
+    .appt-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); z-index: 70; }
+
+    .appt-inner { height: 100%; border-left: 4px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+    .appt-time-range { font-size: 9px; font-weight: 800; color: var(--status-color); text-transform: uppercase; }
     .appt-head { display: flex; justify-content: space-between; align-items: flex-start; }
-    .client { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; }
-    .service { font-size: 10px; color: #64748b; font-weight: 500; }
+    .client { font-size: 13px; font-weight: 800; color: #0f172a; line-height: 1.1; }
+    .service { font-size: 11px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .appt-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+    .status-label { font-size: 9px; font-weight: 800; color: white; background: var(--status-color); padding: 1px 6px; border-radius: 4px; }
+    .res-tag { font-size: 9px; font-weight: 700; color: #94a3b8; }
+
     .time-now { position: absolute; left: 0; right: 0; z-index: 80; pointer-events: none; }
-    .time-now .line { height: 2px; background: #ef4444; width: 100%; }
-    .time-now .pulse-dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: pulse 2s infinite; }
+    .time-now .line { height: 2px; background: #ef4444; width: 100%; box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+    .time-now .pulse-dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; }
 </style>

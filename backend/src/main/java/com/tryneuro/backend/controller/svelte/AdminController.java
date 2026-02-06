@@ -58,7 +58,45 @@ public class AdminController {
         return tenantId;
     }
 
-    // --- CLIENTS ---
+    // --- STAFF (Сотрудники) ---
+    @GetMapping("/staff")
+    public Page<StaffMember> getStaffPaged(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return staffMemberService.getStaffPaged(getRequiredTenantId(tenantId), query, active, page, size);
+    }
+
+    // ИСПРАВЛЕНО: Добавлен метод для получения одного мастера
+    @GetMapping("/staff/{id}")
+    public StaffMember getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        StaffMember staff = staffMemberService.getStaffMemberById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
+
+        if (!staff.getTenantId().equals(getRequiredTenantId(tenantId))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
+        }
+        return staff;
+    }
+
+    @PostMapping("/staff")
+    public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
+        return staffMemberService.addStaffMember(request, getRequiredTenantId(tenantId));
+    }
+
+    @PutMapping("/staff/{id}")
+    public StaffMember updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
+        return staffMemberService.updateStaffMember(id, request, getRequiredTenantId(tenantId));
+    }
+
+    @DeleteMapping("/staff/{id}")
+    public void deleteStaffMember(@PathVariable String id) {
+        staffMemberService.deleteStaffMember(id);
+    }
+
+    // --- CLIENTS (Клиенты) ---
     @GetMapping("/clients")
     public Page<Contact> getClientsPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -69,7 +107,6 @@ public class AdminController {
         return contactService.getContactsPaged(getRequiredTenantId(tenantId), query, showAll, page, size);
     }
 
-    // НОВЫЙ МЕТОД: Получение конкретного клиента по ID
     @GetMapping("/clients/{id}")
     public Contact getContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
         Contact contact = contactService.getContactById(id)
@@ -96,11 +133,6 @@ public class AdminController {
         contactService.deleteContact(id);
     }
 
-    @GetMapping("/clients/{id}/appointments")
-    public List<Appointment> getContactAppointments(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
-        return scheduleService.getAppointmentsForContact(id, getRequiredTenantId(tenantId));
-    }
-
     // --- DASHBOARD ---
     @GetMapping("/dashboard/stats")
     public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
@@ -108,38 +140,10 @@ public class AdminController {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalClients", contactService.countContacts(tId));
         stats.put("totalStaff", staffMemberService.getAllStaff(tId).size());
-        stats.put("totalResources", resourceService.getAllResources(tId).size());
         stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
         return stats;
     }
 
-    // --- STAFF ---
-    @GetMapping("/staff")
-    public Page<StaffMember> getStaffPaged(
-            @RequestAttribute("tenantId") String tenantId,
-            @RequestParam(required = false) String query,
-            @RequestParam(required = false) Boolean active,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
-        return staffMemberService.getStaffPaged(getRequiredTenantId(tenantId), query, active, page, size);
-    }
-
-    @PostMapping("/staff")
-    public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
-        return staffMemberService.addStaffMember(request, getRequiredTenantId(tenantId));
-    }
-
-    @PutMapping("/staff/{id}")
-    public StaffMember updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
-        return staffMemberService.updateStaffMember(id, request, getRequiredTenantId(tenantId));
-    }
-
-    @DeleteMapping("/staff/{id}")
-    public void deleteStaffMember(@PathVariable String id) {
-        staffMemberService.deleteStaffMember(id);
-    }
-
-    // --- SCHEDULE ---
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, @RequestParam int year, @RequestParam int month) {
         return scheduleService.getWorkloadForMonth(getRequiredTenantId(tenantId), year, month);
@@ -172,7 +176,6 @@ public class AdminController {
         return ResponseEntity.ok().build();
     }
 
-    // --- RESOURCES & SERVICES ---
     @GetMapping("/resources")
     public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
         return resourceService.getAllResources(getRequiredTenantId(tenantId));
