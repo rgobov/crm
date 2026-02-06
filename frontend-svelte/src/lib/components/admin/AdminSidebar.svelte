@@ -1,6 +1,6 @@
 <script>
     import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte';
-    import { activeTab } from '$lib/stores/dashboardStore.js';
+    import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
     import { logout } from '$lib/stores/auth.js';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
@@ -8,25 +8,35 @@
 
     const dispatch = createEventDispatcher();
 
+    // КОНСТАНТЫ МЕНЮ: Переименовано в "Главная"
     const menuItems = [
-        { id: 'management', label: 'База', icon: '📊' },
+        { id: 'management', label: 'Главная', icon: '📊' },
         { id: 'timeline', label: 'Таймлайн', icon: '🕒' }
     ];
 
     function handleNav(id) {
         activeTab.set(id);
-        // Если мы НЕ на главной странице (/admin) - переходим на неё
         if ($page.url.pathname !== '/admin') {
             goto('/admin');
         }
     }
 
     function handleDateSelected(event) {
+        // РЕАКТИВНЫЙ SPA ПЕРЕХОД: Обновляем глобальную дату
+        console.log('Sidebar: Date selected via calendar', event.detail.date);
+
+        // Устанавливаем дату в стор
+        selectedDate.set(new Date(event.detail.date));
+
+        // Переключаем вкладку на Таймлайн
         activeTab.set('timeline');
-        // Если мы не на главной - переходим на неё с выбранной датой
+
+        // Если мы не на главной - идем на неё
         if ($page.url.pathname !== '/admin') {
             goto('/admin');
         }
+
+        // Опционально пробрасываем событие дальше
         dispatch('dateChange', event.detail);
     }
 
@@ -62,6 +72,7 @@
         <div class="sidebar-calendar-section">
             <div class="cal-label">ВЫБОР ДАТЫ</div>
             <div class="mini-calendar">
+                <!-- Календарь теперь управляет глобальной датой -->
                 <CalendarScreen on:dateSelected={handleDateSelected} />
             </div>
         </div>

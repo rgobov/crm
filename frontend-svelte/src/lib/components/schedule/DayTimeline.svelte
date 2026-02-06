@@ -9,7 +9,6 @@
     export let appointments = [];
     export let staff = [];
 
-    // ГЕОМЕТРИЯ (Вся математика изолирована здесь)
     const HOUR_HEIGHT = 120;
     const SLOT_HEIGHT = HOUR_HEIGHT / 4;
     const STAFF_WIDTH = 180;
@@ -25,6 +24,10 @@
     let scrollHeader;
     let scrollBody;
     let selectedApptId = null;
+
+    // Проверяем, есть ли записи без назначенного мастера
+    $: unassignedAppts = appointments.filter(a => !a.staffMemberId);
+    $: displayStaff = [...staff];
 
     // РЕАКТИВНЫЙ РАСЧЕТ ШКАЛЫ И ЛИНИИ
     $: {
@@ -46,10 +49,10 @@
 
         startHour = Math.max(0, minH - 1);
         endHour = Math.min(24, maxH + 1);
-
         hours = [];
         for (let i = startHour; i <= endHour; i++) hours.push(i);
 
+        // Расчет линии времени (Относительно текущей шкалы)
         const isToday = currentTime.toDateString() === day.toDateString();
         if (isToday) {
             const h = currentTime.getHours();
@@ -75,7 +78,8 @@
     function scrollToCurrentTime() {
         if (scrollBody && nowLinePos > 0) {
             const viewportHeight = scrollBody.clientHeight;
-            const targetScroll = nowLinePos - (viewportHeight / 2);
+            // Центрируем с учетом верхнего спейсера (40px)
+            const targetScroll = nowLinePos - (viewportHeight / 2) + 40;
             scrollBody.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
         }
     }
@@ -110,12 +114,11 @@
 
 <div class="timeline-root" on:click={() => selectedApptId = null}>
 
-    <!-- ФИКСИРОВАННАЯ ШАПКА МАСТЕРОВ (ОГРАНИЧЕНА СЛЕВА) -->
     <header class="staff-header-fixed">
         <div class="time-corner-empty"></div>
         <div class="staff-scroll-area" bind:this={scrollHeader}>
-            <div class="staff-inner-row" style="width: {staff.length * STAFF_WIDTH}px">
-                {#each staff as s}
+            <div class="staff-inner-row" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
+                {#each displayStaff as s}
                     <div class="staff-cell" style="width: {STAFF_WIDTH}px">
                         <div class="avatar">{s.name.charAt(0)}</div>
                         <div class="meta">
@@ -124,15 +127,22 @@
                         </div>
                     </div>
                 {/each}
+                {#if unassignedAppts.length > 0}
+                    <div class="staff-cell unassigned" style="width: {STAFF_WIDTH}px">
+                        <div class="avatar">?</div>
+                        <div class="meta"><span class="n">Не назначен</span></div>
+                    </div>
+                {/if}
             </div>
         </div>
     </header>
 
-    <!-- ТЕЛО ТАЙМЛАЙНА (СКРОЛЛИРУЕМОЕ) -->
     <div class="timeline-body-scroll" on:scroll={syncScroll} bind:this={scrollBody}>
 
+        <!-- ВЕРХНИЙ ОТСТУП (Чтобы было видно 8:00) -->
+        <div class="timeline-spacer top"></div>
+
         <div class="body-layout-wrapper">
-            <!-- ОСЬ ВРЕМЕНИ (Всегда видна слева) -->
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
@@ -141,9 +151,7 @@
                 {/each}
             </div>
 
-            <!-- ИЗОЛИРОВАННАЯ СЕТКА -->
-            <div class="grid-canvas" style="width: {staff.length * STAFF_WIDTH}px; height: {hours.length * HOUR_HEIGHT}px">
-
+            <div class="grid-canvas" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px; height: {hours.length * HOUR_HEIGHT}px">
                 <div class="grid-lines">
                     {#each Array(hours.length * 4) as _, i}
                         <div class="l" class:bold={i % 4 === 0} style="top: {i * SLOT_HEIGHT}px"></div>
@@ -151,7 +159,7 @@
                 </div>
 
                 <div class="columns-container">
-                    {#each staff as s, sIdx}
+                    {#each [...displayStaff, ...(unassignedAppts.length > 0 ? [{id: null}] : [])] as s, sIdx}
                         <div class="staff-col" style="left: {sIdx * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
                                 <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}></button>
@@ -160,10 +168,7 @@
                             {#each appointments.filter(a => a.staffMemberId === s.id) as appt (appt.id)}
                                 {@const status = getStatusData(appt.status)}
                                 {@const isSelected = selectedApptId === appt.id}
-                                <div class="appt-box"
-                                     class:selected={isSelected}
-                                     style="{getApptStyle(appt)} --status-color: {status.color}"
-                                     on:click|stopPropagation={() => selectedApptId = isSelected ? null : appt.id}>
+                                <div class="appt-box" class:selected={isSelected} style="{getApptStyle(appt)} --status-color: {status.color}" on:click|stopPropagation={() => selectedApptId = isSelected ? null : appt.id}>
                                     <div class="appt-content">
                                         <div class="t">
                                             <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
@@ -171,7 +176,6 @@
                                         </div>
                                         <div class="cl">{appt.clientName}</div>
                                         <div class="sv">{appt.service}</div>
-
                                         {#if isSelected}
                                             <div class="actions" transition:slide>
                                                 <button class="a-btn" style="background:#26a69a" on:click={() => updateStatus(appt, 'CONFIRMED')}>✓</button>
@@ -188,7 +192,6 @@
                     {/each}
                 </div>
 
-                <!-- КРАСНАЯ ЛИНИЯ -->
                 {#if nowLinePos >= 0}
                     <div class="now-indicator" style="top: {nowLinePos}px">
                         <div class="label">{currentTime.toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'})}</div>
@@ -198,13 +201,13 @@
                 {/if}
             </div>
         </div>
+
+        <div class="timeline-spacer bottom"></div>
     </div>
 </div>
 
 <style>
     .timeline-root { height: 100vh; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden; }
-
-    /* ШАПКА МАСТЕРОВ */
     .staff-header-fixed { display: flex; height: 74px; background: white; z-index: 200; border-bottom: 1px solid #f1f5f9; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex-shrink: 0; }
     .time-corner-empty { width: 60px; background: white; z-index: 210; border-right: 1px solid #f1f5f9; }
     .staff-scroll-area { flex: 1; overflow: hidden; }
@@ -214,39 +217,32 @@
     .n { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
 
-    /* ТЕЛО ТАЙМЛАЙНА */
     .timeline-body-scroll { flex: 1; overflow: auto; position: relative; scroll-behavior: smooth; }
-    .body-layout-wrapper { display: flex; min-height: 100%; }
+    .timeline-spacer { height: 40px; background: #f1f5f9; width: 100%; position: relative; z-index: 160; }
+    .timeline-spacer.bottom { height: 100px; }
 
+    .body-layout-wrapper { display: flex; min-height: 100%; }
     .time-axis-col { flex-shrink: 0; background: white; border-right: 1px solid #f1f5f9; position: sticky; left: 0; z-index: 150; }
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 800; color: #94a3b8; background: white; padding: 2px 4px; }
 
     .grid-canvas { position: relative; background: #f8fafc; }
-    .grid-lines { position: absolute; inset: 0; pointer-events: none; }
     .l { position: absolute; left: 0; right: 0; height: 1px; background: #f1f5f9; }
     .l.bold { background: #e2e8f0; }
-
-    .columns-container { position: absolute; inset: 0; }
     .staff-col { position: absolute; top: 0; bottom: 0; }
     .slot-btn { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
-
     .appt-box { position: absolute; left: 4px; right: 4px; background: white; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; transition: all 0.2s; border: 1px solid #f1f5f9; overflow: hidden; }
     .appt-box.selected { left: -2px; right: -2px; box-shadow: 0 12px 30px rgba(0,0,0,0.2); border-color: var(--status-color); }
     .appt-content { height: 100%; border-left: 5px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; overflow: hidden; }
-    .t { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
     .tm { font-size: 10px; font-weight: 800; color: var(--status-color); }
     .st { font-size: 8px; font-weight: 900; text-transform: uppercase; color: white; background: var(--status-color); padding: 1px 5px; border-radius: 4px; }
     .cl { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; }
     .sv { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-
     .actions { margin-top: auto; padding-top: 8px; display: flex; justify-content: space-between; gap: 4px; }
     .a-btn { flex: 1; height: 32px; border-radius: 8px; border: none; color: white; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-
     .now-indicator { position: absolute; left: 0; right: 0; z-index: 180; pointer-events: none; }
     .now-indicator .line { height: 2px; background: #ef4444; width: 100%; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
     .now-indicator .dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; animation: pulse 2s infinite; }
     .now-indicator .label { position: absolute; left: -50px; top: -10px; background: #ef4444; color: white; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 6px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
-
     @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
 </style>

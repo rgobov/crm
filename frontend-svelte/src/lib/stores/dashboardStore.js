@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { adminService } from '$lib/services/adminService.js';
 
-// Состояние всего дашборда (аналог ViewModel во Flutter)
+// Состояние всего дашборда
 function createDashboardStore() {
     const { subscribe, set, update } = writable({
         stats: {
@@ -33,4 +33,7 @@ function createDashboardStore() {
 }
 
 export const dashboardStore = createDashboardStore();
-export const activeTab = writable('management'); // Храним текущую вкладку
+export const activeTab = writable('management');
+
+// НОВЫЙ СТОР: Выбранная дата на таймлайне
+export const selectedDate = writable(new Date());
