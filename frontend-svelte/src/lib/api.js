@@ -2,7 +2,8 @@ import axios from 'axios';
 import { token } from './stores/auth.js';
 import { get } from 'svelte/store';
 
-const API_URL = 'https://api.109.248.203.156.sslip.io/api';
+// Vite автоматически подставит нужный URL в зависимости от режима (dev/prod)
+const API_URL = import.meta.env.VITE_API_URL;
 
 const api = axios.create({
     baseURL: API_URL
@@ -10,7 +11,7 @@ const api = axios.create({
 
 // Автоматически добавляем токен в каждый запрос
 api.interceptors.request.use(config => {
-    const currentToken = get(token) || localStorage.getItem('token');
+    const currentToken = get(token) || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
     if (currentToken) {
         config.headers.Authorization = `Bearer ${currentToken}`;
     }

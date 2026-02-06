@@ -8,8 +8,10 @@ import com.tryneuro.backend.repository.CompanyRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class CompanyService {
@@ -44,5 +46,10 @@ public class CompanyService {
         userRepository.save(admin);
 
         return savedCompany;
+    }
+
+    public Company getCompanyById(String id) {
+        return companyRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Компания не найдена"));
     }
 }

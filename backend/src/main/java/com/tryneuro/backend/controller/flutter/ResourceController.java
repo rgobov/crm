@@ -1,4 +1,4 @@
-package com.tryneuro.backend.controller;
+package com.tryneuro.backend.controller.flutter;
 
 import com.tryneuro.backend.model.Resource;
 import com.tryneuro.backend.service.ResourceService;
@@ -10,6 +10,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/resources")
 public class ResourceController {
+
     private final ResourceService resourceService;
 
     @Autowired
@@ -23,7 +24,7 @@ public class ResourceController {
     }
 
     @PostMapping
-    public Resource createResource(@RequestAttribute("tenantId") String tenantId, @RequestBody Resource resource) {
+    public Resource addResource(@RequestBody Resource resource, @RequestAttribute("tenantId") String tenantId) {
         return resourceService.addResource(resource, tenantId);
     }
 

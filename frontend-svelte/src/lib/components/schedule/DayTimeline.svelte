@@ -1,13 +1,11 @@
 <script>
-    import { onMount, onDestroy } from 'svelte';
-    import { phoneUtils } from '$lib/utils/phoneUtils.js';
+    import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+
+    const dispatch = createEventDispatcher();
 
     export let day = new Date();
     export let appointments = [];
     export let staff = [];
-
-    export let onAppointmentTap = () => {};
-    export let onEmptySlotTap = () => {};
 
     // Размеры
     const HOUR_HEIGHT = 100;
@@ -15,7 +13,6 @@
     const STAFF_WIDTH = 160;
     const TIME_COL_WIDTH = 60;
 
-    // Динамическая шкала времени (как во Flutter)
     let startHour = 8;
     let endHour = 22;
     let hours = [];
@@ -31,12 +28,10 @@
         let maxH = 20;
 
         if (staff.length > 0 || appointments.length > 0) {
-            // Ищем по сменам мастеров
             staff.forEach(s => {
                 if (s.workStartTime) minH = Math.min(minH, parseInt(s.workStartTime.split(':')[0]));
                 if (s.workEndTime) maxH = Math.max(maxH, parseInt(s.workEndTime.split(':')[0]));
             });
-            // Ищем по записям
             appointments.forEach(a => {
                 const start = new Date(a.startTime).getHours();
                 const end = Math.ceil((new Date(a.startTime).getTime() + a.durationInMinutes * 60000) / (3600000)) % 24;
@@ -45,8 +40,8 @@
             });
         }
 
-        startHour = Math.max(0, minH - 1); // Зазор 1 час
-        endHour = Math.min(24, maxH + 1);   // Зазор 1 час
+        startHour = Math.max(0, minH - 1);
+        endHour = Math.min(24, maxH + 1);
 
         hours = [];
         for (let i = startHour; i <= endHour; i++) {
@@ -162,16 +157,18 @@
                 {#each staff as s, sIdx}
                     <div class="staff-column" style="left: {sIdx * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
                         {#each Array(hours.length * 4) as _, i}
+                            <!-- ИСПРАВЛЕНО: Теперь используем dispatch для открытия окна создания -->
                             <button class="slot-trigger"
                                  style="height: {SLOT_HEIGHT}px"
-                                 on:click={() => onEmptySlotTap({ hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}>
+                                 on:click={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}>
                             </button>
                         {/each}
 
                         {#each appointments.filter(a => a.staffMemberId === s.id) as appt}
+                            <!-- ИСПРАВЛЕНО: Теперь используем dispatch для открытия деталей записи -->
                             <div class="appt-card"
                                  style="{getApptStyle(appt)} --status-color: {getStatusColor(appt.status)}"
-                                 on:click|stopPropagation={() => onAppointmentTap(appt)}>
+                                 on:click|stopPropagation={() => dispatch('appointmentTap', appt)}>
                                 <div class="appt-inner">
                                     <div class="appt-head">
                                         <span class="client">{appt.clientName}</span>
@@ -196,7 +193,6 @@
 </div>
 
 <style>
-    /* Стили сохранены из предыдущего ответа с небольшими правками под динамическую шкалу */
     .timeline { height: 100%; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden; }
     .header-row { display: flex; height: 74px; background: white; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
     .time-label-corner { width: 60px; display: flex; align-items: center; justify-content: center; border-right: 1px solid #f1f5f9; font-size: 18px; }
@@ -218,7 +214,6 @@
     .grid-line.bold { background: #e2e8f0; }
     .staff-column { position: absolute; top: 0; bottom: 0; }
     .slot-trigger { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
-    .slot-trigger:active { background: rgba(59, 130, 246, 0.05); }
     .appt-card { position: absolute; left: 6px; right: 6px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 60; cursor: pointer; overflow: hidden; }
     .appt-inner { height: 100%; border-left: 4px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; gap: 2px; }
     .appt-head { display: flex; justify-content: space-between; align-items: flex-start; }
@@ -227,5 +222,4 @@
     .time-now { position: absolute; left: 0; right: 0; z-index: 80; pointer-events: none; }
     .time-now .line { height: 2px; background: #ef4444; width: 100%; }
     .time-now .pulse-dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: pulse 2s infinite; }
-    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 </style>

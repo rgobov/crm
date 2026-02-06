@@ -10,25 +10,25 @@ export const scheduleUpdates = writable(null);
 let stompClient = null;
 let reconnectTimeout = null;
 
-// Используем тот же базовый URL, что и в api.js
-const WS_URL = 'https://api.109.248.203.156.sslip.io/ws';
+// Автоматический выбор URL для веб-сокетов (dev/prod)
+const WS_URL = import.meta.env.VITE_WS_URL;
 
 export const websocketService = {
     connect() {
-        // Несмотря на отключенный SSR, оставляем проверку для надежности библиотек
         if (typeof window === 'undefined') return;
 
         const currentUser = get(user);
         if (!currentUser || !currentUser.tenantId) return;
 
         try {
+            console.log('WS: Attempting to connect to', WS_URL);
             const socket = new SockJS(WS_URL);
             stompClient = Stomp.over(socket);
             stompClient.debug = null;
 
             stompClient.connect({}, (frame) => {
                 wsConnected.set(true);
-                console.log('WS: Connected to API');
+                console.log('WS: Connected successfully');
 
                 stompClient.subscribe(`/topic/schedule/${currentUser.tenantId}`, (message) => {
                     if (message.body) scheduleUpdates.set(message.body);

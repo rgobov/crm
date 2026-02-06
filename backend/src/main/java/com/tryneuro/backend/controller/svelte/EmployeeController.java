@@ -1,4 +1,4 @@
-package com.tryneuro.backend.controller;
+package com.tryneuro.backend.controller.svelte;
 
 import com.tryneuro.backend.dto.CommentRequest;
 import com.tryneuro.backend.dto.WorkloadDto;
@@ -13,14 +13,20 @@ import com.tryneuro.backend.service.StaffMemberService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+/**
+ * Point of Truth for Svelte Employee (Master) Panel
+ */
 @RestController
 @RequestMapping("/api/employee")
 public class EmployeeController {
@@ -36,38 +42,49 @@ public class EmployeeController {
         this.commentService = commentService;
     }
 
+    private String getRequiredStaffId(User user) {
+        if (user.getStaffId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Ошибка: ваш аккаунт не связан с профилем сотрудника");
+        }
+        return user.getStaffId();
+    }
+
+    @GetMapping("/dashboard/stats")
+    public Map<String, Object> getMyDashboardStats(@AuthenticationPrincipal User user) {
+        String sId = getRequiredStaffId(user);
+        Map<String, Object> stats = new HashMap<>();
+        
+        List<Appointment> todayApps = scheduleService.getAppointmentsForStaff(user.getTenantId(), sId, LocalDate.now());
+        List<WorkloadDto> workload = scheduleService.getWorkloadForStaffAndMonth(sId, LocalDate.now().getYear(), LocalDate.now().getMonthValue());
+        
+        stats.put("todayAppointmentsCount", todayApps.size());
+        stats.put("monthlyWorkload", workload);
+        stats.put("staffName", user.getUsername());
+        
+        return stats;
+    }
+
     @GetMapping("/profile")
     public ResponseEntity<StaffMember> getMyProfile(@AuthenticationPrincipal User user, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        if (user.getStaffId() == null) {
-            return ResponseEntity.notFound().build();
-        }
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
-        return staffMemberService.getStaffByIdAndDate(user.getStaffId(), targetDate)
+        return staffMemberService.getStaffByIdAndDate(getRequiredStaffId(user), targetDate)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/profile/shift")
     public ResponseEntity<StaffShift> updateMyShift(@AuthenticationPrincipal User user, @RequestBody StaffShift shift) {
-        if (user.getStaffId() == null) {
-            return ResponseEntity.status(403).build();
-        }
-        shift.setStaffId(user.getStaffId());
+        shift.setStaffId(getRequiredStaffId(user));
         shift.setTenantId(user.getTenantId());
-        StaffShift saved = staffMemberService.saveShift(shift);
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(staffMemberService.saveShift(shift));
     }
 
-    // --- НОВЫЙ ЭНДПОИНТ: Копирование графика на период ---
     @PostMapping("/profile/shift/copy")
-    public ResponseEntity<Void> copyShift(@AuthenticationPrincipal User user,
-                                          @RequestBody StaffShift sourceShift,
-                                          @RequestParam int days) {
-        if (user.getStaffId() == null) return ResponseEntity.status(403).build();
-
+    public ResponseEntity<Void> copyShift(@AuthenticationPrincipal User user, @RequestBody StaffShift sourceShift, @RequestParam int days) {
+        String sId = getRequiredStaffId(user);
         for (int i = 1; i <= days; i++) {
             StaffShift newShift = new StaffShift();
-            newShift.setStaffId(user.getStaffId());
+            newShift.setStaffId(sId);
             newShift.setTenantId(user.getTenantId());
             newShift.setDate(sourceShift.getDate().plusDays(i));
             newShift.setWorkStartTime(sourceShift.getWorkStartTime());
@@ -82,30 +99,7 @@ public class EmployeeController {
 
     @GetMapping("/appointments")
     public List<Appointment> getMyAppointmentsForDay(@AuthenticationPrincipal User user, @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        if (user.getStaffId() == null) {
-            return Collections.emptyList();
-        }
-        return scheduleService.getAppointmentsForStaff(user.getTenantId(), user.getStaffId(), date);
-    }
-
-    @PutMapping("/appointments/{id}")
-    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
-        Appointment updatedAppointment = scheduleService.updateAppointment(id, appointmentDetails);
-        return ResponseEntity.ok(updatedAppointment);
-    }
-
-    @DeleteMapping("/appointments/{id}")
-    public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
-        scheduleService.deleteAppointment(id);
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/workload")
-    public List<WorkloadDto> getMyWorkload(@AuthenticationPrincipal User user, @RequestParam int year, @RequestParam int month) {
-        if (user.getStaffId() == null) {
-            return Collections.emptyList();
-        }
-        return scheduleService.getWorkloadForStaffAndMonth(user.getStaffId(), year, month);
+        return scheduleService.getAppointmentsForStaff(user.getTenantId(), getRequiredStaffId(user), date);
     }
 
     @GetMapping("/appointments/{id}/comments")

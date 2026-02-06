@@ -6,21 +6,20 @@
     import { activeTab } from '$lib/stores/dashboardStore.js';
     import { onMount } from 'svelte';
 
-    export let forcedDate = null; // Дата из сайдбара
+    export let forcedDate = null;
 
     let viewMode = 'month';
     let selectedDate = new Date();
     let currentAppointment = null;
     let preselectedData = null;
 
-    // РЕАКТИВНОСТЬ: Если пришла дата из сайдбара - применяем её
-    $: if (forcedDate) {
+    // Реактивность: Следим за датой и вкладкой, но НЕ сбрасываем, если мы в режиме редактирования
+    $: if (forcedDate && viewMode !== 'edit' && viewMode !== 'detail') {
         selectedDate = new Date(forcedDate);
         viewMode = 'day';
     }
 
-    $: if ($activeTab === 'timeline') {
-        // Если перешли по кнопке Таймлайн, но даты из сайдбара нет - ставим сегодня
+    $: if ($activeTab === 'timeline' && viewMode !== 'edit' && viewMode !== 'detail') {
         if (!forcedDate) selectedDate = new Date();
         viewMode = 'day';
     } else if ($activeTab === 'calendar' && viewMode !== 'edit' && viewMode !== 'detail') {
@@ -33,6 +32,9 @@
     }
 
     function openNewAppointment(event) {
+        // ЛОГ ДЛЯ ПРОВЕРКИ
+        console.log('CalendarTab: Catching event to open New Appointment', event.detail);
+
         preselectedData = {
             date: selectedDate,
             hour: event?.detail?.hour || 10,
@@ -44,6 +46,7 @@
     }
 
     function openDetail(event) {
+        console.log('CalendarTab: Catching event to open Detail', event.detail);
         currentAppointment = event.detail;
         viewMode = 'detail';
     }
@@ -62,7 +65,7 @@
     {#if viewMode === 'month'}
         <div class="tab-content">
             <div class="header-row">
-                <h2>Календарь загрузки</h2>
+                <h2>Сетка месяца</h2>
                 <button class="today-btn" on:click={() => { selectedDate = new Date(); viewMode = 'day'; activeTab.set('timeline'); }}>СЕГОДНЯ</button>
             </div>
             <CalendarScreen on:dateSelected={handleDateSelected} />
@@ -72,14 +75,19 @@
         <div class="day-view-container">
             <div class="day-header">
                 <button class="back-link mobile-only" on:click={() => { viewMode = 'month'; activeTab.set('calendar'); }}>‹ Месяц</button>
+
                 <div class="date-title">
-                    {selectedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    <span class="day-num">{selectedDate.getDate()}</span>
+                    <span class="month-year">{selectedDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</span>
                 </div>
-                <button class="add-mini" on:click={() => openNewAppointment()}>+ Запись</button>
+
+                <button class="add-mini" on:click={() => openNewAppointment({ detail: {} })}>+ Запись</button>
             </div>
-            <!-- Прокидываем информацию, что мы на десктопе, чтобы скрыть верхнюю ленту -->
+
+            <!-- СЛУШАЕМ СОБЫТИЯ ОТ SCHEDULE SCREEN -->
             <ScheduleScreen
                 initialDate={selectedDate}
+                forcedDate={selectedDate}
                 on:emptySlotTap={openNewAppointment}
                 on:appointmentTap={openDetail}
             />
@@ -91,12 +99,14 @@
                 <button class="back-link" on:click={backToDay}>‹ Расписание</button>
                 <div class="date-title">{currentAppointment ? 'Изменить запись' : 'Новая запись'}</div>
             </div>
-            <AppointmentEditScreen
-                appointment={currentAppointment}
-                preselected={preselectedData}
-                on:cancel={backToDay}
-                on:saved={backToDay}
-            />
+            <div class="scrollable-form">
+                <AppointmentEditScreen
+                    appointment={currentAppointment}
+                    preselected={preselectedData}
+                    on:cancel={backToDay}
+                    on:saved={backToDay}
+                />
+            </div>
         </div>
 
     {:else if viewMode === 'detail'}
@@ -105,34 +115,42 @@
                 <button class="back-link" on:click={backToDay}>‹ Расписание</button>
                 <div class="date-title">Детали визита</div>
             </div>
-            <AppointmentDetailScreen
-                appointment={currentAppointment}
-                on:edit={openEditFromDetail}
-                on:deleted={backToDay}
-            />
+            <div class="scrollable-form">
+                <AppointmentDetailScreen
+                    appointment={currentAppointment}
+                    on:edit={openEditFromDetail}
+                    on:deleted={backToDay}
+                />
+            </div>
         </div>
     {/if}
 </div>
 
 <style>
-    .calendar-tab { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-    .tab-content { padding: 20px; animation: fadeIn 0.3s ease-out; }
+    .calendar-tab { height: 100%; display: flex; flex-direction: column; overflow: hidden; background: white; }
+    .tab-content { padding: 24px; animation: fadeIn 0.3s ease-out; }
 
     .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
     h2 { font-size: 24px; font-weight: 800; margin: 0; color: #0f172a; }
 
-    .today-btn { background: var(--primary-gradient); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 700; font-size: 13px; box-shadow: 0 4px 15px rgba(56, 151, 240, 0.2); cursor: pointer; }
+    .today-btn { background: var(--primary-gradient); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 700; font-size: 13px; cursor: pointer; }
 
     .day-view-container, .edit-view-container { flex: 1; display: flex; flex-direction: column; animation: slideIn 0.2s ease-out; overflow: hidden; }
-    .day-header { padding: 14px 20px; background: white; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-    .back-link { background: none; border: none; color: var(--primary-color); font-weight: 700; font-size: 14px; cursor: pointer; }
-    .date-title { font-weight: 800; color: #1e293b; font-size: 15px; }
-    .add-mini { background: #eff6ff; color: var(--primary-color); border: none; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+    .scrollable-form { flex: 1; overflow-y: auto; }
 
-    /* На ПК скрываем кнопку "Назад к месяцу", так как месяц всегда слева */
-    @media (min-width: 1024px) {
-        .mobile-only { display: none; }
+    .day-header {
+        padding: 16px 24px; background: white; border-bottom: 1px solid #f1f5f9;
+        display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
     }
+
+    .date-title { display: flex; align-items: baseline; gap: 8px; }
+    .date-title .day-num { font-size: 22px; font-weight: 900; color: var(--primary-color); }
+    .date-title .month-year { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+
+    .back-link { background: none; border: none; color: var(--primary-color); font-weight: 700; font-size: 14px; cursor: pointer; }
+    .add-mini { background: #eff6ff; color: var(--primary-color); border: none; padding: 8px 16px; border-radius: 12px; font-size: 13px; font-weight: 800; cursor: pointer; }
+
+    @media (min-width: 1024px) { .mobile-only { display: none; } }
 
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

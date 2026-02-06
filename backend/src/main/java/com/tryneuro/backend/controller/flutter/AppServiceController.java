@@ -1,4 +1,4 @@
-package com.tryneuro.backend.controller;
+package com.tryneuro.backend.controller.flutter;
 
 import com.tryneuro.backend.model.Service;
 import com.tryneuro.backend.service.AppServiceService;
@@ -10,6 +10,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/services")
 public class AppServiceController {
+
     private final AppServiceService appServiceService;
 
     @Autowired
@@ -23,7 +24,7 @@ public class AppServiceController {
     }
 
     @PostMapping
-    public Service createService(@RequestAttribute("tenantId") String tenantId, @RequestBody Service service) {
+    public Service addService(@RequestBody Service service, @RequestAttribute("tenantId") String tenantId) {
         return appServiceService.addService(service, tenantId);
     }
 

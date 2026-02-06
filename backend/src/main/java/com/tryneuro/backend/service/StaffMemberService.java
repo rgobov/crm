@@ -56,9 +56,10 @@ public class StaffMemberService {
         return staffOpt;
     }
 
-    public Page<StaffMember> getStaffPaged(String tenantId, String query, int page, int size) {
+    // ОБНОВЛЕНО: Добавлена поддержка параметра active
+    public Page<StaffMember> getStaffPaged(String tenantId, String query, Boolean active, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("active").descending().and(Sort.by("name").ascending()));
-        Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, pageable);
+        Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, active, pageable);
         staffPage.forEach(this::enrichWithUserData);
         return staffPage;
     }
@@ -129,23 +130,17 @@ public class StaffMemberService {
         return savedStaff;
     }
 
-    // УМНОЕ УДАЛЕНИЕ: Физическое если нет записей, Soft-Delete если есть
     @Transactional
     public void deleteStaffMember(String id) {
-        // 1. Удаляем доступ (User) в любом случае
         userRepository.findByStaffId(id).ifPresent(userRepository::delete);
-
-        // 2. Проверяем наличие записей (Appointments)
         boolean hasAppointments = appointmentRepository.existsByStaffMemberId(id);
 
         if (hasAppointments) {
-            // Если записи есть - просто деактивируем (Soft Delete)
             staffMemberRepository.findById(id).ifPresent(staff -> {
                 staff.setActive(false);
                 staffMemberRepository.save(staff);
             });
         } else {
-            // Если записей нет - удаляем физически (чистим базу)
             staffMemberRepository.deleteById(id);
         }
     }

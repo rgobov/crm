@@ -1,4 +1,4 @@
-package com.tryneuro.backend.controller;
+package com.tryneuro.backend.controller.flutter;
 
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Contact;
@@ -28,7 +28,7 @@ public class ContactController {
     public Page<Contact> getAllContacts(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
-            @RequestParam(defaultValue = "false") boolean showAll, // НОВЫЙ ПАРАМЕТР
+            @RequestParam(defaultValue = "false") boolean showAll,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
         return contactService.getContactsPaged(tenantId, query, showAll, page, size);
