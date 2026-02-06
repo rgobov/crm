@@ -4,8 +4,6 @@ import com.tryneuro.backend.service.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -43,10 +41,11 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // ДОБАВЛЕНО: Разрешаем встраивание фреймов для SockJS
+            .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/api/ws/**", "/error").permitAll()
-                // Используем hasAnyRole (Spring автоматически добавит префикс ROLE_)
+                .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/api/ws/**", "/ws/**", "/error").permitAll()
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")
                 .requestMatchers("/api/employee/**").hasAnyRole("EMPLOYEE", "ADMIN")
@@ -62,15 +61,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Настройка разрешенных источников: продакшен + локальные порты для разработки
-        configuration.setAllowedOriginPatterns(List.of(
-            "https://crm.109.248.203.156.sslip.io",
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "https://*.sslip.io"
-        ));
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Telegram-Init-Data", "X-Requested-With", "Accept", "Origin"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(List.of("Authorization"));
         
@@ -93,7 +86,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
     }
 }
