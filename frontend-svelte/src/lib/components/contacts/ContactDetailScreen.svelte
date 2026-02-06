@@ -1,17 +1,16 @@
 <script>
     import { onMount, createEventDispatcher } from 'svelte';
     import api from '$lib/api.js';
-    import { contactService } from '$lib/services/contactService.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
+    import { fade, slide, scale } from 'svelte/transition';
+    import { quintOut } from 'svelte/easing';
 
     export let contactId;
     const dispatch = createEventDispatcher();
 
     let contact = null;
-    let appointments = [];
-    let activeTab = 'info';
     let isLoading = true;
-    let isHistoryLoading = false;
+    let currentStatus = 'SCHEDULED'; // По умолчанию
 
     // Состояния редактирования
     let editMode = { name: false, email: false, notes: false, phoneIdx: -1, isAddingPhone: false };
@@ -26,6 +25,8 @@
         try {
             const response = await api.get(`/admin/clients/${contactId}`);
             contact = response.data;
+            // Здесь можно было бы получить статус последнего визита,
+            // но пока используем локальное состояние для демонстрации дизайна
             syncTempValues();
             dispatch('loaded', { name: contact.name });
         } catch (e) {
@@ -58,7 +59,6 @@
                 : tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p);
 
             if (!tempValues.name) return alert('Имя обязательно');
-            if (finalPhones.length === 0) return alert('Нужен минимум один телефон');
 
             const payload = {
                 ...contact,
@@ -71,140 +71,191 @@
             const res = await api.put(`/admin/clients/${contactId}`, payload);
             contact = res.data;
             cancelAllEdits();
-            dispatch('loaded', { name: contact.name });
-
-            // РЕАКТИВНЫЙ СТЕК: Уведомляем список клиентов на фоне об обновлении
             dispatch('updated', contact);
-
         } catch (e) {
             alert('Ошибка при сохранении');
             cancelAllEdits();
         }
     }
 
-    async function removePhone(idx) {
-        if (contact.phones.length <= 1) return alert('Нельзя удалить единственный номер');
-        if (confirm('Удалить этот номер?')) {
-            tempValues.phones = tempValues.phones.filter((_, i) => i !== idx);
-            await saveField('phones');
-        }
+    function setStatus(status) {
+        currentStatus = status;
     }
 </script>
 
-<div class="screen">
-    {#if isLoading}
-        <div class="center-spinner"><span class="spinner"></span></div>
+<div class="profile-card status-{currentStatus.toLowerCase()}" in:scale={{duration: 500, start: 0.9, easing: quintOut}}>
+    {#if isLoading && !contact}
+        <div class="center-loader"><span class="spinner"></span></div>
     {:else if contact}
-        <div class="tab-bar">
-            <button class:active={activeTab === 'info'} on:click={() => activeTab = 'info'}>ИНФО</button>
-            <button class:active={activeTab === 'history'} on:click={() => activeTab = 'history'}>ИСТОРИЯ</button>
-        </div>
+        <header class="card-header" in:fade>
+            <div class="avatar-section">
+                <div class="avatar-big">{contact.name.charAt(0).toUpperCase()}</div>
+                <div class="status-indicator"></div>
+            </div>
 
-        <div class="tab-content">
-            {#if activeTab === 'info'}
-                <div class="info-section">
-                    <!-- ИМЯ -->
-                    <div class="card hero-card">
-                        {#if editMode.name}
-                            <div class="edit-box">
-                                <input type="text" bind:value={tempValues.name} class="big-input" autofocus />
-                                <div class="actions">
-                                    <button class="save" on:click={() => saveField('name')}>✓</button>
-                                    <button class="cancel" on:click={cancelAllEdits}>✕</button>
-                                </div>
-                            </div>
-                        {:else}
-                            <h2 on:click={() => editMode.name = true}>{contact.name} <small>✎</small></h2>
-                        {/if}
+            <div class="title-section">
+                {#if editMode.name}
+                    <div class="edit-row">
+                        <input type="text" bind:value={tempValues.name} class="name-input" autofocus />
+                        <button class="save-btn-icon" on:click={() => saveField('name')}>✓</button>
                     </div>
+                {:else}
+                    <h2 on:click={() => editMode.name = true}>{contact.name} <span>✎</span></h2>
+                {/if}
 
-                    <label class="section-title">КОНТАКТНЫЕ НОМЕРА</label>
-                    <div class="card p-0">
-                        {#each contact.phones as phone, i}
-                            <div class="detail-row">
-                                {#if editMode.phoneIdx === i}
-                                    <div class="edit-box w-100">
-                                        <input type="tel" bind:value={tempValues.phones[i]} class="mid-input" autofocus />
-                                        <button class="save" on:click={() => saveField('phones')}>✓</button>
-                                        <button class="cancel" on:click={cancelAllEdits}>✕</button>
-                                    </div>
-                                {:else}
-                                    <span class="icon">📱</span>
-                                    <div class="value-col" on:click={() => editMode.phoneIdx = i}>
-                                        <span class="value">{phoneUtils.format(phone)}</span>
-                                        <small>изменить ✎</small>
-                                    </div>
-                                    <button class="icon-btn-del" on:click={() => removePhone(i)}>🗑</button>
-                                {/if}
-                            </div>
-                        {/each}
-                        <div class="detail-row add-row">
-                            {#if editMode.isAddingPhone}
-                                <div class="edit-box w-100">
-                                    <input type="tel" bind:value={tempValues.newPhone} placeholder="+7 (___) ___" class="mid-input" autofocus />
-                                    <button class="save" on:click={() => saveField('addPhone')}>✓</button>
-                                    <button class="cancel" on:click={cancelAllEdits}>✕</button>
+                <div class="status-selector">
+                    <button class:active={currentStatus === 'SCHEDULED'} on:click={() => setStatus('SCHEDULED')}>Ожидается</button>
+                    <button class:active={currentStatus === 'NEEDS_CALL'} on:click={() => setStatus('NEEDS_CALL')}>Звонок</button>
+                    <button class:active={currentStatus === 'COMPLETED'} on:click={() => setStatus('COMPLETED')}>Оказана</button>
+                    <button class:active={currentStatus === 'CANCELLED'} on:click={() => setStatus('CANCELLED')}>Отмена</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="details-grid">
+            <!-- КОНТАКТЫ -->
+            <section class="info-group">
+                <label>Контактные данные</label>
+                <div class="tiles-container">
+                    {#each contact.phones as phone, i}
+                        <div class="tile">
+                            {#if editMode.phoneIdx === i}
+                                <div class="tile-edit">
+                                    <input type="tel" bind:value={tempValues.phones[i]} autofocus />
+                                    <button class="save-mini" on:click={() => saveField('phones')}>✓</button>
                                 </div>
                             {:else}
-                                <button class="add-link" on:click={() => editMode.isAddingPhone = true}>+ Добавить номер</button>
+                                <span class="phone-val" on:click={() => editMode.phoneIdx = i}>
+                                    {phoneUtils.format(phone)}
+                                </span>
+                                <a href="tel:{phone}" class="btn-call">📞</a>
                             {/if}
                         </div>
-                    </div>
-
-                    <label class="section-title">ПРОЧЕЕ</label>
-                    <div class="card p-16">
-                        {#if editMode.email}
-                            <div class="edit-box w-100">
-                                <input type="email" bind:value={tempValues.email} class="mid-input" autofocus />
-                                <button class="save" on:click={() => saveField('email')}>✓</button>
-                                <button class="cancel" on:click={cancelAllEdits}>✕</button>
-                            </div>
-                        {:else}
-                            <div class="clickable-text" on:click={() => editMode.email = true}>✉️ {contact.email || 'Добавить Email'} <small>✎</small></div>
-                        {/if}
-                        <div class="divider"></div>
-                        {#if editMode.notes}
-                            <div class="edit-box column w-100">
-                                <textarea bind:value={tempValues.notes} rows="4" autofocus></textarea>
-                                <div class="actions right">
-                                    <button class="cancel" on:click={cancelAllEdits}>✕ Отмена</button>
-                                    <button class="save-long" on:click={() => saveField('notes')}>✓ Сохранить</button>
-                                </div>
-                            </div>
-                        {:else}
-                            <div class="clickable-text pre" on:click={() => editMode.notes = true}>📝 {contact.notes || 'Добавить заметки...'} <small>✎</small></div>
-                        {/if}
-                    </div>
+                    {/each}
+                    <button class="btn-add-tile" on:click={() => editMode.isAddingPhone = true}>+ Добавить</button>
                 </div>
-            {/if}
+            </section>
+
+            <!-- EMAIL -->
+            <section class="info-group">
+                <label>E-mail</label>
+                <div class="tile full">
+                    {#if editMode.email}
+                        <div class="tile-edit">
+                            <input type="email" bind:value={tempValues.email} autofocus />
+                            <button class="save-mini" on:click={() => saveField('email')}>✓</button>
+                        </div>
+                    {:else}
+                        <span class="email-val" on:click={() => editMode.email = true}>
+                            {contact.email || 'Нажмите, чтобы добавить почту'}
+                        </span>
+                    {/if}
+                </div>
+            </section>
+
+            <!-- ЗАМЕТКИ -->
+            <section class="info-group">
+                <label>Заметки о клиенте</label>
+                <div class="tile full notes-area" on:click={() => !editMode.notes && (editMode.notes = true)}>
+                    {#if editMode.notes}
+                        <div class="notes-edit-box" transition:slide>
+                            <textarea bind:value={tempValues.notes} rows="4" autofocus></textarea>
+                            <div class="actions-row">
+                                <button class="btn-text" on:click|stopPropagation={cancelAllEdits}>Отмена</button>
+                                <button class="btn-save-pill" on:click|stopPropagation={() => saveField('notes')}>✓ Сохранить</button>
+                            </div>
+                        </div>
+                    {:else}
+                        <p class="notes-text">{contact.notes || 'Нет описания...'}</p>
+                    {/if}
+                </div>
+            </section>
         </div>
     {/if}
 </div>
 
 <style>
-    .screen { background: #f8fafc; min-height: 100%; border-radius: 32px; overflow: hidden; }
-    .tab-bar { display: flex; background: white; border-bottom: 1px solid #f1f5f9; }
-    .tab-bar button { flex: 1; padding: 16px; border: none; background: none; font-size: 13px; font-weight: 800; color: #94a3b8; cursor: pointer; }
-    .tab-bar button.active { color: var(--primary-color); border-bottom: 3px solid var(--primary-color); }
-    .card { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); margin-bottom: 16px; border: 1px solid #f1f5f9; }
-    .p-0 { padding: 0; } .p-16 { padding: 16px; }
-    .hero-card { padding: 24px; text-align: center; }
-    .hero-card h2 { margin: 0; font-size: 22px; font-weight: 800; cursor: pointer; }
-    small { font-size: 13px; color: var(--primary-color); opacity: 0.5; margin-left: 4px; }
-    .section-title { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 1px; margin: 0 0 10px 4px; text-transform: uppercase; }
-    .detail-row { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid #f8fafc; }
-    .value-col { flex: 1; display: flex; flex-direction: column; cursor: pointer; }
-    .value { font-weight: 600; color: #1e293b; font-size: 16px; }
-    .add-link { background: none; border: none; color: var(--primary-color); font-weight: 700; font-size: 14px; cursor: pointer; }
-    .edit-box { display: flex; align-items: center; gap: 8px; }
-    input, textarea { flex: 1; padding: 10px 14px; border: 2px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc; }
-    .save { background: #10b981; color: white; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
-    .save-long { background: var(--primary-color); color: white; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 700; }
-    .cancel { background: #f1f5f9; color: #64748b; border: none; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700; }
-    .icon-btn-del { background: #fef2f2; color: #ef4444; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; }
-    .clickable-text { font-size: 15px; color: #1e293b; font-weight: 500; cursor: pointer; min-height: 32px; display: flex; align-items: center; }
-    .divider { height: 1px; background: #f1f5f9; margin: 12px 0; }
-    .center-spinner { display: flex; justify-content: center; padding: 60px; }
-    .spinner { width: 28px; height: 28px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    .profile-card {
+        background: white;
+        border-radius: 32px;
+        padding: 32px;
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+        border: 1px solid #f1f5f9;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* ТЕМЫ В ЗАВИСИМОСТИ ОТ СТАТУСА */
+    .status-scheduled { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); border-color: #3b82f6; }
+    .status-completed { background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%); border-color: #10b981; }
+    .status-needs_call { background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%); border-color: #f59e0b; }
+    .status-cancelled { background: linear-gradient(135deg, #ffffff 0%, #fff1f2 100%); border-color: #ef4444; }
+
+    .card-header { display: flex; align-items: center; gap: 24px; margin-bottom: 32px; }
+
+    .avatar-big {
+        width: 84px; height: 84px; background: white; border-radius: 28px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 36px; font-weight: 900; color: var(--primary-color);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    }
+
+    .title-section { flex: 1; }
+    .title-section h2 { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; cursor: pointer; }
+    .title-section h2 span { font-size: 16px; opacity: 0.2; margin-left: 8px; }
+
+    .status-selector { display: flex; gap: 6px; margin-top: 12px; }
+    .status-selector button {
+        padding: 4px 10px; border-radius: 8px; border: 1px solid #e2e8f0;
+        background: white; font-size: 10px; font-weight: 800; color: #64748b;
+        cursor: pointer; text-transform: uppercase; transition: all 0.2s;
+    }
+    .status-selector button.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+
+    .details-grid { display: flex; flex-direction: column; gap: 24px; }
+    label {
+        display: block; font-size: 10px; font-weight: 800; color: #94a3b8;
+        text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; margin-left: 4px;
+    }
+
+    .tiles-container { display: flex; flex-wrap: wrap; gap: 12px; }
+    .tile {
+        background: white; padding: 14px 18px; border-radius: 18px;
+        border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    }
+    .tile.full { width: 100%; box-sizing: border-box; }
+
+    .phone-val { font-weight: 700; color: #1e293b; cursor: pointer; font-size: 16px; }
+    .btn-call { text-decoration: none; font-size: 16px; }
+
+    .btn-add-tile {
+        background: none; border: 2px dashed #e2e8f0; padding: 12px 20px;
+        border-radius: 18px; color: #94a3b8; font-weight: 700; cursor: pointer;
+    }
+
+    .notes-area { min-height: 100px; align-items: flex-start; cursor: pointer; }
+    .notes-text { margin: 0; color: #64748b; font-size: 14px; line-height: 1.6; font-style: italic; }
+
+    .edit-row, .tile-edit, .notes-edit-box { display: flex; gap: 10px; width: 100%; }
+    .notes-edit-box { flex-direction: column; }
+
+    input, textarea {
+        width: 100%; padding: 10px 14px; border: 2px solid var(--primary-color);
+        border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc;
+    }
+
+    .save-btn-icon, .save-mini {
+        background: #10b981; color: white; border: none; width: 40px; height: 40px;
+        border-radius: 12px; cursor: pointer;
+    }
+
+    .actions-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+    .btn-text { background: none; border: none; color: #94a3b8; font-weight: 700; cursor: pointer; }
+    .btn-save-pill { background: var(--primary-color); color: white; border: none; padding: 10px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+
+    .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .center-loader { display: flex; justify-content: center; padding: 60px; }
 </style>

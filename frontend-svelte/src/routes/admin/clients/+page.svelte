@@ -64,9 +64,15 @@
         loadPage(0);
     }
 
-    // РЕАКТИВНОЕ ОБНОВЛЕНИЕ СПИСКА
-    function handleUpdateSuccess() {
-        console.log('Reactive Sync: Reloading client list...');
+    // МГНОВЕННОЕ ОБНОВЛЕНИЕ СПИСКА (БЕЗ ЛАГА)
+    function handleUpdateSuccess(event) {
+        const updatedContact = event.detail;
+        console.log('Reactive Stack: Updating local state for', updatedContact.name);
+
+        // 1. Сразу обновляем объект в локальном массиве
+        clients = clients.map(c => c.id === updatedContact.id ? updatedContact : c);
+
+        // 2. Параллельно перегружаем с сервера для гарантии целостности
         loadPage(currentPage);
     }
 
@@ -121,7 +127,7 @@
             <div class="center-loader"><span class="spinner"></span></div>
         {:else if clients.length === 0}
             <div class="empty-view" in:fade>
-                <p>{searchQuery ? 'Ничего не найдено' : (showAll ? 'В базе пока нет клиентов' : 'На сегодня пока нет клиентов')}</p>
+                <p>{searchQuery ? 'Ничего не найдено' : (showAll ? 'В базе пока нет клиентов' : 'На сегодня записей нет')}</p>
             </div>
         {:else}
             <div class="client-grid" class:is-loading={isLoading}>
@@ -164,7 +170,6 @@
                     <button class="close-x" on:click={closeDetails}>✕</button>
                 </header>
                 <div class="modal-scroll-body">
-                    <!-- СЛУШАЕМ СОБЫТИЕ UPDATED -->
                     <ContactDetailScreen
                         contactId={selectedClientId}
                         on:updated={handleUpdateSuccess}
