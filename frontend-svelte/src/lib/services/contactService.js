@@ -1,9 +1,9 @@
 import api from '$lib/api.js';
 
 export const contactService = {
-    // Возвращаем данные напрямую (объект Page), чтобы поиск видел поле .content
+    // Возвращаем Page объект напрямую (content, totalElements и т.д.)
     async getContacts(query = '', showAll = false, page = 0, size = 25) {
-        const response = await api.get('/contacts', {
+        const response = await api.get('/admin/clients', {
             params: {
                 query: query.trim(),
                 showAll: showAll,
@@ -17,7 +17,8 @@ export const contactService = {
     async findContactByPhone(phone) {
         const clean = phone.replace(/\D/g, '');
         try {
-            const response = await api.get('/contacts/by-phone', { params: { phone: clean } });
+            // Используем админский путь для поиска
+            const response = await api.get('/admin/clients/by-phone', { params: { phone: clean } });
             return response.data;
         } catch (e) {
             return null;
@@ -25,21 +26,21 @@ export const contactService = {
     },
 
     async getContactById(id) {
-        const response = await api.get(`/contacts/${id}`);
+        const response = await api.get(`/admin/clients/${id}`);
         return response.data;
     },
 
     async addContact(contact) {
-        const response = await api.post('/contacts', contact);
+        const response = await api.post('/admin/clients', contact);
+        return response.data;
+    },
+
+    async updateContact(id, contact) {
+        const response = await api.put(`/admin/clients/${id}`, contact);
         return response.data;
     },
 
     async deleteContact(id) {
-        await api.delete(`/contacts/${id}`);
-    },
-
-    async getContactAppointments(contactId) {
-        const response = await api.get(`/contacts/${contactId}/appointments`);
-        return response.data;
+        await api.delete(`/admin/clients/${id}`);
     }
 };

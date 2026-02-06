@@ -2,22 +2,28 @@
     import { onMount } from 'svelte';
     import { contactService } from '$lib/services/contactService.js';
     import { goto } from '$app/navigation';
+    import { fade } from 'svelte/transition';
+    import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
 
     let clients = [];
     let searchQuery = '';
-    let showAll = false; // Переключатель: false = Сегодня, true = Все
+    let showAll = true;
     let currentPage = 0;
     let totalPages = 0;
     let totalElements = 0;
     let isLoading = true;
     let debounceTimer;
 
-    // Реактивная логика: при смене поиска или переключателя - грузим заново
-    $: if (searchQuery !== undefined || showAll !== undefined) {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            loadPage(0);
-        }, 500);
+    let showAddModal = false;
+
+    // УНИВЕРСАЛЬНЫЙ ПОИСК (Дебаунс 600мс)
+    $: {
+        if (searchQuery !== undefined || showAll !== undefined) {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                loadPage(0);
+            }, 600);
+        }
     }
 
     onMount(async () => {
@@ -31,11 +37,10 @@
     async function loadPage(page) {
         isLoading = true;
         try {
-            // Отправляем новый параметр showAll на бэкенд
-            const result = await contactService.getContacts(searchQuery, showAll, page, 25);
-            clients = result.contacts;
-            totalPages = Math.ceil(result.totalElements / 25);
-            totalElements = result.totalElements;
+            const result = await contactService.getContacts(searchQuery, showAll, page, 20);
+            clients = result.content || [];
+            totalPages = result.totalPages || 0;
+            totalElements = result.totalElements || 0;
             currentPage = page;
         } catch (e) {
             console.error('Failed to load clients', e);
@@ -43,94 +48,138 @@
             isLoading = false;
         }
     }
+
+    function handleAddSuccess() {
+        showAddModal = false;
+        loadPage(0); // Перезагрузка с первой страницы
+    }
+
+    function handleClearSearch() {
+        searchQuery = '';
+    }
 </script>
 
-<div class="page">
-    <div class="header">
-        <h1>Клиенты</h1>
-        <div class="mode-toggle">
-            <button class:active={!showAll} on:click={() => showAll = false}>Сегодня</button>
-            <button class:active={showAll} on:click={() => showAll = true}>Все база</button>
+<div class="clients-page">
+    <div class="page-header">
+        <div class="title-row">
+            <button class="back-btn" on:click={() => goto('/admin')}>‹</button>
+            <h1>База клиентов</h1>
+        </div>
+
+        <div class="filter-tabs">
+            <button class="tab" class:active={!showAll} on:click={() => showAll = false}>
+                На сегодня
+            </button>
+            <button class="tab" class:active={showAll} on:click={() => showAll = true}>
+                Вся база
+            </button>
         </div>
     </div>
 
     <!-- ПОИСК -->
-    <div class="search-container">
-        <div class="search-box">
+    <div class="search-bar-fixed">
+        <div class="search-inner">
             <span class="search-icon">🔍</span>
             <input
                 type="text"
                 bind:value={searchQuery}
-                placeholder="Поиск по всей базе..."
+                placeholder="Поиск по имени или телефону..."
             />
             {#if searchQuery}
-                <button class="clear-btn" on:click={() => searchQuery = ''}>✕</button>
+                <button class="btn-clear" on:click={handleClearSearch}>✕</button>
             {/if}
         </div>
     </div>
 
-    <div class="content">
-        <p class="stats">Найдено: {totalElements}</p>
+    <div class="results-stats">
+        {#if !isLoading}
+            <span>Найдено: <b>{totalElements}</b></span>
+        {/if}
+    </div>
 
-        {#if clients.length === 0 && !isLoading}
-            <div class="empty-state">
-                <p>{searchQuery ? 'Ничего не найдено' : 'На сегодня записей нет'}</p>
+    <div class="scroll-container">
+        {#if isLoading && clients.length === 0}
+            <div class="center-loader"><span class="spinner"></span></div>
+        {:else if clients.length === 0}
+            <div class="empty-view" in:fade>
+                <p>{searchQuery ? 'Ничего не найдено' : (showAll ? 'В базе пока нет клиентов' : 'На сегодня записей нет')}</p>
             </div>
         {:else}
-            <div class="client-list" class:dimmed={isLoading}>
+            <div class="client-grid" class:is-loading={isLoading}>
                 {#each clients as client (client.id)}
-                    <div class="client-card card" on:click={() => goto(`/admin/clients/${client.id}`)}>
-                        <div class="avatar">{client.name.charAt(0).toUpperCase()}</div>
-                        <div class="info">
-                            <h3>{client.name}</h3>
-                            <p>{client.phones?.[0] || 'Нет телефона'}</p>
+                    <button class="client-card-item" on:click={() => goto(`/admin/clients/${client.id}`)}>
+                        <div class="avatar-box">{client.name.charAt(0).toUpperCase()}</div>
+                        <div class="info-meta">
+                            <div class="name-line">{client.name}</div>
+                            <div class="phone-line">{client.phones?.[0] || 'нет номера'}</div>
                         </div>
-                        <span class="chevron">›</span>
-                    </div>
+                        <span class="chevron-icon">›</span>
+                    </button>
                 {/each}
             </div>
 
             {#if totalPages > 1}
-                <div class="pagination">
-                    <button class="pag-btn" disabled={currentPage === 0} on:click={() => loadPage(currentPage - 1)}>←</button>
-                    <span>{currentPage + 1} / {totalPages}</span>
-                    <button class="pag-btn" disabled={currentPage >= totalPages - 1} on:click={() => loadPage(currentPage + 1)}>→</button>
+                <div class="pager">
+                    <button class="btn-p" disabled={currentPage === 0} on:click={() => loadPage(currentPage - 1)}>←</button>
+                    <span class="p-text">{currentPage + 1} / {totalPages}</span>
+                    <button class="btn-p" disabled={currentPage >= totalPages - 1} on:click={() => loadPage(currentPage + 1)}>→</button>
                 </div>
             {/if}
         {/if}
     </div>
 
-    <button class="fab" on:click={() => goto('/admin/clients/new')}>+</button>
+    <!-- КНОПКА ДОБАВЛЕНИЯ (FAB) -->
+    <button class="fab-circle" on:click={() => showAddModal = true} title="Добавить клиента">+</button>
+
+    {#if showAddModal}
+        <AddContactModal
+            on:close={() => showAddModal = false}
+            on:success={handleAddSuccess}
+        />
+    {/if}
 </div>
 
 <style>
-    .page { padding: 20px; max-width: 600px; margin: 0 auto; background: var(--bg-color); min-height: 100vh; }
+    .clients-page { background: #f8fafc; min-height: 100vh; padding-bottom: 100px; }
 
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    h1 { font-size: 24px; font-weight: 800; margin: 0; color: #0f172a; }
+    .page-header { background: white; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; z-index: 100; }
+    .title-row { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .back-btn { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 12px; font-size: 24px; cursor: pointer; color: var(--primary-color); display: flex; align-items: center; justify-content: center; padding-bottom: 4px; }
+    h1 { font-size: 22px; font-weight: 900; margin: 0; color: #0f172a; }
 
-    /* Переключатель режимов */
-    .mode-toggle { background: #f1f5f9; padding: 4px; border-radius: 12px; display: flex; gap: 4px; }
-    .mode-toggle button { border: none; background: none; padding: 6px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #64748b; cursor: pointer; }
-    .mode-toggle button.active { background: white; color: var(--primary-color); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .filter-tabs { background: #f1f5f9; padding: 4px; border-radius: 14px; display: flex; gap: 4px; }
+    .tab { flex: 1; border: none; background: none; padding: 8px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #64748b; cursor: pointer; }
+    .tab.active { background: white; color: var(--primary-color); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 
-    .search-container { margin-bottom: 24px; position: sticky; top: 10px; z-index: 10; }
-    .search-box { display: flex; align-items: center; background: white; padding: 14px 18px; border-radius: 18px; border: 2px solid #3897f033; box-shadow: var(--shadow); }
-    input { border: none; background: none; width: 100%; font-size: 16px; outline: none; margin-left: 10px; }
+    .search-bar-fixed { padding: 16px 20px; }
+    .search-inner { display: flex; align-items: center; background: white; padding: 12px 16px; border-radius: 18px; border: 1.5px solid #f1f5f9; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+    .search-icon { font-size: 18px; margin-right: 12px; }
+    input { border: none; background: none; width: 100%; font-size: 15px; outline: none; font-weight: 500; }
+    .btn-clear { background: #f1f5f9; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 10px; color: #94a3b8; cursor: pointer; }
 
-    .stats { font-size: 12px; color: #94a3b8; font-weight: 600; margin-bottom: 12px; }
+    .results-stats { padding: 0 24px; font-size: 12px; color: #94a3b8; font-weight: 600; margin-bottom: 12px; }
 
-    .client-list { display: grid; gap: 10px; padding-bottom: 20px; }
-    .dimmed { opacity: 0.5; }
+    .scroll-container { padding: 0 20px; }
+    .client-grid { display: grid; gap: 10px; transition: opacity 0.2s; }
+    .is-loading { opacity: 0.6; }
 
-    .client-card { display: flex; align-items: center; gap: 16px; padding: 16px; background: white; border-radius: 22px; cursor: pointer; }
-    .avatar { width: 48px; height: 48px; background: #f1f5f9; color: var(--primary-color); border-radius: 14px; display: flex; justify-content: center; align-items: center; font-weight: 800; }
-    .info { flex: 1; }
-    h3 { margin: 0; font-size: 16px; color: #1e293b; font-weight: 700; }
-    .info p { margin: 2px 0 0 0; font-size: 13px; color: var(--hint-color); }
+    .client-card-item { display: flex; align-items: center; gap: 16px; padding: 14px; background: white; border-radius: 20px; border: 1px solid #f1f5f9; cursor: pointer; text-align: left; }
+    .avatar-box { width: 44px; height: 44px; background: #eff6ff; color: var(--primary-color); border-radius: 14px; display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 18px; }
+    .info-meta { flex: 1; min-width: 0; }
+    .name-line { font-size: 15px; font-weight: 700; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .phone-line { font-size: 13px; color: #94a3b8; font-weight: 500; margin-top: 2px; }
+    .chevron-icon { color: #cbd5e1; font-size: 24px; font-weight: 300; }
 
-    .pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 24px; padding-bottom: 100px; }
-    .pag-btn { padding: 8px 16px; border-radius: 10px; border: 1px solid #e2e8f0; background: white; font-weight: 600; }
+    .pager { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 32px; padding-bottom: 100px; }
+    .btn-p { background: white; border: 1.5px solid #f1f5f9; padding: 8px 16px; border-radius: 12px; font-weight: 700; color: #64748b; cursor: pointer; }
+    .btn-p:disabled { opacity: 0.4; }
+    .p-text { font-size: 13px; font-weight: 700; color: #94a3b8; }
 
-    .fab { position: fixed; bottom: 90px; right: 20px; width: 60px; height: 60px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; box-shadow: 0 12px 30px rgba(56, 151, 240, 0.4); }
+    .empty-view { text-align: center; padding: 60px 20px; color: #94a3b8; font-weight: 600; }
+
+    .fab-circle { position: fixed; bottom: 100px; right: 24px; width: 56px; height: 56px; background: var(--primary-gradient); color: white; border: none; border-radius: 18px; font-size: 32px; font-weight: 300; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.4); cursor: pointer; z-index: 1000; }
+
+    .spinner { width: 24px; height: 24px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .center-loader { display: flex; justify-content: center; padding: 40px; }
 </style>

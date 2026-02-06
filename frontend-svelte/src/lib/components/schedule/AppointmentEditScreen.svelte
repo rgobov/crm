@@ -23,7 +23,7 @@
         resourceId: ''
     };
 
-    // --- СОСТОЯНИЕ: КЛИЕНТ ---
+    // Клиент
     let searchInput = '';
     let lastSearchQuery = '';
     let searchResults = [];
@@ -32,11 +32,12 @@
     let showNewContactForm = false;
     let newContactName = '';
 
-    // --- СОСТОЯНИЕ: УСЛУГА ---
+    // Услуга
     let serviceSearchInput = '';
     let filteredServices = [];
     let showServiceDropdown = false;
     let isNewService = false;
+    let durationInput; // Для автофокуса
 
     let staffList = [];
     let services = [];
@@ -109,7 +110,12 @@
         isNewService = false;
     }
 
-    // ЛОГИКА ПОИСКА КЛИЕНТА (Синхронно с Flutter)
+    function startNewService() {
+        showServiceDropdown = false;
+        if (durationInput) durationInput.focus();
+    }
+
+    // ПОИСК КЛИЕНТА (Дебаунс 800мс)
     $: if (!isAutoUpdating && !selectedContact && !showNewContactForm && searchInput.trim() !== lastSearchQuery) {
         const query = searchInput.trim();
         const digits = query.replace(/\D/g, '');
@@ -121,7 +127,6 @@
                 lastSearchQuery = query;
                 try {
                     const result = await contactService.getContacts(query, true, 0, 5);
-                    // ТЕПЕРЬ ПРАВИЛЬНО ЧИТАЕМ content ИЗ PAGE
                     searchResults = result.content || [];
                 } catch (err) { console.warn('Search failed'); }
             }, 800);
@@ -202,7 +207,6 @@
                         </div>
                     </div>
                 {:else}
-                    <!-- ГРИД ГАРАНТИРУЕТ МЕСТО ДЛЯ КНОПКИ -->
                     <div class="search-grid-container" on:click|stopPropagation>
                         <div class="input-cell">
                             <input type="text"
@@ -218,11 +222,11 @@
                             {/if}
 
                             {#if searchResults.length > 0}
-                                <div class="dropdown shadow-2xl">
+                                <div class="dropdown shadow-2xl" transition:fade={{duration: 100}}>
                                     {#each searchResults as c}
                                         <button class="dropdown-item" on:click={() => selectContact(c)}>
                                             <span class="main-text">{c.name}</span>
-                                            <span class="sub-text">{c.phones[0] || ''}</span>
+                                            <span class="sub-text">{c.phones[0] || 'нет номера'}</span>
                                         </button>
                                     {/each}
                                 </div>
@@ -245,7 +249,7 @@
                            on:focus={() => showServiceDropdown = true}
                     />
                     {#if showServiceDropdown && (filteredServices.length > 0 || isNewService)}
-                        <div class="dropdown shadow-2xl">
+                        <div class="dropdown shadow-2xl" transition:fade={{duration: 100}}>
                             {#each filteredServices as s}
                                 <button class="dropdown-item" on:click={() => selectService(s)}>
                                     <span class="main-text">{s.name}</span>
@@ -253,8 +257,9 @@
                                 </button>
                             {/each}
                             {#if isNewService && serviceSearchInput.trim() !== ''}
-                                <button class="dropdown-item new-mark" on:click={() => showServiceDropdown = false}>
+                                <button class="dropdown-item new-mark" on:click={startNewService}>
                                     <span class="main-text">✨ Создать новую: "{serviceSearchInput}"</span>
+                                    <span class="sub-text">Нажмите, чтобы задать время</span>
                                 </button>
                             {/if}
                         </div>
@@ -265,7 +270,9 @@
                     <label>Длительность (мин)</label>
                     <div class="input-row-group" class:highlight={isNewService}>
                         <span class="clock">⏳</span>
-                        <input type="number" bind:value={formData.durationInMinutes} />
+                        <input type="number"
+                               bind:value={formData.durationInMinutes}
+                               bind:this={durationInput} />
                     </div>
                 </div>
             </section>
@@ -283,7 +290,7 @@
                     {/each}
                 </select>
 
-                <label class="mt-20">Ресурс</label>
+                <label class="mt-20">Ресурс (Кабинет)</label>
                 <select bind:value={formData.resourceId}>
                     <option value="">Без ресурса</option>
                     {#each resources as r}
@@ -305,11 +312,11 @@
 <style>
     .edit-modal-root { height: 100%; display: flex; flex-direction: column; background: #f8fafc; }
     .form-container { flex: 1; overflow-y: auto; padding: 20px; }
-    .section-card { background: white; padding: 20px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 16px; border: 1px solid #f1f5f9; }
+    .section-card { background: white; padding: 20px; border-radius: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); margin-bottom: 16px; border: 1px solid #f1f5f9; }
     label { display: block; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
-    input, select { width: 100%; padding: 14px; border-radius: 14px; border: 1.5px solid #f1f5f9; background: #f8fafc; font-size: 15px; outline: none; box-sizing: border-box; }
+    input, select { width: 100%; padding: 14px; border-radius: 14px; border: 1.5px solid #f1f5f9; background: #f8fafc; font-size: 15px; outline: none; box-sizing: border-box; transition: all 0.2s; }
+    input:focus { border-color: var(--primary-color); background: white; }
 
-    /* ГРИД ДЛЯ КЛИЕНТА - ГАРАНТИЯ ОТ НАЕЗДА */
     .search-grid-container { display: grid; grid-template-columns: 1fr 48px; gap: 12px; align-items: center; width: 100%; }
     .input-cell { position: relative; min-width: 0; }
     .button-cell { width: 48px; height: 48px; flex-shrink: 0; }
@@ -320,17 +327,17 @@
         border: 1.5px solid var(--primary-color); display: flex; align-items: center;
         justify-content: space-between; padding: 0 14px; z-index: 5; pointer-events: none;
     }
-    .badge-layer .clear { pointer-events: auto; background: white; border: none; color: #ef4444; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; }
-    .badge-layer .name { font-weight: 700; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge-layer .clear { pointer-events: auto; background: white; border: none; color: #ef4444; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 10px; font-weight: bold; }
+    .badge-layer .name { font-weight: 700; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 
     .btn-square-add { width: 48px; height: 48px; background: #eff6ff; border: 1.5px solid var(--primary-color); border-radius: 14px; color: var(--primary-color); font-weight: 800; cursor: pointer; }
 
-    .dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 100; border: 1px solid #e2e8f0; margin-top: 4px; max-height: 200px; overflow-y: auto; }
-    .dropdown-item { width: 100%; padding: 10px 14px; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; }
+    .dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); z-index: 100; border: 1px solid #e2e8f0; margin-top: 8px; max-height: 240px; overflow-y: auto; padding: 6px; }
+    .dropdown-item { width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 10px; display: flex; flex-direction: column; gap: 2px; margin-bottom: 2px; }
     .dropdown-item:hover { background: #f8fafc; }
-    .new-mark { background: #fffbeb; border-left: 4px solid #f59e0b; }
+    .new-mark { background: #fffbeb; border: 1.5px dashed #f59e0b; margin-top: 4px; }
     .main-text { font-weight: 700; color: #1e293b; font-size: 14px; }
-    .sub-text { font-size: 11px; color: #94a3b8; }
+    .sub-text { font-size: 11px; color: #94a3b8; font-weight: 600; }
 
     .quick-form { background: #f0f9ff; padding: 16px; border-radius: 16px; border: 1px dashed #3897f0; }
     .btn-group-mini { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
@@ -338,15 +345,17 @@
     .btn-prime-mini { background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; }
 
     .input-row-group { position: relative; display: flex; align-items: center; }
-    .input-row-group .clock { position: absolute; left: 12px; }
-    .input-row-group input { padding-left: 36px; }
+    .input-row-group .clock { position: absolute; left: 12px; font-size: 16px; }
+    .input-row-group input { padding-left: 38px; }
     .highlight input { border-color: #f59e0b; background: #fffbeb; }
 
     .mt-16 { margin-top: 16px; }
     .mt-20 { margin-top: 20px; }
     .actions-sticky { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 24px; padding-bottom: 40px; }
-    .btn-cancel-large { background: white; color: #64748b; border: 1.5px solid #e2e8f0; padding: 16px; border-radius: 16px; font-weight: 700; }
-    .btn-save-large { background: var(--primary-gradient); color: white; border: none; padding: 16px; border-radius: 16px; font-weight: 800; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); }
+    .btn-cancel-large { background: white; color: #64748b; border: 1.5px solid #e2e8f0; padding: 16px; border-radius: 16px; font-weight: 700; cursor: pointer; }
+    .btn-save-large { background: var(--primary-gradient); color: white; border: none; padding: 16px; border-radius: 16px; font-weight: 800; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); cursor: pointer; }
+
     .loader-center { display: flex; justify-content: center; align-items: center; height: 300px; }
     .spinner { width: 30px; height: 30px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 </style>
