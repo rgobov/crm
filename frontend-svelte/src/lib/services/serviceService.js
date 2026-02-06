@@ -7,12 +7,13 @@ export const serviceService = {
     },
 
     async addService(data) {
-        await api.post('/services', data);
+        const response = await api.post('/services', data);
+        return response.data; // ВОЗВРАЩАЕМ СОЗДАННУЮ УСЛУГУ
     },
 
     async updateService(data) {
-        // Синхронизация с Flutter: используется POST для обновления
-        await api.post('/services', data);
+        const response = await api.post('/services', data);
+        return response.data; // ВОЗВРАЩАЕМ ОБНОВЛЕННУЮ УСЛУГУ
     },
 
     async deleteService(id) {
