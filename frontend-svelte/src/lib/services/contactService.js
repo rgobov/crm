@@ -1,25 +1,27 @@
 import api from '$lib/api.js';
 
 export const contactService = {
-    // ИСПРАВЛЕНО: Добавлен параметр showAll
+    // Возвращаем данные напрямую (объект Page), чтобы поиск видел поле .content
     async getContacts(query = '', showAll = false, page = 0, size = 25) {
-        // Очистка телефона для поиска
-        const cleanQuery = query.replace(/\D/g, '').length >= 6 ? query.replace(/\D/g, '') : query;
-
         const response = await api.get('/contacts', {
             params: {
-                query: cleanQuery,
-                showAll: showAll, // Передаем флаг на бэкенд
+                query: query.trim(),
+                showAll: showAll,
                 page,
                 size
             }
         });
+        return response.data;
+    },
 
-        return {
-            contacts: response.data.content,
-            isLast: response.data.last,
-            totalElements: response.data.totalElements
-        };
+    async findContactByPhone(phone) {
+        const clean = phone.replace(/\D/g, '');
+        try {
+            const response = await api.get('/contacts/by-phone', { params: { phone: clean } });
+            return response.data;
+        } catch (e) {
+            return null;
+        }
     },
 
     async getContactById(id) {
@@ -27,11 +29,15 @@ export const contactService = {
         return response.data;
     },
 
+    async addContact(contact) {
+        const response = await api.post('/contacts', contact);
+        return response.data;
+    },
+
     async deleteContact(id) {
         await api.delete(`/contacts/${id}`);
     },
 
-    // История записей (Синхронно с Flutter AdminService)
     async getContactAppointments(contactId) {
         const response = await api.get(`/contacts/${contactId}/appointments`);
         return response.data;

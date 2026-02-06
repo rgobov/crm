@@ -10,7 +10,7 @@ export const scheduleUpdates = writable(null);
 let stompClient = null;
 let reconnectTimeout = null;
 
-// Автоматический выбор URL для веб-сокетов (dev/prod)
+// Используем переменную из .env. SockJS требует http/https схему
 const WS_URL = import.meta.env.VITE_WS_URL;
 
 export const websocketService = {
@@ -21,7 +21,9 @@ export const websocketService = {
         if (!currentUser || !currentUser.tenantId) return;
 
         try {
-            console.log('WS: Attempting to connect to', WS_URL);
+            console.log('WS: Connecting to', WS_URL);
+
+            // Важно: SockJS сам переключится на WebSocket внутри
             const socket = new SockJS(WS_URL);
             stompClient = Stomp.over(socket);
             stompClient.debug = null;
@@ -34,12 +36,12 @@ export const websocketService = {
                     if (message.body) scheduleUpdates.set(message.body);
                 });
             }, (error) => {
-                console.error('WS Error:', error);
+                console.error('WS Connection Error:', error);
                 wsConnected.set(false);
                 this.reconnect();
             });
         } catch (e) {
-            console.error('WS Setup failed:', e);
+            console.error('WS Initialization failed:', e);
         }
     },
 
@@ -50,9 +52,7 @@ export const websocketService = {
 
     disconnect() {
         if (stompClient) {
-            try {
-                stompClient.disconnect();
-            } catch (e) {}
+            try { stompClient.disconnect(); } catch (e) {}
             wsConnected.set(false);
         }
     }
