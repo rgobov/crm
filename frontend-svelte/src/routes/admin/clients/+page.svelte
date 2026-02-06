@@ -8,7 +8,7 @@
 
     let clients = [];
     let searchQuery = '';
-    let lastQuery = ''; // Для предотвращения повторных запросов
+    let lastQuery = '';
     let showAll = true;
     let currentPage = 0;
     let totalPages = 0;
@@ -19,12 +19,10 @@
     let showAddModal = false;
     let selectedClientId = null;
 
-    // УМНЫЙ ПОИСК (Аналогично окну записи и Flutter)
+    // УМНЫЙ ПОИСК
     $: {
         const query = searchQuery.trim();
         const digits = query.replace(/\D/g, '');
-
-        // Условие: 6 цифр для телефона ИЛИ 3 буквы для имени
         const isReadyToSearch = (digits.length >= 6) || (query.length >= 3 && digits.length < 3);
 
         if (query !== lastQuery) {
@@ -34,7 +32,7 @@
                     lastQuery = query;
                     loadPage(0);
                 }
-            }, 800); // 800ms - эталонный дебаунс
+            }, 800);
         }
     }
 
@@ -64,6 +62,12 @@
     function handleAddSuccess() {
         showAddModal = false;
         loadPage(0);
+    }
+
+    // РЕАКТИВНОЕ ОБНОВЛЕНИЕ СПИСКА
+    function handleUpdateSuccess() {
+        console.log('Reactive Sync: Reloading client list...');
+        loadPage(currentPage);
     }
 
     function openDetails(id) {
@@ -117,7 +121,7 @@
             <div class="center-loader"><span class="spinner"></span></div>
         {:else if clients.length === 0}
             <div class="empty-view" in:fade>
-                <p>{searchQuery ? 'Ничего не найдено' : (showAll ? 'В базе пока нет клиентов' : 'На сегодня записей нет')}</p>
+                <p>{searchQuery ? 'Ничего не найдено' : (showAll ? 'В базе пока нет клиентов' : 'На сегодня пока нет клиентов')}</p>
             </div>
         {:else}
             <div class="client-grid" class:is-loading={isLoading}>
@@ -160,7 +164,11 @@
                     <button class="close-x" on:click={closeDetails}>✕</button>
                 </header>
                 <div class="modal-scroll-body">
-                    <ContactDetailScreen contactId={selectedClientId} />
+                    <!-- СЛУШАЕМ СОБЫТИЕ UPDATED -->
+                    <ContactDetailScreen
+                        contactId={selectedClientId}
+                        on:updated={handleUpdateSuccess}
+                    />
                 </div>
             </div>
         </div>
@@ -210,7 +218,6 @@
 
     .pager { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 32px; padding-bottom: 100px; }
     .btn-p { background: white; border: 1.5px solid #f1f5f9; padding: 8px 16px; border-radius: 12px; font-weight: 700; color: #64748b; cursor: pointer; }
-    .btn-p:disabled { opacity: 0.4; }
 
     .spinner { width: 24px; height: 24px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }

@@ -24,7 +24,7 @@
     async function loadContact() {
         isLoading = true;
         try {
-            const response = await api.get(`/contacts/${contactId}`);
+            const response = await api.get(`/admin/clients/${contactId}`);
             contact = response.data;
             syncTempValues();
             dispatch('loaded', { name: contact.name });
@@ -73,6 +73,8 @@
             contact = res.data;
             cancelAllEdits();
             dispatch('loaded', { name: contact.name });
+            // УВЕДОМЛЯЕМ РОДИТЕЛЯ ОБ ОБНОВЛЕНИИ (ДЛЯ ОБНОВЛЕНИЯ СПИСКА)
+            dispatch('updated', contact);
         } catch (e) {
             alert('Ошибка: ' + (e.response?.data?.message || 'Не удалось сохранить'));
             cancelAllEdits();
@@ -148,7 +150,7 @@
                             </div>
                         {/each}
 
-                        <!-- ДОБАВЛЕНИЕ: Теперь тоже реактивно внутри карточки -->
+                        <!-- ДОБАВЛЕНИЕ -->
                         <div class="detail-row add-row">
                             {#if editMode.isAddingPhone}
                                 <div class="edit-box w-100">
@@ -171,7 +173,7 @@
                         </div>
                     </div>
 
-                    <!-- EMAIL & ЗАМЕТКИ (аналогично реактивно) -->
+                    <!-- EMAIL & ЗАМЕТКИ -->
                     <label class="section-title">ПРОЧЕЕ</label>
                     <div class="card p-16">
                         {#if editMode.email}
