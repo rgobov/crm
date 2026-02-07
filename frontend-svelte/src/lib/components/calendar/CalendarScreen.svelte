@@ -15,7 +15,6 @@
 
     const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 
-    // Реактивность для отрисовки
     $: if (workloadData || currMonth || currYear) {
         renderCalendar();
     }
@@ -70,14 +69,19 @@
 
     function getWorkloadColor(count) {
         if (!count || count === 0) return 'transparent';
-        if (count <= 2) return '#dcfce7';
-        if (count <= 5) return '#fef9c3';
-        if (count <= 8) return '#ffedd5';
-        return '#fee2e2';
+        if (count <= 2) return '#dcfce7'; // Зеленый
+        if (count <= 5) return '#fef9c3'; // Желтый
+        if (count <= 8) return '#ffedd5'; // Оранжевый
+        return '#fee2e2'; // Красный
     }
 
     function selectDate(day) {
-        const selectedDate = new Date(currYear, currMonth, day);
+        // Устанавливаем 12:00 дня, чтобы при любых TZ-сдвигах дата оставалась тем же числом
+        const selectedDate = new Date(currYear, currMonth, day, 12, 0, 0);
+        console.group('📅 Calendar: Date Selection');
+        console.log('Clicked day:', day);
+        console.log('Result ISO:', selectedDate.toISOString());
+        console.groupEnd();
         dispatch('dateSelected', { date: selectedDate });
     }
 </script>
@@ -102,12 +106,10 @@
                     class:is-today={d.today}
                     on:click={() => d.current && selectDate(d.day)}
                 >
-                    <span class="day-num">{d.day}</span>
                     {#if d.current && d.count > 0}
-                        <div class="workload-dot" style="background-color: {getWorkloadColor(d.count)}">
-                            {d.count}
-                        </div>
+                        <div class="workload-bg" style="background-color: {getWorkloadColor(d.count)}"></div>
                     {/if}
+                    <span class="day-num">{d.day}</span>
                 </div>
             {/each}
         </div>
@@ -123,31 +125,18 @@
 
 <style>
     .calendar-page-limiter { width: 100%; box-sizing: border-box; }
-
-    .calendar-container {
-        padding: 20px; background: white; border-radius: 24px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;
-    }
-
+    .calendar-container { padding: 20px; background: white; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
     .cal-header h3 { margin: 0; font-size: 17px; font-weight: 800; color: #0f172a; }
     .cal-header button { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 12px; font-size: 20px; cursor: pointer; color: var(--primary-color); }
-
     .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 12px; }
-
     .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-    .loading { opacity: 0.5; }
-
-    .day-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; position: relative; }
-    .day-cell:active { background: #f1f5f9; transform: scale(0.92); }
-    .day-num { font-size: 15px; font-weight: 600; color: #1e293b; z-index: 2; }
+    .day-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; position: relative; transition: 0.2s; }
+    .day-cell:hover { background: #f8fafc; }
+    .day-num { font-size: 15px; font-weight: 700; color: #1e293b; z-index: 2; }
     .inactive { opacity: 0.15; pointer-events: none; }
-
-    .is-today { background: #eff6ff; border: 2px solid var(--primary-color); }
-    .is-today .day-num { color: var(--primary-color); font-weight: 800; }
-
-    .workload-dot { position: absolute; bottom: 4px; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #1e293b; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-
+    .is-today { outline: 2px solid var(--primary-color); background: #eff6ff; }
+    .workload-bg { position: absolute; width: 32px; height: 32px; border-radius: 50%; z-index: 1; }
     .legend { display: flex; justify-content: space-around; margin-top: 24px; padding-top: 16px; border-top: 1px solid #f1f5f9; }
     .legend .item { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; color: #94a3b8; }
     .dot { width: 8px; height: 8px; border-radius: 50%; }

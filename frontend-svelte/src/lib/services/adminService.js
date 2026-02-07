@@ -1,44 +1,51 @@
 import api from '$lib/api.js';
 
+// Хелпер для получения строки YYYY-MM-DD в локальном времени (без UTC сдвига)
+function toLocalDbDate(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export const adminService = {
-    // --- DASHBOARD ---
     async getDashboardStats() {
-        // Запрашиваем всё одним махом через новый эндпоинт
         const response = await api.get('/admin/dashboard/stats');
         return response.data;
     },
 
-    // --- STAFF (Сотрудники) ---
     async getStaff(query = '', page = 0, size = 100) {
         const response = await api.get('/admin/staff', {
             params: { query, page, size }
         });
-        return response.data; // Возвращает Page объект
+        return response.data;
     },
 
-    // --- CLIENTS (Клиенты) ---
     async getClients(query = '', page = 0, size = 100) {
-        // Используем админский путь для клиентов
         const response = await api.get('/admin/clients', {
             params: { query, page, size }
         });
         return response.data;
     },
 
-    // --- CALENDAR & SCHEDULE ---
     async getWorkloadForMonth(year, month) {
         return (await api.get('/admin/workload', { params: { year, month } })).data;
     },
+
     async getAppointmentsForDay(date) {
-        const dateStr = date.toISOString().split('T')[0];
+        // ФИКС: Используем локальную дату вместо toISOString()
+        const dateStr = toLocalDbDate(date);
         return (await api.get('/admin/appointments/day', { params: { date: dateStr } })).data;
     },
+
     async getStaffForSchedule(date) {
-        const dateStr = date.toISOString().split('T')[0];
+        // ФИКС: Используем локальную дату
+        const dateStr = toLocalDbDate(date);
         return (await api.get('/admin/schedule/staff', { params: { date: dateStr } })).data;
     },
 
-    // --- APPOINTMENTS ---
     async createAppointment(data) {
         return await api.post('/admin/appointments', data);
     },

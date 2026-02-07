@@ -34,6 +34,7 @@ function createDashboardStore() {
 
 export const dashboardStore = createDashboardStore();
 export const activeTab = writable('management');
-
-// НОВЫЙ СТОР: Выбранная дата на таймлайне
 export const selectedDate = writable(new Date());
+
+// ТРИГГЕР ДЛЯ ПРИНУДИТЕЛЬНОГО ОБНОВЛЕНИЯ ДАННЫХ (без смены даты)
+export const refreshTrigger = writable(0);
