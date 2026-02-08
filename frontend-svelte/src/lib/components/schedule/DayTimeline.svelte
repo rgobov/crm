@@ -23,7 +23,6 @@
 
     let scrollHeader;
     let scrollBody;
-    let selectedApptId = null;
 
     // Проверяем, есть ли записи без назначенного мастера
     $: unassignedAppts = appointments.filter(a => !a.staffMemberId);
@@ -52,7 +51,6 @@
         hours = [];
         for (let i = startHour; i <= endHour; i++) hours.push(i);
 
-        // Расчет линии времени (Относительно текущей шкалы)
         const isToday = currentTime.toDateString() === day.toDateString();
         if (isToday) {
             const h = currentTime.getHours();
@@ -78,7 +76,6 @@
     function scrollToCurrentTime() {
         if (scrollBody && nowLinePos > 0) {
             const viewportHeight = scrollBody.clientHeight;
-            // Центрируем с учетом верхнего спейсера (40px)
             const targetScroll = nowLinePos - (viewportHeight / 2) + 40;
             scrollBody.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
         }
@@ -86,11 +83,11 @@
 
     function getApptStyle(appt) {
         const start = new Date(appt.startTime);
-        const top = ((start.getHours() - startHour) * 60 + start.getMinutes()) * (HOUR_HEIGHT / 60);
-        const isSelected = selectedApptId === appt.id;
+        const h = start.getHours();
+        const m = start.getMinutes();
+        const top = ((h - startHour) * 60 + m) * (HOUR_HEIGHT / 60);
         const actualHeight = appt.durationInMinutes * (HOUR_HEIGHT / 60);
-        const displayHeight = isSelected ? Math.max(actualHeight, 110) : actualHeight;
-        return `top: ${top}px; height: ${displayHeight - 2}px; z-index: ${isSelected ? 100 : 60};`;
+        return `top: ${top}px; height: ${actualHeight - 2}px; z-index: 60;`;
     }
 
     function getStatusData(status) {
@@ -103,16 +100,9 @@
         };
         return config[status] || config['SCHEDULED'];
     }
-
-    async function updateStatus(appt, newStatus) {
-        try {
-            await adminService.updateAppointment(appt.id, { ...appt, status: newStatus });
-            selectedApptId = null;
-        } catch (e) { alert('Ошибка обновления'); }
-    }
 </script>
 
-<div class="timeline-root" on:click={() => selectedApptId = null}>
+<div class="timeline-root">
 
     <header class="staff-header-fixed">
         <div class="time-corner-empty"></div>
@@ -139,7 +129,6 @@
 
     <div class="timeline-body-scroll" on:scroll={syncScroll} bind:this={scrollBody}>
 
-        <!-- ВЕРХНИЙ ОТСТУП (Чтобы было видно 8:00) -->
         <div class="timeline-spacer top"></div>
 
         <div class="body-layout-wrapper">
@@ -162,13 +151,14 @@
                     {#each [...displayStaff, ...(unassignedAppts.length > 0 ? [{id: null}] : [])] as s, sIdx}
                         <div class="staff-col" style="left: {sIdx * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
-                                <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}></button>
+                                <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click|stopPropagation={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}></button>
                             {/each}
 
                             {#each appointments.filter(a => a.staffMemberId === s.id) as appt (appt.id)}
                                 {@const status = getStatusData(appt.status)}
-                                {@const isSelected = selectedApptId === appt.id}
-                                <div class="appt-box" class:selected={isSelected} style="{getApptStyle(appt)} --status-color: {status.color}" on:click|stopPropagation={() => selectedApptId = isSelected ? null : appt.id}>
+                                <div class="appt-box"
+                                     style="{getApptStyle(appt)} --status-color: {status.color}"
+                                     on:click|stopPropagation={() => dispatch('appointmentTap', appt)}>
                                     <div class="appt-content">
                                         <div class="t">
                                             <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
@@ -176,15 +166,6 @@
                                         </div>
                                         <div class="cl">{appt.clientName}</div>
                                         <div class="sv">{appt.service}</div>
-                                        {#if isSelected}
-                                            <div class="actions" transition:slide>
-                                                <button class="a-btn" style="background:#26a69a" on:click={() => updateStatus(appt, 'CONFIRMED')}>✓</button>
-                                                <button class="a-btn" style="background:#ffa726" on:click={() => updateStatus(appt, 'NEEDS_CALL')}>📞</button>
-                                                <button class="a-btn" style="background:#94a3b8" on:click={() => updateStatus(appt, 'COMPLETED')}>🏁</button>
-                                                <button class="a-btn" style="background:#ef5350" on:click={() => updateStatus(appt, 'CANCELLED')}>✕</button>
-                                                <button class="a-btn" style="background:#3b82f6" on:click={() => dispatch('appointmentTap', appt)}>ℹ</button>
-                                            </div>
-                                        {/if}
                                     </div>
                                 </div>
                             {/each}
@@ -213,6 +194,7 @@
     .staff-scroll-area { flex: 1; overflow: hidden; }
     .staff-inner-row { display: flex; height: 100%; }
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid #f1f5f9; }
+    .staff-cell.unassigned { background: #f8fafc; font-style: italic; opacity: 0.8; }
     .avatar { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 800; }
     .n { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
@@ -231,18 +213,24 @@
     .l.bold { background: #e2e8f0; }
     .staff-col { position: absolute; top: 0; bottom: 0; }
     .slot-btn { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
-    .appt-box { position: absolute; left: 4px; right: 4px; background: white; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; transition: all 0.2s; border: 1px solid #f1f5f9; overflow: hidden; }
-    .appt-box.selected { left: -2px; right: -2px; box-shadow: 0 12px 30px rgba(0,0,0,0.2); border-color: var(--status-color); }
+
+    .appt-box {
+        position: absolute; left: 4px; right: 4px; background: white;
+        border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        cursor: pointer; transition: transform 0.1s; border: 1px solid #f1f5f9; overflow: hidden;
+    }
+    .appt-box:active { transform: scale(0.98); }
+
     .appt-content { height: 100%; border-left: 5px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; overflow: hidden; }
     .tm { font-size: 10px; font-weight: 800; color: var(--status-color); }
     .st { font-size: 8px; font-weight: 900; text-transform: uppercase; color: white; background: var(--status-color); padding: 1px 5px; border-radius: 4px; }
     .cl { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; }
     .sv { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-    .actions { margin-top: auto; padding-top: 8px; display: flex; justify-content: space-between; gap: 4px; }
-    .a-btn { flex: 1; height: 32px; border-radius: 8px; border: none; color: white; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+
     .now-indicator { position: absolute; left: 0; right: 0; z-index: 180; pointer-events: none; }
     .now-indicator .line { height: 2px; background: #ef4444; width: 100%; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
     .now-indicator .dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; animation: pulse 2s infinite; }
     .now-indicator .label { position: absolute; left: -50px; top: -10px; background: #ef4444; color: white; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 6px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
+
     @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
 </style>
