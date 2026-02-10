@@ -18,27 +18,31 @@ jobs:
           script: |
             cd ~/crm
             
-            echo "--- ОБНОВЛЕНИЕ КОДА ---"
+            echo "--- СИНХРОНИЗАЦИЯ КОДА ---"
             git fetch origin feature/telegram-mini-app
             git reset --hard origin/feature/telegram-mini-app
             
-            echo "--- ОСТАНОВКА ТОЛЬКО ПРИЛОЖЕНИЯ (БЕЗ БД И ПРОКСИ) ---"
-            # Мы не трогаем базу и прокси, чтобы не терять соединение и данные
+            echo "--- ВКЛЮЧЕНИЕ BUILDKIT ---"
+            # Эти переменные критически важны для работы сборки Maven/npm
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+            
+            echo "--- ОСТАНОВКА ПРИЛОЖЕНИЯ ---"
             docker-compose stop backend frontend-svelte
             docker-compose rm -f backend frontend-svelte
             
-            echo "--- ПОЛНАЯ ПЕРЕСБОРКА БЕЗ КЭША ---"
-            # Собираем только наши сервисы с нуля
+            echo "--- ПОЛНАЯ ПЕРЕСБОРКА (BUILDKIT ENABLED) ---"
+            # Флаг --no-cache гарантирует чистую сборку без старых слоев
             docker-compose build --no-cache backend frontend-svelte
             
-            echo "--- ЗАПУСК ОБНОВЛЕННОЙ ВЕРСИИ ---"
+            echo "--- ЗАПУСК ---"
             docker-compose up -d
             
-            echo "--- ПРОВЕРКА ЗАПУСКА (СТАТУС) ---"
+            echo "--- ПРОВЕРКА СТАТУСА ---"
             docker-compose ps
             
-            echo "--- ЛОГИ БЭКЕНДА (ПОСЛЕДНИЕ 50 СТРОК) ---"
+            echo "--- ЛОГИ (ПОСЛЕДНИЕ 50 СТРОК) ---"
             docker-compose logs --tail=50 backend
             
-            echo "--- ОЧИСТКА ВРЕМЕННЫХ СЛОЕВ ---"
+            echo "--- ОЧИСТКА ---"
             docker image prune -f
