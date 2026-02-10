@@ -18,9 +18,18 @@ jobs:
           script: |
             cd ~/crm
             git pull origin feature/telegram-mini-app
-            # Полная пересборка без использования старых слоев (кэша)
+            
+            # 1. Останавливаем текущие контейнеры
+            docker-compose down
+            
+            # 2. Удаляем старые образы проекта, чтобы гарантировать чистоту
+            docker images -q "crm-*" | xargs -r docker rmi -f
+            
+            # 3. Полная пересборка без кэша
             docker-compose build --no-cache
-            # Запуск обновленных контейнеров
+            
+            # 4. Запуск с нуля
             docker-compose up -d
-            # Глубокая очистка неиспользуемых ресурсов
+            
+            # 5. Очистка мусора
             docker system prune -f
