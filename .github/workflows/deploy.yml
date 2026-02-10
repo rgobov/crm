@@ -16,6 +16,9 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Остановить выполнение при любой ошибке
+            set -e
+            
             cd ~/crm
             
             echo "--- СИНХРОНИЗАЦИЯ КОДА ---"
@@ -23,26 +26,29 @@ jobs:
             git reset --hard origin/feature/telegram-mini-app
             
             echo "--- ВКЛЮЧЕНИЕ BUILDKIT ---"
-            # Эти переменные критически важны для работы сборки Maven/npm
             export DOCKER_BUILDKIT=1
             export COMPOSE_DOCKER_CLI_BUILD=1
             
-            echo "--- ОСТАНОВКА ПРИЛОЖЕНИЯ ---"
-            docker-compose stop backend frontend-svelte
-            docker-compose rm -f backend frontend-svelte
+            echo "--- ПОЛНАЯ ОЧИСТКА ТЕКУЩИХ КОНТЕЙНЕРОВ ---"
+            # Останавливаем и удаляем контейнеры, чтобы освободить место и гарантировать обновление
+            docker-compose stop backend frontend-svelte || true
+            docker-compose rm -f backend frontend-svelte || true
             
-            echo "--- ПОЛНАЯ ПЕРЕСБОРКА (BUILDKIT ENABLED) ---"
-            # Флаг --no-cache гарантирует чистую сборку без старых слоев
+            echo "--- УДАЛЕНИЕ СТАРЫХ ОБРАЗОВ ---"
+            # Удаляем старые образы проекта, чтобы Docker не переиспользовал их
+            docker images -q | xargs -r docker rmi -f || true
+            
+            echo "--- ПОЛНАЯ ПЕРЕСБОРКА И ЗАПУСК ---"
+            # Собираем с нуля без кэша и запускаем
             docker-compose build --no-cache backend frontend-svelte
-            
-            echo "--- ЗАПУСК ---"
-            docker-compose up -d
+            docker-compose up -d --force-recreate
             
             echo "--- ПРОВЕРКА СТАТУСА ---"
             docker-compose ps
             
-            echo "--- ЛОГИ (ПОСЛЕДНИЕ 50 СТРОК) ---"
-            docker-compose logs --tail=50 backend
+            echo "--- ЛОГИ ЗАПУСКА ---"
+            docker-compose logs --tail=20 backend
+            docker-compose logs --tail=20 frontend-svelte
             
-            echo "--- ОЧИСТКА ---"
-            docker image prune -f
+            echo "--- ФИНАЛЬНАЯ ОЧИСТКА МУСОРА ---"
+            docker system prune -f
