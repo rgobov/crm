@@ -16,39 +16,31 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Остановить выполнение при любой ошибке
             set -e
-            
             cd ~/crm
             
-            echo "--- СИНХРОНИЗАЦИЯ КОДА ---"
+            echo "--- ОБНОВЛЕНИЕ КОДА ---"
             git fetch origin feature/telegram-mini-app
             git reset --hard origin/feature/telegram-mini-app
             
-            echo "--- ВКЛЮЧЕНИЕ BUILDKIT ---"
+            echo "--- ПОДГОТОВКА СРЕДЫ ---"
             export DOCKER_BUILDKIT=1
             export COMPOSE_DOCKER_CLI_BUILD=1
             
-            echo "--- ПОЛНАЯ ОЧИСТКА ТЕКУЩИХ КОНТЕЙНЕРОВ ---"
-            # Останавливаем и удаляем контейнеры, чтобы освободить место и гарантировать обновление
+            echo "--- ОСТАНОВКА ТОЛЬКО ПРИЛОЖЕНИЯ ---"
+            # Мы не трогаем прокси и базу без нужды
             docker-compose stop backend frontend-svelte || true
             docker-compose rm -f backend frontend-svelte || true
             
-            echo "--- УДАЛЕНИЕ СТАРЫХ ОБРАЗОВ ---"
-            # Удаляем старые образы проекта, чтобы Docker не переиспользовал их
-            docker images -q | xargs -r docker rmi -f || true
+            echo "--- ЧИСТАЯ СБОРКА С НУЛЯ (БЕЗ КЭША) ---"
+            # Флаг --pull проверяет свежесть базовых образов
+            docker-compose build --no-cache --pull backend frontend-svelte
             
-            echo "--- ПОЛНАЯ ПЕРЕСБОРКА И ЗАПУСК ---"
-            # Собираем с нуля без кэша и запускаем
-            docker-compose build --no-cache backend frontend-svelte
+            echo "--- ЗАПУСК ОБНОВЛЕННОЙ ВЕРСИИ ---"
             docker-compose up -d --force-recreate
+            
+            echo "--- ОЧИСТКА МУСОРА ---"
+            docker image prune -f
             
             echo "--- ПРОВЕРКА СТАТУСА ---"
             docker-compose ps
-            
-            echo "--- ЛОГИ ЗАПУСКА ---"
-            docker-compose logs --tail=20 backend
-            docker-compose logs --tail=20 frontend-svelte
-            
-            echo "--- ФИНАЛЬНАЯ ОЧИСТКА МУСОРА ---"
-            docker system prune -f
