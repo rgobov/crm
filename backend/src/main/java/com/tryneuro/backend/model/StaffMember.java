@@ -25,8 +25,11 @@ public class StaffMember {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // Новое поле для телефона
     private String phone;
+
+    // Ссылка на аватар (опционально)
+    @Column(name = "photo_url")
+    private String photoUrl;
 
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;

@@ -11,8 +11,8 @@
     let isLoading = true;
 
     // Режимы редактирования полей
-    let editMode = { name: false, specialty: false, phone: false, role: false };
-    let tempValues = { name: '', specialty: '', phone: '', role: '', active: true };
+    let editMode = { name: false, specialty: false, phone: false, role: false, photo: false };
+    let tempValues = { name: '', specialty: '', phone: '', role: '', active: true, photoUrl: '' };
 
     onMount(loadStaff);
 
@@ -35,7 +35,8 @@
             specialty: staff.specialty || '',
             phone: staff.phone || '',
             role: staff.role || 'EMPLOYEE',
-            active: staff.active
+            active: staff.active,
+            photoUrl: staff.photoUrl || ''
         };
     }
 
@@ -73,9 +74,15 @@
             {#if isLoading}
                 <div class="center"><span class="spinner"></span></div>
             {:else if staff}
-                <!-- ГЕРОЙ-СЕКЦИЯ (Как у клиента) -->
+                <!-- ГЕРОЙ-СЕКЦИЯ (Поддержка аватара) -->
                 <div class="hero-section">
-                    <div class="avatar-box">{staff.name.charAt(0)}</div>
+                    <div class="avatar-box">
+                        {#if staff.photoUrl}
+                            <img src={staff.photoUrl} alt={staff.name} class="avatar-image" />
+                        {:else}
+                            {staff.name.charAt(0)}
+                        {/if}
+                    </div>
 
                     <div class="inline-edit-wrap">
                         {#if editMode.name}
@@ -89,7 +96,6 @@
                         {/if}
                     </div>
 
-                    <!-- ПЕРЕКЛЮЧАТЕЛЬ АКТИВНОСТИ -->
                     <div class="status-toggle-wrap">
                         <button class="toggle-pill" class:active={tempValues.active} on:click={toggleActive}>
                             <span class="dot"></span>
@@ -99,7 +105,21 @@
                 </div>
 
                 <div class="details-list">
-                    <!-- ДОЛЖНОСТЬ / СПЕЦИАЛИЗАЦИЯ -->
+                    <!-- ПЛИТКА: ФОТО (URL) -->
+                    <div class="info-tile">
+                        <label>Ссылка на фото / аватар</label>
+                        {#if editMode.photo}
+                            <div class="edit-input-group">
+                                <input type="text" bind:value={tempValues.photoUrl} placeholder="https://..." autofocus />
+                                <button class="btn-tick" on:click={() => saveField('photo')}>✓</button>
+                            </div>
+                        {:else}
+                            <p class="photo-link-val" on:click={() => editMode.photo = true}>
+                                {staff.photoUrl ? 'Изменить фото' : 'Добавить фото...'} <span>✎</span>
+                            </p>
+                        {/if}
+                    </div>
+
                     <div class="info-tile">
                         <label>Должность / Специализация</label>
                         {#if editMode.specialty}
@@ -114,7 +134,6 @@
                         {/if}
                     </div>
 
-                    <!-- ТЕЛЕФОН -->
                     <div class="info-tile">
                         <label>Контактный телефон</label>
                         {#if editMode.phone}
@@ -129,7 +148,6 @@
                         {/if}
                     </div>
 
-                    <!-- РОЛЬ В СИСТЕМЕ -->
                     <div class="info-tile">
                         <label>Уровень доступа (Роль)</label>
                         {#if editMode.role}
@@ -164,12 +182,12 @@
     .modal-body { padding: 24px; }
 
     .hero-section { text-align: center; margin-bottom: 28px; }
-    .avatar-box { width: 84px; height: 84px; background: var(--primary-gradient); color: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; margin: 0 auto 16px; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); }
+    .avatar-box { width: 84px; height: 84px; background: var(--primary-gradient); color: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; margin: 0 auto 16px; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); overflow: hidden; }
+    .avatar-image { width: 100%; height: 100%; object-fit: cover; }
 
     h3 { margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; cursor: pointer; }
     h3 span { color: var(--primary-color); opacity: 0.4; font-size: 16px; margin-left: 4px; }
 
-    /* TOGGLE STYLES */
     .status-toggle-wrap { margin-top: 16px; display: flex; justify-content: center; }
     .toggle-pill { display: flex; align-items: center; gap: 8px; padding: 6px 16px 6px 8px; border-radius: 20px; border: 1.5px solid #e2e8f0; background: white; cursor: pointer; transition: all 0.3s; }
     .toggle-pill .dot { width: 12px; height: 12px; border-radius: 50%; background: #94a3b8; }
@@ -185,7 +203,9 @@
 
     label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
     p { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; display: flex; align-items: center; justify-content: space-between; }
-    p span { color: var(--primary-color); opacity: 0.4; }
+    p span, .photo-link-val span { color: var(--primary-color); opacity: 0.4; }
+
+    .photo-link-val { color: var(--primary-color); font-weight: 700; text-decoration: underline; }
 
     .badge-role { background: #eff6ff; color: var(--primary-color); padding: 2px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; }
 

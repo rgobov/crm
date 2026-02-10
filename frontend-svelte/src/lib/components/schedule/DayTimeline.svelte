@@ -24,7 +24,6 @@
     let scrollHeader;
     let scrollBody;
 
-    // Проверяем, есть ли записи без назначенного мастера
     $: unassignedAppts = appointments.filter(a => !a.staffMemberId);
     $: displayStaff = [...staff];
 
@@ -110,7 +109,12 @@
             <div class="staff-inner-row" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 {#each displayStaff as s}
                     <div class="staff-cell" style="width: {STAFF_WIDTH}px">
-                        <div class="avatar">{s.name.charAt(0)}</div>
+                        <!-- ФИКС: Используем реальное фото, если оно есть -->
+                        {#if s.photoUrl}
+                            <img src={s.photoUrl} alt={s.name} class="avatar img" />
+                        {:else}
+                            <div class="avatar">{s.name.charAt(0)}</div>
+                        {/if}
                         <div class="meta">
                             <span class="n">{s.name}</span>
                             <span class="s">{s.specialty}</span>
@@ -194,8 +198,10 @@
     .staff-scroll-area { flex: 1; overflow: hidden; }
     .staff-inner-row { display: flex; height: 100%; }
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid #f1f5f9; }
-    .staff-cell.unassigned { background: #f8fafc; font-style: italic; opacity: 0.8; }
+
     .avatar { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 800; }
+    .avatar.img { object-fit: cover; border: 1px solid #e2e8f0; }
+
     .n { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
 
