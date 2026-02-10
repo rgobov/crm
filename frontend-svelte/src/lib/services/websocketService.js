@@ -1,47 +1,72 @@
-import SockJS from 'sockjs-client/dist/sockjs.js';
 import Stomp from 'stompjs';
 import { writable } from 'svelte/store';
-import { user } from '$lib/stores/auth.js';
-import { get } from 'svelte/store';
 
 export const wsConnected = writable(false);
-export const scheduleUpdates = writable(null);
+export const scheduleRefreshSignal = writable({ ts: 0 });
 
 let stompClient = null;
 let reconnectTimeout = null;
+let isConnecting = false;
 
-// Используем переменную из .env. SockJS требует http/https схему
-const WS_URL = import.meta.env.VITE_WS_URL;
+/**
+ * Безопасное извлечение tenantId для подписки
+ */
+function getTenantFromToken() {
+    if (typeof window === 'undefined') return null;
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.tenantId || payload.tenant_id || payload.tenant || payload.sub;
+    } catch (e) {
+        return null;
+    }
+}
+
+const getWsUrl = () => {
+    if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host;
+    return `${protocol}//${host}/ws`;
+};
 
 export const websocketService = {
     connect() {
         if (typeof window === 'undefined') return;
+        if (stompClient?.connected || isConnecting) return;
 
-        const currentUser = get(user);
-        if (!currentUser || !currentUser.tenantId) return;
+        const tenantId = getTenantFromToken();
+        if (!tenantId) return;
+
+        isConnecting = true;
+        const url = getWsUrl();
+        const token = localStorage.getItem('token');
 
         try {
-            console.log('WS: Connecting to', WS_URL);
-
-            // Важно: SockJS сам переключится на WebSocket внутри
-            const socket = new SockJS(WS_URL);
+            const socket = new WebSocket(url);
             stompClient = Stomp.over(socket);
             stompClient.debug = null;
 
-            stompClient.connect({}, (frame) => {
-                wsConnected.set(true);
-                console.log('WS: Connected successfully');
+            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
 
-                stompClient.subscribe(`/topic/schedule/${currentUser.tenantId}`, (message) => {
-                    if (message.body) scheduleUpdates.set(message.body);
+            stompClient.connect(headers, (frame) => {
+                isConnecting = false;
+                wsConnected.set(true);
+                console.log('✅ WS: Connected');
+
+                const topic = `/topic/schedule/${tenantId}`;
+                stompClient.subscribe(topic, (message) => {
+                    console.log('📥 WS: Refresh signal received');
+                    scheduleRefreshSignal.set({ ts: Date.now() });
                 });
             }, (error) => {
-                console.error('WS Connection Error:', error);
+                isConnecting = false;
                 wsConnected.set(false);
                 this.reconnect();
             });
         } catch (e) {
-            console.error('WS Initialization failed:', e);
+            isConnecting = false;
+            this.reconnect();
         }
     },
 
@@ -52,8 +77,13 @@ export const websocketService = {
 
     disconnect() {
         if (stompClient) {
-            try { stompClient.disconnect(); } catch (e) {}
+            stompClient.disconnect();
             wsConnected.set(false);
+            console.log('📡 WS: Disconnected');
         }
     }
 };
+
+if (typeof window !== 'undefined') {
+    setTimeout(() => websocketService.connect(), 1000);
+}

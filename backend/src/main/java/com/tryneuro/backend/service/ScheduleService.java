@@ -17,7 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -59,14 +61,10 @@ public class ScheduleService {
         return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
     }
 
-    /**
-     * Проверка доступности мастера с учетом системы смен.
-     */
     public boolean isStaffMemberAvailable(String tenantId, String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
         StaffMember staffMember = staffMemberRepository.findById(staffMemberId).orElse(null);
         if (staffMember == null || !staffMember.isActive()) return false;
 
-        // В чистой системе смен: если смены нет или это выходной - мастер недоступен
         Optional<StaffShift> shiftOpt = staffShiftRepository.findByStaffIdAndDate(staffMemberId, date);
         if (shiftOpt.isEmpty() || shiftOpt.get().isDayOff()) {
             return false;
@@ -75,7 +73,6 @@ public class ScheduleService {
         LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
         LocalTime end = start.plusMinutes(duration);
 
-        // Проверяем наложение на другие записи
         List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
         for (Appointment existing : staffAppointments) {
             if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
@@ -114,21 +111,6 @@ public class ScheduleService {
     public Appointment updateAppointment(String id, Appointment details) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
-        
-        boolean isTimeChanged = !appointment.getTime().truncatedTo(ChronoUnit.MINUTES)
-                                 .equals(details.getTime().truncatedTo(ChronoUnit.MINUTES));
-        
-        boolean isScheduleChanged = isTimeChanged ||
-                                     !appointment.getDate().equals(details.getDate()) ||
-                                     !appointment.getDurationInMinutes().equals(details.getDurationInMinutes()) ||
-                                     !Objects.equals(appointment.getStaffMemberId(), details.getStaffMemberId()) ||
-                                     !Objects.equals(appointment.getResourceId(), details.getResourceId());
-
-        if (isScheduleChanged) {
-            details.setId(id);
-            details.setTenantId(appointment.getTenantId());
-            validateAvailability(details);
-        }
 
         appointment.setDate(details.getDate());
         appointment.setTime(details.getTime());
@@ -154,9 +136,16 @@ public class ScheduleService {
         });
     }
 
+    /**
+     * Профессиональное уведомление через WebSocket.
+     * Шлем объект с меткой времени, чтобы клиент всегда видел изменение состояния.
+     */
     private void notifyChange(String tenantId) {
         if (tenantId != null) {
-            messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, "refresh");
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "SCHEDULE_REFRESH");
+            payload.put("timestamp", System.currentTimeMillis());
+            messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
         }
     }
 
@@ -164,18 +153,8 @@ public class ScheduleService {
         String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
         if (app.getStaffMemberId() != null) {
             if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
-                String name = staffMemberRepository.findById(app.getStaffMemberId()).map(StaffMember::getName).orElse("Сотрудник");
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер " + name + " недоступен или уже занят на это время");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят на это время");
             }
         }
-        if (app.getResourceId() != null) {
-            if (!isResourceAvailable(app.getResourceId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Этот кабинет или ресурс уже занят");
-            }
-        }
-    }
-
-    public Appointment updateAppointment(Appointment appointmentDetails) {
-        return updateAppointment(appointmentDetails.getId(), appointmentDetails);
     }
 }

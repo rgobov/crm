@@ -12,17 +12,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        // Очередь для уведомлений (например, /topic/schedule/tenant-1)
+        // Очередь для уведомлений
         config.enableSimpleBroker("/topic");
-        // Префикс для сообщений ОТ клиента К серверу
         config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Эндпоинт для подключения (SockJS)
+        // ФИКС: Регистрируем эндпоинт ДВАЖДЫ - с SockJS и БЕЗ него для поддержки чистых WebSockets
+
+        // 1. Для чистых WebSockets (как во Flutter)
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*");
+
+        // 2. Для обратной совместимости с SockJS
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
-                .withSockJS(); // Включаем поддержку SockJS
+                .withSockJS();
     }
 }

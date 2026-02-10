@@ -1,7 +1,7 @@
 <script>
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
-    import { scheduleUpdates } from '$lib/services/websocketService.js';
+    import { scheduleRefreshSignal } from '$lib/services/websocketService.js'; // Новый триггер
     import { selectedDate } from '$lib/stores/dashboardStore.js';
     import HorizontalDatePicker from './HorizontalDatePicker.svelte';
     import DayTimeline from './DayTimeline.svelte';
@@ -12,18 +12,17 @@
     let staff = [];
     let isLoading = true;
 
-    // РЕАКТИВНОСТЬ: Гарантируем срабатывание при изменении стора
-    // Используем конструкцию, которая точно отследит изменение значения
-    $: {
-        const dateToLoad = $selectedDate;
-        console.log('Schedule: Reactive trigger detected for date:', dateToLoad?.toDateString());
-        if (dateToLoad) {
-            loadDayData(dateToLoad);
-        }
+    // РЕАКТИВНОСТЬ: Загрузка при смене даты в календаре
+    $: if ($selectedDate) {
+        loadDayData($selectedDate);
     }
 
-    const unsubscribe = scheduleUpdates.subscribe(update => {
-        if (update === 'refresh') loadDayData($selectedDate, true);
+    // WEBSOCKET: Мгновенная реакция на сигнал обновления (через timestamp)
+    const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
+        if (signal && signal.ts > 0) {
+            console.log('🔄 Schedule: Global refresh signal received (Real-time update)');
+            loadDayData($selectedDate, true); // silent update
+        }
     });
 
     onMount(() => {
@@ -37,7 +36,11 @@
         if (!silent) isLoading = true;
 
         try {
-            console.log('Schedule: Fetching data from API for', date.toISOString().split('T')[0]);
+            // Используем локальную дату для запроса
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
 
             const [apptsData, staffData] = await Promise.all([
                 adminService.getAppointmentsForDay(date),
@@ -46,17 +49,14 @@
 
             appointments = apptsData || [];
             staff = (staffData || []).filter(s => s.role === 'ROLE_EMPLOYEE' || s.role === 'EMPLOYEE');
-
-            console.log('Schedule: Data loaded successfully. Masters count:', staff.length);
         } catch (e) {
-            console.error('Schedule: API Error', e);
+            console.error('❌ Schedule API Error', e);
         } finally {
             isLoading = false;
         }
     }
 
     function handleHorizontalDate(event) {
-        // При выборе даты в мобильном пикере - пишем в глобальный стор
         selectedDate.set(new Date(event.detail.date));
     }
 
@@ -80,7 +80,7 @@
         {:else if staff.length === 0}
             <div class="empty-state-msg">
                 <span class="icon">🔍</span>
-                <p>Нет мастеров на {new Date($selectedDate).toLocaleDateString('ru-RU')}</p>
+                <p>Мастера на эту дату не найдены</p>
             </div>
         {:else}
             <DayTimeline
@@ -97,11 +97,7 @@
 <style>
     .schedule-screen { display: flex; flex-direction: column; height: 100%; width: 100%; background: white; overflow: hidden; }
     .date-picker-container { flex-shrink: 0; z-index: 30; background: white; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: center; }
-
-    @media (min-width: 1024px) {
-        .date-picker-container { display: none; }
-    }
-
+    @media (min-width: 1024px) { .date-picker-container { display: none; } }
     .timeline-body { flex: 1; overflow: hidden; width: 100%; position: relative; }
     .center-box { display: flex; justify-content: center; align-items: center; height: 100%; }
     .empty-state-msg { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: #94a3b8; font-weight: 600; padding: 20px; text-align: center; }

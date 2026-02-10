@@ -68,14 +68,15 @@
                 serviceSearchInput = appointment.service;
                 if (appointment.contactId) {
                     const c = await contactService.getContactById(appointment.contactId);
-                    selectedContact = c;
-                    searchInput = c.name;
+                    if (c) {
+                        selectedContact = c;
+                        searchInput = c.name;
+                    }
                 }
             } else {
                 formData.staffMemberId = preselected.staffId || '';
                 const d = new Date(preselected.date);
                 d.setHours(preselected.hour, preselected.min, 0, 0);
-                // ФИКС: Устанавливаем ровно то время, по которому кликнули
                 formData.startTime = toInputFormat(d);
             }
         } catch (e) {
@@ -110,8 +111,10 @@
         if (query.length < 3) { searchResults = []; return; }
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
-            const res = await contactService.getContacts(query, true, 0, 5);
-            searchResults = res.content || [];
+            try {
+                const result = await contactService.getContacts(query, true, 0, 5);
+                searchResults = result.content || [];
+            } catch (err) { searchResults = []; }
         }, 600);
     }
 
@@ -134,9 +137,18 @@
 
         isSaving = true;
         try {
+            let finalService = serviceSearchInput.trim();
+            if (isNewService) {
+                const newSvc = await serviceService.addService({
+                    name: finalService,
+                    durationInMinutes: formData.durationInMinutes
+                });
+                finalService = newSvc.name;
+            }
+
             const payload = {
                 ...formData,
-                service: serviceSearchInput.trim(),
+                service: finalService,
                 clientName: selectedContact.name,
                 contactId: selectedContact.id,
                 // ПРИ ОТПРАВКЕ: преобразуем обратно в ISO
@@ -231,7 +243,7 @@
                 <div class="tile-card dual">
                     <div class="part">
                         <label>КОГДА</label>
-                        <!-- ФИКС: Убираем on:change с конвертацией в ISO, оставляем чистую привязку -->
+                        <!-- ФИКС: Добавлен bind:value для реактивного изменения времени -->
                         <input type="datetime-local" bind:value={formData.startTime} />
                     </div>
                     <div class="part border-l">
