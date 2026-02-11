@@ -3,18 +3,20 @@
     import ScheduleScreen from '$lib/components/schedule/ScheduleScreen.svelte';
     import AppointmentEditScreen from '$lib/components/schedule/AppointmentEditScreen.svelte';
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
+    import AddContactModal from '$lib/components/admin/AddContactModal.svelte'; // Импорт красивой модалки
     import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
 
     export let forcedDate = null;
 
-    let viewMode = 'month'; // 'month', 'day'
-    let showModal = null;   // null, 'edit', 'detail'
+    let viewMode = 'month';
+    let showModal = null;
+    let showNestedAddContact = false; // Состояние для вложенной модалки
 
     let currentAppointment = null;
     let preselectedData = null;
+    let appointmentEditRef; // Ссылка для вызова метода подстановки клиента
 
-    // Реактивность: Следим за датой и вкладкой
     $: if (forcedDate) {
         selectedDate.set(new Date(forcedDate));
         viewMode = 'day';
@@ -49,11 +51,16 @@
 
     function closeModal() {
         showModal = null;
+        showNestedAddContact = false;
     }
 
-    function handleSaved() {
-        closeModal();
-        // Можно добавить уведомление
+    // Обработка успеха из красивой модалки клиента
+    function handleContactAdded(event) {
+        const newContact = event.detail;
+        if (appointmentEditRef && appointmentEditRef.setCreatedContact) {
+            appointmentEditRef.setCreatedContact(newContact);
+        }
+        showNestedAddContact = false;
     }
 </script>
 
@@ -61,7 +68,7 @@
     {#if viewMode === 'month'}
         <div class="month-view" in:fade>
             <div class="header-row">
-                <h2>Календарь</h2>
+                <h2>Календарь записей</h2>
                 <button class="today-btn" on:click={() => { selectedDate.set(new Date()); viewMode = 'day'; activeTab.set('timeline'); }}>СЕГОДНЯ</button>
             </div>
             <CalendarScreen on:dateSelected={handleDateSelected} />
@@ -70,11 +77,12 @@
     {:else if viewMode === 'day'}
         <div class="day-view-wrapper" in:fade>
             <div class="day-top-bar">
+                <button class="btn-to-month" on:click={() => { viewMode = 'month'; activeTab.set('calendar'); }}>‹ Месяц</button>
                 <div class="date-info">
                     <span class="d">{$selectedDate.getDate()}</span>
                     <span class="m">{$selectedDate.toLocaleDateString('ru-RU', { month: 'long' })}</span>
                 </div>
-                <button class="btn-add" on:click={() => openNewAppointment({ detail: {} })}>+ Новая запись</button>
+                <button class="btn-add" on:click={() => openNewAppointment({ detail: {} })}>+ Запись</button>
             </div>
 
             <div class="timeline-container">
@@ -86,9 +94,9 @@
         </div>
     {/if}
 
-    <!-- МОДАЛЬНОЕ ОКНО (SPA СТИЛЬ) -->
+    <!-- МОДАЛЬНОЕ ОКНО ЗАПИСИ -->
     {#if showModal}
-        <div class="modal-backdrop" on:click|self={closeModal} transition:fade={{duration: 200}}>
+        <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
                     <h3>{showModal === 'edit' ? (currentAppointment ? 'Редактирование' : 'Новая запись') : 'Детали визита'}</h3>
@@ -98,10 +106,12 @@
                 <div class="modal-body-scroll">
                     {#if showModal === 'edit'}
                         <AppointmentEditScreen
+                            bind:this={appointmentEditRef}
                             appointment={currentAppointment}
                             preselected={preselectedData}
                             on:cancel={closeModal}
-                            on:saved={handleSaved}
+                            on:saved={closeModal}
+                            on:request-add-client={() => showNestedAddContact = true}
                         />
                     {:else if showModal === 'detail'}
                         <AppointmentDetailScreen
@@ -114,18 +124,27 @@
             </div>
         </div>
     {/if}
+
+    <!-- ТА САМАЯ КРАСИВАЯ МОДАЛКА КЛИЕНТА (ОТКРЫВАЕТСЯ ПОВЕРХ) -->
+    {#if showNestedAddContact}
+        <AddContactModal
+            on:close={() => showNestedAddContact = false}
+            on:success={handleContactAdded}
+        />
+    {/if}
 </div>
 
 <style>
     .calendar-tab-root { height: 100%; display: flex; flex-direction: column; background: white; position: relative; overflow: hidden; }
-
     .month-view { padding: 24px; flex: 1; overflow-y: auto; }
     .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    h2 { font-size: 24px; font-weight: 800; margin: 0; }
+    h2 { font-size: 24px; font-weight: 800; margin: 0; color: #0f172a; }
     .today-btn { background: var(--primary-gradient); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 700; cursor: pointer; }
 
     .day-view-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
     .day-top-bar { padding: 16px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    .btn-to-month { background: none; border: none; color: var(--primary-color); font-weight: 700; cursor: pointer; }
+
     .date-info { display: flex; align-items: baseline; gap: 8px; }
     .date-info .d { font-size: 24px; font-weight: 900; color: var(--primary-color); }
     .date-info .m { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; }
@@ -133,24 +152,14 @@
 
     .timeline-container { flex: 1; overflow: hidden; position: relative; }
 
-    /* МОДАЛКА */
-    .modal-backdrop {
-        position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(4px); z-index: 2000;
-        display: flex; align-items: center; justify-content: center; padding: 20px;
-    }
-    .modal-content {
-        background: white; width: 100%; max-width: 550px; height: 85vh;
-        border-radius: 32px; display: flex; flex-direction: column;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden;
-    }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-content { background: white; width: 100%; max-width: 550px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
     .modal-header { padding: 24px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-    .modal-header h3 { margin: 0; font-size: 18px; font-weight: 800; }
-    .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
+    .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; }
     .modal-body-scroll { flex: 1; overflow-y: auto; background: #f8fafc; }
 
     @media (max-width: 640px) {
         .modal-backdrop { padding: 0; }
-        .modal-content { height: 100vh; border-radius: 0; }
+        .modal-content { height: 95vh; border-radius: 32px 32px 0 0; }
     }
 </style>
