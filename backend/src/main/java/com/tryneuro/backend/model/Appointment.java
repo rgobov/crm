@@ -30,7 +30,6 @@ public class Appointment {
     @Column(name = "client_name", nullable = false)
     private String clientName;
 
-    // Игнорируем объект при сериализации в JSON, чтобы не было ошибки прокси
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contact_id", insertable = false, updatable = false)
@@ -42,7 +41,6 @@ public class Appointment {
     @Column(nullable = false)
     private String service;
 
-    // Игнорируем объект при сериализации в JSON
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resource_id", insertable = false, updatable = false)
@@ -51,7 +49,6 @@ public class Appointment {
     @Column(name = "resource_id")
     private String resourceId;
 
-    // Игнорируем объект при сериализации в JSON
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "staff_member_id", insertable = false, updatable = false)
@@ -75,6 +72,7 @@ public class Appointment {
     @Column(name = "reminder_sent", nullable = false)
     private boolean reminderSent = false;
 
+    // Геттеры для логики (не мешают Jackson)
     public LocalDate getDate() {
         return startTime != null ? startTime.toLocalDate() : null;
     }
@@ -83,19 +81,5 @@ public class Appointment {
         return startTime != null ? startTime.toLocalTime() : null;
     }
     
-    public void setDate(LocalDate date) {
-        if (date != null) {
-            LocalTime current = (this.startTime != null) ? this.startTime.toLocalTime() : LocalTime.MIDNIGHT;
-            this.startTime = OffsetDateTime.of(date, current, 
-                (this.startTime != null) ? this.startTime.getOffset() : OffsetDateTime.now().getOffset());
-        }
-    }
-
-    public void setTime(LocalTime time) {
-        if (time != null) {
-            LocalDate current = (this.startTime != null) ? this.startTime.toLocalDate() : LocalDate.now();
-            this.startTime = OffsetDateTime.of(current, time, 
-                (this.startTime != null) ? this.startTime.getOffset() : OffsetDateTime.now().getOffset());
-        }
-    }
+    // Сеттеры удалены, чтобы Jackson использовал прямое поле startTime
 }

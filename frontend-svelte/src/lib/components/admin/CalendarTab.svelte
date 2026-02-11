@@ -3,7 +3,7 @@
     import ScheduleScreen from '$lib/components/schedule/ScheduleScreen.svelte';
     import AppointmentEditScreen from '$lib/components/schedule/AppointmentEditScreen.svelte';
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
-    import AddContactModal from '$lib/components/admin/AddContactModal.svelte'; // Импорт красивой модалки
+    import AddContactModal from '$lib/components/admin/AddContactModal.svelte'; // Тот самый красивый крестик
     import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
 
@@ -57,7 +57,8 @@
     // Обработка успеха из красивой модалки клиента
     function handleContactAdded(event) {
         const newContact = event.detail;
-        if (appointmentEditRef && appointmentEditRef.setCreatedContact) {
+        if (appointmentEditRef) {
+            // "Пробрасываем" нового клиента в открытое окно записи
             appointmentEditRef.setCreatedContact(newContact);
         }
         showNestedAddContact = false;
@@ -111,7 +112,7 @@
                             preselected={preselectedData}
                             on:cancel={closeModal}
                             on:saved={closeModal}
-                            on:request-add-client={() => showNestedAddContact = true}
+                            on:open-add-contact-modal={() => showNestedAddContact = true}
                         />
                     {:else if showModal === 'detail'}
                         <AppointmentDetailScreen

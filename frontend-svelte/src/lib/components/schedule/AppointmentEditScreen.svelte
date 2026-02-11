@@ -37,7 +37,6 @@
     let isSaving = false;
     let debounceTimer;
 
-    // ПУБЛИЧНЫЙ МЕТОД: Для подстановки клиента из внешней красивой модалки
     export function setCreatedContact(contact) {
         if (contact) {
             selectContact(contact);
@@ -182,8 +181,7 @@
                             </div>
                         {/if}
 
-                        <!-- ДИСПАТЧИМ СОБЫТИЕ ДЛЯ РОДИТЕЛЯ -->
-                        <button class="btn-plus" on:click={() => dispatch('request-add-client')}>+</button>
+                        <button class="btn-plus" on:click={() => dispatch('open-add-contact-modal')}>+</button>
 
                         {#if searchResults.length > 0}
                             <div class="drop shadow-xl">
