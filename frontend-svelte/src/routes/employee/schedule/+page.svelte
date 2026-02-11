@@ -77,7 +77,7 @@
                             {/if}
                         </div>
                         <div class="status-indicator {appt.status.toLowerCase()}"></div>
-                    </button>
+                    </div>
                 {/each}
             </div>
         {/if}
