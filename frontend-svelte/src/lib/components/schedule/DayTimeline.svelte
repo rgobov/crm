@@ -24,14 +24,45 @@
     let scrollHeader;
     let scrollBody;
 
+    // ЛОГИКА ЗАХВАТА МЫШКОЙ (Drag to Scroll)
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    function handleMouseDown(e) {
+        isDown = true;
+        bodyDragging = true;
+        startX = e.pageX - scrollBody.offsetLeft;
+        scrollLeft = scrollBody.scrollLeft;
+    }
+
+    function handleMouseLeave() {
+        isDown = false;
+        bodyDragging = false;
+    }
+
+    function handleMouseUp() {
+        isDown = false;
+        setTimeout(() => bodyDragging = false, 50);
+    }
+
+    let bodyDragging = false;
+
+    function handleMouseMove(e) {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - scrollBody.offsetLeft;
+        const walk = (x - startX) * 1.5; // Скорость прокрутки
+        scrollBody.scrollLeft = scrollLeft - walk;
+    }
+
     $: unassignedAppts = appointments.filter(a => !a.staffMemberId);
     $: displayStaff = [...staff];
 
-    // РЕАКТИВНЫЙ РАСЧЕТ ШКАЛЫ И ЛИНИИ
+    // РЕАКТИВНЫЙ РАСЧЕТ ШКАЛЫ
     $: {
         let minH = 9;
         let maxH = 20;
-
         if (staff.length > 0 || appointments.length > 0) {
             staff.forEach(s => {
                 if (s.workStartTime) minH = Math.min(minH, parseInt(s.workStartTime.split(':')[0]));
@@ -44,7 +75,6 @@
                 maxH = Math.max(maxH, end);
             });
         }
-
         startHour = Math.max(0, minH - 1);
         endHour = Math.min(24, maxH + 1);
         hours = [];
@@ -54,8 +84,7 @@
         if (isToday) {
             const h = currentTime.getHours();
             const m = currentTime.getMinutes();
-            const minsFromStart = (h - startHour) * 60 + m;
-            nowLinePos = minsFromStart * (HOUR_HEIGHT / 60);
+            nowLinePos = ((h - startHour) * 60 + m) * (HOUR_HEIGHT / 60);
         } else {
             nowLinePos = -1;
         }
@@ -82,9 +111,7 @@
 
     function getApptStyle(appt) {
         const start = new Date(appt.startTime);
-        const h = start.getHours();
-        const m = start.getMinutes();
-        const top = ((h - startHour) * 60 + m) * (HOUR_HEIGHT / 60);
+        const top = ((start.getHours() - startHour) * 60 + start.getMinutes()) * (HOUR_HEIGHT / 60);
         const actualHeight = appt.durationInMinutes * (HOUR_HEIGHT / 60);
         return `top: ${top}px; height: ${actualHeight - 2}px; z-index: 60;`;
     }
@@ -103,13 +130,13 @@
 
 <div class="timeline-root">
 
+    <!-- ФИКСИРОВАННАЯ ШАПКА -->
     <header class="staff-header-fixed">
-        <div class="time-corner-empty"></div>
+        <div class="time-corner-empty">🕒</div>
         <div class="staff-scroll-area" bind:this={scrollHeader}>
             <div class="staff-inner-row" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 {#each displayStaff as s}
                     <div class="staff-cell" style="width: {STAFF_WIDTH}px">
-                        <!-- ФИКС: Используем реальное фото, если оно есть -->
                         {#if s.photoUrl}
                             <img src={s.photoUrl} alt={s.name} class="avatar img" />
                         {:else}
@@ -131,11 +158,20 @@
         </div>
     </header>
 
-    <div class="timeline-body-scroll" on:scroll={syncScroll} bind:this={scrollBody}>
+    <!-- ОСНОВНОЕ ТЕЛО С ЗАХВАТОМ МЫШИ -->
+    <div class="timeline-body-scroll"
+         on:scroll={syncScroll}
+         bind:this={scrollBody}
+         on:mousedown={handleMouseDown}
+         on:mouseleave={handleMouseLeave}
+         on:mouseup={handleMouseUp}
+         on:mousemove={handleMouseMove}
+         class:grabbing={isDown}>
 
         <div class="timeline-spacer top"></div>
 
-        <div class="body-layout-wrapper">
+        <div class="body-layout-wrapper" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
+            <!-- ШКАЛА ВРЕМЕНИ (Фиксированная слева) -->
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
@@ -144,7 +180,8 @@
                 {/each}
             </div>
 
-            <div class="grid-canvas" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px; height: {hours.length * HOUR_HEIGHT}px">
+            <!-- СЕТКА И КОЛОНКИ -->
+            <div class="grid-canvas" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 <div class="grid-lines">
                     {#each Array(hours.length * 4) as _, i}
                         <div class="l" class:bold={i % 4 === 0} style="top: {i * SLOT_HEIGHT}px"></div>
@@ -153,16 +190,19 @@
 
                 <div class="columns-container">
                     {#each [...displayStaff, ...(unassignedAppts.length > 0 ? [{id: null}] : [])] as s, sIdx}
-                        <div class="staff-col" style="left: {sIdx * STAFF_WIDTH}px; width: {STAFF_WIDTH}px">
+                        <div class="staff-col" style="width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
-                                <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click|stopPropagation={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}></button>
+                                <button class="slot-btn"
+                                        style="height: {SLOT_HEIGHT}px"
+                                        on:click|stopPropagation={() => !bodyDragging && dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}>
+                                </button>
                             {/each}
 
                             {#each appointments.filter(a => a.staffMemberId === s.id) as appt (appt.id)}
                                 {@const status = getStatusData(appt.status)}
                                 <div class="appt-box"
                                      style="{getApptStyle(appt)} --status-color: {status.color}"
-                                     on:click|stopPropagation={() => dispatch('appointmentTap', appt)}>
+                                     on:click|stopPropagation={() => !bodyDragging && dispatch('appointmentTap', appt)}>
                                     <div class="appt-content">
                                         <div class="t">
                                             <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
@@ -192,21 +232,23 @@
 </div>
 
 <style>
-    .timeline-root { height: 100vh; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden; }
+    .timeline-root { height: 100vh; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden; user-select: none; }
+
     .staff-header-fixed { display: flex; height: 74px; background: white; z-index: 200; border-bottom: 1px solid #f1f5f9; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex-shrink: 0; }
-    .time-corner-empty { width: 60px; background: white; z-index: 210; border-right: 1px solid #f1f5f9; }
+    .time-corner-empty { width: 60px; background: white; z-index: 210; border-right: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 18px; }
     .staff-scroll-area { flex: 1; overflow: hidden; }
     .staff-inner-row { display: flex; height: 100%; }
-    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid #f1f5f9; }
+    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid #f1f5f9; box-sizing: border-box; }
 
     .avatar { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 800; }
     .avatar.img { object-fit: cover; border: 1px solid #e2e8f0; }
-
     .n { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
 
-    .timeline-body-scroll { flex: 1; overflow: auto; position: relative; scroll-behavior: smooth; }
-    .timeline-spacer { height: 40px; background: #f1f5f9; width: 100%; position: relative; z-index: 160; }
+    .timeline-body-scroll { flex: 1; overflow: auto; position: relative; scroll-behavior: smooth; cursor: grab; }
+    .timeline-body-scroll.grabbing { cursor: grabbing; scroll-behavior: auto; }
+
+    .timeline-spacer { height: 40px; background: white; width: 100%; position: relative; z-index: 160; }
     .timeline-spacer.bottom { height: 100px; }
 
     .body-layout-wrapper { display: flex; min-height: 100%; }
@@ -214,10 +256,12 @@
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 800; color: #94a3b8; background: white; padding: 2px 4px; }
 
-    .grid-canvas { position: relative; background: #f8fafc; }
+    .grid-canvas { position: relative; background: #f8fafc; flex-shrink: 0; }
     .l { position: absolute; left: 0; right: 0; height: 1px; background: #f1f5f9; }
     .l.bold { background: #e2e8f0; }
-    .staff-col { position: absolute; top: 0; bottom: 0; }
+
+    .columns-container { display: flex; height: 100%; }
+    .staff-col { position: relative; height: 100%; border-right: 1px solid #f1f5f9; box-sizing: border-box; flex-shrink: 0; scroll-snap-align: start; }
     .slot-btn { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
 
     .appt-box {
