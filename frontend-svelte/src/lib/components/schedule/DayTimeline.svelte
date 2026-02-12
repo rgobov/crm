@@ -27,33 +27,42 @@
     // ЛОГИКА ЗАХВАТА МЫШКОЙ (Drag to Scroll)
     let isDown = false;
     let startX;
+    let startY; // Добавляем Y для точности
     let scrollLeft;
+    let bodyDragging = false;
 
     function handleMouseDown(e) {
         isDown = true;
-        bodyDragging = true;
         startX = e.pageX - scrollBody.offsetLeft;
+        startY = e.pageY - scrollBody.offsetTop;
         scrollLeft = scrollBody.scrollLeft;
+        bodyDragging = false; // Сбрасываем при каждом нажатии
     }
 
     function handleMouseLeave() {
         isDown = false;
-        bodyDragging = false;
     }
 
     function handleMouseUp() {
         isDown = false;
-        setTimeout(() => bodyDragging = false, 50);
+        // Не сбрасываем bodyDragging сразу, чтобы клик успел его прочитать
+        setTimeout(() => { bodyDragging = false; }, 100);
     }
-
-    let bodyDragging = false;
 
     function handleMouseMove(e) {
         if (!isDown) return;
-        e.preventDefault();
+
         const x = e.pageX - scrollBody.offsetLeft;
-        const walk = (x - startX) * 1.5; // Скорость прокрутки
-        scrollBody.scrollLeft = scrollLeft - walk;
+        const y = e.pageY - scrollBody.offsetTop;
+        const dist = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+
+        // Считаем перетаскиванием только если сдвинули более чем на 5px
+        if (dist > 5) {
+            bodyDragging = true;
+            e.preventDefault();
+            const walk = (x - startX) * 1.5;
+            scrollBody.scrollLeft = scrollLeft - walk;
+        }
     }
 
     $: unassignedAppts = appointments.filter(a => !a.staffMemberId);
@@ -130,7 +139,6 @@
 
 <div class="timeline-root">
 
-    <!-- ФИКСИРОВАННАЯ ШАПКА -->
     <header class="staff-header-fixed">
         <div class="time-corner-empty">🕒</div>
         <div class="staff-scroll-area" bind:this={scrollHeader}>
@@ -158,7 +166,6 @@
         </div>
     </header>
 
-    <!-- ОСНОВНОЕ ТЕЛО С ЗАХВАТОМ МЫШИ -->
     <div class="timeline-body-scroll"
          on:scroll={syncScroll}
          bind:this={scrollBody}
@@ -171,7 +178,6 @@
         <div class="timeline-spacer top"></div>
 
         <div class="body-layout-wrapper" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
-            <!-- ШКАЛА ВРЕМЕНИ (Фиксированная слева) -->
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
@@ -180,7 +186,6 @@
                 {/each}
             </div>
 
-            <!-- СЕТКА И КОЛОНКИ -->
             <div class="grid-canvas" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 <div class="grid-lines">
                     {#each Array(hours.length * 4) as _, i}
@@ -194,7 +199,7 @@
                             {#each Array(hours.length * 4) as _, i}
                                 <button class="slot-btn"
                                         style="height: {SLOT_HEIGHT}px"
-                                        on:click|stopPropagation={() => !bodyDragging && dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}>
+                                        on:click|stopPropagation={() => { if(!bodyDragging) dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id }); }}>
                                 </button>
                             {/each}
 
@@ -202,7 +207,7 @@
                                 {@const status = getStatusData(appt.status)}
                                 <div class="appt-box"
                                      style="{getApptStyle(appt)} --status-color: {status.color}"
-                                     on:click|stopPropagation={() => !bodyDragging && dispatch('appointmentTap', appt)}>
+                                     on:click|stopPropagation={() => { if(!bodyDragging) dispatch('appointmentTap', appt); }}>
                                     <div class="appt-content">
                                         <div class="t">
                                             <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
@@ -233,54 +238,39 @@
 
 <style>
     .timeline-root { height: 100vh; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden; user-select: none; }
-
     .staff-header-fixed { display: flex; height: 74px; background: white; z-index: 200; border-bottom: 1px solid #f1f5f9; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex-shrink: 0; }
     .time-corner-empty { width: 60px; background: white; z-index: 210; border-right: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 18px; }
     .staff-scroll-area { flex: 1; overflow: hidden; }
     .staff-inner-row { display: flex; height: 100%; }
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid #f1f5f9; box-sizing: border-box; }
-
     .avatar { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 800; }
     .avatar.img { object-fit: cover; border: 1px solid #e2e8f0; }
     .n { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
-
     .timeline-body-scroll { flex: 1; overflow: auto; position: relative; scroll-behavior: smooth; cursor: grab; }
     .timeline-body-scroll.grabbing { cursor: grabbing; scroll-behavior: auto; }
-
     .timeline-spacer { height: 40px; background: white; width: 100%; position: relative; z-index: 160; }
     .timeline-spacer.bottom { height: 100px; }
-
     .body-layout-wrapper { display: flex; min-height: 100%; }
     .time-axis-col { flex-shrink: 0; background: white; border-right: 1px solid #f1f5f9; position: sticky; left: 0; z-index: 150; }
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 800; color: #94a3b8; background: white; padding: 2px 4px; }
-
     .grid-canvas { position: relative; background: #f8fafc; flex-shrink: 0; }
     .l { position: absolute; left: 0; right: 0; height: 1px; background: #f1f5f9; }
     .l.bold { background: #e2e8f0; }
-
     .columns-container { display: flex; height: 100%; }
-    .staff-col { position: relative; height: 100%; border-right: 1px solid #f1f5f9; box-sizing: border-box; flex-shrink: 0; scroll-snap-align: start; }
+    .staff-col { position: relative; height: 100%; border-right: 1px solid #f1f5f9; box-sizing: border-box; flex-shrink: 0; }
     .slot-btn { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
-
-    .appt-box {
-        position: absolute; left: 4px; right: 4px; background: white;
-        border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        cursor: pointer; transition: transform 0.1s; border: 1px solid #f1f5f9; overflow: hidden;
-    }
+    .appt-box { position: absolute; left: 4px; right: 4px; background: white; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.1s; border: 1px solid #f1f5f9; overflow: hidden; }
     .appt-box:active { transform: scale(0.98); }
-
     .appt-content { height: 100%; border-left: 5px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; overflow: hidden; }
     .tm { font-size: 10px; font-weight: 800; color: var(--status-color); }
     .st { font-size: 8px; font-weight: 900; text-transform: uppercase; color: white; background: var(--status-color); padding: 1px 5px; border-radius: 4px; }
     .cl { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; }
     .sv { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-
     .now-indicator { position: absolute; left: 0; right: 0; z-index: 180; pointer-events: none; }
     .now-indicator .line { height: 2px; background: #ef4444; width: 100%; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
     .now-indicator .dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; animation: pulse 2s infinite; }
     .now-indicator .label { position: absolute; left: -50px; top: -10px; background: #ef4444; color: white; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 6px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
-
     @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
 </style>
