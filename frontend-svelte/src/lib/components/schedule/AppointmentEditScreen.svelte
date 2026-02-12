@@ -38,9 +38,7 @@
     let debounceTimer;
 
     export function setCreatedContact(contact) {
-        if (contact) {
-            selectContact(contact);
-        }
+        if (contact) selectContact(contact);
     }
 
     function toLocalISO(date) {
@@ -65,12 +63,20 @@
 
             services = servicesData;
             resources = resourcesData;
+            // Фильтруем только сотрудников
             staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
 
             if (isEditing) {
-                formData = { ...appointment };
+                // ВАЖНО: Делаем глубокую копию и гарантируем наличие staffMemberId
+                formData = {
+                    ...appointment,
+                    // Если поле в объекте называется иначе - мапим его
+                    staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : '')
+                };
+
                 formData.startTime = toLocalISO(new Date(appointment.startTime));
                 serviceSearchInput = appointment.service;
+
                 if (appointment.contactId) {
                     const c = await contactService.getContactById(appointment.contactId);
                     if (c) selectContact(c);

@@ -24,10 +24,9 @@
     let scrollHeader;
     let scrollBody;
 
-    // ЛОГИКА ЗАХВАТА МЫШКОЙ (Drag to Scroll)
     let isDown = false;
     let startX;
-    let startY; // Добавляем Y для точности
+    let startY;
     let scrollLeft;
     let bodyDragging = false;
 
@@ -36,27 +35,21 @@
         startX = e.pageX - scrollBody.offsetLeft;
         startY = e.pageY - scrollBody.offsetTop;
         scrollLeft = scrollBody.scrollLeft;
-        bodyDragging = false; // Сбрасываем при каждом нажатии
+        bodyDragging = false;
     }
 
-    function handleMouseLeave() {
-        isDown = false;
-    }
+    function handleMouseLeave() { isDown = false; }
 
     function handleMouseUp() {
         isDown = false;
-        // Не сбрасываем bodyDragging сразу, чтобы клик успел его прочитать
         setTimeout(() => { bodyDragging = false; }, 100);
     }
 
     function handleMouseMove(e) {
         if (!isDown) return;
-
         const x = e.pageX - scrollBody.offsetLeft;
         const y = e.pageY - scrollBody.offsetTop;
         const dist = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-
-        // Считаем перетаскиванием только если сдвинули более чем на 5px
         if (dist > 5) {
             bodyDragging = true;
             e.preventDefault();
@@ -65,10 +58,23 @@
         }
     }
 
+    // ФУНКЦИЯ ДЛЯ КЛИКА ПО ЗАПИСИ
+    function onApptClick(appt) {
+        if (bodyDragging) return;
+
+        // ФИКС: Ищем мастера в текущем списке staff, чтобы передать его имя в модалку
+        const master = staff.find(s => s.id === appt.staffMemberId);
+        const enrichedAppt = {
+            ...appt,
+            staffName: master ? master.name : 'Не назначен'
+        };
+
+        dispatch('appointmentTap', enrichedAppt);
+    }
+
     $: unassignedAppts = appointments.filter(a => !a.staffMemberId);
     $: displayStaff = [...staff];
 
-    // РЕАКТИВНЫЙ РАСЧЕТ ШКАЛЫ
     $: {
         let minH = 9;
         let maxH = 20;
@@ -207,7 +213,7 @@
                                 {@const status = getStatusData(appt.status)}
                                 <div class="appt-box"
                                      style="{getApptStyle(appt)} --status-color: {status.color}"
-                                     on:click|stopPropagation={() => { if(!bodyDragging) dispatch('appointmentTap', appt); }}>
+                                     on:click|stopPropagation={() => onApptClick(appt)}>
                                     <div class="appt-content">
                                         <div class="t">
                                             <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
