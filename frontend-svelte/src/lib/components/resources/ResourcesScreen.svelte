@@ -53,46 +53,48 @@
 
 <div class="screen-wrapper">
     <div class="screen-content">
-        <header class="header">
-            <div class="title-wrap">
-                <h1>Ресурсы</h1>
-                <span class="count-badge">{resources.length}</span>
-            </div>
-            <p class="subtitle">Кабинеты, залы и оборудование</p>
-        </header>
+        <!-- ВНУТРЕННИЙ КОНТЕЙНЕР ДЛЯ ЦЕНТРИРОВАНИЯ -->
+        <div class="container-inner">
+            <header class="header">
+                <div class="title-wrap">
+                    <h1>Ресурсы</h1>
+                    <span class="count-badge">{resources.length}</span>
+                </div>
+                <p class="subtitle">Кабинеты, залы и оборудование</p>
+            </header>
 
-        {#if isLoading && resources.length === 0}
-            <div class="center-loader"><span class="spinner"></span></div>
-        {:else if resources.length === 0}
-            <div class="empty-state" in:fade>
-                <div class="empty-icon">🛠️</div>
-                <h3>Нет активных ресурсов</h3>
-                <p>Добавьте первый кабинет для работы</p>
-                <button class="btn-prime" on:click={openCreate}>Создать ресурс</button>
-            </div>
-        {:else}
-            <div class="tiles-grid">
-                {#each resources as resource}
-                    <div class="resource-tile" on:click={() => openEdit(resource)}>
-                        <div class="icon-circle">📦</div>
-                        <div class="info">
-                            <h3>{resource.name}</h3>
-                            <p>{resource.description || 'Без описания'}</p>
+            {#if isLoading && resources.length === 0}
+                <div class="center-loader"><span class="spinner"></span></div>
+            {:else if resources.length === 0}
+                <div class="empty-state" in:fade>
+                    <div class="empty-icon">🛠️</div>
+                    <h3>Нет активных ресурсов</h3>
+                    <p>Добавьте первый кабинет для работы</p>
+                    <button class="btn-prime" on:click={openCreate}>Создать ресурс</button>
+                </div>
+            {:else}
+                <div class="tiles-grid">
+                    {#each resources as resource}
+                        <div class="resource-tile" on:click={() => openEdit(resource)}>
+                            <div class="icon-circle">📦</div>
+                            <div class="info">
+                                <h3>{resource.name}</h3>
+                                <p>{resource.description || 'Без описания'}</p>
+                            </div>
+                            <button class="btn-del" on:click|stopPropagation={() => handleDelete(resource.id, resource.name)}>
+                                🗑
+                            </button>
                         </div>
-                        <button class="btn-del" on:click|stopPropagation={() => handleDelete(resource.id, resource.name)}>
-                            🗑
-                        </button>
-                    </div>
-                {/each}
-            </div>
+                    {/each}
+                </div>
 
-            <div class="bottom-spacer"></div>
-        {/if}
+                <div class="bottom-spacer"></div>
+            {/if}
+        </div>
     </div>
 
     <button class="fab-btn" on:click={openCreate}>+</button>
 
-    <!-- МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ/СОЗДАНИЯ -->
     {#if showModal}
         <ResourceEditScreen
             resource={selectedResource}
@@ -116,12 +118,16 @@
     .screen-content {
         flex: 1;
         overflow-y: auto;
-        padding: 32px;
-        max-width: 800px;
-        margin: 0 auto;
         width: 100%;
         box-sizing: border-box;
         -webkit-overflow-scrolling: touch;
+    }
+
+    /* ЦЕНТРИРУЕМ КОНТЕНТ ВНУТРИ ПОЛНОШИРОТНОГО СКРОЛЛА */
+    .container-inner {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 32px 20px;
     }
 
     .header { margin-bottom: 32px; }
@@ -152,16 +158,12 @@
 
     .bottom-spacer { height: 120px; }
 
-    .empty-state { text-align: center; padding: 80px 20px; }
-    .empty-icon { font-size: 64px; margin-bottom: 24px; opacity: 0.5; }
-    .btn-prime { background: var(--primary-gradient); color: white; border: none; padding: 14px 32px; border-radius: 16px; font-weight: 800; cursor: pointer; }
-
     .center-loader { display: flex; justify-content: center; padding: 100px; }
     .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 640px) {
-        .screen-content { padding: 20px; }
+        .container-inner { padding: 20px; }
         .tiles-grid { grid-template-columns: 1fr; }
         .fab-btn { bottom: 100px; right: 20px; }
     }
