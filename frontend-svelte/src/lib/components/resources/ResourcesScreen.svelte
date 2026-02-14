@@ -51,42 +51,46 @@
     }
 </script>
 
-<div class="screen-content">
-    <header class="header">
-        <div class="title-wrap">
-            <h1>Ресурсы</h1>
-            <span class="count-badge">{resources.length}</span>
-        </div>
-        <p class="subtitle">Кабинеты, залы и оборудование</p>
-    </header>
+<div class="screen-wrapper">
+    <div class="screen-content">
+        <header class="header">
+            <div class="title-wrap">
+                <h1>Ресурсы</h1>
+                <span class="count-badge">{resources.length}</span>
+            </div>
+            <p class="subtitle">Кабинеты, залы и оборудование</p>
+        </header>
 
-    {#if isLoading && resources.length === 0}
-        <div class="center-loader"><span class="spinner"></span></div>
-    {:else if resources.length === 0}
-        <div class="empty-state" in:fade>
-            <div class="empty-icon">🛠️</div>
-            <h3>Нет активных ресурсов</h3>
-            <p>Добавьте первый кабинет для работы</p>
-            <button class="btn-prime" on:click={openCreate}>Создать ресурс</button>
-        </div>
-    {:else}
-        <div class="tiles-grid">
-            {#each resources as resource}
-                <div class="resource-tile" on:click={() => openEdit(resource)}>
-                    <div class="icon-circle">📦</div>
-                    <div class="info">
-                        <h3>{resource.name}</h3>
-                        <p>{resource.description || 'Без описания'}</p>
+        {#if isLoading && resources.length === 0}
+            <div class="center-loader"><span class="spinner"></span></div>
+        {:else if resources.length === 0}
+            <div class="empty-state" in:fade>
+                <div class="empty-icon">🛠️</div>
+                <h3>Нет активных ресурсов</h3>
+                <p>Добавьте первый кабинет для работы</p>
+                <button class="btn-prime" on:click={openCreate}>Создать ресурс</button>
+            </div>
+        {:else}
+            <div class="tiles-grid">
+                {#each resources as resource}
+                    <div class="resource-tile" on:click={() => openEdit(resource)}>
+                        <div class="icon-circle">📦</div>
+                        <div class="info">
+                            <h3>{resource.name}</h3>
+                            <p>{resource.description || 'Без описания'}</p>
+                        </div>
+                        <button class="btn-del" on:click|stopPropagation={() => handleDelete(resource.id, resource.name)}>
+                            🗑
+                        </button>
                     </div>
-                    <button class="btn-del" on:click|stopPropagation={() => handleDelete(resource.id, resource.name)}>
-                        🗑
-                    </button>
-                </div>
-            {/each}
-        </div>
+                {/each}
+            </div>
 
-        <button class="fab-btn" on:click={openCreate}>+</button>
-    {/if}
+            <div class="bottom-spacer"></div>
+        {/if}
+    </div>
+
+    <button class="fab-btn" on:click={openCreate}>+</button>
 
     <!-- МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ/СОЗДАНИЯ -->
     {#if showModal}
@@ -99,7 +103,26 @@
 </div>
 
 <style>
-    .screen-content { padding: 32px; max-width: 800px; margin: 0 auto; position: relative; min-height: 100%; }
+    .screen-wrapper {
+        height: 100vh;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        background: #f8fafc;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .screen-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 32px;
+        max-width: 800px;
+        margin: 0 auto;
+        width: 100%;
+        box-sizing: border-box;
+        -webkit-overflow-scrolling: touch;
+    }
 
     .header { margin-bottom: 32px; }
     .title-wrap { display: flex; align-items: center; gap: 12px; }
@@ -124,8 +147,10 @@
     .btn-del { background: #fef2f2; color: #ef4444; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; opacity: 0; transition: 0.2s; }
     .resource-tile:hover .btn-del { opacity: 1; }
 
-    .fab-btn { position: fixed; bottom: 40px; right: 40px; width: 64px; height: 64px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; font-weight: 300; cursor: pointer; box-shadow: 0 15px 35px rgba(56, 151, 240, 0.3); transition: 0.2s; z-index: 100; }
+    .fab-btn { position: fixed; bottom: 40px; right: 40px; width: 64px; height: 64px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; font-weight: 300; cursor: pointer; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.3); transition: 0.2s; z-index: 100; }
     .fab-btn:active { transform: scale(0.9); }
+
+    .bottom-spacer { height: 120px; }
 
     .empty-state { text-align: center; padding: 80px 20px; }
     .empty-icon { font-size: 64px; margin-bottom: 24px; opacity: 0.5; }
