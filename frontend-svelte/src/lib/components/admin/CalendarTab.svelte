@@ -3,7 +3,7 @@
     import ScheduleScreen from '$lib/components/schedule/ScheduleScreen.svelte';
     import AppointmentEditScreen from '$lib/components/schedule/AppointmentEditScreen.svelte';
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
-    import AddContactModal from '$lib/components/admin/AddContactModal.svelte'; // Тот самый красивый крестик
+    import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
     import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
 
@@ -11,11 +11,11 @@
 
     let viewMode = 'month';
     let showModal = null;
-    let showNestedAddContact = false; // Состояние для вложенной модалки
+    let showNestedAddContact = false;
 
     let currentAppointment = null;
     let preselectedData = null;
-    let appointmentEditRef; // Ссылка для вызова метода подстановки клиента
+    let appointmentEditRef;
 
     $: if (forcedDate) {
         selectedDate.set(new Date(forcedDate));
@@ -54,11 +54,9 @@
         showNestedAddContact = false;
     }
 
-    // Обработка успеха из красивой модалки клиента
     function handleContactAdded(event) {
         const newContact = event.detail;
         if (appointmentEditRef) {
-            // "Пробрасываем" нового клиента в открытое окно записи
             appointmentEditRef.setCreatedContact(newContact);
         }
         showNestedAddContact = false;
@@ -81,7 +79,10 @@
                 <button class="btn-to-month" on:click={() => { viewMode = 'month'; activeTab.set('calendar'); }}>‹ Месяц</button>
                 <div class="date-info">
                     <span class="d">{$selectedDate.getDate()}</span>
-                    <span class="m">{$selectedDate.toLocaleDateString('ru-RU', { month: 'long' })}</span>
+                    <!-- ФИКС КАПСА: Убрали uppercase, добавили мягкую капитализацию первой буквы через JS -->
+                    <span class="m">
+                        {$selectedDate.toLocaleDateString('ru-RU', { month: 'long' }).replace(/^./, str => str.toUpperCase())}
+                    </span>
                 </div>
                 <button class="btn-add" on:click={() => openNewAppointment({ detail: {} })}>+ Запись</button>
             </div>
@@ -95,7 +96,6 @@
         </div>
     {/if}
 
-    <!-- МОДАЛЬНОЕ ОКНО ЗАПИСИ -->
     {#if showModal}
         <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
@@ -126,7 +126,6 @@
         </div>
     {/if}
 
-    <!-- ТА САМАЯ КРАСИВАЯ МОДАЛКА КЛИЕНТА (ОТКРЫВАЕТСЯ ПОВЕРХ) -->
     {#if showNestedAddContact}
         <AddContactModal
             on:close={() => showNestedAddContact = false}
@@ -147,8 +146,10 @@
     .btn-to-month { background: none; border: none; color: var(--primary-color); font-weight: 700; cursor: pointer; }
 
     .date-info { display: flex; align-items: baseline; gap: 8px; }
-    .date-info .d { font-size: 24px; font-weight: 900; color: var(--primary-color); }
-    .date-info .m { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+    .date-info .d { font-size: 24px; font-weight: 900; color: var(--primary-color); letter-spacing: -0.5px; }
+    /* УБРАЛИ UPPERCASE И УМЕНЬШИЛИ ИНТЕРВАЛ */
+    .date-info .m { font-size: 15px; font-weight: 700; color: #64748b; letter-spacing: -0.2px; }
+
     .btn-add { background: #eff6ff; color: var(--primary-color); border: none; padding: 10px 20px; border-radius: 12px; font-weight: 800; cursor: pointer; }
 
     .timeline-container { flex: 1; overflow: hidden; position: relative; }
