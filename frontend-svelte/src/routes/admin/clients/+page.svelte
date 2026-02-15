@@ -47,7 +47,8 @@
     async function loadPage(page) {
         isLoading = true;
         try {
-            const result = await contactService.getContacts(searchQuery, showAll, page, 25);
+            // ФИКС: Устанавливаем размер страницы 24 для симметрии колонок (12+12)
+            const result = await contactService.getContacts(searchQuery, showAll, page, 24);
             clients = result.content || [];
             totalPages = result.totalPages || 0;
             totalElements = result.totalElements || 0;
