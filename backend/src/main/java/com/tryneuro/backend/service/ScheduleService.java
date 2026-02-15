@@ -53,7 +53,6 @@ public class ScheduleService {
         return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
     }
 
-    // ВОССТАНОВЛЕННЫЙ МЕТОД: Для ContactController (Flutter версия)
     public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
         return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
     }
@@ -70,29 +69,35 @@ public class ScheduleService {
         return saved;
     }
 
+    /**
+     * СТАБИЛЬНОЕ ОБНОВЛЕНИЕ: Сохраняем ID неизменным.
+     * Это исправляет ошибки 404 при быстрой смене статусов.
+     */
     @Transactional
     public Appointment updateAppointment(String id, Appointment details) {
-        log.info("♻️ Re-creating appointment (Delete & Create) for id: {}", id);
+        log.info("📝 Updating appointment id: {}", id);
 
-        Appointment oldAppointment = appointmentRepository.findById(id)
+        Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
 
-        String tenantId = oldOldAppointmentTenantId(oldAppointment);
+        // Обновляем поля существующего объекта
+        appointment.setStartTime(details.getStartTime());
+        appointment.setDurationInMinutes(details.getDurationInMinutes());
+        appointment.setClientName(details.getClientName());
+        appointment.setContactId(details.getContactId());
+        appointment.setService(details.getService());
+        appointment.setStaffMemberId(details.getStaffMemberId());
+        appointment.setResourceId(details.getResourceId());
+        appointment.setStatus(details.getStatus());
+        appointment.setComment(details.getComment());
 
-        appointmentRepository.delete(oldAppointment);
+        // Проверяем доступность (исключая текущую запись из проверки наложений)
+        validateAvailability(appointment);
+
+        Appointment updated = appointmentRepository.save(appointment);
         
-        details.setId(null);
-        details.setTenantId(tenantId);
-
-        validateAvailability(details);
-        Appointment saved = appointmentRepository.save(details);
-        
-        notifyChange(tenantId);
-        return saved;
-    }
-
-    private String oldOldAppointmentTenantId(Appointment old) {
-        return old.getTenantId();
+        notifyChange(updated.getTenantId());
+        return updated;
     }
 
     @Transactional
@@ -115,8 +120,9 @@ public class ScheduleService {
     }
 
     private void validateAvailability(Appointment app) {
+        String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
         if (app.getStaffMemberId() != null) {
-            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), null)) {
+            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят на это время");
             }
         }
