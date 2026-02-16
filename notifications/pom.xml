@@ -13,11 +13,11 @@
     <artifactId>notifications</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>notifications</name>
-    <description>Try Neuro Notification Service (Java 25 LTS)</description>
+    <description>Try Neuro Notification Service (Java 21 LTS)</description>
 
     <properties>
-        <java.version>25</java.version>
-        <tdlight.version>3.4.4</tdlight.version>
+        <java.version>21</java.version>
+        <tdlight.version>3.4.4+td.1.8.52</tdlight.version>
         <zxing.version>3.5.3</zxing.version>
     </properties>
 
@@ -25,10 +25,26 @@
         <repository>
             <id>mchv</id>
             <url>https://mvn.mchv.eu/repository/mchv/</url>
-            <releases><enabled>true</enabled></releases>
-            <snapshots><enabled>true</enabled></snapshots>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
         </repository>
     </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>it.tdlight</groupId>
+                <artifactId>tdlight-java-bom</artifactId>
+                <version>${tdlight.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -53,17 +69,24 @@
             <version>${zxing.version}</version>
         </dependency>
 
-        <!-- TDLight Java (Telegram Protocol) -->
+        <!-- TDLight Java -->
         <dependency>
             <groupId>it.tdlight</groupId>
             <artifactId>tdlight-java</artifactId>
-            <version>${tdlight.version}</version>
         </dependency>
+
+        <!-- Нативные библиотеки для Windows -->
         <dependency>
             <groupId>it.tdlight</groupId>
             <artifactId>tdlight-natives</artifactId>
-            <version>${tdlight.version}</version>
             <classifier>windows_amd64</classifier>
+        </dependency>
+
+        <!-- Нативные библиотеки для WSL (Linux) -->
+        <dependency>
+            <groupId>it.tdlight</groupId>
+            <artifactId>tdlight-natives</artifactId>
+            <classifier>linux_amd64_gnu_ssl3</classifier>
         </dependency>
 
         <dependency>
@@ -80,8 +103,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <source>25</source>
-                    <target>25</target>
+                    <source>21</source>
+                    <target>21</target>
                 </configuration>
             </plugin>
             <plugin>

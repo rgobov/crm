@@ -3,13 +3,13 @@ package com.tryneuro.notifications.telegram.service;
 import it.tdlight.Init;
 import it.tdlight.client.*;
 import it.tdlight.jni.TdApi;
-import it.tdlight.tdlight.ClientManager;
 import com.tryneuro.notifications.telegram.config.TelegramProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -22,9 +22,10 @@ import java.util.concurrent.CompletableFuture;
 public class TelegramClientManager {
 
     private final TelegramProperties properties;
-    private final ClientManager clientManager = ClientManager.create();
     private final Map<String, SimpleTelegramClient> activeClients = new ConcurrentHashMap<>();
     private final Map<String, String> pendingQrLinks = new ConcurrentHashMap<>();
+
+    private final SimpleTelegramClientFactory clientFactory = new SimpleTelegramClientFactory();
 
     @PostConstruct
     public void init() {
@@ -41,82 +42,75 @@ public class TelegramClientManager {
         return pendingQrLinks.get(tenantId);
     }
 
-    public SimpleTelegramClient getClient(String tenantId) {
-        return activeClients.computeIfAbsent(tenantId, this::createNewClientInstance);
+    public synchronized SimpleTelegramClient getClient(String tenantId) {
+        if (activeClients.containsKey(tenantId)) {
+            return activeClients.get(tenantId);
+        }
+        SimpleTelegramClient client = createNewClientInstance(tenantId);
+        activeClients.put(tenantId, client);
+        return client;
     }
 
     private SimpleTelegramClient createNewClientInstance(String tenantId) {
-        log.info("🚀 Creating Telegram session instance for tenant: {}", tenantId);
+        log.info("🚀 Creating session for tenant: {}", tenantId);
 
         Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId);
-        
-        TDLibSettings settings = TDLibSettings.create(properties.getApiId(), properties.getApiHash());
+        File dbDir = sessionPath.resolve("db").toFile();
+        if (!dbDir.exists()) dbDir.mkdirs();
+
+        APIToken apiToken = new APIToken(properties.getApiId(), properties.getApiHash());
+        TDLibSettings settings = TDLibSettings.create(apiToken);
         settings.setDatabaseDirectoryPath(sessionPath.resolve("db"));
-        settings.setFilesDirectoryPath(sessionPath.resolve("files"));
+        settings.setDownloadedFilesDirectoryPath(sessionPath.resolve("downloads"));
 
-        SimpleTelegramClientBuilder builder = SimpleTelegramClient.builder();
-        builder.setTDLibSettings(settings);
-        builder.setClientManager(clientManager);
+        SimpleTelegramClientBuilder builder = clientFactory.builder(settings);
 
-        builder.setAuthenticationSupplier(new AuthenticationSupplier<>() {
-            @Override
-            public CompletableFuture<Void> onShortQrCode(String link) {
-                log.info("📸 NEW QR LINK for {}: {}", tenantId, link);
-                pendingQrLinks.put(tenantId, link);
-                return CompletableFuture.completedFuture(null);
-            }
-            @Override public CompletableFuture<TdApi.AuthenticationServerProtocol> onAuthenticationServerProtocol() { return null; }
-            @Override public CompletableFuture<String> onBotToken() { return null; }
-            @Override public CompletableFuture<Long> onParameter() { return null; }
-            @Override public CompletableFuture<String> onPassword(String hint) { return null; }
-            @Override public CompletableFuture<String> onPhoneNumber() { return null; }
-            @Override public CompletableFuture<String> onEmailAddress() { return null; }
-            @Override public CompletableFuture<String> onEmailCode() { return null; }
-            @Override public CompletableFuture<String> onCode() { return null; }
-        });
+        builder.addUpdateHandler(TdApi.UpdateAuthorizationState.class, update -> {
+            TdApi.AuthorizationState state = update.authorizationState;
 
-        SimpleTelegramClient client = builder.build();
-
-        client.addUpdateHandler(TdApi.UpdateAuthorizationState.class, update -> {
-            if (update.authorizationState instanceof TdApi.AuthorizationStateReady) {
-                log.info("🌟 Tenant {} is now AUTHORIZED and READY!", tenantId);
+            if (state instanceof TdApi.AuthorizationStateWaitPhoneNumber) {
+                getClient(tenantId).send(new TdApi.RequestQrCodeAuthentication(), res -> {
+                    if (res.isError()) log.error("QR Error for {}: {}", tenantId, res.getError().message);
+                });
+            } else if (state instanceof TdApi.AuthorizationStateWaitOtherDeviceConfirmation qrState) {
+                log.info("📸 NEW QR LINK for {}: {}", tenantId, qrState.link);
+                pendingQrLinks.put(tenantId, qrState.link);
+            } else if (state instanceof TdApi.AuthorizationStateReady) {
+                log.info("🌟 Tenant {} connected!", tenantId);
                 pendingQrLinks.remove(tenantId);
             }
         });
 
-        return client;
+        return builder.build(AuthenticationSupplier.consoleLogin());
     }
 
     public CompletableFuture<Void> sendMessageByPhone(String tenantId, String phoneNumber, String text) {
         SimpleTelegramClient client = getClient(tenantId);
-        CompletableFuture<Void> result = new CompletableFuture<>();
 
-        TdApi.SearchUserByPhoneNumber search = new TdApi.SearchUserByPhoneNumber();
-        search.phoneNumber = phoneNumber;
+        TdApi.SearchUserByPhoneNumber searchRequest = new TdApi.SearchUserByPhoneNumber();
+        searchRequest.phoneNumber = phoneNumber;
 
-        client.send(search).thenAccept(user -> {
-            TdApi.CreatePrivateChat createChat = new TdApi.CreatePrivateChat();
-            createChat.userId = user.id;
-            createChat.force = false;
+        return client.send(searchRequest)
+            .thenCompose(user -> {
+                TdApi.CreatePrivateChat createChatRequest = new TdApi.CreatePrivateChat();
+                createChatRequest.userId = user.id;
+                createChatRequest.force = false;
+                return client.send(createChatRequest);
+            })
+            .thenCompose(chat -> {
+                TdApi.InputMessageText content = new TdApi.InputMessageText();
+                content.text = new TdApi.FormattedText(text, new TdApi.TextEntity[0]);
 
-            client.send(createChat).thenAccept(chat -> {
                 TdApi.SendMessage sendMsg = new TdApi.SendMessage();
                 sendMsg.chatId = chat.id;
-                sendMsg.inputMessageContent = new TdApi.InputMessageText(
-                    new TdApi.FormattedText(text, null), false, true
-                );
+                sendMsg.inputMessageContent = content;
 
-                client.send(sendMsg).thenAccept(msg -> {
-                    log.info("📤 Message successfully sent to {} (Tenant: {})", phoneNumber, tenantId);
-                    result.complete(null);
-                }).exceptionally(ex -> { result.completeExceptionally(ex); return null; });
+                return client.send(sendMsg);
+            })
+            .thenAccept(msg -> log.info("📤 Message successfully sent to {}", phoneNumber))
+            .exceptionally(ex -> {
+                log.error("❌ Failed to send message to {}: {}", phoneNumber, ex.getMessage());
+                throw new RuntimeException(ex);
             });
-        }).exceptionally(ex -> {
-            log.warn("❌ User not found by phone: {}", phoneNumber);
-            result.completeExceptionally(ex);
-            return null;
-        });
-
-        return result;
     }
 }
