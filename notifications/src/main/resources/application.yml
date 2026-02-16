@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: notification-service
+  threads:
+    virtual:
+      enabled: true
+
+telegram:
+  api-id: ${TELEGRAM_API_ID:0}
+  api-hash: ${TELEGRAM_API_HASH:none}
+  sessions-path: ./tg-sessions
+
+logging:
+  level:
+    root: INFO
+    it.tdlight: WARN
