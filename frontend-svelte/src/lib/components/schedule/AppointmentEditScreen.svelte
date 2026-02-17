@@ -4,10 +4,8 @@
     import { contactService } from '$lib/services/contactService.js';
     import { serviceService } from '$lib/services/serviceService.js';
     import { resourceService } from '$lib/services/resourceService.js';
-    import { phoneUtils } from '$lib/utils/phoneUtils.js';
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { fade, slide, scale } from 'svelte/transition';
-    import { quintOut } from 'svelte/easing';
 
     export let appointment = null;
     export let preselected = { date: new Date(), hour: 10, min: 0, staffId: null };
@@ -22,7 +20,8 @@
         clientName: '',
         service: '',
         staffMemberId: '',
-        resourceId: ''
+        resourceId: '',
+        allowReminder: true // По умолчанию разрешено
     };
 
     let searchInput = '';
@@ -32,7 +31,6 @@
     let filteredServices = [];
     let showServiceDropdown = false;
     let isNewService = false;
-    let durationInputEl;
     let isLoading = true;
     let isSaving = false;
     let debounceTimer;
@@ -63,15 +61,13 @@
 
             services = servicesData;
             resources = resourcesData;
-            // Фильтруем только сотрудников
             staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
 
             if (isEditing) {
-                // ВАЖНО: Делаем глубокую копию и гарантируем наличие staffMemberId
                 formData = {
                     ...appointment,
-                    // Если поле в объекте называется иначе - мапим его
-                    staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : '')
+                    staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : ''),
+                    allowReminder: appointment.allowReminder ?? true // Подгружаем из базы
                 };
 
                 formData.startTime = toLocalISO(new Date(appointment.startTime));
@@ -232,7 +228,7 @@
                     </div>
                     <div class="part border-l">
                         <label>МИН</label>
-                        <input type="number" bind:value={formData.durationInMinutes} bind:this={durationInputEl} />
+                        <input type="number" bind:value={formData.durationInMinutes} />
                     </div>
                 </div>
 
@@ -254,6 +250,19 @@
                             <option value={r.id}>{r.name}</option>
                         {/each}
                     </select>
+                </div>
+
+                <!-- БЛОК НАПОМИНАНИЯ (НОВЫЙ) -->
+                <div class="tile-card reminder-control">
+                    <div class="rem-body">
+                        <label>УВЕДОМЛЕНИЕ В ТЕЛЕГРАМ</label>
+                        <p class="rem-val">{formData.allowReminder ? 'Напоминание разрешено' : 'Напоминание выключено'}</p>
+                    </div>
+                    <button class="toggle-switch"
+                            class:on={formData.allowReminder}
+                            on:click={() => formData.allowReminder = !formData.allowReminder}>
+                        <div class="switch-handle"></div>
+                    </button>
                 </div>
             </div>
 
@@ -283,6 +292,23 @@
     .btn-plus { width: 42px; height: 42px; border-radius: 14px; border: none; background: var(--primary-color); color: white; font-size: 24px; cursor: pointer; flex-shrink: 0; }
     .tiles-stack { display: flex; flex-direction: column; gap: 12px; }
     .tile-card { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+
+    .reminder-control { display: flex; align-items: center; justify-content: space-between; }
+    .rem-val { margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; }
+
+    /* TOGGLE SWITCH (такой же как в деталях) */
+    .toggle-switch {
+        width: 44px; height: 24px; background: #e2e8f0; border-radius: 12px; border: none;
+        position: relative; cursor: pointer; transition: background 0.3s;
+    }
+    .toggle-switch.on { background: #10b981; }
+    .switch-handle {
+        width: 18px; height: 18px; background: white; border-radius: 50%;
+        position: absolute; top: 3px; left: 3px; transition: transform 0.3s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .toggle-switch.on .switch-handle { transform: translateX(20px); }
+
     .rel-pos { position: relative; }
     .dual { display: grid; grid-template-columns: 1fr 85px; padding: 0; overflow: hidden; }
     .part { padding: 16px 20px; }

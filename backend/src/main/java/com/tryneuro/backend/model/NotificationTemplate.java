@@ -23,12 +23,15 @@ public class NotificationTemplate {
     private String tenantId;
 
     @Column(nullable = false)
-    private String type; // APPOINTMENT_CONFIRMATION, REMINDER_2_HOURS, etc.
+    private String type; // REMINDER, etc.
 
     private String title;
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
+
+    @Column(name = "lead_time_hours")
+    private Integer leadTimeHours; // Время напоминания в часах до визита
 
     @Column(name = "is_enabled")
     private boolean enabled = true;

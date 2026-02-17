@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -18,10 +17,9 @@ public class NotificationTemplateService {
 
     private final NotificationTemplateRepository repository;
 
-    // Тексты по умолчанию, если компания еще не создала свои шаблоны
+    // ОБНОВЛЕННЫЕ ДЕФОЛТЫ (соответствуют новой логике)
     private static final Map<String, String> DEFAULT_TEMPLATES = Map.of(
-        "APPOINTMENT_CONFIRMATION", "Здравствуйте, {client}! Вы записаны на услугу {service}. Ждем вас {date} в {time}.",
-        "REMINDER_2_HOURS", "Напоминаем: у вас сегодня визит в {time} на услугу {service}. До встречи!",
+        "REMINDER", "Здравствуйте, {client}! Напоминаем о вашей записи на {service}: {date} в {time}.",
         "APPOINTMENT_CANCELLED", "Ваша запись на {date} в {time} ({service}) была отменена."
     );
 
@@ -33,6 +31,18 @@ public class NotificationTemplateService {
     public NotificationTemplate saveTemplate(String tenantId, NotificationTemplate template) {
         template.setTenantId(tenantId);
         return repository.save(template);
+    }
+
+    public NotificationTemplate getTemplateByType(String tenantId, String type) {
+        return repository.findByTenantIdAndType(tenantId, type)
+                .orElseGet(() -> {
+                    NotificationTemplate t = new NotificationTemplate();
+                    t.setTenantId(tenantId);
+                    t.setType(type);
+                    t.setContent(DEFAULT_TEMPLATES.getOrDefault(type, ""));
+                    t.setLeadTimeHours(24);
+                    return t;
+                });
     }
 
     public String getTemplateContent(String tenantId, String type) {
