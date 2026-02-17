@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -30,6 +31,7 @@ public class TelegramClientManager {
     private final Map<String, SimpleTelegramClient> activeClients = new ConcurrentHashMap<>();
     private final Map<String, String> pendingQrLinks = new ConcurrentHashMap<>();
     private final Set<String> tenantsToCleanup = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Map<String, AtomicBoolean> qrRequestedFlags = new ConcurrentHashMap<>();
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -57,22 +59,24 @@ public class TelegramClientManager {
         }
     }
 
-    /**
-     * ПОЛУЧЕНИЕ QR (без создания новой сессии)
-     */
     public String getQrLink(String tenantId) {
-        // Мы НЕ вызываем getClient здесь, чтобы не плодить сессии автоматически
         return pendingQrLinks.get(tenantId);
     }
 
+    // ДОБАВЛЕННЫЙ МЕТОД
     public boolean isSessionActive(String tenantId) {
         return activeClients.containsKey(tenantId);
     }
 
     public synchronized SimpleTelegramClient getClient(String tenantId) {
+        if (tenantsToCleanup.contains(tenantId)) {
+            log.warn("⏳ Cleaning up tenant {}. Please wait.", tenantId);
+            return null;
+        }
         if (activeClients.containsKey(tenantId)) {
             return activeClients.get(tenantId);
         }
+        
         SimpleTelegramClient client = createNewClientInstance(tenantId);
         activeClients.put(tenantId, client);
         return client;
@@ -80,14 +84,20 @@ public class TelegramClientManager {
 
     public synchronized void deleteSession(String tenantId) {
         log.info("🗑 Request to delete session for tenant: {}", tenantId);
-        SimpleTelegramClient client = activeClients.remove(tenantId);
+        pendingQrLinks.remove(tenantId);
+        qrRequestedFlags.remove(tenantId);
         
+        SimpleTelegramClient client = activeClients.remove(tenantId);
         if (client != null) {
             tenantsToCleanup.add(tenantId);
-            pendingQrLinks.remove(tenantId);
-            client.send(new TdApi.LogOut(), res -> {
-                log.info("Logout signal sent for {}, waiting for Closed state", tenantId);
-            });
+            try {
+                client.send(new TdApi.LogOut(), res -> {
+                    log.info("Logout signal sent for {}", tenantId);
+                });
+            } catch (Exception e) {
+                log.warn("Error during LogOut: {}", e.getMessage());
+                tenantsToCleanup.remove(tenantId);
+            }
         } else {
             cleanupFiles(tenantId);
             syncStatusWithBackend(tenantId, "DISCONNECTED");
@@ -105,11 +115,13 @@ public class TelegramClientManager {
             }
         } catch (Exception e) {
             log.error("❌ Error during cleanup: {}", e.getMessage());
+        } finally {
+            tenantsToCleanup.remove(tenantId);
         }
     }
 
     private SimpleTelegramClient createNewClientInstance(String tenantId) {
-        log.info("🚀 Creating instance for tenant: {}", tenantId);
+        log.info("🚀 Starting session for tenant: {}", tenantId);
 
         Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId);
         new File(sessionPath.toString()).mkdirs();
@@ -119,6 +131,7 @@ public class TelegramClientManager {
         TDLibSettings settings = TDLibSettings.create(apiToken);
         settings.setDatabaseDirectoryPath(sessionPath.resolve("db"));
         settings.setDownloadedFilesDirectoryPath(sessionPath.resolve("downloads"));
+        settings.setUseTestDatacenter(false);
 
         SimpleTelegramClientBuilder builder = clientFactory.builder(settings);
         final SimpleTelegramClient[] clientHolder = new SimpleTelegramClient[1];
@@ -127,20 +140,31 @@ public class TelegramClientManager {
             TdApi.AuthorizationState state = update.authorizationState;
 
             if (state instanceof TdApi.AuthorizationStateWaitOtherDeviceConfirmation qrState) {
+                log.info("📸 NEW QR LINK for {}: {}", tenantId, qrState.link);
                 pendingQrLinks.put(tenantId, qrState.link);
                 syncStatusWithBackend(tenantId, "WAITING_QR");
+                
             } else if (state instanceof TdApi.AuthorizationStateWaitPhoneNumber) {
-                if (clientHolder[0] != null) {
-                    clientHolder[0].send(new TdApi.RequestQrCodeAuthentication(), res -> {});
+                AtomicBoolean alreadyRequested = qrRequestedFlags.computeIfAbsent(tenantId, k -> new AtomicBoolean(false));
+                if (clientHolder[0] != null && alreadyRequested.compareAndSet(false, true)) {
+                    log.info("📸 Initial QR code request for tenant: {}", tenantId);
+                    clientHolder[0].send(new TdApi.RequestQrCodeAuthentication(), res -> {
+                        if (res.isError()) {
+                            log.error("❌ QR Request failed: {}", res.getError().message);
+                            alreadyRequested.set(false); 
+                        }
+                    });
                 }
             } else if (state instanceof TdApi.AuthorizationStateReady) {
-                log.info("🌟 Tenant {} connected!", tenantId);
+                log.info("🌟 Tenant {} CONNECTED!", tenantId);
                 pendingQrLinks.remove(tenantId);
+                qrRequestedFlags.remove(tenantId);
                 syncStatusWithBackend(tenantId, "CONNECTED");
             } else if (state instanceof TdApi.AuthorizationStateClosed) {
                 log.info("📡 Session closed for tenant: {}", tenantId);
                 activeClients.remove(tenantId);
-                if (tenantsToCleanup.remove(tenantId)) {
+                qrRequestedFlags.remove(tenantId);
+                if (tenantsToCleanup.contains(tenantId)) {
                     cleanupFiles(tenantId);
                 }
                 syncStatusWithBackend(tenantId, "DISCONNECTED");

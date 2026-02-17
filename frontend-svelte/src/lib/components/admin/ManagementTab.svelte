@@ -3,7 +3,7 @@
     import { adminService } from '$lib/services/adminService.js';
     import { goto } from '$app/navigation';
     import TelegramSettingsModal from './TelegramSettingsModal.svelte';
-    import { fade, slide } from 'svelte/transition';
+    import { fade, scale } from 'svelte/transition';
 
     let stats = {
         totalClients: 0,
@@ -78,7 +78,6 @@
             </button>
         {/each}
 
-        <!-- КАРТОЧКА TELEGRAM -->
         <button class="menu-item telegram-item" on:click={() => showTelegramModal = true}>
             <div class="item-icon tg-bg">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -96,7 +95,7 @@
 
 {#if showTelegramModal}
     <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTelegramModal = false}>
-        <div class="modal-content" in:slide={{duration: 300}}>
+        <div class="modal-wrapper" in:scale={{start: 0.95, duration: 200}}>
             <TelegramSettingsModal on:close={() => showTelegramModal = false} />
         </div>
     </div>
@@ -127,13 +126,16 @@
     .item-text p { margin: 2px 0 0 0; font-size: 12px; color: #94a3b8; }
     .arrow { margin-left: auto; font-size: 24px; color: #cbd5e1; }
 
+    /* ОБНОВЛЕННЫЕ СТИЛИ МОДАЛКИ ДЛЯ ДЕСКТОПА */
     .modal-overlay {
-        position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: flex-end;
+        position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(8px); z-index: 1000;
+        display: flex; align-items: center; justify-content: center; padding: 20px;
     }
-    .modal-content {
-        width: 100%; height: 90vh; background: white;
-        border-radius: 32px 32px 0 0; overflow: hidden;
+    .modal-wrapper {
+        width: 100%; max-width: 440px; height: auto; max-height: 90vh;
+        background: white; border-radius: 32px; overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     }
 
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
