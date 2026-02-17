@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Repository
@@ -21,8 +22,10 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
     List<Appointment> findByTenantId(String tenantId);
 
-    // ПРОВЕРКА НАЛИЧИЯ ЗАПИСЕЙ У СОТРУДНИКА
     boolean existsByStaffMemberId(String staffId);
+
+    // НОВЫЙ МЕТОД ДЛЯ УНИВЕРСАЛЬНОГО ПЛАНИРОВЩИКА
+    List<Appointment> findAllByReminderSentFalseAndAllowReminderTrueAndStartTimeAfter(OffsetDateTime time);
 
     @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId " +
            "AND (a.reminderSent IS NULL OR a.reminderSent = false) " +

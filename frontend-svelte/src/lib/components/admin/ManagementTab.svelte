@@ -3,6 +3,7 @@
     import { adminService } from '$lib/services/adminService.js';
     import { goto } from '$app/navigation';
     import TelegramSettingsModal from './TelegramSettingsModal.svelte';
+    import NotificationTemplatesModal from './NotificationTemplatesModal.svelte';
     import { fade, scale } from 'svelte/transition';
 
     let stats = {
@@ -14,6 +15,7 @@
     let isLoading = true;
     let error = null;
     let showTelegramModal = false;
+    let showTemplatesModal = false;
 
     onMount(async () => {
         await loadStats();
@@ -78,6 +80,16 @@
             </button>
         {/each}
 
+        <!-- ШАБЛОНЫ СООБЩЕНИЙ -->
+        <button class="menu-item templates-item" on:click={() => showTemplatesModal = true}>
+            <div class="item-icon templates-bg">📝</div>
+            <div class="item-text">
+                <h3>Шаблоны сообщений</h3>
+                <p>Тексты уведомлений клиентам</p>
+            </div>
+            <span class="arrow">›</span>
+        </button>
+
         <button class="menu-item telegram-item" on:click={() => showTelegramModal = true}>
             <div class="item-icon tg-bg">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -86,7 +98,7 @@
             </div>
             <div class="item-text">
                 <h3>Telegram Уведомления</h3>
-                <p>Настройка рассылки клиентам</p>
+                <p>Настройка канала связи</p>
             </div>
             <span class="arrow">›</span>
         </button>
@@ -97,6 +109,14 @@
     <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTelegramModal = false}>
         <div class="modal-wrapper" in:scale={{start: 0.95, duration: 200}}>
             <TelegramSettingsModal on:close={() => showTelegramModal = false} />
+        </div>
+    </div>
+{/if}
+
+{#if showTemplatesModal}
+    <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTemplatesModal = false}>
+        <div class="modal-wrapper" in:scale={{start: 0.95, duration: 200}}>
+            <NotificationTemplatesModal on:close={() => showTemplatesModal = false} />
         </div>
     </div>
 {/if}
@@ -121,12 +141,12 @@
 
     .item-icon { width: 44px; height: 44px; background: #f8fafc; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-right: 16px; }
     .tg-bg { background: #f0f9ff; color: #0ea5e9; }
+    .templates-bg { background: #fdf2f8; color: #db2777; }
 
     .item-text h3 { margin: 0; font-size: 15px; color: #1e293b; font-weight: 700; }
     .item-text p { margin: 2px 0 0 0; font-size: 12px; color: #94a3b8; }
     .arrow { margin-left: auto; font-size: 24px; color: #cbd5e1; }
 
-    /* ОБНОВЛЕННЫЕ СТИЛИ МОДАЛКИ ДЛЯ ДЕСКТОПА */
     .modal-overlay {
         position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7);
         backdrop-filter: blur(8px); z-index: 1000;

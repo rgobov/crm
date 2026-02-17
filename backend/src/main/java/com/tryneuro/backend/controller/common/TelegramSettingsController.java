@@ -19,24 +19,32 @@ import java.util.Map;
 public class TelegramSettingsController {
 
     private final TelegramSettingsService telegramSettingsService;
-    private final HttpServletRequest request; // Внедряем HttpServletRequest для доступа к атрибутам
+    private final HttpServletRequest request;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
 
     @GetMapping("/status")
     public ResponseEntity<?> getStatus() {
-        // Извлекаем tenantId, который JwtAuthenticationFilter положил в атрибуты запроса
         String tenantId = (String) request.getAttribute("tenantId");
         
-        TelegramSettings settings = telegramSettingsService.getSettings(tenantId);
-        if (settings != null && settings.isActive()) {
+        // ВСЕГДА запрашиваем реальный статус у микросервиса (прощупывание)
+        Map<String, String> realTimeStatus = telegramSettingsService.getRealTimeStatus(tenantId);
+        String status = realTimeStatus.get("status");
+
+        // Синхронизируем локальную БД на основе реального ответа
+        telegramSettingsService.updateStatus(tenantId, status);
+
+        // Если подключено, добавляем номер телефона из базы для красоты UI
+        if ("CONNECTED".equals(status)) {
+            TelegramSettings settings = telegramSettingsService.getSettings(tenantId);
             return ResponseEntity.ok(Map.of(
-                "status", "CONNECTED", 
-                "phone", settings.getConnectedPhone() != null ? settings.getConnectedPhone() : ""
+                "status", "CONNECTED",
+                "phone", (settings != null && settings.getConnectedPhone() != null) ? settings.getConnectedPhone() : ""
             ));
         }
-        return ResponseEntity.ok(telegramSettingsService.getRealTimeStatus(tenantId));
+
+        return ResponseEntity.ok(realTimeStatus);
     }
 
     @PostMapping("/connect")

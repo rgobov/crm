@@ -35,7 +35,7 @@ public class TelegramSettingsService {
         try {
             return notificationClient.getQrStatus(internalSecret, tenantId);
         } catch (Exception e) {
-            log.error("Failed to get TG status from microservice: {}", e.getMessage());
+            log.error("Failed to get TG status from microservice for tenant {}: {}", tenantId, e.getMessage());
             return Map.of("status", "ERROR", "qrCode", "");
         }
     }
@@ -69,29 +69,38 @@ public class TelegramSettingsService {
 
     @Transactional
     public void updateStatus(String tenantId, String status) {
-        log.info("Updating Telegram status for tenant {}: {}", tenantId, status);
+        Optional<TelegramSettings> existingOpt = telegramSettingsRepository.findById(tenantId);
         
-        if ("CONNECTED".equals(status)) {
-            Optional<TelegramSettings> existing = telegramSettingsRepository.findById(tenantId);
+        // ОПРЕДЕЛЯЕМ, ИЗМЕНИЛСЯ ЛИ СТАТУС (для предотвращения бесконечного цикла)
+        boolean isNowActive = "CONNECTED".equals(status);
+        boolean wasActive = existingOpt.map(TelegramSettings::isActive).orElse(false);
+        
+        if (isNowActive != wasActive || existingOpt.isEmpty()) {
+            log.info("Status changed for tenant {}: {} -> {}", tenantId, wasActive, isNowActive);
             
-            if (existing.isPresent()) {
-                TelegramSettings settings = existing.get();
-                settings.setActive(true);
-                settings.setConnectedAt(LocalDateTime.now());
-            } else {
-                log.info("Initializing new Telegram settings for tenant {} via SQL", tenantId);
-                jdbcTemplate.update(
-                    "INSERT INTO telegram_settings (tenant_id, is_active, connected_at) VALUES (?, ?, ?)",
-                    tenantId, true, LocalDateTime.now()
-                );
+            if (isNowActive) {
+                if (existingOpt.isPresent()) {
+                    TelegramSettings settings = existingOpt.get();
+                    settings.setActive(true);
+                    settings.setConnectedAt(LocalDateTime.now());
+                    telegramSettingsRepository.save(settings);
+                } else {
+                    log.info("Initializing new Telegram settings via SQL for: {}", tenantId);
+                    jdbcTemplate.update(
+                        "INSERT INTO telegram_settings (tenant_id, is_active, connected_at) VALUES (?, ?, ?)",
+                        tenantId, true, LocalDateTime.now()
+                    );
+                }
+            } else if ("DISCONNECTED".equals(status)) {
+                existingOpt.ifPresent(s -> {
+                    s.setActive(false);
+                    telegramSettingsRepository.save(s);
+                });
             }
-        } else if ("DISCONNECTED".equals(status)) {
-            telegramSettingsRepository.findById(tenantId).ifPresent(s -> {
-                s.setActive(false);
-            });
+            
+            // УВЕДОМЛЯЕМ ФРОНТЕНД ТОЛЬКО ПРИ РЕАЛЬНОЙ СМЕНЕ
+            notifyFrontend(tenantId, status);
         }
-
-        notifyFrontend(tenantId, status);
     }
 
     private void notifyFrontend(String tenantId, String status) {

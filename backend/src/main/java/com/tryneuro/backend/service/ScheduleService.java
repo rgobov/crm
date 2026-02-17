@@ -61,6 +61,7 @@ public class ScheduleService {
         return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
     }
 
+    @Transactional
     public Appointment addAppointment(Appointment appointment) {
         log.info("📝 Creating new appointment for client: {}", appointment.getClientName());
         validateAvailability(appointment);
@@ -69,10 +70,6 @@ public class ScheduleService {
         return saved;
     }
 
-    /**
-     * СТАБИЛЬНОЕ ОБНОВЛЕНИЕ: Сохраняем ID неизменным.
-     * Это исправляет ошибки 404 при быстрой смене статусов.
-     */
     @Transactional
     public Appointment updateAppointment(String id, Appointment details) {
         log.info("📝 Updating appointment id: {}", id);
@@ -80,7 +77,7 @@ public class ScheduleService {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
 
-        // Обновляем поля существующего объекта
+        // Обновляем поля
         appointment.setStartTime(details.getStartTime());
         appointment.setDurationInMinutes(details.getDurationInMinutes());
         appointment.setClientName(details.getClientName());
@@ -90,10 +87,9 @@ public class ScheduleService {
         appointment.setResourceId(details.getResourceId());
         appointment.setStatus(details.getStatus());
         appointment.setComment(details.getComment());
+        appointment.setAllowReminder(details.isAllowReminder()); // Обновляем признак разрешения уведомления
 
-        // Проверяем доступность (исключая текущую запись из проверки наложений)
         validateAvailability(appointment);
-
         Appointment updated = appointmentRepository.save(appointment);
         
         notifyChange(updated.getTenantId());

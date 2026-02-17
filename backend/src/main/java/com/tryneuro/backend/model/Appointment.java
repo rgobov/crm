@@ -72,7 +72,9 @@ public class Appointment {
     @Column(name = "reminder_sent", nullable = false)
     private boolean reminderSent = false;
 
-    // Геттеры для логики (не мешают Jackson)
+    @Column(name = "allow_reminder", nullable = false)
+    private boolean allowReminder = true; // Переименовано для ясности
+
     public LocalDate getDate() {
         return startTime != null ? startTime.toLocalDate() : null;
     }
@@ -80,6 +82,4 @@ public class Appointment {
     public LocalTime getTime() {
         return startTime != null ? startTime.toLocalTime() : null;
     }
-    
-    // Сеттеры удалены, чтобы Jackson использовал прямое поле startTime
 }
