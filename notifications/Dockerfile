@@ -1,21 +1,22 @@
-# Этап 1: Сборка
+# ЭТАП 1: Сборка
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 WORKDIR /app
-COPY pom.xml .
-COPY src ./src
-RUN mvn clean package -DskipTests
 
-# Этап 2: Запуск
+# Кешируем зависимости
+COPY pom.xml .
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline
+
+COPY src ./src
+RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests
+
+# ЭТАП 2: Запуск (JRE 21)
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Установка необходимых нативных библиотек для TDLib
-RUN apk add --no-cache libstdc++ gcompat openssl zlib
+# Устанавливаем необходимые библиотеки для работы TDLib в Linux
+RUN apk add --no-cache gcompat libstdc++
 
-COPY --from=build /app/target/*.jar app.jar
-
-# Создаем папку для сессий
-RUN mkdir tg-sessions && chmod 777 tg-sessions
+COPY --from=build /app/target/notifications-0.0.1-SNAPSHOT.jar app.jar
 
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]

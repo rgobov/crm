@@ -3,7 +3,7 @@ name: Deploy to VPS
 on:
   push:
     branches:
-      - feature/notifications-service
+      - feature/notifications-service # Деплоим при пуше в текущую ветку
 
 jobs:
   deploy:
@@ -20,25 +20,24 @@ jobs:
             cd ~/crm
             
             echo "--- ОБНОВЛЕНИЕ КОДА ---"
+            # Переключаемся на нужную ветку и подтягиваем изменения
             git fetch origin feature/notifications-service
             git reset --hard origin/feature/notifications-service
             
-            echo "--- ПОДГОТОВКА СРЕДЫ ---"
+            echo "--- ПОДГОТОВКА СРЕДЫ (СЕКРЕТЫ) ---"
+            # Создаем .env файл только с теми секретами, которые есть в GitHub
+            echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env
+            echo "TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}" >> .env
+            
+            echo "--- СБОРКА КОНТЕЙНЕРОВ (BuildKit) ---"
             export DOCKER_BUILDKIT=1
-            export COMPOSE_DOCKER_CLI_BUILD=1
+            docker-compose build --pull
             
-            # Передаем секреты из GitHub в переменные сервера
-            export TELEGRAM_API_ID="${{ secrets.TELEGRAM_API_ID }}"
-            export TELEGRAM_API_HASH="${{ secrets.TELEGRAM_API_HASH }}"
-            
-            echo "--- ОСТАНОВКА И СБОРКА ---"
-            docker-compose build --no-cache --pull
-            
-            echo "--- ЗАПУСК ОБНОВЛЕННОЙ ВЕРСИИ ---"
-            TELEGRAM_API_ID=$TELEGRAM_API_ID TELEGRAM_API_HASH=$TELEGRAM_API_HASH docker-compose up -d --force-recreate
+            echo "--- ПЕРЕЗАПУСК СЕРВИСОВ ---"
+            docker-compose up -d --force-recreate
             
             echo "--- ОЧИСТКА МУСОРА ---"
             docker image prune -f
             
-            echo "--- ПРОВЕРКА СТАТУСА ---"
+            echo "--- СТАТУС КОНТЕЙНЕРОВ ---"
             docker-compose ps
