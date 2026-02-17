@@ -41,10 +41,12 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            // ДОБАВЛЕНО: Разрешаем встраивание фреймов для SockJS
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // РАЗРЕШАЕМ ВНУТРЕННЮЮ СИНХРОНИЗАЦИЮ (защищена секретным заголовком в контроллере)
+                .requestMatchers("/api/admin/telegram/internal/**").permitAll()
+                // ОСТАЛЬНЫЕ ПУТИ
                 .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/api/ws/**", "/ws/**", "/error").permitAll()
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")

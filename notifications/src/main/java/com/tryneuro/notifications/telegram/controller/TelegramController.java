@@ -22,11 +22,34 @@ public class TelegramController {
     @GetMapping("/qr")
     public Map<String, String> getQr(@RequestParam String tenantId) {
         String qrLink = clientManager.getQrLink(tenantId);
+        String status = "WAITING_QR";
+        String base64Image = "";
+
         if (qrLink != null && !qrLink.isEmpty()) {
-            String base64Image = qrCodeService.generateQrBase64(qrLink);
-            return Map.of("status", "WAITING_QR", "qrCode", base64Image);
+            log.info("Generating QR image for link: {}", qrLink);
+            base64Image = qrCodeService.generateQrBase64(qrLink);
+            if (base64Image == null || base64Image.isEmpty()) {
+                log.error("QR image generation failed for tenant: {}", tenantId);
+            }
+        } else {
+            status = "INITIALIZING";
         }
-        return Map.of("status", "CONNECTED", "qrCode", "");
+
+        return Map.of("status", status, "qrCode", base64Image != null ? base64Image : "");
+    }
+
+    @PostMapping("/connect")
+    public ResponseEntity<?> connect(@RequestParam String tenantId) {
+        log.info("🚀 Manual connect request for tenant: {}", tenantId);
+        clientManager.getClient(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/session")
+    public ResponseEntity<?> deleteSession(@RequestParam String tenantId) {
+        log.info("🗑 Request to delete session for tenant: {}", tenantId);
+        clientManager.deleteSession(tenantId);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/send-by-phone")

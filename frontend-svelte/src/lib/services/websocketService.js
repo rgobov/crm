@@ -3,6 +3,7 @@ import { writable } from 'svelte/store';
 
 export const wsConnected = writable(false);
 export const scheduleRefreshSignal = writable({ ts: 0 });
+export const telegramStatusSignal = writable({ ts: 0 }); // НОВЫЙ СТОР ДЛЯ ТЕЛЕГРАМА
 
 let stompClient = null;
 let reconnectTimeout = null;
@@ -54,11 +55,18 @@ export const websocketService = {
                 wsConnected.set(true);
                 console.log('✅ WS: Connected');
 
-                const topic = `/topic/schedule/${tenantId}`;
-                stompClient.subscribe(topic, (message) => {
-                    console.log('📥 WS: Refresh signal received');
+                // Подписка на расписание
+                stompClient.subscribe(`/topic/schedule/${tenantId}`, (message) => {
+                    console.log('📥 WS: Schedule refresh received');
                     scheduleRefreshSignal.set({ ts: Date.now() });
                 });
+
+                // Подписка на ТЕЛЕГРАМ
+                stompClient.subscribe(`/topic/telegram/${tenantId}`, (message) => {
+                    console.log('📥 WS: Telegram update received');
+                    telegramStatusSignal.set({ ts: Date.now() });
+                });
+
             }, (error) => {
                 isConnecting = false;
                 wsConnected.set(false);

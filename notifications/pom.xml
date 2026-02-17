@@ -17,6 +17,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <spring-cloud.version>2024.0.0</spring-cloud.version>
         <tdlight.version>3.4.4+td.1.8.52</tdlight.version>
         <zxing.version>3.5.3</zxing.version>
     </properties>
@@ -25,17 +26,20 @@
         <repository>
             <id>mchv</id>
             <url>https://mvn.mchv.eu/repository/mchv/</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
         </repository>
     </repositories>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>it.tdlight</groupId>
                 <artifactId>tdlight-java-bom</artifactId>
@@ -51,6 +55,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- OpenFeign -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -75,14 +86,14 @@
             <artifactId>tdlight-java</artifactId>
         </dependency>
 
-        <!-- Нативные библиотеки для Windows -->
+        <!-- Native libraries for Windows -->
         <dependency>
             <groupId>it.tdlight</groupId>
             <artifactId>tdlight-natives</artifactId>
             <classifier>windows_amd64</classifier>
         </dependency>
 
-        <!-- Нативные библиотеки для WSL (Linux) -->
+        <!-- Native libraries for WSL (Linux) -->
         <dependency>
             <groupId>it.tdlight</groupId>
             <artifactId>tdlight-natives</artifactId>

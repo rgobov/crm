@@ -21,13 +21,17 @@ public class UserService {
         return userRepository.findByTenantId(tenantId);
     }
 
+    public String getTenantIdByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(User::getTenantId)
+                .orElseThrow(() -> new RuntimeException("User or Tenant not found"));
+    }
+
     public User createUser(User user) {
-        // tenantId должен быть установлен в контроллере
         return userRepository.save(user);
     }
 
     public User login(String email, String password) {
-        // В реальном приложении здесь должна быть проверка хеша пароля
         Optional<User> user = userRepository.findByEmail(email);
         if (user.isPresent() && user.get().getPassword().equals(password)) {
             return user.get();
