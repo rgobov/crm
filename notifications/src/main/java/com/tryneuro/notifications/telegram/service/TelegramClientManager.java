@@ -49,23 +49,30 @@ public class TelegramClientManager {
     private void syncStatusWithBackend(String tenantId, String status) {
         try {
             backendClient.syncStatus(internalSecret, Map.of("tenantId", tenantId, "status", status));
-            log.info("📡 Sync status '{}' for tenant {}", status, tenantId);
+            if (!"WAITING_QR".equals(status)) {
+                log.info("📡 Sync status '{}' for tenant {}", status, tenantId);
+            }
         } catch (Exception e) {
             log.warn("⚠️ Sync failed for {}: {}", tenantId, e.getMessage());
         }
     }
 
+    /**
+     * ПОЛУЧЕНИЕ QR (без создания новой сессии)
+     */
     public String getQrLink(String tenantId) {
-        getClient(tenantId);
+        // Мы НЕ вызываем getClient здесь, чтобы не плодить сессии автоматически
         return pendingQrLinks.get(tenantId);
+    }
+
+    public boolean isSessionActive(String tenantId) {
+        return activeClients.containsKey(tenantId);
     }
 
     public synchronized SimpleTelegramClient getClient(String tenantId) {
         if (activeClients.containsKey(tenantId)) {
             return activeClients.get(tenantId);
         }
-        
-        // Создаем и СРАЗУ кладем в карту, чтобы избежать рекурсии при обновлениях
         SimpleTelegramClient client = createNewClientInstance(tenantId);
         activeClients.put(tenantId, client);
         return client;
@@ -114,8 +121,6 @@ public class TelegramClientManager {
         settings.setDownloadedFilesDirectoryPath(sessionPath.resolve("downloads"));
 
         SimpleTelegramClientBuilder builder = clientFactory.builder(settings);
-
-        // Используем массив как контейнер для ссылки на клиент, чтобы использовать его внутри лямбды
         final SimpleTelegramClient[] clientHolder = new SimpleTelegramClient[1];
 
         builder.addUpdateHandler(TdApi.UpdateAuthorizationState.class, update -> {
@@ -125,7 +130,6 @@ public class TelegramClientManager {
                 pendingQrLinks.put(tenantId, qrState.link);
                 syncStatusWithBackend(tenantId, "WAITING_QR");
             } else if (state instanceof TdApi.AuthorizationStateWaitPhoneNumber) {
-                // ВАЖНО: Используем уже созданный клиент из холдера, никакой рекурсии!
                 if (clientHolder[0] != null) {
                     clientHolder[0].send(new TdApi.RequestQrCodeAuthentication(), res -> {});
                 }
@@ -144,7 +148,7 @@ public class TelegramClientManager {
         });
 
         SimpleTelegramClient client = builder.build(AuthenticationSupplier.qrCode());
-        clientHolder[0] = client; // Сохраняем ссылку для обработчика
+        clientHolder[0] = client;
         return client;
     }
 
