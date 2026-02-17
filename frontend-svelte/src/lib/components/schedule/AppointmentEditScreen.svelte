@@ -21,7 +21,8 @@
         service: '',
         staffMemberId: '',
         resourceId: '',
-        allowReminder: true // По умолчанию разрешено
+        allowReminder: true,
+        reminderLeadTimeHours: 24
     };
 
     let searchInput = '';
@@ -67,7 +68,8 @@
                 formData = {
                     ...appointment,
                     staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : ''),
-                    allowReminder: appointment.allowReminder ?? true // Подгружаем из базы
+                    allowReminder: appointment.allowReminder ?? true,
+                    reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24
                 };
 
                 formData.startTime = toLocalISO(new Date(appointment.startTime));
@@ -170,21 +172,14 @@
                 <div class="hero-body">
                     <label>КЛИЕНТ ЗАПИСИ</label>
                     <div class="search-box" on:click|stopPropagation>
-                        <input type="text"
-                               bind:value={searchInput}
-                               on:input={handleClientInput}
-                               placeholder="Имя или номер..."
-                               class:invisible={!!selectedContact} />
-
+                        <input type="text" bind:value={searchInput} on:input={handleClientInput} placeholder="Имя или номер..." class:invisible={!!selectedContact} />
                         {#if selectedContact}
                             <div class="badge" in:scale>
                                 <span class="txt">{selectedContact.name}</span>
                                 <button class="x" on:click={() => { selectedContact = null; searchInput = ''; }}>✕</button>
                             </div>
                         {/if}
-
                         <button class="btn-plus" on:click={() => dispatch('open-add-contact-modal')}>+</button>
-
                         {#if searchResults.length > 0}
                             <div class="drop shadow-xl">
                                 {#each searchResults as c}
@@ -203,18 +198,11 @@
                 <div class="tile-card rel-pos" on:click|stopPropagation>
                     <label>УСЛУГА</label>
                     <div class="input-rel">
-                        <input type="text"
-                               bind:value={serviceSearchInput}
-                               placeholder="Что будем делать?"
-                               on:focus={() => showServiceDropdown = true} />
-
+                        <input type="text" bind:value={serviceSearchInput} placeholder="Что будем делать?" on:focus={() => showServiceDropdown = true} />
                         {#if showServiceDropdown && (filteredServices.length > 0 || isNewService)}
                             <div class="drop shadow-xl">
                                 {#each filteredServices as s}
-                                    <button class="item" on:click={() => selectService(s)}>
-                                        <b>{s.name}</b>
-                                        <small>{s.durationInMinutes} мин</small>
-                                    </button>
+                                    <button class="item" on:click={() => selectService(s)}><b>{s.name}</b><small>{s.durationInMinutes} мин</small></button>
                                 {/each}
                             </div>
                         {/if}
@@ -222,45 +210,30 @@
                 </div>
 
                 <div class="tile-card dual">
-                    <div class="part">
-                        <label>КОГДА</label>
-                        <input type="datetime-local" bind:value={formData.startTime} />
-                    </div>
-                    <div class="part border-l">
-                        <label>МИН</label>
-                        <input type="number" bind:value={formData.durationInMinutes} />
-                    </div>
+                    <div class="part"><label>КОГДА</label><input type="datetime-local" bind:value={formData.startTime} /></div>
+                    <div class="part border-l"><label>МИН</label><input type="number" bind:value={formData.durationInMinutes} /></div>
                 </div>
 
-                <div class="tile-card">
-                    <label>ИСПОЛНИТЕЛЬ</label>
-                    <select bind:value={formData.staffMemberId}>
-                        <option value="">Не назначен</option>
-                        {#each staffList as s}
-                            <option value={s.id}>{s.name}</option>
-                        {/each}
-                    </select>
-                </div>
+                <div class="tile-card"><label>ИСПОЛНИТЕЛЬ</label><select bind:value={formData.staffMemberId}><option value="">Не назначен</option>{#each staffList as s}<option value={s.id}>{s.name}</option>{/each}</select></div>
 
-                <div class="tile-card">
-                    <label>КАБИНЕТ / РЕСУРС</label>
-                    <select bind:value={formData.resourceId}>
-                        <option value="">Без ресурса</option>
-                        {#each resources as r}
-                            <option value={r.id}>{r.name}</option>
-                        {/each}
-                    </select>
-                </div>
+                <div class="tile-card"><label>КАБИНЕТ / РЕСУРС</label><select bind:value={formData.resourceId}><option value="">Без ресурса</option>{#each resources as r}<option value={r.id}>{r.name}</option>{/each}</select></div>
 
-                <!-- БЛОК НАПОМИНАНИЯ (НОВЫЙ) -->
-                <div class="tile-card reminder-control">
-                    <div class="rem-body">
-                        <label>УВЕДОМЛЕНИЕ В ТЕЛЕГРАМ</label>
-                        <p class="rem-val">{formData.allowReminder ? 'Напоминание разрешено' : 'Напоминание выключено'}</p>
+                <div class="tile-card reminder-panel">
+                    <div class="rem-main">
+                        <label>НАПОМИНАНИЕ (ТЕЛЕГРАМ/WA)</label>
+                        <div class="rem-settings">
+                            {#if formData.allowReminder}
+                                <div class="hours-input" in:slide={{axis: 'x'}}>
+                                    <span>за</span>
+                                    <input type="number" bind:value={formData.reminderLeadTimeHours} min="1" max="168" />
+                                    <span>ч. до визита</span>
+                                </div>
+                            {:else}
+                                <p class="rem-off">Отключено</p>
+                            {/if}
+                        </div>
                     </div>
-                    <button class="toggle-switch"
-                            class:on={formData.allowReminder}
-                            on:click={() => formData.allowReminder = !formData.allowReminder}>
+                    <button class="toggle-switch" class:on={formData.allowReminder} on:click={() => formData.allowReminder = !formData.allowReminder}>
                         <div class="switch-handle"></div>
                     </button>
                 </div>
@@ -277,50 +250,43 @@
 </div>
 
 <style>
-    .appt-edit-root { height: 100%; display: flex; flex-direction: column; background: #f8fafc; position: relative; }
-    .tiles-layout { padding: 24px; max-width: 500px; margin: 0 auto; width: 100%; }
-    .tile-hero { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); padding: 24px; border-radius: 32px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; margin-bottom: 20px; }
-    .avatar { width: 64px; height: 64px; background: white; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; color: var(--primary-color); box-shadow: 0 8px 20px rgba(56, 151, 240, 0.1); }
+    .appt-edit-root { height: 100%; display: flex; flex-direction: column; background: #f8fafc; position: relative; overflow-x: hidden; }
+    .tiles-layout { padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; }
+    .tile-hero { background: white; padding: 20px; border-radius: 28px; display: flex; align-items: center; gap: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; margin-bottom: 16px; }
+    .avatar { width: 56px; height: 56px; background: #f0f9ff; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; color: #0ea5e9; }
     .hero-body { flex: 1; position: relative; }
-    label { display: block; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; margin-left: 4px; }
+    label { display: block; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
     .search-box { display: flex; align-items: center; gap: 8px; position: relative; }
-    .search-box input { width: 100%; padding: 12px 16px; border-radius: 16px; border: 1.5px solid #f1f5f9; background: white; font-size: 15px; outline: none; }
-    .invisible { color: transparent; }
-    .badge { position: absolute; left: 4px; right: 48px; top: 4px; bottom: 4px; background: #eff6ff; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border: 1.5px solid var(--primary-color); }
-    .badge .txt { font-weight: 700; color: #1e40af; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .x { background: none; border: none; color: #ef4444; font-weight: 800; cursor: pointer; }
-    .btn-plus { width: 42px; height: 42px; border-radius: 14px; border: none; background: var(--primary-color); color: white; font-size: 24px; cursor: pointer; flex-shrink: 0; }
-    .tiles-stack { display: flex; flex-direction: column; gap: 12px; }
-    .tile-card { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+    .search-box input { width: 100%; padding: 10px 14px; border-radius: 14px; border: 1.5px solid #f1f5f9; background: white; font-size: 14px; outline: none; }
+    .badge { position: absolute; left: 4px; right: 44px; top: 4px; bottom: 4px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border: 1.5px solid #0ea5e9; }
+    .badge .txt { font-weight: 700; color: #1e40af; font-size: 13px; }
+    .btn-plus { width: 38px; height: 38px; border-radius: 12px; border: none; background: #0ea5e9; color: white; font-size: 20px; cursor: pointer; }
 
-    .reminder-control { display: flex; align-items: center; justify-content: space-between; }
-    .rem-val { margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; }
+    .tiles-stack { display: flex; flex-direction: column; gap: 10px; }
+    .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.01); }
 
-    /* TOGGLE SWITCH (такой же как в деталях) */
-    .toggle-switch {
-        width: 44px; height: 24px; background: #e2e8f0; border-radius: 12px; border: none;
-        position: relative; cursor: pointer; transition: background 0.3s;
-    }
+    .input-rel { position: relative; width: 100%; }
+    .drop { position: absolute; top: calc(100% + 8px); left: -10px; right: -10px; background: white; border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); z-index: 2000; border: 1px solid #e2e8f0; max-height: 200px; overflow-y: auto; padding: 6px; }
+    .item { width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 12px; display: flex; flex-direction: column; }
+    .item:hover { background: #f8fafc; }
+
+    .reminder-panel { display: flex; align-items: center; justify-content: space-between; }
+    .hours-input { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #1e293b; }
+    .hours-input input { width: 40px; padding: 4px; border-radius: 8px; border: 1.5px solid #e2e8f0; text-align: center; font-weight: 800; color: #0ea5e9; background: #f8fafc; }
+
+    .toggle-switch { width: 40px; height: 22px; background: #e2e8f0; border-radius: 11px; border: none; position: relative; cursor: pointer; transition: background 0.3s; }
     .toggle-switch.on { background: #10b981; }
-    .switch-handle {
-        width: 18px; height: 18px; background: white; border-radius: 50%;
-        position: absolute; top: 3px; left: 3px; transition: transform 0.3s;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .toggle-switch.on .switch-handle { transform: translateX(20px); }
+    .switch-handle { width: 16px; height: 16px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
+    .toggle-switch.on .switch-handle { transform: translateX(18px); }
 
-    .rel-pos { position: relative; }
-    .dual { display: grid; grid-template-columns: 1fr 85px; padding: 0; overflow: hidden; }
-    .part { padding: 16px 20px; }
+    .dual { display: grid; grid-template-columns: 1fr 80px; padding: 0; }
+    .part { padding: 14px 18px; }
     .border-l { border-left: 1px solid #f1f5f9; background: #f8fafc; }
-    input, select { width: 100%; border: none; background: none; font-size: 16px; font-weight: 700; color: #1e293b; outline: none; }
-    select { appearance: none; color: var(--primary-color); cursor: pointer; }
-    .drop { position: absolute; top: calc(100% + 5px); left: 0; right: 0; background: white; border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); z-index: 1000; border: 1px solid #e2e8f0; max-height: 250px; overflow-y: auto; padding: 8px; }
-    .item { width: 100%; padding: 14px 18px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 12px; display: flex; flex-direction: column; gap: 3px; }
-    .footer-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-top: 32px; padding-bottom: 40px; }
-    .btn-cancel { background: white; color: #64748b; border: 1.5px solid #e2e8f0; padding: 16px; border-radius: 20px; font-weight: 700; cursor: pointer; }
-    .btn-save { background: var(--primary-gradient); color: white; border: none; padding: 16px; border-radius: 20px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); }
-    .loader-center { display: flex; justify-content: center; align-items: center; height: 300px; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    input, select { width: 100%; border: none; background: none; font-size: 15px; font-weight: 700; color: #1e293b; outline: none; }
+
+    .footer-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 24px; padding-bottom: 30px; }
+    .btn-cancel { background: white; color: #64748b; border: 1.5px solid #e2e8f0; padding: 14px; border-radius: 18px; font-weight: 700; cursor: pointer; }
+    .btn-save { background: #0ea5e9; color: white; border: none; padding: 14px; border-radius: 18px; font-weight: 800; cursor: pointer; }
+    .spinner { width: 28px; height: 28px; border: 3px solid #f1f5f9; border-top-color: #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 </style>

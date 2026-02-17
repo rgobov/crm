@@ -73,7 +73,10 @@ public class Appointment {
     private boolean reminderSent = false;
 
     @Column(name = "allow_reminder", nullable = false)
-    private boolean allowReminder = true; // Переименовано для ясности
+    private boolean allowReminder = true;
+
+    @Column(name = "reminder_lead_time_hours")
+    private Integer reminderLeadTimeHours = 24; // Значение по умолчанию 24 часа
 
     public LocalDate getDate() {
         return startTime != null ? startTime.toLocalDate() : null;
