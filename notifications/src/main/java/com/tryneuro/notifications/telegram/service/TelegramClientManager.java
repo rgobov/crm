@@ -33,6 +33,7 @@ public class TelegramClientManager {
     private final Map<String, String> pendingQrLinks = new ConcurrentHashMap<>();
     private final Set<String> tenantsToCleanup = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<String, AtomicBoolean> qrRequestedFlags = new ConcurrentHashMap<>();
+    private final Map<String, Long> qrStartTime = new ConcurrentHashMap<>(); // Для отслеживания таймаута
     
     private final AtomicBoolean isStopping = new AtomicBoolean(false);
 
@@ -45,7 +46,7 @@ public class TelegramClientManager {
     public void init() {
         try {
             Init.init();
-            log.info("✅ TDLib system initialized. Sessions base path: {}", new File(properties.getSessionsPath()).getAbsolutePath());
+            log.info("✅ TDLib system initialized.");
         } catch (Exception e) {
             log.error("❌ Failed to initialize TDLib system", e);
         }
@@ -54,7 +55,6 @@ public class TelegramClientManager {
     @PreDestroy
     public void shutdown() {
         isStopping.set(true);
-        log.info("🌐 System shutdown: closing {} active sessions...", activeClients.size());
         activeClients.values().forEach(client -> {
             try { client.close(); } catch (Exception e) {}
         });
@@ -64,6 +64,7 @@ public class TelegramClientManager {
         if (isStopping.get()) return;
         try {
             backendClient.syncStatus(internalSecret, Map.of("tenantId", tenantId, "status", status));
+            // НЕ ЛОГИРУЕМ WAITING_QR, чтобы не спамить в консоль
             if (!"WAITING_QR".equals(status)) {
                 log.info("📡 Sync status '{}' for tenant {}", status, tenantId);
             }
@@ -76,28 +77,20 @@ public class TelegramClientManager {
         return pendingQrLinks.get(tenantId);
     }
 
-    /**
-     * ПРОВЕРКА И АВТО-ВОССТАНОВЛЕНИЕ
-     */
     public boolean isSessionActive(String tenantId) {
         if (activeClients.containsKey(tenantId)) return true;
-
         Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId).resolve("db");
-        File dbFolder = new File(sessionPath.toString());
-        
-        if (dbFolder.exists() && dbFolder.isDirectory()) {
-            log.info("📂 Found existing session folder for {}. Attempting restoration...", tenantId);
-            getClient(tenantId); // Запускаем процесс восстановления
-            return true; // Считаем сессию активной (она в процессе загрузки)
+        if (new File(sessionPath.toString()).exists()) {
+            getClient(tenantId); 
+            return true; 
         }
-        
-        log.debug("No active session or folder found for {}", tenantId);
         return false;
     }
 
     public synchronized SimpleTelegramClient getClient(String tenantId) {
         if (tenantsToCleanup.contains(tenantId)) return null;
         if (activeClients.containsKey(tenantId)) {
+            qrRequestedFlags.remove(tenantId);
             return activeClients.get(tenantId);
         }
         
@@ -110,14 +103,13 @@ public class TelegramClientManager {
         log.info("🗑 Request to delete session for tenant: {}", tenantId);
         pendingQrLinks.remove(tenantId);
         qrRequestedFlags.remove(tenantId);
+        qrStartTime.remove(tenantId);
         
         SimpleTelegramClient client = activeClients.remove(tenantId);
         if (client != null) {
             tenantsToCleanup.add(tenantId);
             try {
-                client.send(new TdApi.LogOut(), res -> {
-                    log.info("Logout signal processed for {}", tenantId);
-                });
+                client.send(new TdApi.LogOut(), res -> {});
             } catch (Exception e) {
                 tenantsToCleanup.remove(tenantId);
             }
@@ -133,8 +125,8 @@ public class TelegramClientManager {
             File directory = sessionPath.toFile();
             if (directory.exists()) {
                 Thread.sleep(1500);
-                boolean deleted = FileSystemUtils.deleteRecursively(directory);
-                log.info("📁 Physical cleanup for {}: {}", tenantId, deleted ? "SUCCESS" : "FAILED");
+                FileSystemUtils.deleteRecursively(directory);
+                log.info("📁 Physical cleanup for {}: SUCCESS", tenantId);
             }
         } catch (Exception e) {
             log.error("❌ Error during cleanup: {}", e.getMessage());
@@ -164,13 +156,21 @@ public class TelegramClientManager {
 
             if (state instanceof TdApi.AuthorizationStateWaitOtherDeviceConfirmation qrState) {
                 pendingQrLinks.put(tenantId, qrState.link);
+                
+                // ТАЙМАУТ: Если QR висит больше 5 минут - закрываем сессию
+                long startTime = qrStartTime.computeIfAbsent(tenantId, k -> System.currentTimeMillis());
+                if (System.currentTimeMillis() - startTime > 300000) {
+                    log.warn("⏱ QR Timeout for tenant {}. Aborting session.", tenantId);
+                    deleteSession(tenantId);
+                    return;
+                }
+                
                 syncStatusWithBackend(tenantId, "WAITING_QR");
                 
             } else if (state instanceof TdApi.AuthorizationStateWaitPhoneNumber) {
                 AtomicBoolean alreadyRequested = qrRequestedFlags.computeIfAbsent(tenantId, k -> new AtomicBoolean(false));
-                // Запрашиваем QR только если это НОВЫЙ вход, а не восстановление
                 if (clientHolder[0] != null && alreadyRequested.compareAndSet(false, true)) {
-                    log.info("📸 Requesting QR for manual authorization: {}", tenantId);
+                    log.info("📸 Requesting initial QR for tenant: {}", tenantId);
                     clientHolder[0].send(new TdApi.RequestQrCodeAuthentication(), res -> {
                         if (res.isError()) alreadyRequested.set(false); 
                     });
@@ -179,11 +179,13 @@ public class TelegramClientManager {
                 log.info("🌟 Tenant {} connected!", tenantId);
                 pendingQrLinks.remove(tenantId);
                 qrRequestedFlags.remove(tenantId);
+                qrStartTime.remove(tenantId);
                 syncStatusWithBackend(tenantId, "CONNECTED");
             } else if (state instanceof TdApi.AuthorizationStateClosed) {
                 log.info("📡 Session closed for tenant: {}", tenantId);
                 activeClients.remove(tenantId);
                 qrRequestedFlags.remove(tenantId);
+                qrStartTime.remove(tenantId);
                 if (!isStopping.get()) {
                     if (tenantsToCleanup.contains(tenantId)) cleanupFiles(tenantId);
                     syncStatusWithBackend(tenantId, "DISCONNECTED");
