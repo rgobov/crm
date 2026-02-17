@@ -23,9 +23,6 @@ public class NotificationManager {
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
 
-    /**
-     * Отправка уведомления по типу события
-     */
     public void sendNotification(Appointment appointment, String type) {
         String tenantId = appointment.getTenantId();
         
@@ -49,26 +46,32 @@ public class NotificationManager {
         String template = templateService.getTemplateContent(tenantId, type);
         String message = templateEngine.process(template, appointment);
 
-        log.info("Preparing to send Telegram notification for tenant {}: {}", tenantId, message);
-        
-        // ПРОВЕРКА КОНТАКТА И ТЕЛЕФОНОВ
         if (appointment.getContact() != null && 
             appointment.getContact().getPhones() != null && 
             !appointment.getContact().getPhones().isEmpty()) {
             
-            // Берем первый номер из списка text[]
             String rawPhone = appointment.getContact().getPhones().get(0);
             String cleanPhone = rawPhone.replaceAll("[^0-9]", "");
             
+            // ИСПРАВЛЕНИЕ: Конвертируем 8 в 7 для международного формата Telegram
+            if (cleanPhone.startsWith("8") && cleanPhone.length() == 11) {
+                cleanPhone = "7" + cleanPhone.substring(1);
+            }
+            
             log.info("Sending message to phone: {}", cleanPhone);
             
-            notificationClient.sendTelegramMessage(internalSecret, Map.of(
-                "tenantId", tenantId,
-                "phone", cleanPhone,
-                "text", message
-            ));
+            try {
+                notificationClient.sendTelegramMessage(internalSecret, Map.of(
+                    "tenantId", tenantId,
+                    "phone", cleanPhone,
+                    "text", message
+                ));
+            } catch (Exception e) {
+                log.error("NotificationClient failed: {}", e.getMessage());
+                throw e; // Пробрасываем выше для логирования в планировщике
+            }
         } else {
-            log.warn("Cannot send Telegram notification: No phone found for contact in appointment {}", appointment.getId());
+            log.warn("Cannot send Telegram notification: No phone found for contact");
         }
     }
 }
