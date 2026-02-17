@@ -9,12 +9,18 @@ RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests
 
-# ЭТАП 2: Запуск (JRE 21)
-FROM eclipse-temurin:21-jre-alpine
+# ЭТАП 2: Запуск (Используем Debian-based образ вместо Alpine для совместимости с TDLib)
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-# Устанавливаем необходимые библиотеки для работы TDLib в Linux
-RUN apk add --no-cache gcompat libstdc++
+# Устанавливаем необходимые библиотеки согласно документации TDLib:
+# OpenSSL (libssl3), zlib (zlib1g), стандартные библиотеки C++ (libstdc++6) и сертификаты
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    zlib1g \
+    libstdc++6 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/target/notifications-0.0.1-SNAPSHOT.jar app.jar
 
