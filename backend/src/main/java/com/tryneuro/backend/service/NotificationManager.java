@@ -42,7 +42,6 @@ public class NotificationManager {
 
     private void sendViaTelegram(Appointment appointment, String type) {
         String tenantId = appointment.getTenantId();
-        
         String template = templateService.getTemplateContent(tenantId, type);
         String message = templateEngine.process(template, appointment);
 
@@ -51,14 +50,19 @@ public class NotificationManager {
             !appointment.getContact().getPhones().isEmpty()) {
             
             String rawPhone = appointment.getContact().getPhones().get(0);
+            
+            // 1. Очищаем от всего, кроме цифр
             String cleanPhone = rawPhone.replaceAll("[^0-9]", "");
             
-            // ИСПРАВЛЕНИЕ: Конвертируем 8 в 7 для международного формата Telegram
-            if (cleanPhone.startsWith("8") && cleanPhone.length() == 11) {
+            // 2. Умная коррекция для РФ (если 11 цифр и начинается с 8)
+            if (cleanPhone.length() == 11 && cleanPhone.startsWith("8")) {
                 cleanPhone = "7" + cleanPhone.substring(1);
             }
             
-            log.info("Sending message to phone: {}", cleanPhone);
+            // 3. Если номер все еще начинается с 8 (и длина не 11), 
+            // мы его не трогаем, так как это может быть международный номер другой страны (например, Японии 81...)
+            
+            log.info("Telegram notification phone: {}", cleanPhone);
             
             try {
                 notificationClient.sendTelegramMessage(internalSecret, Map.of(
@@ -67,8 +71,8 @@ public class NotificationManager {
                     "text", message
                 ));
             } catch (Exception e) {
-                log.error("NotificationClient failed: {}", e.getMessage());
-                throw e; // Пробрасываем выше для логирования в планировщике
+                log.error("Failed to send to microservice: {}", e.getMessage());
+                throw e;
             }
         } else {
             log.warn("Cannot send Telegram notification: No phone found for contact");

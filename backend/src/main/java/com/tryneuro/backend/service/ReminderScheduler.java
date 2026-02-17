@@ -23,7 +23,6 @@ public class ReminderScheduler {
     @Scheduled(fixedRateString = "${reminder.check.interval:60000}")
     @Transactional
     public void checkAndSendReminders() {
-        // Берем будущие записи, где напоминание не отправлено и разрешено
         List<Appointment> pendingAppointments = appointmentRepository.findAllByReminderSentFalseAndAllowReminderTrueAndStartTimeAfter(
             OffsetDateTime.now()
         );
@@ -39,23 +38,25 @@ public class ReminderScheduler {
             }
 
             OffsetDateTime startTime = app.getStartTime();
-            
-            // ЧИТАЕМ ИНДИВИДУАЛЬНУЮ НАСТРОЙКУ ЧАСОВ ИЗ ЗАПИСИ
             int leadTimeHours = app.getReminderLeadTimeHours() != null ? app.getReminderLeadTimeHours() : 24;
 
-            // Если до записи осталось меньше или равно leadTimeHours, но больше 30 минут
             if (startTime.isBefore(now.plusHours(leadTimeHours)) && startTime.isAfter(now.plusMinutes(30))) {
                 try {
-                    log.info("⏰ Time to send reminder for appointment {}: за {}ч. до визита", app.getId(), leadTimeHours);
+                    log.info("⏰ Triggering scheduled reminder for appointment: {}", app.getId());
                     notificationManager.sendNotification(app, "REMINDER");
                     
+                    // Успешная отправка
                     app.setReminderSent(true);
                     appointmentRepository.save(app);
                 } catch (Exception e) {
-                    log.error("❌ Error sending reminder: {}", e.getMessage());
+                    // ЕСЛИ ОШИБКА: Всё равно помечаем как отправленное, чтобы не зацикливать бан.
+                    // В логах увидим причину.
+                    log.error("❌ Failed to process reminder for {}: {}. Mark as skipped to avoid spam.", app.getId(), e.getMessage());
+                    app.setReminderSent(true);
+                    appointmentRepository.save(app);
                 }
             } else if (startTime.isBefore(now.plusMinutes(30))) {
-                // Очистка просроченных
+                // Если клиент уже почти пришел - просто гасим напоминание
                 app.setReminderSent(true);
                 appointmentRepository.save(app);
             }
