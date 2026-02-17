@@ -4,6 +4,7 @@
     import AppointmentEditScreen from '$lib/components/schedule/AppointmentEditScreen.svelte';
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
+    import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
     import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
 
@@ -12,6 +13,7 @@
     let viewMode = 'month';
     let showModal = null;
     let showNestedAddContact = false;
+    let selectedClientId = null; // ДЛЯ МОДАЛКИ КЛИЕНТА
 
     let currentAppointment = null;
     let preselectedData = null;
@@ -52,6 +54,7 @@
     function closeModal() {
         showModal = null;
         showNestedAddContact = false;
+        selectedClientId = null;
     }
 
     function handleContactAdded(event) {
@@ -60,6 +63,12 @@
             appointmentEditRef.setCreatedContact(newContact);
         }
         showNestedAddContact = false;
+    }
+
+    // ОБРАБОТЧИК КЛИКА ПО ИМЕНИ КЛИЕНТА
+    function handleOpenClient(id) {
+        selectedClientId = id;
+        showModal = 'client-profile';
     }
 </script>
 
@@ -79,7 +88,6 @@
                 <button class="btn-to-month" on:click={() => { viewMode = 'month'; activeTab.set('calendar'); }}>‹ Месяц</button>
                 <div class="date-info">
                     <span class="d">{$selectedDate.getDate()}</span>
-                    <!-- ФИКС КАПСА: Убрали uppercase, добавили мягкую капитализацию первой буквы через JS -->
                     <span class="m">
                         {$selectedDate.toLocaleDateString('ru-RU', { month: 'long' }).replace(/^./, str => str.toUpperCase())}
                     </span>
@@ -100,7 +108,15 @@
         <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
-                    <h3>{showModal === 'edit' ? (currentAppointment ? 'Редактирование' : 'Новая запись') : 'Детали визита'}</h3>
+                    <h3>
+                        {#if showModal === 'edit'}
+                            {currentAppointment ? 'Редактирование' : 'Новая запись'}
+                        {:else if showModal === 'detail'}
+                            Детали визита
+                        {:else if showModal === 'client-profile'}
+                            Карточка клиента
+                        {/if}
+                    </h3>
                     <button class="close-btn" on:click={closeModal}>✕</button>
                 </header>
 
@@ -119,6 +135,12 @@
                             appointment={currentAppointment}
                             on:edit={(e) => { currentAppointment = e.detail; showModal = 'edit'; }}
                             on:deleted={closeModal}
+                            on:open-client={(e) => handleOpenClient(e.detail)}
+                        />
+                    {:else if showModal === 'client-profile'}
+                        <ContactDetailScreen
+                            contactId={selectedClientId}
+                            on:updated={closeModal}
                         />
                     {/if}
                 </div>
@@ -147,7 +169,6 @@
 
     .date-info { display: flex; align-items: baseline; gap: 8px; }
     .date-info .d { font-size: 24px; font-weight: 900; color: var(--primary-color); letter-spacing: -0.5px; }
-    /* УБРАЛИ UPPERCASE И УМЕНЬШИЛИ ИНТЕРВАЛ */
     .date-info .m { font-size: 15px; font-weight: 700; color: #64748b; letter-spacing: -0.2px; }
 
     .btn-add { background: #eff6ff; color: var(--primary-color); border: none; padding: 10px 20px; border-radius: 12px; font-weight: 800; cursor: pointer; }

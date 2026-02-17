@@ -49,6 +49,13 @@
             dispatch('deleted', appointment.id);
         }
     }
+
+    // НОВАЯ ФУНКЦИЯ ДЛЯ ПЕРЕХОДА В КАРТОЧКУ КЛИЕНТА
+    function handleClientClick() {
+        if (appointment.contactId) {
+            dispatch('open-client', appointment.contactId);
+        }
+    }
 </script>
 
 <div class="detail-tiles-container" in:scale={{duration: 400, start: 0.95, easing: quintOut}}>
@@ -57,7 +64,10 @@
         <div class="avatar-big">{appointment.clientName?.charAt(0) || '?'}</div>
         <div class="hero-info">
             <label>Карточка визита</label>
-            <h2>{appointment.clientName}</h2>
+            <!-- ИМЯ ТЕПЕРЬ КЛИКАБЕЛЬНОЕ -->
+            <button class="client-link-btn" on:click={handleClientClick}>
+                <h2>{appointment.clientName} <span>›</span></h2>
+            </button>
 
             <div class="status-selector">
                 {#each STATUSES as st}
@@ -141,38 +151,23 @@
 </div>
 
 <style>
-    /* УБИРАЕМ ПРИНУДИТЕЛЬНУЮ ВЫСОТУ И ЛИШНИЙ ПАДДИНГ ВНИЗУ */
-    .detail-tiles-container {
-        padding: 20px 20px 4px 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        background: #f8fafc;
-        overflow-x: hidden;
-    }
+    .detail-tiles-container { padding: 20px 20px 4px 20px; display: flex; flex-direction: column; gap: 12px; background: #f8fafc; overflow-x: hidden; }
 
-    /* УЖИМАЕМ ШАПКУ (МЕНЬШЕ ПУСТОТЫ) */
-    .hero-card {
-        background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
-        padding: 16px 24px; border-radius: 32px; display: flex; align-items: center; gap: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.04); border: 1px solid #f1f5f9;
-    }
+    .hero-card { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); padding: 16px 24px; border-radius: 32px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
     .avatar-big { width: 64px; height: 64px; background: var(--primary-gradient); color: white; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; }
 
     .hero-info { flex: 1; }
     .hero-info label { display: block; font-size: 9px; font-weight: 850; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
-    .hero-info h2 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.1; }
+
+    /* СТИЛИ КЛИКАБЕЛЬНОГО ИМЕНИ */
+    .client-link-btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; display: block; width: 100%; transition: opacity 0.2s; }
+    .client-link-btn:hover { opacity: 0.7; }
+    .client-link-btn h2 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.1; }
+    .client-link-btn span { color: #0ea5e9; font-size: 24px; font-weight: 300; vertical-align: middle; margin-left: 4px; }
 
     .status-selector { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-    .status-btn {
-        padding: 6px 10px; border-radius: 10px; border: 1.5px solid #f1f5f9; background: white;
-        font-size: 10px; font-weight: 800; color: #64748b; cursor: pointer; transition: all 0.2s;
-        text-transform: uppercase;
-    }
-    .status-btn.active {
-        background: var(--active-bg); color: white; border-color: var(--active-bg);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
+    .status-btn { padding: 6px 10px; border-radius: 10px; border: 1.5px solid #f1f5f9; background: white; font-size: 10px; font-weight: 800; color: #64748b; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+    .status-btn.active { background: var(--active-bg); color: white; border-color: var(--active-bg); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
     .grid-layout { display: flex; flex-direction: column; gap: 10px; }
     .info-tile { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); text-align: left; }
@@ -187,18 +182,11 @@
     .hours-edit { display: flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 800; color: #1e293b; }
     .hours-edit input { width: 45px; padding: 2px; border: 1.5px solid #e2e8f0; border-radius: 8px; text-align: center; color: #0ea5e9; font-weight: 900; background: #f8fafc; }
 
-    .toggle-switch {
-        width: 44px; height: 24px; background: #e2e8f0; border-radius: 12px; border: none;
-        position: relative; cursor: pointer; transition: background 0.3s;
-    }
+    .toggle-switch { width: 44px; height: 24px; background: #e2e8f0; border-radius: 12px; border: none; position: relative; cursor: pointer; transition: background 0.3s; }
     .toggle-switch.on { background: #10b981; }
-    .switch-handle {
-        width: 18px; height: 18px; background: white; border-radius: 50%;
-        position: absolute; top: 3px; left: 3px; transition: transform 0.3s;
-    }
+    .switch-handle { width: 18px; height: 18px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
     .toggle-switch.on .switch-handle { transform: translateX(20px); }
 
-    /* ПРИЖИМАЕМ КНОПКИ К КОНТЕНТУ */
     .actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 0; padding-bottom: 10px; }
     .action-tile { height: 52px; border-radius: 20px; border: 1.5px solid #f1f5f9; background: white; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .action-tile.edit { color: var(--primary-color); }

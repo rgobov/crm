@@ -20,12 +20,10 @@ jobs:
             cd ~/crm
             
             echo "--- ОБНОВЛЕНИЕ КОДА ---"
-            # Переключаемся на нужную ветку и подтягиваем изменения
             git fetch origin feature/notifications-service
             git reset --hard origin/feature/notifications-service
             
             echo "--- ПОДГОТОВКА СРЕДЫ (СЕКРЕТЫ) ---"
-            # Создаем .env файл только с теми секретами, которые есть в GitHub
             echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env
             echo "TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}" >> .env
             
@@ -36,8 +34,11 @@ jobs:
             echo "--- ПЕРЕЗАПУСК СЕРВИСОВ ---"
             docker-compose up -d --force-recreate
             
-            echo "--- ОЧИСТКА МУСОРА ---"
-            docker image prune -f
+            echo "--- ГЛУБОКАЯ ОЧИСТКА МУСОРА ---"
+            # Удаляем старые неиспользуемые образы, контейнеры и сети
+            docker system prune -f
+            # Удаляем образы старше 24 часов, которые не используются текущими контейнерами
+            docker image prune -a -f --filter "until=24h"
             
             echo "--- СТАТУС КОНТЕЙНЕРОВ ---"
             docker-compose ps
