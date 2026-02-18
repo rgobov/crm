@@ -57,12 +57,15 @@ public class Appointment {
     @Column(name = "staff_member_id")
     private String staffMemberId;
 
+    // Поле для записи ID в базу
+    @Column(name = "branch_id")
+    private String branchId;
+
+    // Объект связи для чтения
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", insertable = false, updatable = false)
     private Branch branch;
-
-    @Column(name = "branch_id")
-    private String branchId;
 
     @Enumerated(EnumType.STRING)
     private AppointmentStatus status = AppointmentStatus.SCHEDULED;
@@ -83,7 +86,7 @@ public class Appointment {
     private boolean allowReminder = true;
 
     @Column(name = "reminder_lead_time_hours")
-    private Integer reminderLeadTimeHours = 24; // Значение по умолчанию 24 часа
+    private Integer reminderLeadTimeHours = 24;
 
     public LocalDate getDate() {
         return startTime != null ? startTime.toLocalDate() : null;
