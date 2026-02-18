@@ -57,11 +57,10 @@ public class Appointment {
     @Column(name = "staff_member_id")
     private String staffMemberId;
 
-    // Поле для записи ID в базу
-    @Column(name = "branch_id")
+    // ТЕПЕРЬ ОБЯЗАТЕЛЬНОЕ ПОЛЕ
+    @Column(name = "branch_id", nullable = false)
     private String branchId;
 
-    // Объект связи для чтения
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", insertable = false, updatable = false)

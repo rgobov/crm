@@ -24,8 +24,8 @@ public class Resource {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // СВЯЗЬ С ФИЛИАЛОМ
-    @Column(name = "branch_id")
+    // СДЕЛАНО ОБЯЗАТЕЛЬНЫМ
+    @Column(name = "branch_id", nullable = false)
     private String branchId;
 
     @JsonIgnore

@@ -1,6 +1,5 @@
 <script>
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
-    import { adminService } from '$lib/services/adminService.js';
     import { fade, slide } from 'svelte/transition';
 
     const dispatch = createEventDispatcher();
@@ -26,54 +25,41 @@
 
     let isDown = false;
     let startX;
-    let startY;
     let scrollLeft;
     let bodyDragging = false;
+
+    $: staffIds = new Set(staff.map(s => s.id));
+    $: unassignedAppts = appointments.filter(a => !a.staffMemberId || !staffIds.has(a.staffMemberId));
 
     function handleMouseDown(e) {
         isDown = true;
         startX = e.pageX - scrollBody.offsetLeft;
-        startY = e.pageY - scrollBody.offsetTop;
         scrollLeft = scrollBody.scrollLeft;
         bodyDragging = false;
     }
 
     function handleMouseLeave() { isDown = false; }
-
     function handleMouseUp() {
         isDown = false;
-        setTimeout(() => { bodyDragging = false; }, 100);
+        setTimeout(() => { bodyDragging = false; }, 50);
     }
 
     function handleMouseMove(e) {
         if (!isDown) return;
         const x = e.pageX - scrollBody.offsetLeft;
-        const y = e.pageY - scrollBody.offsetTop;
-        const dist = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-        if (dist > 5) {
-            bodyDragging = true;
+        const walk = (x - startX) * 1.5;
+        if (Math.abs(walk) > 5) bodyDragging = true;
+        if (bodyDragging) {
             e.preventDefault();
-            const walk = (x - startX) * 1.5;
             scrollBody.scrollLeft = scrollLeft - walk;
         }
     }
 
-    // ФУНКЦИЯ ДЛЯ КЛИКА ПО ЗАПИСИ
     function onApptClick(appt) {
         if (bodyDragging) return;
-
-        // ФИКС: Ищем мастера в текущем списке staff, чтобы передать его имя в модалку
         const master = staff.find(s => s.id === appt.staffMemberId);
-        const enrichedAppt = {
-            ...appt,
-            staffName: master ? master.name : 'Не назначен'
-        };
-
-        dispatch('appointmentTap', enrichedAppt);
+        dispatch('appointmentTap', { ...appt, staffName: master ? master.name : 'Не назначен' });
     }
-
-    $: unassignedAppts = appointments.filter(a => !a.staffMemberId);
-    $: displayStaff = [...staff];
 
     $: {
         let minH = 9;
@@ -144,12 +130,11 @@
 </script>
 
 <div class="timeline-root">
-
     <header class="staff-header-fixed">
         <div class="time-corner-empty">🕒</div>
         <div class="staff-scroll-area" bind:this={scrollHeader}>
-            <div class="staff-inner-row" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
-                {#each displayStaff as s}
+            <div class="staff-inner-row" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
+                {#each staff as s}
                     <div class="staff-cell" style="width: {STAFF_WIDTH}px">
                         {#if s.photoUrl}
                             <img src={s.photoUrl} alt={s.name} class="avatar img" />
@@ -183,7 +168,7 @@
 
         <div class="timeline-spacer top"></div>
 
-        <div class="body-layout-wrapper" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
+        <div class="body-layout-wrapper" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
@@ -192,7 +177,7 @@
                 {/each}
             </div>
 
-            <div class="grid-canvas" style="width: {(displayStaff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
+            <div class="grid-canvas" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 <div class="grid-lines">
                     {#each Array(hours.length * 4) as _, i}
                         <div class="l" class:bold={i % 4 === 0} style="top: {i * SLOT_HEIGHT}px"></div>
@@ -200,20 +185,14 @@
                 </div>
 
                 <div class="columns-container">
-                    {#each [...displayStaff, ...(unassignedAppts.length > 0 ? [{id: null}] : [])] as s, sIdx}
+                    {#each staff as s}
                         <div class="staff-col" style="width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
-                                <button class="slot-btn"
-                                        style="height: {SLOT_HEIGHT}px"
-                                        on:click|stopPropagation={() => { if(!bodyDragging) dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id }); }}>
-                                </button>
+                                <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click|stopPropagation={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}></button>
                             {/each}
-
                             {#each appointments.filter(a => a.staffMemberId === s.id) as appt (appt.id)}
                                 {@const status = getStatusData(appt.status)}
-                                <div class="appt-box"
-                                     style="{getApptStyle(appt)} --status-color: {status.color}"
-                                     on:click|stopPropagation={() => onApptClick(appt)}>
+                                <div class="appt-box" style="{getApptStyle(appt)} --status-color: {status.color}" on:click|stopPropagation={() => onApptClick(appt)}>
                                     <div class="appt-content">
                                         <div class="t">
                                             <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
@@ -226,18 +205,37 @@
                             {/each}
                         </div>
                     {/each}
+
+                    {#if unassignedAppts.length > 0}
+                        <div class="staff-col unassigned-col" style="width: {STAFF_WIDTH}px; background: rgba(241, 245, 249, 0.5);">
+                            {#each Array(hours.length * 4) as _, i}
+                                <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click|stopPropagation={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: null })}></button>
+                            {/each}
+                            {#each unassignedAppts as appt (appt.id)}
+                                {@const status = getStatusData(appt.status)}
+                                <div class="appt-box" style="{getApptStyle(appt)} --status-color: {status.color}" on:click|stopPropagation={() => onApptClick(appt)}>
+                                    <div class="appt-content">
+                                        <div class="t">
+                                            <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
+                                            <span class="st">{status.label}</span>
+                                        </div>
+                                        <div class="cl">{appt.clientName}</div>
+                                        <div class="sv">{appt.service}</div>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
                 </div>
 
                 {#if nowLinePos >= 0}
                     <div class="now-indicator" style="top: {nowLinePos}px">
-                        <div class="label">{currentTime.toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'})}</div>
-                        <div class="dot"></div>
                         <div class="line"></div>
+                        <div class="dot"></div>
                     </div>
                 {/if}
             </div>
         </div>
-
         <div class="timeline-spacer bottom"></div>
     </div>
 </div>
@@ -270,13 +268,12 @@
     .appt-box { position: absolute; left: 4px; right: 4px; background: white; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.1s; border: 1px solid #f1f5f9; overflow: hidden; }
     .appt-box:active { transform: scale(0.98); }
     .appt-content { height: 100%; border-left: 5px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; overflow: hidden; }
+    .t { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
     .tm { font-size: 10px; font-weight: 800; color: var(--status-color); }
     .st { font-size: 8px; font-weight: 900; text-transform: uppercase; color: white; background: var(--status-color); padding: 1px 5px; border-radius: 4px; }
     .cl { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; }
     .sv { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
     .now-indicator { position: absolute; left: 0; right: 0; z-index: 180; pointer-events: none; }
     .now-indicator .line { height: 2px; background: #ef4444; width: 100%; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
-    .now-indicator .dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; animation: pulse 2s infinite; }
-    .now-indicator .label { position: absolute; left: -50px; top: -10px; background: #ef4444; color: white; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 6px; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
-    @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+    .now-indicator .dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; }
 </style>

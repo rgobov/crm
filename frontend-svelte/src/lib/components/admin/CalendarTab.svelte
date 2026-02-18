@@ -5,7 +5,7 @@
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
-    import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
+    import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
 
     export let forcedDate = null;
@@ -97,6 +97,7 @@
 
             <div class="timeline-container">
                 <ScheduleScreen
+                    branchId={$activeBranchId}
                     on:emptySlotTap={openNewAppointment}
                     on:appointmentTap={openDetail}
                 />

@@ -1,56 +1,84 @@
 <script>
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js'; // Новый триггер
+    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { selectedDate } from '$lib/stores/dashboardStore.js';
     import HorizontalDatePicker from './HorizontalDatePicker.svelte';
     import DayTimeline from './DayTimeline.svelte';
 
+    export let branchId = null;
     const dispatch = createEventDispatcher();
 
     let appointments = [];
     let staff = [];
     let isLoading = true;
 
-    // РЕАКТИВНОСТЬ: Загрузка при смене даты в календаре
-    $: if ($selectedDate) {
-        loadDayData($selectedDate);
+    // РЕАКТИВНОСТЬ: Перегружаем данные при смене даты ИЛИ филиала
+    $: if ($selectedDate && branchId) {
+        loadDayData($selectedDate, branchId);
+    } else {
+        isLoading = false;
     }
 
-    // WEBSOCKET: Мгновенная реакция на сигнал обновления (через timestamp)
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
-        if (signal && signal.ts > 0) {
-            console.log('🔄 Schedule: Global refresh signal received (Real-time update)');
-            loadDayData($selectedDate, true); // silent update
+        if (signal && signal.ts > 0 && branchId) {
+            console.log('🔄 ScheduleScreen: WebSocket signal received, refreshing...');
+            loadDayData($selectedDate, branchId, true);
         }
     });
 
     onMount(() => {
-        if ($selectedDate) loadDayData($selectedDate);
+        if ($selectedDate && branchId) loadDayData($selectedDate, branchId);
     });
 
     onDestroy(() => unsubscribe());
 
-    async function loadDayData(date, silent = false) {
-        if (!date) return;
-        if (!silent) isLoading = true;
+    async function loadDayData(date, bId, silent = false) {
+        if (!date || !bId) {
+            isLoading = false;
+            return;
+        }
+
+        if (!silent) {
+            isLoading = true;
+            // Очищаем списки только при "полной" загрузке, чтобы не моргало при WS-обновлении
+            appointments = [];
+            staff = [];
+        }
 
         try {
-            // Используем локальную дату для запроса
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`;
-
             const [apptsData, staffData] = await Promise.all([
-                adminService.getAppointmentsForDay(date),
-                adminService.getStaffForSchedule(date)
+                adminService.getAppointmentsForDay(date, bId),
+                adminService.getStaffForSchedule(date, bId)
             ]);
+
+            // --- ПОДРОБНОЕ ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ ---
+            console.group('📅 Schedule Update Debug');
+            console.log('Branch:', bId);
+            console.log('Date:', date.toLocaleDateString());
+
+            console.log('👥 Staff from API:', staffData?.length || 0);
+            if (staffData?.length > 0) {
+                console.table(staffData.map(s => ({ id: s.id, name: s.name, active: s.active, branchIds: s.branches?.map(b=>b.id) })));
+            }
+
+            console.log('📝 Appointments from API:', apptsData?.length || 0);
+            if (apptsData?.length > 0) {
+                console.table(apptsData.map(a => ({
+                    id: a.id,
+                    client: a.clientName,
+                    staffId: a.staffMemberId,
+                    branchId: a.branchId,
+                    time: a.startTime
+                })));
+            }
+            console.groupEnd();
+            // ----------------------------------------
 
             appointments = apptsData || [];
             staff = (staffData || []).filter(s => s.role === 'ROLE_EMPLOYEE' || s.role === 'EMPLOYEE');
         } catch (e) {
-            console.error('❌ Schedule API Error', e);
+            console.error('❌ Schedule Screen API Error:', e);
         } finally {
             isLoading = false;
         }
@@ -77,10 +105,15 @@
     <div class="timeline-body">
         {#if isLoading && staff.length === 0}
             <div class="center-box"><span class="spinner"></span></div>
-        {:else if staff.length === 0}
+        {:else if !branchId}
+             <div class="empty-state-msg">
+                <span class="icon">🏢</span>
+                <p>Выберите филиал в меню слева</p>
+            </div>
+        {:else if staff.length === 0 && !isLoading}
             <div class="empty-state-msg">
-                <span class="icon">🔍</span>
-                <p>Мастера на эту дату не найдены</p>
+                <span class="icon">👥</span>
+                <p>В этом филиале пока нет работающих мастеров</p>
             </div>
         {:else}
             <DayTimeline
