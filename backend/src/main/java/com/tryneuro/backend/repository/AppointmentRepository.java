@@ -3,6 +3,7 @@ package com.tryneuro.backend.repository;
 import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,6 +18,11 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
     @Query("SELECT a FROM Appointment a WHERE CAST(a.startTime AS date) = :date AND a.tenantId = :tenantId")
     List<Appointment> findByDateAndTenantId(@Param("date") LocalDate date, @Param("tenantId") String tenantId);
 
+    // МЕТОД ОБНОВЛЕНИЯ ИМЕНИ (СИНХРОНИЗАЦИЯ)
+    @Modifying
+    @Query("UPDATE Appointment a SET a.clientName = :newName WHERE a.contactId = :contactId AND a.tenantId = :tenantId")
+    void updateClientNameForContact(@Param("contactId") String contactId, @Param("newName") String newName, @Param("tenantId") String tenantId);
+
     @Query("SELECT a FROM Appointment a WHERE a.resourceId = :resourceId AND CAST(a.startTime AS date) = :date")
     List<Appointment> findByResourceIdAndDate(@Param("resourceId") String resourceId, @Param("date") LocalDate date);
 
@@ -24,7 +30,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
     boolean existsByStaffMemberId(String staffId);
 
-    // НОВЫЙ МЕТОД ДЛЯ УНИВЕРСАЛЬНОГО ПЛАНИРОВЩИКА
     List<Appointment> findAllByReminderSentFalseAndAllowReminderTrueAndStartTimeAfter(OffsetDateTime time);
 
     @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId " +

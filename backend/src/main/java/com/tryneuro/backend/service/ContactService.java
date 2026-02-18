@@ -2,6 +2,7 @@ package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.repository.ContactRepository;
+import com.tryneuro.backend.repository.AppointmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -9,37 +10,31 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 @Service
 public class ContactService {
     private final ContactRepository contactRepository;
+    private final AppointmentRepository appointmentRepository;
 
     @Autowired
-    public ContactService(ContactRepository contactRepository) {
+    public ContactService(ContactRepository contactRepository, AppointmentRepository appointmentRepository) {
         this.contactRepository = contactRepository;
+        this.appointmentRepository = appointmentRepository;
     }
 
-    // ОБНОВЛЕНО: Добавлен параметр showAll
     public Page<Contact> getContactsPaged(String tenantId, String query, boolean showAll, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
-
-        // 1. Поиск всегда имеет приоритет (от 3-х символов)
         if (query != null && query.trim().length() >= 3) {
             return contactRepository.searchContacts(tenantId, query.trim(), pageable);
         }
-
-        // 2. Если поиска нет, смотрим на переключатель
         if (showAll) {
-            // Показываем абсолютно всех клиентов компании
             return contactRepository.findByTenantId(tenantId, pageable);
         }
-
-        // 3. По умолчанию (или если выбрано "Сегодня") - только клиенты с записями
         return contactRepository.findByAppointmentDate(tenantId, LocalDate.now(), pageable);
     }
 
@@ -68,10 +63,16 @@ public class ContactService {
         return contactRepository.save(contact);
     }
 
+    @Transactional
     public Contact updateContact(String id, Contact contact, String tenantId) {
         contact.setId(id);
         contact.setTenantId(tenantId);
-        return contactRepository.save(contact);
+        Contact saved = contactRepository.save(contact);
+        
+        // СИНХРОНИЗАЦИЯ: Обновляем имя клиента во всех его записях
+        appointmentRepository.updateClientNameForContact(id, saved.getName(), tenantId);
+        
+        return saved;
     }
 
     public void deleteContact(String id) {

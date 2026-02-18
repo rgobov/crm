@@ -2,6 +2,7 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import api from '$lib/api.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
+    import { scheduleRefreshSignal } from '$lib/services/websocketService.js'; // ИМПОРТ СИГНАЛА
     import { fade, slide, scale } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -11,7 +12,6 @@
     let contact = null;
     let isLoading = true;
 
-    // Состояния редактирования
     let editMode = { name: false, email: false, notes: false, phoneIdx: -1, isAddingPhone: false };
     let tempValues = { name: '', phones: [], email: '', notes: '', newPhone: '' };
 
@@ -55,7 +55,6 @@
                 ? [...tempValues.phones, phoneUtils.clean(tempValues.newPhone)]
                 : tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p);
 
-            // ВАЛИДАЦИЯ
             if (!tempValues.name) return alert('Имя обязательно');
             if (finalPhones.length === 0) return alert('У клиента должен быть минимум один телефон');
 
@@ -70,6 +69,10 @@
             const res = await api.put(`/admin/clients/${contactId}`, payload);
             contact = res.data;
             cancelAllEdits();
+
+            // МАГИЯ: Отправляем сигнал таймлайну обновиться
+            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
+
             dispatch('updated', contact);
         } catch (e) {
             alert('Ошибка при сохранении');
@@ -102,7 +105,6 @@
         </header>
 
         <div class="details-grid">
-            <!-- ТЕЛЕФОНЫ -->
             <section class="info-group">
                 <label>Контактные телефоны</label>
                 <div class="tiles-container">
@@ -117,7 +119,6 @@
                                 <span class="phone-val" on:click={() => editMode.phoneIdx = i}>
                                     {phoneUtils.format(phone)}
                                 </span>
-                                <!-- ВОЗВРАЩЕН ФУНКЦИОНАЛ ЗВОНКА -->
                                 <a href="tel:+{phoneUtils.clean(phone)}" class="btn-call" title="Позвонить">📞</a>
                             {/if}
                         </div>
@@ -137,7 +138,6 @@
                 </div>
             </section>
 
-            <!-- EMAIL -->
             <section class="info-group">
                 <label>E-mail адрес</label>
                 <div class="tile full">
@@ -154,7 +154,6 @@
                 </div>
             </section>
 
-            <!-- ЗАМЕТКИ -->
             <section class="info-group">
                 <label>Заметки и особенности</label>
                 <div class="tile full notes-area" on:click={() => !editMode.notes && (editMode.notes = true)}>
