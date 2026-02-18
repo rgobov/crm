@@ -29,15 +29,12 @@ public class TelegramClientManager {
 
     private final TelegramProperties properties;
     private final BackendClient backendClient;
-    
-    // ИЗОЛЯЦИЯ: Все карты используют tenantId как уникальный ключ
     private final Map<String, SimpleTelegramClient> activeClients = new ConcurrentHashMap<>();
     private final Map<String, String> pendingQrLinks = new ConcurrentHashMap<>();
-    private final Map<String, Long> floodWaitUntil = new ConcurrentHashMap<>(); 
+    private final Map<String, Long> floodWaitUntil = new ConcurrentHashMap<>();
     private final Map<String, AtomicBoolean> qrRequestedFlags = new ConcurrentHashMap<>();
     private final Map<String, Long> qrStartTime = new ConcurrentHashMap<>();
     
-    private final Set<String> tenantsToCleanup = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final AtomicBoolean isStopping = new AtomicBoolean(false);
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
@@ -80,11 +77,8 @@ public class TelegramClientManager {
     }
 
     public boolean isSessionActive(String tenantId) {
-        // Проверка индивидуального бана
         if (isUnderFloodWait(tenantId)) return false;
-
         if (activeClients.containsKey(tenantId)) return true;
-        
         Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId).resolve("db");
         if (new File(sessionPath.toString()).exists()) {
             getClient(tenantId); 
@@ -96,8 +90,6 @@ public class TelegramClientManager {
     private boolean isUnderFloodWait(String tenantId) {
         Long banEndTime = floodWaitUntil.get(tenantId);
         if (banEndTime != null && banEndTime > System.currentTimeMillis()) {
-            long remaining = (banEndTime - System.currentTimeMillis()) / 1000;
-            log.warn("🛑 Account for tenant {} is temporarily BLOCKED by Telegram. Remaining: {}s", tenantId, remaining);
             return true;
         }
         floodWaitUntil.remove(tenantId);
@@ -105,34 +97,21 @@ public class TelegramClientManager {
     }
 
     public synchronized SimpleTelegramClient getClient(String tenantId) {
-        if (isUnderFloodWait(tenantId) || tenantsToCleanup.contains(tenantId)) {
-            return null;
-        }
-
-        if (activeClients.containsKey(tenantId)) {
-            return activeClients.get(tenantId);
-        }
-        
+        if (isUnderFloodWait(tenantId) || tenantsToCleanup.contains(tenantId)) return null;
+        if (activeClients.containsKey(tenantId)) return activeClients.get(tenantId);
         SimpleTelegramClient client = createNewClientInstance(tenantId);
         activeClients.put(tenantId, client);
         return client;
     }
 
+    private final Set<String> tenantsToCleanup = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+
     public synchronized void deleteSession(String tenantId) {
-        log.info("🗑 Request to delete session for tenant: {}", tenantId);
-        pendingQrLinks.remove(tenantId);
-        qrRequestedFlags.remove(tenantId);
-        qrStartTime.remove(tenantId);
-        floodWaitUntil.remove(tenantId);
-        
+        log.info("🗑 Deleting session for tenant: {}", tenantId);
         SimpleTelegramClient client = activeClients.remove(tenantId);
         if (client != null) {
             tenantsToCleanup.add(tenantId);
-            try {
-                client.send(new TdApi.LogOut(), res -> {});
-            } catch (Exception e) {
-                tenantsToCleanup.remove(tenantId);
-            }
+            try { client.send(new TdApi.LogOut(), res -> {}); } catch (Exception e) {}
         } else {
             cleanupFiles(tenantId);
             syncStatusWithBackend(tenantId, "DISCONNECTED");
@@ -144,65 +123,37 @@ public class TelegramClientManager {
             Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId);
             File directory = sessionPath.toFile();
             if (directory.exists()) {
-                Thread.sleep(1500);
+                Thread.sleep(1000);
                 FileSystemUtils.deleteRecursively(directory);
-                log.info("📁 Physical cleanup for {}: SUCCESS", tenantId);
             }
-        } catch (Exception e) {
-            log.error("❌ Error during cleanup for {}: {}", tenantId, e.getMessage());
-        } finally {
-            tenantsToCleanup.remove(tenantId);
-        }
+        } catch (Exception e) {} finally { tenantsToCleanup.remove(tenantId); }
     }
 
     private SimpleTelegramClient createNewClientInstance(String tenantId) {
-        log.info("🚀 Starting session for tenant: {}", tenantId);
-
+        log.info("🚀 Starting session: {}", tenantId);
         Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId);
-        new File(sessionPath.toString()).mkdirs();
-        new File(sessionPath.resolve("db").toString()).mkdirs();
+        sessionPath.toFile().mkdirs();
 
         APIToken apiToken = new APIToken(properties.getApiId(), properties.getApiHash());
         TDLibSettings settings = TDLibSettings.create(apiToken);
         settings.setDatabaseDirectoryPath(sessionPath.resolve("db"));
-        settings.setDownloadedFilesDirectoryPath(sessionPath.resolve("downloads"));
 
         SimpleTelegramClientBuilder builder = clientFactory.builder(settings);
         final SimpleTelegramClient[] clientHolder = new SimpleTelegramClient[1];
 
         builder.addUpdateHandler(TdApi.UpdateAuthorizationState.class, update -> {
             TdApi.AuthorizationState state = update.authorizationState;
-
             if (state instanceof TdApi.AuthorizationStateWaitOtherDeviceConfirmation qrState) {
                 pendingQrLinks.put(tenantId, qrState.link);
-                qrStartTime.computeIfAbsent(tenantId, k -> System.currentTimeMillis());
                 syncStatusWithBackend(tenantId, "WAITING_QR");
-                
-            } else if (state instanceof TdApi.AuthorizationStateWaitPhoneNumber) {
-                AtomicBoolean alreadyRequested = qrRequestedFlags.computeIfAbsent(tenantId, k -> new AtomicBoolean(false));
-                if (clientHolder[0] != null && alreadyRequested.compareAndSet(false, true)) {
-                    log.info("📸 Requesting QR for tenant: {}", tenantId);
-                    clientHolder[0].send(new TdApi.RequestQrCodeAuthentication(), res -> {
-                        if (res.isError()) {
-                            handleFloodWait(tenantId, res.getError(), clientHolder[0]);
-                            alreadyRequested.set(false);
-                        }
-                    });
-                }
             } else if (state instanceof TdApi.AuthorizationStateReady) {
                 log.info("🌟 Tenant {} connected!", tenantId);
                 pendingQrLinks.remove(tenantId);
-                qrRequestedFlags.remove(tenantId);
-                qrStartTime.remove(tenantId);
                 floodWaitUntil.remove(tenantId);
                 syncStatusWithBackend(tenantId, "CONNECTED");
             } else if (state instanceof TdApi.AuthorizationStateClosed) {
-                log.info("📡 Session closed for tenant: {}", tenantId);
                 activeClients.remove(tenantId);
-                if (!isStopping.get()) {
-                    if (tenantsToCleanup.contains(tenantId)) cleanupFiles(tenantId);
-                    syncStatusWithBackend(tenantId, "DISCONNECTED");
-                }
+                syncStatusWithBackend(tenantId, "DISCONNECTED");
             }
         });
 
@@ -211,12 +162,16 @@ public class TelegramClientManager {
         return client;
     }
 
-    private void handleFloodWait(String tenantId, TdApi.Error error, SimpleTelegramClient client) {
-        if (error.code == 420 || error.message.contains("FLOOD_WAIT")) {
-            String secStr = error.message.replaceAll("[^0-9]", "");
-            int seconds = secStr.isEmpty() ? 600 : Integer.parseInt(secStr);
+    private void handleIncomingError(String tenantId, Throwable ex) {
+        if (ex == null) return;
+        String msg = ex.getMessage();
+        if (msg.contains("420") || msg.contains("FLOOD_WAIT")) {
+            String secondsOnly = msg.replaceAll("[^0-9]", "");
+            int seconds = secondsOnly.isEmpty() ? 600 : Integer.parseInt(secondsOnly);
             floodWaitUntil.put(tenantId, System.currentTimeMillis() + (seconds * 1000));
-            log.error("🛑 Individual Flood Wait for {}: Blocked for {}s. Closing session.", tenantId, seconds);
+            log.error("🛑 CRITICAL: Flood Wait during message chain for {}. Banned for {}s. Closing client.", tenantId, seconds);
+            
+            SimpleTelegramClient client = activeClients.remove(tenantId);
             if (client != null) {
                 try { client.close(); } catch (Exception e) {}
             }
@@ -225,37 +180,33 @@ public class TelegramClientManager {
 
     public CompletableFuture<Void> sendMessageByPhone(String tenantId, String phoneNumber, String text) {
         SimpleTelegramClient client = getClient(tenantId);
-        if (client == null) return CompletableFuture.failedFuture(new RuntimeException("Account is currently BLOCKED due to Flood Wait"));
+        if (client == null) return CompletableFuture.failedFuture(new RuntimeException("TG client blocked or inactive"));
 
-        TdApi.SearchUserByPhoneNumber searchRequest = new TdApi.SearchUserByPhoneNumber();
-        searchRequest.phoneNumber = phoneNumber;
+        TdApi.Contact contact = new TdApi.Contact();
+        contact.phoneNumber = phoneNumber;
+        contact.firstName = "Client";
+        contact.lastName = "";
 
-        return client.send(searchRequest)
-            .handle((user, ex) -> {
-                if (ex != null) {
-                    if (ex.getMessage().contains("FLOOD_WAIT")) {
-                        String sec = ex.getMessage().replaceAll("[^0-9]", "");
-                        int s = sec.isEmpty() ? 600 : Integer.parseInt(sec);
-                        floodWaitUntil.put(tenantId, System.currentTimeMillis() + (s * 1000));
-                        try { client.close(); } catch (Exception e) {}
-                    }
-                    throw new RuntimeException(ex);
-                }
-                return user;
+        return client.send(new TdApi.ImportContacts(new TdApi.Contact[]{contact}))
+            .handle((imported, ex) -> {
+                if (ex != null) { handleIncomingError(tenantId, ex); throw new RuntimeException(ex); }
+                if (imported.userIds.length == 0 || imported.userIds[0] == 0) throw new RuntimeException("404: Not Found");
+                return imported.userIds[0];
             })
-            .thenCompose(user -> {
-                TdApi.CreatePrivateChat createChatRequest = new TdApi.CreatePrivateChat();
-                createChatRequest.userId = user.id;
-                createChatRequest.force = false;
-                return client.send(createChatRequest);
+            .thenCompose(userId -> client.send(new TdApi.CreatePrivateChat(userId, false)))
+            .handle((chat, ex) -> {
+                if (ex != null) { handleIncomingError(tenantId, ex); throw new RuntimeException(ex); }
+                return chat;
             })
             .thenCompose(chat -> {
                 TdApi.InputMessageText content = new TdApi.InputMessageText();
                 content.text = new TdApi.FormattedText(text, new TdApi.TextEntity[0]);
-                TdApi.SendMessage sendMsg = new TdApi.SendMessage();
-                sendMsg.chatId = chat.id;
-                sendMsg.inputMessageContent = content;
-                return client.send(sendMsg);
-            }).thenAccept(v -> {});
+                return client.send(new TdApi.SendMessage(chat.id, 0, null, null, null, content));
+            })
+            .handle((msg, ex) -> {
+                if (ex != null) { handleIncomingError(tenantId, ex); throw new RuntimeException(ex); }
+                log.info("✅ Message sent to {} via Contact Import", phoneNumber);
+                return null;
+            });
     }
 }
