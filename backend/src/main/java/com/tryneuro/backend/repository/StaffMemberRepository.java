@@ -12,9 +12,13 @@ import java.util.List;
 
 @Repository
 public interface StaffMemberRepository extends JpaRepository<StaffMember, String> {
+    
     List<StaffMember> findByTenantId(String tenantId);
 
-    // Добавлен параметр active. Если он null - фильтр не применяется.
+    // МЕТОД ДЛЯ ФИЛЬТРАЦИИ МАСТЕРОВ ПО ФИЛИАЛУ (ManyToMany)
+    @Query("SELECT DISTINCT s FROM StaffMember s JOIN s.branches b WHERE s.tenantId = :tenantId AND b.id = :branchId AND s.active = true")
+    List<StaffMember> findByTenantIdAndBranchId(@Param("tenantId") String tenantId, @Param("branchId") String branchId);
+
     @Query("SELECT s FROM StaffMember s WHERE s.tenantId = :tenantId " +
            "AND (:active IS NULL OR s.active = :active) " +
            "AND (:query IS NULL OR :query = '' OR LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) " +

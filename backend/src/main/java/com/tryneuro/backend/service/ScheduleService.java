@@ -3,7 +3,6 @@ package com.tryneuro.backend.service;
 import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentStatus;
-import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
@@ -30,23 +29,20 @@ public class ScheduleService {
     private static final Logger log = LoggerFactory.getLogger(ScheduleService.class);
 
     private final AppointmentRepository appointmentRepository;
-    private final StaffMemberRepository staffMemberRepository;
     private final StaffShiftRepository staffShiftRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     public ScheduleService(AppointmentRepository appointmentRepository, 
-                           StaffMemberRepository staffMemberRepository,
                            StaffShiftRepository staffShiftRepository,
                            SimpMessagingTemplate messagingTemplate) {
         this.appointmentRepository = appointmentRepository;
-        this.staffMemberRepository = staffMemberRepository;
         this.staffShiftRepository = staffShiftRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
-    public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId) {
-        return appointmentRepository.findByDateAndTenantId(date, tenantId);
+    public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId, String branchId) {
+        return appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
     }
 
     public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {
@@ -63,7 +59,9 @@ public class ScheduleService {
 
     @Transactional
     public Appointment addAppointment(Appointment appointment) {
-        log.info("📝 Creating new appointment for client: {}", appointment.getClientName());
+        if (appointment.getBranch() != null && appointment.getBranch().getId() != null) {
+            appointment.setBranchId(appointment.getBranch().getId());
+        }
         validateAvailability(appointment);
         Appointment saved = appointmentRepository.save(appointment);
         notifyChange(saved.getTenantId());
@@ -72,12 +70,9 @@ public class ScheduleService {
 
     @Transactional
     public Appointment updateAppointment(String id, Appointment details) {
-        log.info("📝 Updating appointment id: {}", id);
-
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
 
-        // Обновляем поля
         appointment.setStartTime(details.getStartTime());
         appointment.setDurationInMinutes(details.getDurationInMinutes());
         appointment.setClientName(details.getClientName());
@@ -87,18 +82,20 @@ public class ScheduleService {
         appointment.setResourceId(details.getResourceId());
         appointment.setStatus(details.getStatus());
         appointment.setComment(details.getComment());
-        appointment.setAllowReminder(details.isAllowReminder()); // Обновляем признак разрешения уведомления
+        appointment.setAllowReminder(details.isAllowReminder());
+        
+        if (details.getBranch() != null && details.getBranch().getId() != null) {
+            appointment.setBranchId(details.getBranch().getId());
+        }
 
         validateAvailability(appointment);
         Appointment updated = appointmentRepository.save(appointment);
-        
         notifyChange(updated.getTenantId());
         return updated;
     }
 
     @Transactional
     public void deleteAppointment(String id) {
-        log.info("🗑 Deleting appointment: {}", id);
         appointmentRepository.findById(id).ifPresent(app -> {
             String tenantId = app.getTenantId();
             appointmentRepository.deleteById(id);
@@ -142,7 +139,16 @@ public class ScheduleService {
         return true;
     }
 
-    public List<WorkloadDto> getWorkloadForMonth(String tenantId, int year, int month) {
-        return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
+    // ЛОГИРОВАНИЕ ДЛЯ ПРОВЕРКИ ФИЛЬТРАЦИИ
+    public List<WorkloadDto> getWorkloadForMonth(String tenantId, int year, int month, String branchId) {
+        log.info("📊 Workload Request: tenant={}, branch={}, year={}, month={}", tenantId, branchId, year, month);
+        
+        if (branchId == null || branchId.isEmpty() || "null".equals(branchId)) {
+            log.info("🔍 Calling GLOBAL workload query");
+            return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
+        }
+        
+        log.info("🔍 Calling BRANCH-SPECIFIC workload query for: {}", branchId);
+        return appointmentRepository.getWorkloadForMonthAndBranch(tenantId, year, month, branchId);
     }
 }

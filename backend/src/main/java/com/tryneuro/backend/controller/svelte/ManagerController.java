@@ -1,23 +1,16 @@
 package com.tryneuro.backend.controller.svelte;
 
-import com.tryneuro.backend.dto.CommentRequest;
 import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
-import com.tryneuro.backend.model.AppointmentComment;
 import com.tryneuro.backend.model.StaffMember;
-import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.model.WappiSettings;
-import com.tryneuro.backend.service.CommentService;
 import com.tryneuro.backend.service.ContactService;
 import com.tryneuro.backend.service.ScheduleService;
 import com.tryneuro.backend.service.StaffMemberService;
 import com.tryneuro.backend.service.WappiService;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -32,19 +25,16 @@ public class ManagerController {
 
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
-    private final CommentService commentService;
     private final WappiService wappiService;
     private final ContactService contactService;
 
     @Autowired
     public ManagerController(StaffMemberService staffMemberService, 
                              ScheduleService scheduleService, 
-                             CommentService commentService,
                              WappiService wappiService,
                              ContactService contactService) {
         this.staffMemberService = staffMemberService;
         this.scheduleService = scheduleService;
-        this.commentService = commentService;
         this.wappiService = wappiService;
         this.contactService = contactService;
     }
@@ -62,23 +52,34 @@ public class ManagerController {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalClients", contactService.countContacts(tId));
         stats.put("totalStaff", staffMemberService.getAllStaff(tId).size());
-        stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
+        // Передаем null для branchId, так как у менеджера нет контекста филиала в дашборде
+        stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId, null).size());
         return stats;
     }
 
     @GetMapping("/appointments/day")
-    public List<Appointment> getAppointmentsForDay(@RequestAttribute("tenantId") String tenantId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId));
+    public List<Appointment> getAppointmentsForDay(
+            @RequestAttribute("tenantId") String tenantId, 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) String branchId) {
+        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId), branchId);
     }
 
     @GetMapping("/workload")
-    public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, @RequestParam int year, @RequestParam int month) {
-        return scheduleService.getWorkloadForMonth(getRequiredTenantId(tenantId), year, month);
+    public List<WorkloadDto> getWorkload(
+            @RequestAttribute("tenantId") String tenantId, 
+            @RequestParam int year, 
+            @RequestParam int month,
+            @RequestParam(required = false) String branchId) {
+        return scheduleService.getWorkloadForMonth(getRequiredTenantId(tenantId), year, month, branchId);
     }
 
     @GetMapping("/schedule/staff")
-    public List<StaffMember> getStaffForSchedule(@RequestAttribute("tenantId") String tenantId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date);
+    public List<StaffMember> getStaffForSchedule(
+            @RequestAttribute("tenantId") String tenantId, 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) String branchId) {
+        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId);
     }
 
     // Wappi Settings

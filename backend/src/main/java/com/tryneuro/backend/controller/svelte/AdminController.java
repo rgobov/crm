@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +57,6 @@ public class AdminController {
         return tenantId;
     }
 
-    // --- STAFF (Сотрудники) ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -69,7 +67,6 @@ public class AdminController {
         return staffMemberService.getStaffPaged(getRequiredTenantId(tenantId), query, active, page, size);
     }
 
-    // ИСПРАВЛЕНО: Добавлен метод для получения одного мастера
     @GetMapping("/staff/{id}")
     public StaffMember getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
         StaffMember staff = staffMemberService.getStaffMemberById(id)
@@ -96,7 +93,6 @@ public class AdminController {
         staffMemberService.deleteStaffMember(id);
     }
 
-    // --- CLIENTS (Клиенты) ---
     @GetMapping("/clients")
     public Page<Contact> getClientsPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -133,30 +129,40 @@ public class AdminController {
         contactService.deleteContact(id);
     }
 
-    // --- DASHBOARD ---
     @GetMapping("/dashboard/stats")
     public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
         String tId = getRequiredTenantId(tenantId);
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalClients", contactService.countContacts(tId));
         stats.put("totalStaff", staffMemberService.getAllStaff(tId).size());
-        stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId).size());
+        stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId, null).size());
         return stats;
     }
 
+    // Используем branch_id для точности
     @GetMapping("/workload")
-    public List<WorkloadDto> getWorkload(@RequestAttribute("tenantId") String tenantId, @RequestParam int year, @RequestParam int month) {
-        return scheduleService.getWorkloadForMonth(getRequiredTenantId(tenantId), year, month);
+    public List<WorkloadDto> getWorkload(
+            @RequestAttribute("tenantId") String tenantId, 
+            @RequestParam("year") int year, 
+            @RequestParam("month") int month,
+            @RequestParam(value = "branch_id", required = false) String branchId) {
+        return scheduleService.getWorkloadForMonth(getRequiredTenantId(tenantId), year, month, branchId);
     }
 
     @GetMapping("/appointments/day")
-    public List<Appointment> getAppointmentsForDay(@RequestAttribute("tenantId") String tenantId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId));
+    public List<Appointment> getAppointmentsForDay(
+            @RequestAttribute("tenantId") String tenantId, 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(value = "branch_id", required = false) String branchId) {
+        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId), branchId);
     }
 
     @GetMapping("/schedule/staff")
-    public List<StaffMember> getStaffForSchedule(@RequestAttribute("tenantId") String tenantId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date);
+    public List<StaffMember> getStaffForSchedule(
+            @RequestAttribute("tenantId") String tenantId, 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(value = "branch_id", required = false) String branchId) {
+        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId);
     }
 
     @PostMapping("/appointments")

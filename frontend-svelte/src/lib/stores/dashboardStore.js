@@ -36,5 +36,8 @@ export const dashboardStore = createDashboardStore();
 export const activeTab = writable('management');
 export const selectedDate = writable(new Date());
 
-// ТРИГГЕР ДЛЯ ПРИНУДИТЕЛЬНОГО ОБНОВЛЕНИЯ ДАННЫХ (без смены даты)
+// ГЛОБАЛЬНЫЙ КОНТЕКСТ ФИЛИАЛА (ИСТОЧНИК ИСТИНЫ)
+export const activeBranchId = writable(null);
+
+// ТРИГГЕР ДЛЯ ПРИНУДИТЕЛЬНОГО ОБНОВЛЕНИЯ ДАННЫХ
 export const refreshTrigger = writable(0);

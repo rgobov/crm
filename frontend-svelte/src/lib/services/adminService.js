@@ -1,6 +1,5 @@
 import api from '$lib/api.js';
 
-// Хелпер для получения строки YYYY-MM-DD в локальном времени (без UTC сдвига)
 function toLocalDbDate(date) {
     if (!date) return '';
     const d = new Date(date);
@@ -16,34 +15,25 @@ export const adminService = {
         return response.data;
     },
 
-    async getStaff(query = '', page = 0, size = 100) {
-        const response = await api.get('/admin/staff', {
-            params: { query, page, size }
-        });
-        return response.data;
+    // Используем branch_id для гарантии передачи
+    async getWorkloadForMonth(year, month, branchId) {
+        return (await api.get('/admin/workload', {
+            params: { year, month, branch_id: branchId }
+        })).data;
     },
 
-    async getClients(query = '', page = 0, size = 100) {
-        const response = await api.get('/admin/clients', {
-            params: { query, page, size }
-        });
-        return response.data;
-    },
-
-    async getWorkloadForMonth(year, month) {
-        return (await api.get('/admin/workload', { params: { year, month } })).data;
-    },
-
-    async getAppointmentsForDay(date) {
-        // ФИКС: Используем локальную дату вместо toISOString()
+    async getAppointmentsForDay(date, branchId) {
         const dateStr = toLocalDbDate(date);
-        return (await api.get('/admin/appointments/day', { params: { date: dateStr } })).data;
+        return (await api.get('/admin/appointments/day', {
+            params: { date: dateStr, branch_id: branchId }
+        })).data;
     },
 
-    async getStaffForSchedule(date) {
-        // ФИКС: Используем локальную дату
+    async getStaffForSchedule(date, branchId) {
         const dateStr = toLocalDbDate(date);
-        return (await api.get('/admin/schedule/staff', { params: { date: dateStr } })).data;
+        return (await api.get('/admin/schedule/staff', {
+            params: { date: dateStr, branch_id: branchId }
+        })).data;
     },
 
     async createAppointment(data) {

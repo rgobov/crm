@@ -18,7 +18,13 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
     @Query("SELECT a FROM Appointment a WHERE CAST(a.startTime AS date) = :date AND a.tenantId = :tenantId")
     List<Appointment> findByDateAndTenantId(@Param("date") LocalDate date, @Param("tenantId") String tenantId);
 
-    // МЕТОД ОБНОВЛЕНИЯ ИМЕНИ (СИНХРОНИЗАЦИЯ)
+    // ФИЛЬТРАЦИЯ ПО ФИЛИАЛУ ДЛЯ ТАЙМЛАЙНА
+    @Query("SELECT a FROM Appointment a WHERE CAST(a.startTime AS date) = :date AND a.tenantId = :tenantId " +
+           "AND (:branchId IS NULL OR :branchId = '' OR a.branchId = :branchId)")
+    List<Appointment> findByDateAndTenantIdAndBranchId(@Param("date") LocalDate date, 
+                                                       @Param("tenantId") String tenantId, 
+                                                       @Param("branchId") String branchId);
+
     @Modifying
     @Query("UPDATE Appointment a SET a.clientName = :newName WHERE a.contactId = :contactId AND a.tenantId = :tenantId")
     void updateClientNameForContact(@Param("contactId") String contactId, @Param("newName") String newName, @Param("tenantId") String tenantId);
@@ -32,12 +38,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
     List<Appointment> findAllByReminderSentFalseAndAllowReminderTrueAndStartTimeAfter(OffsetDateTime time);
 
-    @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId " +
-           "AND (a.reminderSent IS NULL OR a.reminderSent = false) " +
-           "AND CAST(a.startTime AS date) >= :today " +
-           "AND a.contactId IS NOT NULL")
-    List<Appointment> findPendingReminders(@Param("tenantId") String tenantId, @Param("today") LocalDate today);
-
     @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId AND a.staffMemberId = :staffId AND CAST(a.startTime AS date) = :date")
     List<Appointment> findByTenantIdAndStaffMemberIdAndDate(@Param("tenantId") String tenantId, @Param("staffId") String staffId, @Param("date") LocalDate date);
 
@@ -48,6 +48,17 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
            "FROM Appointment a WHERE a.tenantId = :tenantId AND YEAR(a.startTime) = :year AND MONTH(a.startTime) = :month " +
            "GROUP BY DAY(a.startTime)")
     List<WorkloadDto> getWorkloadForMonth(@Param("tenantId") String tenantId, @Param("year") int year, @Param("month") int month);
+
+    // ФИЛЬТРАЦИЯ НАГРУЗКИ ПО ФИЛИАЛУ ДЛЯ КАЛЕНДАРЯ
+    @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.startTime), COUNT(a)) " +
+           "FROM Appointment a WHERE a.tenantId = :tenantId " +
+           "AND (:branchId IS NULL OR :branchId = '' OR a.branchId = :branchId) " +
+           "AND YEAR(a.startTime) = :year AND MONTH(a.startTime) = :month " +
+           "GROUP BY DAY(a.startTime)")
+    List<WorkloadDto> getWorkloadForMonthAndBranch(@Param("tenantId") String tenantId, 
+                                                   @Param("year") int year, 
+                                                   @Param("month") int month, 
+                                                   @Param("branchId") String branchId);
 
     @Query("SELECT new com.tryneuro.backend.dto.WorkloadDto(DAY(a.startTime), COUNT(a)) " +
            "FROM Appointment a WHERE a.staffMemberId = :staffId AND YEAR(a.startTime) = :year AND MONTH(a.startTime) = :month " +

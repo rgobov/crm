@@ -1,17 +1,34 @@
 <script>
     import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte';
-    import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
+    import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { logout } from '$lib/stores/auth.js';
+    import { branchService } from '$lib/services/branchService.js';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
-    import { createEventDispatcher } from 'svelte';
+    import { createEventDispatcher, onMount } from 'svelte';
 
     const dispatch = createEventDispatcher();
+
+    let branches = [];
+    let isLoadingBranches = true;
 
     const menuItems = [
         { id: 'management', label: 'Главная', icon: '📊' },
         { id: 'timeline', label: 'Таймлайн', icon: '🕒' }
     ];
+
+    onMount(async () => {
+        try {
+            branches = await branchService.getBranches();
+            if (!$activeBranchId && branches.length > 0) {
+                activeBranchId.set(branches[0].id);
+            }
+        } catch (e) {
+            console.error('Sidebar: Failed to load branches', e);
+        } finally {
+            isLoadingBranches = false;
+        }
+    });
 
     function handleNav(id) {
         activeTab.set(id);
@@ -38,6 +55,24 @@
             <div class="logo-text">
                 <h1>CRM Система</h1>
                 <span>ADMIN PANEL</span>
+            </div>
+        </div>
+
+        <!-- ГЛОБАЛЬНЫЙ ПЕРЕКЛЮЧАТЕЛЬ ФИЛИАЛОВ -->
+        <div class="branch-nav-section">
+            <label class="section-micro-label">ТЕКУЩИЙ ФИЛИАЛ</label>
+            <div class="branch-select-box">
+                {#if isLoadingBranches}
+                    <div class="branch-loading">...</div>
+                {:else if branches.length > 0}
+                    <select class="branch-select" bind:value={$activeBranchId}>
+                        {#each branches as b}
+                            <option value={b.id}>{b.name}</option>
+                        {/each}
+                    </select>
+                {:else}
+                    <div class="no-branches">Нет филиалов</div>
+                {/if}
             </div>
         </div>
 
@@ -72,14 +107,22 @@
 
 <style>
     .sidebar { width: 100%; height: 100%; background: white; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #f1f5f9; }
-    .sidebar-content { padding: 24px; display: flex; flex-direction: column; height: 100%; gap: 28px; }
+    .sidebar-content { padding: 24px; display: flex; flex-direction: column; height: 100%; gap: 24px; }
 
     .logo-section { display: flex; align-items: center; gap: 12px; }
     .logo-icon { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; flex-shrink: 0; }
-
-    /* ФИКС РАСТЯНУТОСТИ */
     .logo-text h1 { font-size: 17px; margin: 0; color: #0f172a; font-weight: 800; letter-spacing: -0.2px; }
     .logo-text span { font-size: 9px; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; opacity: 0.8; }
+
+    /* СТИЛИ ПЕРЕКЛЮЧАТЕЛЯ */
+    .branch-nav-section { background: #f8fafc; padding: 12px; border-radius: 16px; border: 1px solid #f1f5f9; }
+    .section-micro-label { display: block; font-size: 8px; font-weight: 900; color: #94a3b8; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .branch-select {
+        width: 100%; background: white; border: 1.5px solid #e2e8f0;
+        border-radius: 10px; padding: 8px 10px; font-size: 13px;
+        font-weight: 700; color: #1e293b; outline: none; cursor: pointer;
+    }
+    .branch-loading, .no-branches { font-size: 12px; font-weight: 600; color: #94a3b8; padding: 4px; }
 
     .nav-menu { display: flex; flex-direction: column; gap: 4px; }
     .nav-btn { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: none; background: none; border-radius: 12px; color: #64748b; font-weight: 700; cursor: pointer; transition: 0.2s; }

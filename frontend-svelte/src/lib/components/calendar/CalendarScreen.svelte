@@ -1,6 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
+    import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { createEventDispatcher } from 'svelte';
 
     const dispatch = createEventDispatcher();
@@ -19,20 +20,32 @@
         renderCalendar();
     }
 
+    // ДЕБАГ: Логируем смену филиала
+    $: if ($activeBranchId !== undefined) {
+        console.log('✅ CalendarScreen: Branch changed! New activeBranchId:', $activeBranchId);
+        loadWorkload();
+    }
+
     onMount(async () => {
+        console.log('✅ CalendarScreen: Component Mounted. Initial activeBranchId:', $activeBranchId);
         await loadWorkload();
     });
 
     async function loadWorkload() {
+        if ($activeBranchId === undefined) return; // Не грузим, если филиал еще не определен
         isLoading = true;
+
+        console.log(`🚀 CalendarScreen: Loading workload for ${currYear}-${currMonth + 1} and branch: ${$activeBranchId}`);
+
         try {
-            const data = await adminService.getWorkloadForMonth(currYear, currMonth + 1);
+            const data = await adminService.getWorkloadForMonth(currYear, currMonth + 1, $activeBranchId);
+            console.log('📦 CalendarScreen: Received workload data:', data);
             workloadData = {};
             data.forEach(item => {
                 workloadData[item.day] = item.appointmentCount;
             });
         } catch (e) {
-            console.error('Workload load failed', e);
+            console.error('❌ Workload load failed', e);
         } finally {
             isLoading = false;
         }
@@ -69,19 +82,14 @@
 
     function getWorkloadColor(count) {
         if (!count || count === 0) return 'transparent';
-        if (count <= 2) return '#dcfce7'; // Зеленый
-        if (count <= 5) return '#fef9c3'; // Желтый
-        if (count <= 8) return '#ffedd5'; // Оранжевый
-        return '#fee2e2'; // Красный
+        if (count <= 2) return '#dcfce7';
+        if (count <= 5) return '#fef9c3';
+        if (count <= 8) return '#ffedd5';
+        return '#fee2e2';
     }
 
     function selectDate(day) {
-        // Устанавливаем 12:00 дня, чтобы при любых TZ-сдвигах дата оставалась тем же числом
         const selectedDate = new Date(currYear, currMonth, day, 12, 0, 0);
-        console.group('📅 Calendar: Date Selection');
-        console.log('Clicked day:', day);
-        console.log('Result ISO:', selectedDate.toISOString());
-        console.groupEnd();
         dispatch('dateSelected', { date: selectedDate });
     }
 </script>

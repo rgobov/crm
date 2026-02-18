@@ -36,7 +36,7 @@ public class StaffMemberService {
     private final StaffShiftRepository staffShiftRepository;
     private final UserRepository userRepository;
     private final AppointmentRepository appointmentRepository;
-    private final BranchRepository branchRepository; // НОВОЕ
+    private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -44,13 +44,13 @@ public class StaffMemberService {
                               StaffShiftRepository staffShiftRepository,
                               UserRepository userRepository,
                               AppointmentRepository appointmentRepository,
-                              BranchRepository branchRepository, // НОВОЕ
+                              BranchRepository branchRepository,
                               PasswordEncoder passwordEncoder) {
         this.staffMemberRepository = staffMemberRepository;
         this.staffShiftRepository = staffShiftRepository;
         this.userRepository = userRepository;
         this.appointmentRepository = appointmentRepository;
-        this.branchRepository = branchRepository; // НОВОЕ
+        this.branchRepository = branchRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -89,7 +89,6 @@ public class StaffMemberService {
         staffMember.setTenantId(tenantId);
         staffMember.setActive(true);
 
-        // ПРИВЯЗКА К ФИЛИАЛАМ ПРИ СОЗДАНИИ
         if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
             Set<Branch> branches = new HashSet<>(branchRepository.findAllById(request.getBranchIds()));
             staffMember.setBranches(branches);
@@ -126,7 +125,6 @@ public class StaffMemberService {
         staffMember.setPhone(request.getPhone());
         staffMember.setActive(request.isAvailable());
 
-        // ОБНОВЛЕНИЕ СПИСКА ФИЛИАЛОВ (ManyToMany)
         if (request.getBranchIds() != null) {
             Set<Branch> branches = new HashSet<>(branchRepository.findAllById(request.getBranchIds()));
             staffMember.setBranches(branches);
@@ -179,8 +177,16 @@ public class StaffMemberService {
         });
     }
 
-    public List<StaffMember> getStaffForDate(String tenantId, LocalDate date) {
-        return staffMemberRepository.findByTenantId(tenantId).stream()
+    // ИСПРАВЛЕНО: Добавлен branchId в сигнатуру
+    public List<StaffMember> getStaffForDate(String tenantId, LocalDate date, String branchId) {
+        List<StaffMember> staffList;
+        if (branchId != null && !branchId.isEmpty() && !"null".equals(branchId)) {
+            staffList = staffMemberRepository.findByTenantIdAndBranchId(tenantId, branchId);
+        } else {
+            staffList = staffMemberRepository.findByTenantId(tenantId);
+        }
+
+        return staffList.stream()
                 .filter(StaffMember::isActive)
                 .map(staff -> {
                     enrichWithUserData(staff);

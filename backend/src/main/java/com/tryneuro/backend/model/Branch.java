@@ -23,6 +23,7 @@ public class Branch {
     @Column(nullable = false)
     private String timezone;
 
+    // ЯВНО УКАЗЫВАЕМ ИМЯ КОЛОНКИ ДЛЯ HIBERNATE
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 }
