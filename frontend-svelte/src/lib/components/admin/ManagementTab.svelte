@@ -6,6 +6,8 @@
     import NotificationTemplatesModal from './NotificationTemplatesModal.svelte';
     import { fade, scale } from 'svelte/transition';
 
+    export let forcedDate = null;
+
     let stats = {
         totalClients: 0,
         todayAppointments: 0,
@@ -36,6 +38,7 @@
     }
 
     const menuCards = [
+        { id: 'branches', title: 'Филиалы', desc: 'Ваши точки и часовые пояса', icon: '🏢', link: '/admin/branches' },
         { id: 'staff', title: 'Персонал', desc: 'Сотрудники и роли', icon: '👤', link: '/admin/staff' },
         { id: 'resources', title: 'Ресурсы', desc: 'Оборудование и залы', icon: '⚒️', link: '/admin/resources' },
         { id: 'services', title: 'Услуги', desc: 'Ваш прайс-лист', icon: '✂️', link: '/admin/services' },

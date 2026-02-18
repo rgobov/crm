@@ -1,11 +1,13 @@
 package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.dto.CreateStaffRequest;
+import com.tryneuro.backend.model.Branch;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.model.UserRole;
 import com.tryneuro.backend.repository.AppointmentRepository;
+import com.tryneuro.backend.repository.BranchRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.StaffShiftRepository;
 import com.tryneuro.backend.repository.UserRepository;
@@ -21,10 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,19 +36,21 @@ public class StaffMemberService {
     private final StaffShiftRepository staffShiftRepository;
     private final UserRepository userRepository;
     private final AppointmentRepository appointmentRepository;
+    private final BranchRepository branchRepository; // НОВОЕ
     private final PasswordEncoder passwordEncoder;
-    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
     @Autowired
     public StaffMemberService(StaffMemberRepository staffMemberRepository,
                               StaffShiftRepository staffShiftRepository,
                               UserRepository userRepository,
                               AppointmentRepository appointmentRepository,
+                              BranchRepository branchRepository, // НОВОЕ
                               PasswordEncoder passwordEncoder) {
         this.staffMemberRepository = staffMemberRepository;
         this.staffShiftRepository = staffShiftRepository;
         this.userRepository = userRepository;
         this.appointmentRepository = appointmentRepository;
+        this.branchRepository = branchRepository; // НОВОЕ
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -56,7 +60,6 @@ public class StaffMemberService {
         return staffOpt;
     }
 
-    // ОБНОВЛЕНО: Добавлена поддержка параметра active
     public Page<StaffMember> getStaffPaged(String tenantId, String query, Boolean active, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("active").descending().and(Sort.by("name").ascending()));
         Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, active, pageable);
@@ -85,6 +88,12 @@ public class StaffMemberService {
         staffMember.setPhone(request.getPhone());
         staffMember.setTenantId(tenantId);
         staffMember.setActive(true);
+
+        // ПРИВЯЗКА К ФИЛИАЛАМ ПРИ СОЗДАНИИ
+        if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
+            Set<Branch> branches = new HashSet<>(branchRepository.findAllById(request.getBranchIds()));
+            staffMember.setBranches(branches);
+        }
 
         StaffMember saved = staffMemberRepository.save(staffMember);
 
@@ -116,6 +125,12 @@ public class StaffMemberService {
         staffMember.setSpecialty(request.getSpecialty());
         staffMember.setPhone(request.getPhone());
         staffMember.setActive(request.isAvailable());
+
+        // ОБНОВЛЕНИЕ СПИСКА ФИЛИАЛОВ (ManyToMany)
+        if (request.getBranchIds() != null) {
+            Set<Branch> branches = new HashSet<>(branchRepository.findAllById(request.getBranchIds()));
+            staffMember.setBranches(branches);
+        }
 
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
         

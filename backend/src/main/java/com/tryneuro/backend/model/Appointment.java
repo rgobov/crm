@@ -57,6 +57,13 @@ public class Appointment {
     @Column(name = "staff_member_id")
     private String staffMemberId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id", insertable = false, updatable = false)
+    private Branch branch;
+
+    @Column(name = "branch_id")
+    private String branchId;
+
     @Enumerated(EnumType.STRING)
     private AppointmentStatus status = AppointmentStatus.SCHEDULED;
 
