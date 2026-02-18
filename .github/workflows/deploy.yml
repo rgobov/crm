@@ -3,7 +3,7 @@ name: Deploy to VPS
 on:
   push:
     branches:
-      - feature/notifications-service # Деплоим при пуше в текущую ветку
+      - feature/multi-branch-support # ИЗМЕНЕНО: Деплой теперь из новой ветки
 
 jobs:
   deploy:
@@ -19,25 +19,23 @@ jobs:
             set -e
             cd ~/crm
             
-            echo "--- ОБНОВЛЕНИЕ КОДА ---"
-            git fetch origin feature/notifications-service
-            git reset --hard origin/feature/notifications-service
+            echo "--- ОБНОВЛЕНИЕ КОДА (ветка feature/multi-branch-support) ---"
+            git fetch origin feature/multi-branch-support
+            git reset --hard origin/feature/multi-branch-support
             
             echo "--- ПОДГОТОВКА СРЕДЫ (СЕКРЕТЫ) ---"
             echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env
             echo "TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}" >> .env
             
-            echo "--- СБОРКА КОНТЕЙНЕРОВ (BuildKit) ---"
+            echo "--- СБОРКА КОНТЕЙНЕРОВ ---"
             export DOCKER_BUILDKIT=1
             docker-compose build --pull
             
             echo "--- ПЕРЕЗАПУСК СЕРВИСОВ ---"
             docker-compose up -d --force-recreate
             
-            echo "--- ГЛУБОКАЯ ОЧИСТКА МУСОРА ---"
-            # Удаляем старые неиспользуемые образы, контейнеры и сети
+            echo "--- ОЧИСТКА МУСОРА ---"
             docker system prune -f
-            # Удаляем образы старше 24 часов, которые не используются текущими контейнерами
             docker image prune -a -f --filter "until=24h"
             
             echo "--- СТАТУС КОНТЕЙНЕРОВ ---"
