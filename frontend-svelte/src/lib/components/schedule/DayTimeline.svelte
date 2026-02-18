@@ -1,6 +1,6 @@
 <script>
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
-    import { fade, slide } from 'svelte/transition';
+    import { fade, slide, scale } from 'svelte/transition';
 
     const dispatch = createEventDispatcher();
 
@@ -8,10 +8,10 @@
     export let appointments = [];
     export let staff = [];
 
-    const HOUR_HEIGHT = 120;
-    const SLOT_HEIGHT = HOUR_HEIGHT / 4;
-    const STAFF_WIDTH = 180;
-    const TIME_COL_WIDTH = 60;
+    let HOUR_HEIGHT = 140;
+    let SLOT_HEIGHT = HOUR_HEIGHT / 4;
+    let STAFF_WIDTH = 200;
+    let TIME_COL_WIDTH = 75;
 
     let startHour = 8;
     let endHour = 22;
@@ -28,29 +28,78 @@
     let scrollLeft;
     let bodyDragging = false;
 
+    // АДАПТИВНОСТЬ
+    function updateLayoutSizes() {
+        const width = window.innerWidth;
+        if (width < 768) {
+            TIME_COL_WIDTH = 60;
+            STAFF_WIDTH = (width - TIME_COL_WIDTH) / 3;
+            HOUR_HEIGHT = 120;
+        } else {
+            TIME_COL_WIDTH = 75;
+            STAFF_WIDTH = 200;
+            HOUR_HEIGHT = 140;
+        }
+        SLOT_HEIGHT = HOUR_HEIGHT / 4;
+    }
+
+    onMount(() => {
+        updateLayoutSizes();
+        window.addEventListener('resize', updateLayoutSizes);
+        timer = setInterval(() => {
+            currentTime = new Date();
+            updateNowPosition();
+        }, 60000);
+
+        updateNowPosition();
+        setTimeout(scrollToCurrentTime, 600);
+
+        return () => {
+            window.removeEventListener('resize', updateLayoutSizes);
+            clearInterval(timer);
+        };
+    });
+
+    function updateNowPosition() {
+        const isToday = currentTime.toDateString() === day.toDateString();
+        if (isToday) {
+            const h = currentTime.getHours();
+            const m = currentTime.getMinutes();
+            nowLinePos = ((h - startHour) * 60 + m) * (HOUR_HEIGHT / 60);
+        } else {
+            nowLinePos = -1;
+        }
+    }
+
+    $: if (day) updateNowPosition();
+
     $: staffIds = new Set(staff.map(s => s.id));
     $: unassignedAppts = appointments.filter(a => !a.staffMemberId || !staffIds.has(a.staffMemberId));
 
-    function handleMouseDown(e) {
+    function handleStart(e) {
         isDown = true;
-        startX = e.pageX - scrollBody.offsetLeft;
+        if (scrollBody) scrollBody.style.scrollBehavior = 'auto';
+        const pageX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
+        startX = pageX - scrollBody.offsetLeft;
         scrollLeft = scrollBody.scrollLeft;
         bodyDragging = false;
     }
 
-    function handleMouseLeave() { isDown = false; }
-    function handleMouseUp() {
+    function handleEnd() {
         isDown = false;
+        if (scrollBody) scrollBody.style.scrollBehavior = 'smooth';
         setTimeout(() => { bodyDragging = false; }, 50);
     }
 
-    function handleMouseMove(e) {
+    function handleMove(e) {
         if (!isDown) return;
-        const x = e.pageX - scrollBody.offsetLeft;
-        const walk = (x - startX) * 1.5;
-        if (Math.abs(walk) > 5) bodyDragging = true;
-        if (bodyDragging) {
-            e.preventDefault();
+        const pageX = e.pageX || (e.touches ? e.touches[0].pageX : null);
+        if (pageX === null) return;
+        const x = pageX - scrollBody.offsetLeft;
+        const walk = (x - startX) * 2.2;
+        if (Math.abs(walk) > 5) {
+            bodyDragging = true;
+            if (e.cancelable) e.preventDefault();
             scrollBody.scrollLeft = scrollLeft - walk;
         }
     }
@@ -59,6 +108,22 @@
         if (bodyDragging) return;
         const master = staff.find(s => s.id === appt.staffMemberId);
         dispatch('appointmentTap', { ...appt, staffName: master ? master.name : 'Не назначен' });
+    }
+
+    function handleSlotClick(h, m, sId) {
+        if (bodyDragging) return;
+        dispatch('emptySlotTap', { hour: h, min: m, staffId: sId });
+    }
+
+    function getSlotStatus(s, h, m) {
+        if (!s || !s.workStartTime || !s.workEndTime) return 'WORK';
+        const slotTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+        if (s.isDayOff) return 'OFF';
+        if (slotTime < s.workStartTime || slotTime >= s.workEndTime) return 'OFF';
+        if (s.breakStartTime && s.breakEndTime) {
+            if (slotTime >= s.breakStartTime && slotTime < s.breakEndTime) return 'BREAK';
+        }
+        return 'WORK';
     }
 
     $: {
@@ -80,27 +145,11 @@
         endHour = Math.min(24, maxH + 1);
         hours = [];
         for (let i = startHour; i <= endHour; i++) hours.push(i);
-
-        const isToday = currentTime.toDateString() === day.toDateString();
-        if (isToday) {
-            const h = currentTime.getHours();
-            const m = currentTime.getMinutes();
-            nowLinePos = ((h - startHour) * 60 + m) * (HOUR_HEIGHT / 60);
-        } else {
-            nowLinePos = -1;
-        }
     }
 
     function syncScroll(e) {
         if (scrollHeader && e.target === scrollBody) scrollHeader.scrollLeft = scrollBody.scrollLeft;
     }
-
-    onMount(() => {
-        timer = setInterval(() => { currentTime = new Date(); }, 30000);
-        setTimeout(scrollToCurrentTime, 600);
-    });
-
-    onDestroy(() => clearInterval(timer));
 
     function scrollToCurrentTime() {
         if (scrollBody && nowLinePos > 0) {
@@ -120,10 +169,10 @@
     function getStatusData(status) {
         const config = {
             'SCHEDULED': { color: '#3b82f6', label: 'Ожидается' },
-            'CONFIRMED': { color: '#26a69a', label: 'Подтвержден' },
-            'NEEDS_CALL': { color: '#ffa726', label: 'Звонок' },
-            'COMPLETED': { color: '#94a3b8', label: 'Завершен' },
-            'CANCELLED': { color: '#ef5350', label: 'Отменен' }
+            'CONFIRMED': { color: '#10b981', label: 'Подтвержден' },
+            'NEEDS_CALL': { color: '#f59e0b', label: 'Звонок' },
+            'COMPLETED': { color: '#64748b', label: 'Завершен' },
+            'CANCELLED': { color: '#ef4444', label: 'Отменен' }
         };
         return config[status] || config['SCHEDULED'];
     }
@@ -131,19 +180,15 @@
 
 <div class="timeline-root">
     <header class="staff-header-fixed">
-        <div class="time-corner-empty">🕒</div>
+        <div class="time-corner-empty" style="width: {TIME_COL_WIDTH}px">🕒</div>
         <div class="staff-scroll-area" bind:this={scrollHeader}>
             <div class="staff-inner-row" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 {#each staff as s}
                     <div class="staff-cell" style="width: {STAFF_WIDTH}px">
-                        {#if s.photoUrl}
-                            <img src={s.photoUrl} alt={s.name} class="avatar img" />
-                        {:else}
-                            <div class="avatar">{s.name.charAt(0)}</div>
-                        {/if}
+                        <div class="avatar">{s.name.charAt(0)}</div>
                         <div class="meta">
                             <span class="n">{s.name}</span>
-                            <span class="s">{s.specialty}</span>
+                            <span class="s">{s.specialty || 'Специалист'}</span>
                         </div>
                     </div>
                 {/each}
@@ -160,10 +205,13 @@
     <div class="timeline-body-scroll"
          on:scroll={syncScroll}
          bind:this={scrollBody}
-         on:mousedown={handleMouseDown}
-         on:mouseleave={handleMouseLeave}
-         on:mouseup={handleMouseUp}
-         on:mousemove={handleMouseMove}
+         on:mousedown={handleStart}
+         on:touchstart|passive={handleStart}
+         on:mouseleave={handleEnd}
+         on:mouseup={handleEnd}
+         on:touchend={handleEnd}
+         on:mousemove={handleMove}
+         on:touchmove={handleMove}
          class:grabbing={isDown}>
 
         <div class="timeline-spacer top"></div>
@@ -188,16 +236,27 @@
                     {#each staff as s}
                         <div class="staff-col" style="width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
-                                <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click|stopPropagation={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: s.id })}></button>
+                                {@const h = hours[Math.floor(i/4)]}
+                                {@const m = (i%4)*15}
+                                {@const status = getSlotStatus(s, h, m)}
+                                <button class="slot-btn"
+                                        class:is-off={status === 'OFF'}
+                                        class:is-break={status === 'BREAK'}
+                                        class:is-work={status === 'WORK'}
+                                        style="height: {SLOT_HEIGHT}px"
+                                        title={status === 'BREAK' ? `Перерыв с ${s.breakStartTime?.slice(0,5)} до ${s.breakEndTime?.slice(0,5)}` : ''}
+                                        on:click|stopPropagation={() => handleSlotClick(h, m, s.id)}>
+                                    {#if status === 'BREAK' && m === 0}
+                                        <span class="break-label">☕ ПЕРЕРЫВ</span>
+                                    {/if}
+                                </button>
                             {/each}
+
                             {#each appointments.filter(a => a.staffMemberId === s.id) as appt (appt.id)}
                                 {@const status = getStatusData(appt.status)}
                                 <div class="appt-box" style="{getApptStyle(appt)} --status-color: {status.color}" on:click|stopPropagation={() => onApptClick(appt)}>
                                     <div class="appt-content">
-                                        <div class="t">
-                                            <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
-                                            <span class="st">{status.label}</span>
-                                        </div>
+                                        <div class="t-row"><span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span><span class="st-dot" style="background: {status.color}"></span></div>
                                         <div class="cl">{appt.clientName}</div>
                                         <div class="sv">{appt.service}</div>
                                     </div>
@@ -207,18 +266,15 @@
                     {/each}
 
                     {#if unassignedAppts.length > 0}
-                        <div class="staff-col unassigned-col" style="width: {STAFF_WIDTH}px; background: rgba(241, 245, 249, 0.5);">
+                        <div class="staff-col unassigned-col" style="width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
-                                <button class="slot-btn" style="height: {SLOT_HEIGHT}px" on:click|stopPropagation={() => dispatch('emptySlotTap', { hour: hours[Math.floor(i/4)], min: (i%4)*15, staffId: null })}></button>
+                                <button class="slot-btn is-off" style="height: {SLOT_HEIGHT}px"></button>
                             {/each}
                             {#each unassignedAppts as appt (appt.id)}
                                 {@const status = getStatusData(appt.status)}
                                 <div class="appt-box" style="{getApptStyle(appt)} --status-color: {status.color}" on:click|stopPropagation={() => onApptClick(appt)}>
                                     <div class="appt-content">
-                                        <div class="t">
-                                            <span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span>
-                                            <span class="st">{status.label}</span>
-                                        </div>
+                                        <div class="t-row"><span class="tm">{new Date(appt.startTime).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})}</span><span class="st-dot" style="background: {status.color}"></span></div>
                                         <div class="cl">{appt.clientName}</div>
                                         <div class="sv">{appt.service}</div>
                                     </div>
@@ -230,8 +286,8 @@
 
                 {#if nowLinePos >= 0}
                     <div class="now-indicator" style="top: {nowLinePos}px">
-                        <div class="line"></div>
                         <div class="dot"></div>
+                        <div class="line"></div>
                     </div>
                 {/if}
             </div>
@@ -241,39 +297,89 @@
 </div>
 
 <style>
-    .timeline-root { height: 100vh; display: flex; flex-direction: column; background: #f1f5f9; overflow: hidden; user-select: none; }
-    .staff-header-fixed { display: flex; height: 74px; background: white; z-index: 200; border-bottom: 1px solid #f1f5f9; box-shadow: 0 2px 10px rgba(0,0,0,0.05); flex-shrink: 0; }
-    .time-corner-empty { width: 60px; background: white; z-index: 210; border-right: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 18px; }
+    * { box-sizing: border-box; }
+    .timeline-root { height: 100vh; display: flex; flex-direction: column; background: #fffbeb; overflow: hidden; user-select: none; }
+
+    .staff-header-fixed {
+        display: flex; height: 84px; background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        z-index: 200; border-bottom: 1px solid rgba(0,0,0,0.05);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03); flex-shrink: 0;
+    }
+
+    .time-corner-empty { display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 20px; border-right: 1px solid rgba(0,0,0,0.05); }
     .staff-scroll-area { flex: 1; overflow: hidden; }
     .staff-inner-row { display: flex; height: 100%; }
-    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid #f1f5f9; box-sizing: border-box; }
-    .avatar { width: 36px; height: 36px; background: #eff6ff; color: #3b82f6; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 800; }
-    .avatar.img { object-fit: cover; border: 1px solid #e2e8f0; }
-    .n { font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .s { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
-    .timeline-body-scroll { flex: 1; overflow: auto; position: relative; scroll-behavior: smooth; cursor: grab; }
-    .timeline-body-scroll.grabbing { cursor: grabbing; scroll-behavior: auto; }
-    .timeline-spacer { height: 40px; background: white; width: 100%; position: relative; z-index: 160; }
-    .timeline-spacer.bottom { height: 100px; }
-    .body-layout-wrapper { display: flex; min-height: 100%; }
-    .time-axis-col { flex-shrink: 0; background: white; border-right: 1px solid #f1f5f9; position: sticky; left: 0; z-index: 150; }
+    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid rgba(0,0,0,0.05); }
+    .avatar { width: 44px; height: 44px; background: var(--primary-gradient); color: white; border-radius: 16px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 18px; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.2); }
+
+    .n { display: block; font-size: 14px; font-weight: 850; color: #0f172a; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s { display: block; font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .timeline-body-scroll { flex: 1; overflow: auto; position: relative; cursor: grab; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+    .timeline-body-scroll.grabbing { cursor: grabbing; }
+    .timeline-spacer { height: 40px; }
+    .timeline-spacer.bottom { height: 120px; }
+
+    .body-layout-wrapper { display: flex; min-height: 100%; align-items: flex-start; }
+    .time-axis-col { flex-shrink: 0; background: #f8fafc; border-right: 1px solid #e2e8f0; position: sticky; left: 0; z-index: 150; }
     .hour-cell { position: relative; }
-    .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 800; color: #94a3b8; background: white; padding: 2px 4px; }
-    .grid-canvas { position: relative; background: #f8fafc; flex-shrink: 0; }
-    .l { position: absolute; left: 0; right: 0; height: 1px; background: #f1f5f9; }
-    .l.bold { background: #e2e8f0; }
-    .columns-container { display: flex; height: 100%; }
-    .staff-col { position: relative; height: 100%; border-right: 1px solid #f1f5f9; box-sizing: border-box; flex-shrink: 0; }
-    .slot-btn { width: 100%; border: none; background: transparent; cursor: pointer; display: block; }
-    .appt-box { position: absolute; left: 4px; right: 4px; background: white; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; transition: transform 0.1s; border: 1px solid #f1f5f9; overflow: hidden; }
-    .appt-box:active { transform: scale(0.98); }
-    .appt-content { height: 100%; border-left: 5px solid var(--status-color); padding: 8px; display: flex; flex-direction: column; overflow: hidden; }
-    .t { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    .tm { font-size: 10px; font-weight: 800; color: var(--status-color); }
-    .st { font-size: 8px; font-weight: 900; text-transform: uppercase; color: white; background: var(--status-color); padding: 1px 5px; border-radius: 4px; }
-    .cl { font-size: 12px; font-weight: 800; color: #0f172a; line-height: 1.2; word-break: break-word; }
-    .sv { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
-    .now-indicator { position: absolute; left: 0; right: 0; z-index: 180; pointer-events: none; }
-    .now-indicator .line { height: 2px; background: #ef4444; width: 100%; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
-    .now-indicator .dot { position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 10px #ef4444; }
+    .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 900; color: #64748b; background: #f8fafc; padding: 4px 8px; border-radius: 8px; border: 1px solid #e2e8f0; }
+
+    .grid-canvas { position: relative; flex: 1; margin: 0; padding: 0; }
+    .l { position: absolute; left: 0; right: 0; height: 1px; background: rgba(0,0,0,0.03); }
+    .l.bold { background: rgba(0,0,0,0.06); height: 1.5px; }
+
+    .columns-container { display: flex; height: 100%; position: relative; z-index: 10; }
+    .staff-col { position: relative; height: 100%; border-right: 1px solid rgba(0,0,0,0.05); flex-shrink: 0; }
+
+    /* СЛОТЫ: УСИЛЕННЫЙ ЭФФЕКТ НАВЕДЕНИЯ */
+    .slot-btn {
+        width: 100%; border: none !important; margin: 0 !important; padding: 0 !important;
+        cursor: pointer; display: block; outline: none; transition: background 0.1s;
+    }
+    .slot-btn.is-work { background: white; }
+    .slot-btn.is-work:hover {
+        background: #eff6ff !important;
+        box-shadow: inset 0 0 0 1.5px rgba(59, 130, 246, 0.3);
+        z-index: 5;
+    }
+    .slot-btn.is-off { background: #f1f5f9; cursor: not-allowed; }
+    .slot-btn.is-break { background: #fef08a; cursor: not-allowed; }
+    .break-label { font-size: 9px; font-weight: 950; color: #854d0e; letter-spacing: 1px; opacity: 0.6; padding-left: 8px; }
+
+    .appt-box { position: absolute; left: 6px; right: 6px; background: white; border-radius: 18px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border: 1px solid rgba(0,0,0,0.03); overflow: hidden; }
+    .appt-box:hover { transform: translateY(-2px) scale(1.02); z-index: 100 !important; }
+    .appt-content { height: 100%; border-left: 6px solid var(--status-color); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+
+    .t-row { display: flex; justify-content: space-between; align-items: center; }
+    .tm { font-size: 11px; font-weight: 900; color: #1e293b; }
+    .st-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .cl { font-size: 13px; font-weight: 850; color: #0f172a; line-height: 1.2; }
+    .sv { font-size: 10px; color: #64748b; font-weight: 750; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .now-indicator {
+        position: absolute; left: 0; right: 0; z-index: 300;
+        pointer-events: none; display: flex; align-items: center;
+        transform: translateY(-50%);
+    }
+    .now-indicator .line {
+        height: 2px; background: #ef4444; flex: 1;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+    }
+    .now-indicator .dot {
+        width: 12px; height: 12px; background: #ef4444;
+        border-radius: 50%; margin-left: -6px; flex-shrink: 0;
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+        animation: pulse-red 2s infinite;
+        z-index: 310;
+    }
+
+    @keyframes pulse-red {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        70% { transform: scale(1.3); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    @media (max-width: 768px) { .n { font-size: 12px; } .s { font-size: 8px; } .avatar { width: 36px; height: 36px; font-size: 14px; } .cl { font-size: 11px; } .sv { font-size: 8px; } }
 </style>
