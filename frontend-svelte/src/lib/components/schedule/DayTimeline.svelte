@@ -115,18 +115,25 @@
         dispatch('emptySlotTap', { hour: h, min: m, staffId: sId });
     }
 
+    // ИСПРАВЛЕННЫЙ ПРИОРИТЕТ: Перерыв ВАЖНЕЕ нерабочего времени
     function getSlotStatus(s, h, m) {
-        if (!s || !s.workStartTime || !s.workEndTime) return 'WORK';
+        if (!s) return 'WORK';
         const slotTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
-        if (s.isDayOff) return 'OFF';
-        if (slotTime < s.workStartTime || slotTime >= s.workEndTime) return 'OFF';
+
+        // 1. Сначала перерыв
         if (s.breakStartTime && s.breakEndTime) {
             if (slotTime >= s.breakStartTime && slotTime < s.breakEndTime) return 'BREAK';
         }
+
+        // 2. Потом нерабочие часы/дни
+        if (s.isDayOff || !s.workStartTime || !s.workEndTime) return 'OFF';
+        if (slotTime < s.workStartTime || slotTime >= s.workEndTime) return 'OFF';
+
         return 'WORK';
     }
 
     function isBreakStart(s, h, m) {
+        if (!s) return false;
         const slotTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
         return s.breakStartTime === slotTime;
     }
@@ -295,8 +302,8 @@
 
                 {#if nowLinePos >= 0}
                     <div class="now-indicator" style="top: {nowLinePos}px">
-                        <div class="line"></div>
                         <div class="dot"></div>
+                        <div class="line"></div>
                     </div>
                 {/if}
             </div>
@@ -319,11 +326,11 @@
     .time-corner-empty { display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 20px; border-right: 1px solid rgba(0,0,0,0.05); }
     .staff-scroll-area { flex: 1; overflow: hidden; }
     .staff-inner-row { display: flex; height: 100%; }
-    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 10px; border-right: 1px solid rgba(0,0,0,0.05); }
+    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; gap: 12px; border-right: 1px solid rgba(0,0,0,0.05); }
     .avatar { width: 44px; height: 44px; background: var(--primary-gradient); color: white; border-radius: 16px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 18px; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.2); }
 
     .n { display: block; font-size: 14px; font-weight: 850; color: #0f172a; letter-spacing: -0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .s { display: block; font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s { display: block; font-size: 9px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 
     .timeline-body-scroll { flex: 1; overflow: auto; position: relative; cursor: grab; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
     .timeline-body-scroll.grabbing { cursor: grabbing; }
@@ -344,9 +351,9 @@
 
     .slot-btn { width: 100%; border: none !important; margin: 0 !important; padding: 0 !important; cursor: pointer; display: block; outline: none; transition: background 0.1s; position: relative; }
     .slot-btn.is-work { background: white; }
-    .slot-btn.is-work:hover { background: #eff6ff !important; box-shadow: inset 0 0 0 1.5px rgba(59, 130, 240, 0.3); z-index: 5; }
+    .slot-btn.is-work:hover { background: #eff6ff !important; box-shadow: inset 0 0 0 1.5px rgba(59, 130, 246, 0.3); z-index: 5; }
     .slot-btn.is-off { background: #f1f5f9; cursor: not-allowed; }
-    .slot-btn.is-break { background: #fef08a; cursor: not-allowed; }
+    .slot-btn.is-break { background: #fef08a !important; cursor: not-allowed; opacity: 1; }
 
     .break-overlay { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; pointer-events: none; }
     .break-icon { font-size: 14px; }
@@ -362,9 +369,20 @@
     .cl { font-size: 13px; font-weight: 850; color: #0f172a; line-height: 1.2; }
     .sv { font-size: 10px; color: #64748b; font-weight: 750; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .now-indicator { position: absolute; left: 0; right: 0; z-index: 300; pointer-events: none; display: flex; align-items: center; transform: translateY(-50%); }
+    /* ФИКС ИНДИКАТОРА ТЕКУЩЕГО ВРЕМЕНИ */
+    .now-indicator {
+        position: absolute; left: 0; right: 0; z-index: 300;
+        pointer-events: none; display: flex; align-items: center;
+        transform: translateY(-50%);
+    }
     .now-indicator .line { height: 2px; background: #ef4444; flex: 1; box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
-    .now-indicator .dot { width: 12px; height: 12px; background: #ef4444; border-radius: 50%; margin-left: -6px; flex-shrink: 0; box-shadow: 0 0 15px rgba(239, 68, 68, 0.8); animation: pulse-red 2s infinite; z-index: 310; }
+    .now-indicator .dot {
+        width: 12px; height: 12px; background: #ef4444;
+        border-radius: 50%; margin-left: -6px; flex-shrink: 0;
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+        animation: pulse-red 2s infinite;
+        z-index: 310;
+    }
 
     @keyframes pulse-red {
         0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
@@ -378,6 +396,5 @@
         .avatar { width: 36px; height: 36px; font-size: 14px; }
         .cl { font-size: 11px; }
         .sv { font-size: 8px; }
-        .break-txt { font-size: 7px; }
     }
 </style>
