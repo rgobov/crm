@@ -6,13 +6,11 @@
     export let appt;
     export let startHour;
     export let hourHeight;
-    export let timezone = 'Europe/Moscow'; // Принимаем TZ филиала
+    export let timezone = 'Europe/Moscow';
 
     const dispatch = createEventDispatcher();
 
-    // РЕАКТИВНЫЙ СТИЛЬ С УЧЕТОМ ТАЙМЗОНЫ ФИЛИАЛА
     $: apptStyle = (() => {
-        // Получаем отступ сверху, игнорируя локальный часовой пояс администратора
         const top = timeUtils.getTimeOffset(appt.startTime, startHour, hourHeight, timezone);
         const actualHeight = appt.durationInMinutes * (hourHeight / 60);
         return `top: ${top}px; height: ${actualHeight - 2}px; z-index: 60;`;
@@ -35,7 +33,6 @@
      in:scale={{duration: 200, start: 0.95}}>
     <div class="appt-content">
         <div class="t-row">
-            <!-- Время тоже отображаем по поясу филиала -->
             <span class="tm">{timeUtils.formatTime(appt.startTime, timezone)}</span>
             <div class="indicators">
                 {#if appt.comment}
@@ -44,7 +41,16 @@
                 <span class="st-dot" style="background: {color}"></span>
             </div>
         </div>
-        <div class="cl">{appt.clientName}</div>
+
+        <div class="main-info">
+            <div class="cl">{appt.clientName}</div>
+
+            <!-- НОВОЕ: ВЫВОД МАШИНЫ / ОБЪЕКТА -->
+            {#if appt.referenceTag}
+                <div class="ref-tag">🚗 {appt.referenceTag}</div>
+            {/if}
+        </div>
+
         <div class="sv">{appt.service}</div>
     </div>
 </div>
@@ -59,15 +65,21 @@
     .appt-box:hover { transform: translateY(-2px) scale(1.02); z-index: 100 !important; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.15); }
     .appt-box:active { transform: scale(0.98); }
 
-    .appt-content { height: 100%; border-left: 6px solid var(--status-color); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .appt-content { height: 100%; border-left: 6px solid var(--status-color); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
 
-    .t-row { display: flex; justify-content: space-between; align-items: center; }
+    .t-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
     .tm { font-size: 11px; font-weight: 900; color: #1e293b; }
 
     .indicators { display: flex; align-items: center; gap: 6px; }
     .st-dot { width: 8px; height: 8px; border-radius: 50%; transition: background 0.3s; }
     .note-icon { font-size: 10px; opacity: 0.8; }
 
-    .cl { font-size: 13px; font-weight: 850; color: #0f172a; line-height: 1.2; word-break: break-word; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .main-info { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+
+    .cl { font-size: 13px; font-weight: 850; color: #0f172a; line-height: 1.1; word-break: break-word; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+
+    /* СТИЛЬ ОБЪЕКТА */
+    .ref-tag { font-size: 11px; font-weight: 900; color: #059669; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
     .sv { font-size: 10px; color: #64748b; font-weight: 750; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

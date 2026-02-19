@@ -23,7 +23,6 @@ public class Contact {
     @Column(nullable = false)
     private String name;
 
-    // --- ИЗМЕНЕНИЕ: Теперь это массив телефонов ---
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "phones", nullable = false, columnDefinition = "text[]")
     private List<String> phones = new ArrayList<>();
@@ -35,4 +34,9 @@ public class Contact {
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
+
+    // НОВОЕ: Массив тегов/автомобилей для поиска и быстрой привязки
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "tags", columnDefinition = "text[]")
+    private List<String> tags = new ArrayList<>();
 }

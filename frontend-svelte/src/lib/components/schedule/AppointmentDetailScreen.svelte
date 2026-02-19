@@ -106,6 +106,17 @@
     </header>
 
     <div class="grid-layout">
+        <!-- НОВОЕ: ПЛИТКА ОБЪЕКТА (МАШИНЫ) -->
+        {#if appointment.referenceTag}
+            <div class="info-tile reference-tile" in:slide>
+                <div class="tile-icon car">🚗</div>
+                <div class="tile-body">
+                    <label>Объект визита</label>
+                    <p class="val">{appointment.referenceTag}</p>
+                </div>
+            </div>
+        {/if}
+
         <!-- ИНТЕРАКТИВНАЯ ПЛИТКА ЗАМЕТКИ -->
         <div class="info-tile comment-tile" class:editing={isEditingComment}>
             <div class="tile-icon note">📝</div>
@@ -221,14 +232,18 @@
     .grid-layout { display: flex; flex-direction: column; gap: 10px; }
     .info-tile { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); text-align: left; transition: all 0.2s; }
 
+    /* СТИЛИ ОБЪЕКТА (МАШИНЫ) */
+    .reference-tile { background: #f0fdf4; border-color: #dcfce7; }
+    .tile-icon.car { background: #dcfce7; color: #10b981; }
+
     /* СТИЛИ ЗАМЕТКИ */
     .comment-tile { background: #fffbeb; border-color: #fef3c7; cursor: pointer; }
     .comment-tile:hover { background: #fef3c7; }
     .comment-tile.editing { background: white; border-color: #0ea5e9; cursor: default; }
     .tile-icon.note { background: #fef3c7; color: #d97706; }
 
-    .clickable-text { display: flex; justify-content: space-between; align-items: center; width: 100%; width: 100%; }
-    .comment-text { font-style: italic; color: #92400e; }
+    .clickable-text { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .comment-text { font-style: italic; color: #92400e; font-weight: 600; }
     .placeholder { color: #94a3b8; font-weight: 500; font-size: 14px; }
     .edit-icon { opacity: 0.3; font-size: 14px; }
 

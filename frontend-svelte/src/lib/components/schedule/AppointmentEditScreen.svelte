@@ -27,6 +27,7 @@
         resourceId: '',
         branchId: '',
         comment: '',
+        referenceTag: '',
         allowReminder: true,
         reminderLeadTimeHours: 24
     };
@@ -67,7 +68,6 @@
     async function loadInitialData() {
         isLoading = true;
         try {
-            // Сначала загружаем данные филиала, чтобы знать его часовой пояс
             const allBranches = await branchService.getBranches();
             currentBranchData = allBranches.find(b => b.id === $activeBranchId);
 
@@ -88,12 +88,11 @@
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
-                    comment: appointment.comment || ''
+                    comment: appointment.comment || '',
+                    referenceTag: appointment.referenceTag || ''
                 };
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
-
-                // Отображаем время в инпуте по часовому поясу филиала
                 formData.startTime = timeUtils.toBranchLocalISO(appointment.startTime, currentBranchData?.timezone);
                 serviceSearchInput = appointment.service;
 
@@ -104,8 +103,6 @@
             } else {
                 formData.staffMemberId = preselected.staffId || '';
                 formData.branchId = $activeBranchId;
-
-                // Для новой записи: преобразуем кликнутое "визуальное" время в формат для инпута
                 const d = new Date(preselected.date);
                 d.setHours(preselected.hour, preselected.min, 0, 0);
                 const pad = n => n < 10 ? '0'+n : n;
@@ -153,18 +150,21 @@
 
     async function handleSave() {
         if (!selectedContact) return alert('Выберите клиента');
-        if (!serviceSearchInput.trim()) return alert('Укажите услугу');
         if (!currentBranchData) return alert('Данные филиала еще загружаются...');
 
         isSaving = true;
         try {
+            // ФИКС: Если услуга пустая - ставим "Стандарт"
             let sName = serviceSearchInput.trim();
-            if (isNewService) {
+            if (!sName) {
+                sName = "Стандарт";
+            }
+
+            if (isNewService && sName !== "Стандарт") {
                 const ns = await serviceService.addService({ name: sName, durationInMinutes: formData.durationInMinutes });
                 sName = ns.name;
             }
 
-            // ПРЕОБРАЗУЕМ ВРЕМЯ ИЗ ИНПУТА В UTC ДЛЯ СОХРАНЕНИЯ В БАЗУ
             const correctedStartTime = timeUtils.fromBranchLocalToUTC(formData.startTime, currentBranchData.timezone);
 
             const payload = {
@@ -202,7 +202,7 @@
                 <div class="hero-body">
                     <label>КЛИЕНТ ЗАПИСИ</label>
                     <div class="search-box rel-pos" on:click|stopPropagation>
-                        <input type="text" bind:value={searchInput} on:input={handleClientInput} placeholder="Имя или номер..." class:invisible={!!selectedContact} />
+                        <input type="text" bind:value={searchInput} on:input={handleClientInput} placeholder="Имя, телефон или ГОСНОМЕР..." class:invisible={!!selectedContact} />
                         {#if selectedContact}
                             <div class="badge" in:scale><span class="txt">{selectedContact.name}</span><button class="x" on:click={() => { selectedContact = null; searchInput = ''; }}>✕</button></div>
                         {/if}
@@ -213,7 +213,7 @@
                                 {#each searchResults as c}
                                     <SearchDropdownItem
                                         title={c.name}
-                                        subtitle={c.phones[0] || 'Нет номера'}
+                                        subtitle={(c.tags && c.tags.length > 0) ? `🚗 ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
                                         type="client"
                                         on:select={() => selectContact(c)}
                                     />
@@ -225,10 +225,26 @@
             </section>
 
             <div class="tiles-stack">
+                <div class="tile-card reference-card">
+                    <label>АВТОМОБИЛЬ / ОБЪЕКТ</label>
+                    <div class="tag-input-wrap">
+                        <input type="text" bind:value={formData.referenceTag} placeholder="Марка, модель, госномер..." />
+                        {#if selectedContact?.tags?.length > 0}
+                            <div class="quick-tags" in:slide>
+                                {#each selectedContact.tags as tag}
+                                    <button class="tag-chip" class:active={formData.referenceTag === tag} on:click={() => formData.referenceTag = tag}>
+                                        {tag}
+                                    </button>
+                                {/each}
+                            </div>
+                        {/if}
+                    </div>
+                </div>
+
                 <div class="tile-card rel-pos" on:click|stopPropagation>
                     <label>УСЛУГА</label>
                     <div class="input-rel">
-                        <input type="text" bind:value={serviceSearchInput} placeholder="Что будем делать?" on:focus={() => showServiceDropdown = true} />
+                        <input type="text" bind:value={serviceSearchInput} placeholder="Оставьте пустым для 'Стандарт'" on:focus={() => showServiceDropdown = true} />
                         {#if showServiceDropdown}
                             <div class="drop shadow-xl">
                                 {#each filteredServices as s}
@@ -297,7 +313,7 @@
 
                 <div class="tile-card comment-card">
                     <label>ЗАМЕТКА К ЗАПИСИ (ВНУТРЕННЯЯ)</label>
-                    <textarea bind:value={formData.comment} placeholder="Например: клиент просил кофе или аллергия на материалы..."></textarea>
+                    <textarea bind:value={formData.comment} placeholder="Например: аллергия на материалы..."></textarea>
                 </div>
             </div>
 
@@ -327,6 +343,12 @@
 
     .tiles-stack { display: flex; flex-direction: column; gap: 10px; }
     .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; }
+
+    .reference-card { background: #f0fdf4; border-color: #bbf7d0; }
+    .quick-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .tag-chip { background: white; border: 1px solid #dcfce7; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #166534; cursor: pointer; transition: all 0.2s; }
+    .tag-chip:hover { border-color: #22c55e; background: #f0fdf4; }
+    .tag-chip.active { background: #22c55e; color: white; border-color: #22c55e; }
 
     .drop { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: white; border-radius: 22px; box-shadow: 0 25px 60px -15px rgba(0,0,0,0.2); z-index: 2000; border: 1px solid #e2e8f0; max-height: 280px; overflow-y: auto; padding: 8px; }
 

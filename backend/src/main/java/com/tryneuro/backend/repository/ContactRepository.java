@@ -17,18 +17,20 @@ public interface ContactRepository extends JpaRepository<Contact, String> {
 
     List<Contact> findByTenantId(String tenantId);
 
+    // ИСПРАВЛЕНО: Полная поддержка регистронезависимого поиска по Имени, Телефону и Тегам
     @Query(value = "SELECT * FROM contacts WHERE tenant_id = :tenantId AND (" +
            "LOWER(name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "array_to_string(phones, ',') LIKE CONCAT('%', :query, '%'))",
+           "array_to_string(phones, ',') LIKE CONCAT('%', :query, '%') OR " +
+           "LOWER(array_to_string(tags, ',')) LIKE LOWER(CONCAT('%', :query, '%')))",
            countQuery = "SELECT count(*) FROM contacts WHERE tenant_id = :tenantId AND (" +
            "LOWER(name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "array_to_string(phones, ',') LIKE CONCAT('%', :query, '%'))",
+           "array_to_string(phones, ',') LIKE CONCAT('%', :query, '%') OR " +
+           "LOWER(array_to_string(tags, ',')) LIKE LOWER(CONCAT('%', :query, '%')))",
            nativeQuery = true)
     Page<Contact> searchContacts(@Param("tenantId") String tenantId, @Param("query") String query, Pageable pageable);
 
     Page<Contact> findByTenantId(String tenantId, Pageable pageable);
 
-    // --- НОВОЕ: Поиск клиентов, у которых есть записи на конкретную дату ---
     @Query(value = "SELECT DISTINCT c.* FROM contacts c " +
            "JOIN appointments a ON a.contact_id = c.id " +
            "WHERE c.tenant_id = :tenantId AND CAST(a.start_time AS date) = :date",

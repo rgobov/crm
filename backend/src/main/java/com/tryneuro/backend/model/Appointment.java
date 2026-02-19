@@ -57,7 +57,6 @@ public class Appointment {
     @Column(name = "staff_member_id")
     private String staffMemberId;
 
-    // ТЕПЕРЬ ОБЯЗАТЕЛЬНОЕ ПОЛЕ
     @Column(name = "branch_id", nullable = false)
     private String branchId;
 
@@ -70,6 +69,10 @@ public class Appointment {
     private AppointmentStatus status = AppointmentStatus.SCHEDULED;
 
     private String comment;
+
+    // НОВОЕ: Объект визита (Марка машины, госномер, порода собаки и т.д.)
+    @Column(name = "reference_tag")
+    private String referenceTag;
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;

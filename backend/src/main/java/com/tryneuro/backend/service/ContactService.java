@@ -2,80 +2,93 @@ package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.repository.ContactRepository;
-import com.tryneuro.backend.repository.AppointmentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class ContactService {
-    private final ContactRepository contactRepository;
-    private final AppointmentRepository appointmentRepository;
 
-    @Autowired
-    public ContactService(ContactRepository contactRepository, AppointmentRepository appointmentRepository) {
-        this.contactRepository = contactRepository;
-        this.appointmentRepository = appointmentRepository;
-    }
+    private final ContactRepository contactRepository;
 
     public Page<Contact> getContactsPaged(String tenantId, String query, boolean showAll, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
-        if (query != null && query.trim().length() >= 3) {
-            return contactRepository.searchContacts(tenantId, query.trim(), pageable);
+        if (query != null && !query.isEmpty()) {
+            return contactRepository.searchContacts(tenantId, query, PageRequest.of(page, size));
         }
-        if (showAll) {
-            return contactRepository.findByTenantId(tenantId, pageable);
-        }
-        return contactRepository.findByAppointmentDate(tenantId, LocalDate.now(), pageable);
-    }
-
-    public long countContacts(String tenantId) {
-        return contactRepository.countByTenantId(tenantId);
+        return contactRepository.findByTenantId(tenantId, PageRequest.of(page, size));
     }
 
     public Optional<Contact> getContactById(String id) {
         return contactRepository.findById(id);
     }
 
+    // ВОССТАНОВЛЕНО: Поиск клиента по номеру телефона (для Flutter)
     public Optional<Contact> findContactByPhone(String phone, String tenantId) {
+        if (phone == null || phone.isEmpty()) return Optional.empty();
+        // Очищаем номер от лишних символов перед поиском
         String cleanPhone = phone.replaceAll("[^0-9]", "");
+        if (cleanPhone.length() == 11 && cleanPhone.startsWith("8")) {
+            cleanPhone = "7" + cleanPhone.substring(1);
+        }
         return contactRepository.findByCleanPhone(cleanPhone, tenantId);
     }
 
     public Contact addContact(Contact contact, String tenantId) {
-        for (String phone : contact.getPhones()) {
-            String cleanPhone = phone.replaceAll("[^0-9]", "");
-            Optional<Contact> existing = contactRepository.findByCleanPhone(cleanPhone, tenantId);
-            if (existing.isPresent()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Клиент с номером " + phone + " уже существует.");
-            }
-        }
         contact.setTenantId(tenantId);
+        if (contact.getTags() == null) contact.setTags(new ArrayList<>());
         return contactRepository.save(contact);
     }
 
+    public Contact updateContact(String id, Contact details, String tenantId) {
+        Contact contact = contactRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Contact not found"));
+        contact.setName(details.getName());
+        contact.setPhones(details.getPhones());
+        contact.setEmail(details.getEmail());
+        contact.setNotes(details.getNotes());
+        contact.setTags(details.getTags());
+        return contactRepository.save(contact);
+    }
+
+    /**
+     * Добавляет тег в массив клиента, если его там еще нет (для автоматического обучения по машинам)
+     */
     @Transactional
-    public Contact updateContact(String id, Contact contact, String tenantId) {
-        contact.setId(id);
-        contact.setTenantId(tenantId);
-        Contact saved = contactRepository.save(contact);
+    public void addTagIfMissing(String contactId, String newTag) {
+        if (newTag == null || newTag.trim().isEmpty()) return;
         
-        // СИНХРОНИЗАЦИЯ: Обновляем имя клиента во всех его записях
-        appointmentRepository.updateClientNameForContact(id, saved.getName(), tenantId);
-        
-        return saved;
+        contactRepository.findById(contactId).ifPresent(contact -> {
+            List<String> tags = contact.getTags();
+            if (tags == null) tags = new ArrayList<>();
+            
+            String trimmedTag = newTag.trim();
+            boolean exists = tags.stream().anyMatch(t -> t.equalsIgnoreCase(trimmedTag));
+            
+            if (!exists) {
+                tags.add(trimmedTag);
+                contact.setTags(tags);
+                contactRepository.save(contact);
+            }
+        });
     }
 
     public void deleteContact(String id) {
         contactRepository.deleteById(id);
+    }
+
+    public long countContacts(String tenantId) {
+        return contactRepository.countByTenantId(tenantId);
+    }
+
+    public Page<Contact> findByAppointmentDate(String tenantId, LocalDate date, int page, int size) {
+        return contactRepository.findByAppointmentDate(tenantId, date, PageRequest.of(page, size));
     }
 }

@@ -5,7 +5,6 @@ import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentStatus;
 import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.repository.AppointmentRepository;
-import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.StaffShiftRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,14 +29,17 @@ public class ScheduleService {
 
     private final AppointmentRepository appointmentRepository;
     private final StaffShiftRepository staffShiftRepository;
+    private final ContactService contactService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     public ScheduleService(AppointmentRepository appointmentRepository, 
                            StaffShiftRepository staffShiftRepository,
+                           ContactService contactService,
                            SimpMessagingTemplate messagingTemplate) {
         this.appointmentRepository = appointmentRepository;
         this.staffShiftRepository = staffShiftRepository;
+        this.contactService = contactService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -49,25 +51,27 @@ public class ScheduleService {
         return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
     }
 
-    public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
-        return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
-    }
-
     public List<WorkloadDto> getWorkloadForStaffAndMonth(String staffId, int year, int month) {
         return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
     }
 
+    public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
+        return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
+    }
+
     @Transactional
     public Appointment addAppointment(Appointment appointment) {
-        // Упрощенная логика привязки филиала без лишних WARN
-        if (appointment.getBranch() != null && appointment.getBranch().getId() != null) {
-            appointment.setBranchId(appointment.getBranch().getId());
-        }
-        
+        // Мы полагаемся на branchId, который пришел в JSON как строка
         log.info("🚀 Creating appointment for client '{}' in branch '{}'", appointment.getClientName(), appointment.getBranchId());
 
         validateAvailability(appointment);
         Appointment saved = appointmentRepository.save(appointment);
+        
+        // Автоматически запоминаем объект визита (машину) в карточке клиента
+        if (saved.getContactId() != null && saved.getReferenceTag() != null && !saved.getReferenceTag().isEmpty()) {
+            contactService.addTagIfMissing(saved.getContactId(), saved.getReferenceTag());
+        }
+
         notifyChange(saved.getTenantId());
         return saved;
     }
@@ -87,15 +91,21 @@ public class ScheduleService {
         appointment.setComment(details.getComment());
         appointment.setAllowReminder(details.isAllowReminder());
         appointment.setReminderLeadTimeHours(details.getReminderLeadTimeHours());
-
+        appointment.setReferenceTag(details.getReferenceTag());
+        
+        // Обновляем филиал, если он изменился
         if (details.getBranchId() != null) {
             appointment.setBranchId(details.getBranchId());
-        } else if (details.getBranch() != null && details.getBranch().getId() != null) {
-            appointment.setBranchId(details.getBranch().getId());
         }
 
         validateAvailability(appointment);
         Appointment updated = appointmentRepository.save(appointment);
+
+        // Автоматически запоминаем объект визита
+        if (updated.getContactId() != null && updated.getReferenceTag() != null && !updated.getReferenceTag().isEmpty()) {
+            contactService.addTagIfMissing(updated.getContactId(), updated.getReferenceTag());
+        }
+
         notifyChange(updated.getTenantId());
         return updated;
     }
