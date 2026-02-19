@@ -6,14 +6,9 @@ import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.model.Resource;
 import com.tryneuro.backend.model.StaffMember;
-import com.tryneuro.backend.service.AppServiceService;
-import com.tryneuro.backend.service.ContactService;
-import com.tryneuro.backend.service.ResourceService;
-import com.tryneuro.backend.service.ScheduleService;
-import com.tryneuro.backend.service.StaffMemberService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.tryneuro.backend.service.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -23,33 +18,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/admin")
+@RequiredArgsConstructor // Используем Lombok для конструктора
 public class AdminController {
-    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
     private final ContactService contactService;
     private final AppServiceService appServiceService;
     private final ResourceService resourceService;
-
-    @Autowired
-    public AdminController(StaffMemberService staffMemberService,
-                           ScheduleService scheduleService,
-                           ContactService contactService,
-                           AppServiceService appServiceService,
-                           ResourceService resourceService) {
-        this.staffMemberService = staffMemberService;
-        this.scheduleService = scheduleService;
-        this.contactService = contactService;
-        this.appServiceService = appServiceService;
-        this.resourceService = resourceService;
-    }
+    private final DashboardService dashboardService; // <<< НОВЫЙ СЕРВИС
 
     private String getRequiredTenantId(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
@@ -58,14 +41,17 @@ public class AdminController {
         return tenantId;
     }
 
-    // НОВОЕ: Эндпоинт для синхронизации времени
     @GetMapping("/server-time")
     public Map<String, Object> getServerTime() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("currentTime", OffsetDateTime.now());
-        return response;
+        return Map.of("currentTime", OffsetDateTime.now());
     }
 
+    @GetMapping("/dashboard/stats")
+    public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
+        return dashboardService.getAdminStats(getRequiredTenantId(tenantId));
+    }
+
+    // --- STAFF ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -78,13 +64,9 @@ public class AdminController {
 
     @GetMapping("/staff/{id}")
     public StaffMember getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
-        StaffMember staff = staffMemberService.getStaffMemberById(id)
+        return staffMemberService.getStaffMemberById(id)
+                .filter(s -> s.getTenantId().equals(getRequiredTenantId(tenantId)))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
-
-        if (!staff.getTenantId().equals(getRequiredTenantId(tenantId))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
-        }
-        return staff;
     }
 
     @PostMapping("/staff")
@@ -102,6 +84,7 @@ public class AdminController {
         staffMemberService.deleteStaffMember(id);
     }
 
+    // --- CLIENTS ---
     @GetMapping("/clients")
     public Page<Contact> getClientsPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -114,13 +97,9 @@ public class AdminController {
 
     @GetMapping("/clients/{id}")
     public Contact getContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
-        Contact contact = contactService.getContactById(id)
+        return contactService.getContactById(id)
+                .filter(c -> c.getTenantId().equals(getRequiredTenantId(tenantId)))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Клиент не найден"));
-
-        if (!contact.getTenantId().equals(getRequiredTenantId(tenantId))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ к чужим данным запрещен");
-        }
-        return contact;
     }
 
     @PostMapping("/clients")
@@ -138,16 +117,7 @@ public class AdminController {
         contactService.deleteContact(id);
     }
 
-    @GetMapping("/dashboard/stats")
-    public Map<String, Object> getDashboardStats(@RequestAttribute("tenantId") String tenantId) {
-        String tId = getRequiredTenantId(tenantId);
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalClients", contactService.countContacts(tId));
-        stats.put("totalStaff", staffMemberService.getAllStaff(tId).size());
-        stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId, null).size());
-        return stats;
-    }
-
+    // --- APPOINTMENTS & SCHEDULE ---
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(
             @RequestAttribute("tenantId") String tenantId, 

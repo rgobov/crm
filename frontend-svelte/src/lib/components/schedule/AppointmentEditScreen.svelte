@@ -32,6 +32,10 @@
         reminderLeadTimeHours: 24
     };
 
+    // Состояние инлайн-создания клиента
+    let isNewClientMode = false;
+    let newClientPhone = "";
+
     let durationHours = 1;
     let durationMinutes = 0;
     let showDurationPicker = false;
@@ -56,10 +60,6 @@
     let currentBranchData = null;
 
     $: formData.durationInMinutes = (durationHours * 60) + durationMinutes;
-
-    export function setCreatedContact(contact) {
-        if (contact) selectContact(contact);
-    }
 
     onMount(async () => {
         await loadInitialData();
@@ -130,17 +130,18 @@
     }
 
     function handleClientInput() {
-        if (selectedContact) return;
+        if (selectedContact || isNewClientMode) return;
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(async () => {
             const q = searchInput.trim();
-            if (q.length < 3) { searchResults = []; return; }
+            if (q.length < 2) { searchResults = []; return; }
             const res = await contactService.getContacts(q, true, 0, 5);
             searchResults = res.content || [];
-        }, 600);
+        }, 400);
     }
 
     function selectContact(contact) {
+        isNewClientMode = false;
         selectedContact = contact;
         formData.contactId = contact.id;
         formData.clientName = contact.name;
@@ -148,18 +149,41 @@
         searchResults = [];
     }
 
+    function startInlineCreation() {
+        isNewClientMode = true;
+        selectedContact = null;
+        formData.contactId = "";
+        formData.clientName = searchInput; // Имя берем из поиска
+
+        // Пытаемся вытащить телефон, если в поиске были цифры
+        const digits = searchInput.replace(/\D/g, "");
+        if (digits.length >= 10) newClientPhone = digits;
+
+        searchResults = [];
+    }
+
     async function handleSave() {
-        if (!selectedContact) return alert('Выберите клиента');
+        if (!searchInput.trim()) return alert('Укажите имя клиента');
+        if (isNewClientMode && !newClientPhone.trim()) return alert('Укажите телефон нового клиента');
         if (!currentBranchData) return alert('Данные филиала еще загружаются...');
 
         isSaving = true;
         try {
-            // ФИКС: Если услуга пустая - ставим "Стандарт"
-            let sName = serviceSearchInput.trim();
-            if (!sName) {
-                sName = "Стандарт";
+            // 1. ЕСЛИ НОВЫЙ КЛИЕНТ - СОЗДАЕМ ЕГО ИНЛАЙН
+            let contactId = formData.contactId;
+            let clientName = searchInput.trim();
+
+            if (isNewClientMode) {
+                const newContact = await contactService.addContact({
+                    name: clientName,
+                    phones: [newClientPhone.trim()],
+                    tags: formData.referenceTag ? [formData.referenceTag] : []
+                }, $activeBranchId);
+                contactId = newContact.id;
             }
 
+            // 2. ОБРАБОТКА УСЛУГИ
+            let sName = serviceSearchInput.trim() || "Стандарт";
             if (isNewService && sName !== "Стандарт") {
                 const ns = await serviceService.addService({ name: sName, durationInMinutes: formData.durationInMinutes });
                 sName = ns.name;
@@ -170,8 +194,8 @@
             const payload = {
                 ...formData,
                 service: sName,
-                clientName: selectedContact.name,
-                contactId: selectedContact.id,
+                clientName: clientName,
+                contactId: contactId,
                 startTime: correctedStartTime,
                 branchId: $activeBranchId
             };
@@ -197,19 +221,32 @@
         <div class="loader-center"><span class="spinner"></span></div>
     {:else}
         <div class="tiles-layout" in:fade>
-            <section class="tile-hero">
-                <div class="avatar">{selectedContact ? selectedContact.name.charAt(0).toUpperCase() : '?'}</div>
+            <section class="tile-hero" class:is-new={isNewClientMode}>
+                <div class="avatar">{isNewClientMode ? '✨' : (selectedContact ? selectedContact.name.charAt(0).toUpperCase() : '?')}</div>
                 <div class="hero-body">
-                    <label>КЛИЕНТ ЗАПИСИ</label>
+                    <label>{isNewClientMode ? 'НОВЫЙ КЛИЕНТ' : 'КЛИЕНТ ЗАПИСИ'}</label>
                     <div class="search-box rel-pos" on:click|stopPropagation>
                         <input type="text" bind:value={searchInput} on:input={handleClientInput} placeholder="Имя, телефон или ГОСНОМЕР..." class:invisible={!!selectedContact} />
-                        {#if selectedContact}
-                            <div class="badge" in:scale><span class="txt">{selectedContact.name}</span><button class="x" on:click={() => { selectedContact = null; searchInput = ''; }}>✕</button></div>
-                        {/if}
-                        <button class="btn-plus" on:click={() => dispatch('open-add-contact-modal')}>+</button>
 
-                        {#if searchResults.length > 0}
+                        {#if selectedContact}
+                            <div class="badge" in:scale>
+                                <span class="txt">{selectedContact.name}</span>
+                                <button class="x" on:click={() => { selectedContact = null; searchInput = ''; isNewClientMode = false; }}>✕</button>
+                            </div>
+                        {/if}
+
+                        {#if searchResults.length > 0 || (searchInput.length >= 2 && !selectedContact && !isNewClientMode)}
                             <div class="drop shadow-xl">
+                                {#if searchInput.length >= 2 && !selectedContact}
+                                    <SearchDropdownItem
+                                        title="Создать нового: {searchInput}"
+                                        subtitle="Нажмите для инлайн-создания"
+                                        icon="✨"
+                                        type="action"
+                                        on:select={startInlineCreation}
+                                    />
+                                    <div class="divider"></div>
+                                {/if}
                                 {#each searchResults as c}
                                     <SearchDropdownItem
                                         title={c.name}
@@ -221,6 +258,14 @@
                             </div>
                         {/if}
                     </div>
+
+                    <!-- ИНЛАЙН ПОЛЕ ТЕЛЕФОНА ДЛЯ НОВОГО КЛИЕНТА -->
+                    {#if isNewClientMode}
+                        <div class="inline-phone-field" in:slide>
+                            <input type="tel" bind:value={newClientPhone} placeholder="Номер телефона..." autofocus />
+                            <button class="btn-cancel-new" on:click={() => isNewClientMode = false}>✕</button>
+                        </div>
+                    {/if}
                 </div>
             </section>
 
@@ -328,7 +373,8 @@
 <style>
     .appt-edit-root { height: 100%; display: flex; flex-direction: column; background: #f8fafc; position: relative; overflow-x: hidden; }
     .tiles-layout { padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; padding-bottom: 40px; }
-    .tile-hero { background: white; padding: 20px; border-radius: 28px; display: flex; align-items: center; gap: 16px; border: 1px solid #f1f5f9; margin-bottom: 16px; }
+    .tile-hero { background: white; padding: 20px; border-radius: 28px; display: flex; align-items: center; gap: 16px; border: 1px solid #f1f5f9; margin-bottom: 16px; transition: all 0.3s; }
+    .tile-hero.is-new { background: #fff7ed; border-color: #ffedd5; }
     .avatar { width: 56px; height: 56px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; }
     .hero-body { flex: 1; position: relative; }
     label { display: block; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
@@ -336,21 +382,24 @@
     .rel-pos { position: relative; }
     .search-box { display: flex; align-items: center; gap: 8px; }
     .search-box input { width: 100%; padding: 10px 14px; border-radius: 14px; border: 1.5px solid #f1f5f9; background: white; font-size: 14px; outline: none; }
-    .badge { position: absolute; left: 4px; right: 44px; top: 4px; bottom: 4px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border: 1.5px solid #0ea5e9; }
+    .badge { position: absolute; left: 4px; right: 4px; top: 4px; bottom: 4px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border: 1.5px solid #0ea5e9; }
     .badge .txt { font-weight: 700; color: #1e40af; }
-    .x { background: none; border: none; color: #ef4444; font-weight: 800; cursor: pointer; }
-    .btn-plus { width: 38px; height: 38px; border-radius: 12px; border: none; background: #0ea5e9; color: white; font-size: 20px; cursor: pointer; }
+    .x { background: white; border: none; color: #ef4444; font-weight: 800; cursor: pointer; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+
+    .inline-phone-field { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+    .inline-phone-field input { flex: 1; background: white; padding: 10px 14px; border-radius: 12px; border: 1.5px solid #fbbf24; font-size: 14px; font-weight: 700; color: #92400e; }
+    .btn-cancel-new { background: #fef3c7; border: none; color: #d97706; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; font-weight: 800; }
 
     .tiles-stack { display: flex; flex-direction: column; gap: 10px; }
     .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; }
 
     .reference-card { background: #f0fdf4; border-color: #bbf7d0; }
     .quick-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-    .tag-chip { background: white; border: 1px solid #dcfce7; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #166534; cursor: pointer; transition: all 0.2s; }
-    .tag-chip:hover { border-color: #22c55e; background: #f0fdf4; }
+    .tag-chip { background: white; border: 1px solid #dcfce7; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #166534; cursor: pointer; }
     .tag-chip.active { background: #22c55e; color: white; border-color: #22c55e; }
 
     .drop { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: white; border-radius: 22px; box-shadow: 0 25px 60px -15px rgba(0,0,0,0.2); z-index: 2000; border: 1px solid #e2e8f0; max-height: 280px; overflow-y: auto; padding: 8px; }
+    .divider { height: 1px; background: #f1f5f9; margin: 4px 0; }
 
     .dual { display: grid; grid-template-columns: 1fr 140px; padding: 0; }
     .date-part { padding: 14px 18px; border-right: 1px solid #f1f5f9; }
