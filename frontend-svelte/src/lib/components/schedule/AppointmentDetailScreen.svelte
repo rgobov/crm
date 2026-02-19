@@ -8,6 +8,10 @@
     export let appointment;
     const dispatch = createEventDispatcher();
 
+    let isEditingComment = false;
+    let tempComment = "";
+    let isSaving = false;
+
     const STATUSES = [
         { id: 'SCHEDULED', label: 'Ожидается', color: '#3b82f6' },
         { id: 'CONFIRMED', label: 'Подтвержден', color: '#10b981' },
@@ -25,6 +29,26 @@
         } catch (e) {
             alert('Ошибка обновления статуса');
         }
+    }
+
+    async function saveInlineComment() {
+        isSaving = true;
+        try {
+            const updated = { ...appointment, comment: tempComment };
+            await adminService.updateAppointment(appointment.id, updated);
+            appointment.comment = tempComment;
+            isEditingComment = false;
+            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
+        } catch (e) {
+            alert('Ошибка сохранения заметки');
+        } finally {
+            isSaving = false;
+        }
+    }
+
+    function startEditComment() {
+        tempComment = appointment.comment || "";
+        isEditingComment = true;
     }
 
     async function handlePropertyChange() {
@@ -50,7 +74,6 @@
         }
     }
 
-    // НОВАЯ ФУНКЦИЯ ДЛЯ ПЕРЕХОДА В КАРТОЧКУ КЛИЕНТА
     function handleClientClick() {
         if (appointment.contactId) {
             dispatch('open-client', appointment.contactId);
@@ -64,7 +87,6 @@
         <div class="avatar-big">{appointment.clientName?.charAt(0) || '?'}</div>
         <div class="hero-info">
             <label>Карточка визита</label>
-            <!-- ИМЯ ТЕПЕРЬ КЛИКАБЕЛЬНОЕ -->
             <button class="client-link-btn" on:click={handleClientClick}>
                 <h2>{appointment.clientName} <span>›</span></h2>
             </button>
@@ -84,6 +106,34 @@
     </header>
 
     <div class="grid-layout">
+        <!-- ИНТЕРАКТИВНАЯ ПЛИТКА ЗАМЕТКИ -->
+        <div class="info-tile comment-tile" class:editing={isEditingComment}>
+            <div class="tile-icon note">📝</div>
+            <div class="tile-body">
+                <label>Внутренняя заметка</label>
+                {#if isEditingComment}
+                    <div class="inline-editor" in:fade>
+                        <textarea bind:value={tempComment} placeholder="Добавьте детали..." autofocus></textarea>
+                        <div class="editor-actions">
+                            <button class="btn-save-mini" on:click={saveInlineComment} disabled={isSaving}>
+                                {isSaving ? '...' : 'СОХРАНИТЬ ✓'}
+                            </button>
+                            <button class="btn-cancel-mini" on:click={() => isEditingComment = false}>ОТМЕНА</button>
+                        </div>
+                    </div>
+                {:else}
+                    <p class="val clickable-text" on:click={startEditComment}>
+                        {#if appointment.comment}
+                            <span class="comment-text">"{appointment.comment}"</span>
+                        {:else}
+                            <span class="placeholder">Нажмите, чтобы добавить заметку...</span>
+                        {/if}
+                        <span class="edit-icon">✎</span>
+                    </p>
+                {/if}
+            </div>
+        </div>
+
         <div class="info-tile">
             <div class="tile-icon">✂️</div>
             <div class="tile-body">
@@ -142,7 +192,7 @@
 
     <div class="actions-row">
         <button class="action-tile edit" on:click={() => dispatch('edit', appointment)}>
-            <span>✎</span> Изменить
+            <span>✎</span> Изменить всё
         </button>
         <button class="action-tile delete" on:click={handleDelete}>
             <span>🗑</span> Удалить
@@ -159,7 +209,6 @@
     .hero-info { flex: 1; }
     .hero-info label { display: block; font-size: 9px; font-weight: 850; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
 
-    /* СТИЛИ КЛИКАБЕЛЬНОГО ИМЕНИ */
     .client-link-btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; display: block; width: 100%; transition: opacity 0.2s; }
     .client-link-btn:hover { opacity: 0.7; }
     .client-link-btn h2 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.1; }
@@ -170,11 +219,31 @@
     .status-btn.active { background: var(--active-bg); color: white; border-color: var(--active-bg); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
     .grid-layout { display: flex; flex-direction: column; gap: 10px; }
-    .info-tile { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); text-align: left; }
+    .info-tile { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); text-align: left; transition: all 0.2s; }
+
+    /* СТИЛИ ЗАМЕТКИ */
+    .comment-tile { background: #fffbeb; border-color: #fef3c7; cursor: pointer; }
+    .comment-tile:hover { background: #fef3c7; }
+    .comment-tile.editing { background: white; border-color: #0ea5e9; cursor: default; }
+    .tile-icon.note { background: #fef3c7; color: #d97706; }
+
+    .clickable-text { display: flex; justify-content: space-between; align-items: center; width: 100%; width: 100%; }
+    .comment-text { font-style: italic; color: #92400e; }
+    .placeholder { color: #94a3b8; font-weight: 500; font-size: 14px; }
+    .edit-icon { opacity: 0.3; font-size: 14px; }
+
+    .inline-editor { width: 100%; margin-top: 8px; }
+    textarea { width: 100%; min-height: 80px; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 10px; font-size: 14px; font-family: inherit; color: #1e293b; outline: none; resize: none; margin-bottom: 8px; }
+    textarea:focus { border-color: #0ea5e9; }
+
+    .editor-actions { display: flex; gap: 8px; }
+    .btn-save-mini { flex: 1; background: #0ea5e9; color: white; border: none; padding: 8px; border-radius: 10px; font-weight: 800; font-size: 11px; cursor: pointer; }
+    .btn-cancel-mini { background: #f1f5f9; color: #64748b; border: none; padding: 8px 12px; border-radius: 10px; font-weight: 700; font-size: 11px; cursor: pointer; }
 
     .tile-icon { width: 44px; height: 44px; background: #f1f5f9; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
     .tile-icon.tg { background: #e0f2fe; color: #0ea5e9; }
 
+    .tile-body { flex: 1; }
     .tile-body label { display: block; font-size: 9px; font-weight: 800; color: #cbd5e1; text-transform: uppercase; }
     .tile-body .val { margin: 0; font-size: 15px; font-weight: 700; color: #1e293b; }
     .tile-body small { font-size: 11px; color: #94a3b8; font-weight: 600; }
@@ -187,7 +256,7 @@
     .switch-handle { width: 18px; height: 18px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
     .toggle-switch.on .switch-handle { transform: translateX(20px); }
 
-    .actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 0; padding-bottom: 10px; }
+    .actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; padding-bottom: 10px; }
     .action-tile { height: 52px; border-radius: 20px; border: 1.5px solid #f1f5f9; background: white; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .action-tile.edit { color: var(--primary-color); }
     .action-tile.delete { color: #ef4444; }

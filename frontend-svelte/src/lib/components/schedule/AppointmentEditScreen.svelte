@@ -6,6 +6,7 @@
     import { resourceService } from '$lib/services/resourceService.js';
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
+    import SearchDropdownItem from './SearchDropdownItem.svelte'; // <<< НОВЫЙ КОМПОНЕНТ
     import { fade, slide, scale } from 'svelte/transition';
 
     export let appointment = null;
@@ -187,17 +188,22 @@
                 <div class="avatar">{selectedContact ? selectedContact.name.charAt(0).toUpperCase() : '?'}</div>
                 <div class="hero-body">
                     <label>КЛИЕНТ ЗАПИСИ</label>
-                    <!-- ДОБАВЛЕНА ОБЕРТКА rel-pos ДЛЯ КОРРЕКТНОГО ВЫПАДАЮЩЕГО СПИСКА -->
                     <div class="search-box rel-pos" on:click|stopPropagation>
                         <input type="text" bind:value={searchInput} on:input={handleClientInput} placeholder="Имя или номер..." class:invisible={!!selectedContact} />
                         {#if selectedContact}
                             <div class="badge" in:scale><span class="txt">{selectedContact.name}</span><button class="x" on:click={() => { selectedContact = null; searchInput = ''; }}>✕</button></div>
                         {/if}
                         <button class="btn-plus" on:click={() => dispatch('open-add-contact-modal')}>+</button>
+
                         {#if searchResults.length > 0}
                             <div class="drop shadow-xl">
                                 {#each searchResults as c}
-                                    <button class="item" on:click={() => selectContact(c)}><b>{c.name}</b><small>{c.phones[0] || ''}</small></button>
+                                    <SearchDropdownItem
+                                        title={c.name}
+                                        subtitle={c.phones[0] || 'Нет номера'}
+                                        type="client"
+                                        on:select={() => selectContact(c)}
+                                    />
                                 {/each}
                             </div>
                         {/if}
@@ -213,7 +219,12 @@
                         {#if showServiceDropdown}
                             <div class="drop shadow-xl">
                                 {#each filteredServices as s}
-                                    <button class="item" on:click={() => selectService(s)}><b>{s.name}</b><small>{s.durationInMinutes} мин</small></button>
+                                    <SearchDropdownItem
+                                        title={s.name}
+                                        subtitle="{s.durationInMinutes} мин"
+                                        type="service"
+                                        on:select={() => selectService(s)}
+                                    />
                                 {/each}
                             </div>
                         {/if}
@@ -286,7 +297,7 @@
     .appt-edit-root { height: 100%; display: flex; flex-direction: column; background: #f8fafc; position: relative; overflow-x: hidden; }
     .tiles-layout { padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; padding-bottom: 40px; }
     .tile-hero { background: white; padding: 20px; border-radius: 28px; display: flex; align-items: center; gap: 16px; border: 1px solid #f1f5f9; margin-bottom: 16px; }
-    .avatar { width: 56px; height: 56px; background: #f0f9ff; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; color: #0ea5e9; }
+    .avatar { width: 56px; height: 56px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; }
     .hero-body { flex: 1; position: relative; }
     label { display: block; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
 
@@ -301,11 +312,7 @@
     .tiles-stack { display: flex; flex-direction: column; gap: 10px; }
     .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; }
 
-    .drop { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: white; border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); z-index: 2000; border: 1px solid #e2e8f0; max-height: 200px; overflow-y: auto; padding: 6px; }
-    .item { width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 12px; display: flex; flex-direction: column; }
-    .item:hover { background: #f8fafc; }
-    .item b { font-weight: 700; color: #1e293b; font-size: 15px; }
-    .item small { font-size: 11px; color: #94a3b8; font-weight: 600; }
+    .drop { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: white; border-radius: 22px; box-shadow: 0 25px 60px -15px rgba(0,0,0,0.2); z-index: 2000; border: 1px solid #e2e8f0; max-height: 280px; overflow-y: auto; padding: 8px; }
 
     .dual { display: grid; grid-template-columns: 1fr 140px; padding: 0; }
     .date-part { padding: 14px 18px; border-right: 1px solid #f1f5f9; }
@@ -331,7 +338,7 @@
     input, select { width: 100%; border: none; background: none; font-size: 15px; font-weight: 700; color: #1e293b; outline: none; }
     .footer-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 24px; }
     .btn-cancel { background: white; color: #64748b; border: 1.5px solid #e2e8f0; padding: 14px; border-radius: 18px; font-weight: 700; cursor: pointer; }
-    .btn-save { background: #0ea5e9; color: white; border: none; padding: 14px; border-radius: 18px; font-weight: 800; cursor: pointer; }
+    .btn-save { background: var(--primary-gradient); color: white; border: none; padding: 14px; border-radius: 18px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); }
     .spinner { width: 28px; height: 28px; border: 3px solid #f1f5f9; border-top-color: #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 </style>
