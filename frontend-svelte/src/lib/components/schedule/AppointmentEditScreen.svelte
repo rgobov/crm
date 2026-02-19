@@ -23,6 +23,7 @@
         staffMemberId: '',
         resourceId: '',
         branchId: '',
+        comment: '',
         allowReminder: true,
         reminderLeadTimeHours: 24
     };
@@ -84,7 +85,8 @@
                     staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : ''),
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
-                    reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24
+                    reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
+                    comment: appointment.comment || ''
                 };
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
@@ -129,7 +131,6 @@
         debounceTimer = setTimeout(async () => {
             const q = searchInput.trim();
             if (q.length < 3) { searchResults = []; return; }
-            console.log('🔍 Searching for contacts:', q);
             const res = await contactService.getContacts(q, true, 0, 5);
             searchResults = res.content || [];
         }, 600);
@@ -159,10 +160,8 @@
                 clientName: selectedContact.name,
                 contactId: selectedContact.id,
                 startTime: new Date(formData.startTime).toISOString(),
-                branchId: $activeBranchId // Гарантируем отправку текущего филиала
+                branchId: $activeBranchId
             };
-
-            console.log('📤 Saving Appointment payload:', payload);
 
             if (isEditing) {
                 await adminService.updateAppointment(appointment.id, payload);
@@ -172,7 +171,6 @@
             scheduleRefreshSignal.set({ ts: Date.now() });
             dispatch('saved');
         } catch (e) {
-            console.error('❌ Save failed:', e);
             alert('Ошибка сохранения');
         } finally {
             isSaving = false;
@@ -189,7 +187,8 @@
                 <div class="avatar">{selectedContact ? selectedContact.name.charAt(0).toUpperCase() : '?'}</div>
                 <div class="hero-body">
                     <label>КЛИЕНТ ЗАПИСИ</label>
-                    <div class="search-box" on:click|stopPropagation>
+                    <!-- ДОБАВЛЕНА ОБЕРТКА rel-pos ДЛЯ КОРРЕКТНОГО ВЫПАДАЮЩЕГО СПИСКА -->
+                    <div class="search-box rel-pos" on:click|stopPropagation>
                         <input type="text" bind:value={searchInput} on:input={handleClientInput} placeholder="Имя или номер..." class:invisible={!!selectedContact} />
                         {#if selectedContact}
                             <div class="badge" in:scale><span class="txt">{selectedContact.name}</span><button class="x" on:click={() => { selectedContact = null; searchInput = ''; }}>✕</button></div>
@@ -248,6 +247,31 @@
 
                 <div class="tile-card"><label>ИСПОЛНИТЕЛЬ</label><select bind:value={formData.staffMemberId}><option value="">Не назначен</option>{#each staffList as s}<option value={s.id}>{s.name}</option>{/each}</select></div>
                 <div class="tile-card"><label>КАБИНЕТ / РЕСУРС</label><select bind:value={formData.resourceId}><option value="">Без ресурса</option>{#each resources as r}<option value={r.id}>{r.name}</option>{/each}</select></div>
+
+                <div class="tile-card reminder-panel">
+                    <div class="rem-main">
+                        <label>НАПОМИНАНИЕ (ТЕЛЕГРАМ/WA)</label>
+                        <div class="rem-settings">
+                            {#if formData.allowReminder}
+                                <div class="hours-input" in:slide={{axis:'x'}}>
+                                    <span>за</span>
+                                    <input type="number" bind:value={formData.reminderLeadTimeHours} min="1" max="168" />
+                                    <span>ч. до визита</span>
+                                </div>
+                            {:else}
+                                <p class="rem-off">Отключено</p>
+                            {/if}
+                        </div>
+                    </div>
+                    <button class="toggle-switch" class:on={formData.allowReminder} on:click={() => formData.allowReminder = !formData.allowReminder}>
+                        <div class="switch-handle"></div>
+                    </button>
+                </div>
+
+                <div class="tile-card comment-card">
+                    <label>ЗАМЕТКА К ЗАПИСИ (ВНУТРЕННЯЯ)</label>
+                    <textarea bind:value={formData.comment} placeholder="Например: клиент просил кофе или аллергия на материалы..."></textarea>
+                </div>
             </div>
 
             <div class="footer-actions">
@@ -260,22 +284,29 @@
 
 <style>
     .appt-edit-root { height: 100%; display: flex; flex-direction: column; background: #f8fafc; position: relative; overflow-x: hidden; }
-    .tiles-layout { padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; }
+    .tiles-layout { padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; padding-bottom: 40px; }
     .tile-hero { background: white; padding: 20px; border-radius: 28px; display: flex; align-items: center; gap: 16px; border: 1px solid #f1f5f9; margin-bottom: 16px; }
     .avatar { width: 56px; height: 56px; background: #f0f9ff; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; color: #0ea5e9; }
     .hero-body { flex: 1; position: relative; }
     label { display: block; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-    .search-box { display: flex; align-items: center; gap: 8px; position: relative; }
+
+    .rel-pos { position: relative; }
+    .search-box { display: flex; align-items: center; gap: 8px; }
     .search-box input { width: 100%; padding: 10px 14px; border-radius: 14px; border: 1.5px solid #f1f5f9; background: white; font-size: 14px; outline: none; }
     .badge { position: absolute; left: 4px; right: 44px; top: 4px; bottom: 4px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border: 1.5px solid #0ea5e9; }
     .badge .txt { font-weight: 700; color: #1e40af; }
+    .x { background: none; border: none; color: #ef4444; font-weight: 800; cursor: pointer; }
     .btn-plus { width: 38px; height: 38px; border-radius: 12px; border: none; background: #0ea5e9; color: white; font-size: 20px; cursor: pointer; }
+
     .tiles-stack { display: flex; flex-direction: column; gap: 10px; }
     .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; }
-    .rel-pos { position: relative; }
+
     .drop { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: white; border-radius: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); z-index: 2000; border: 1px solid #e2e8f0; max-height: 200px; overflow-y: auto; padding: 6px; }
     .item { width: 100%; padding: 12px 16px; border: none; background: none; text-align: left; cursor: pointer; border-radius: 12px; display: flex; flex-direction: column; }
     .item:hover { background: #f8fafc; }
+    .item b { font-weight: 700; color: #1e293b; font-size: 15px; }
+    .item small { font-size: 11px; color: #94a3b8; font-weight: 600; }
+
     .dual { display: grid; grid-template-columns: 1fr 140px; padding: 0; }
     .date-part { padding: 14px 18px; border-right: 1px solid #f1f5f9; }
     .duration-part { padding: 14px 18px; position: relative; background: #f8fafc; border-radius: 0 22px 22px 0; }
@@ -286,6 +317,17 @@
     .duration-v2-col-list { display: flex; flex-direction: column; max-height: 200px; overflow-y: auto; }
     .duration-v2-col-list button { border: none; background: none; padding: 8px; border-radius: 8px; cursor: pointer; }
     .duration-v2-col-list button.active { background: #0ea5e9; color: white; }
+
+    .reminder-panel { display: flex; align-items: center; justify-content: space-between; }
+    .hours-input { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #1e293b; }
+    .hours-input input { width: 40px; padding: 4px; border-radius: 8px; border: 1.5px solid #e2e8f0; text-align: center; font-weight: 800; color: #0ea5e9; background: #f8fafc; }
+    .rem-off { margin: 0; font-size: 14px; color: #94a3b8; font-weight: 600; }
+    .toggle-switch { width: 44px; height: 24px; background: #e2e8f0; border-radius: 12px; border: none; position: relative; cursor: pointer; transition: background 0.3s; }
+    .toggle-switch.on { background: #10b981; }
+    .switch-handle { width: 18px; height: 18px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
+    .toggle-switch.on .switch-handle { transform: translateX(20px); }
+
+    textarea { width: 100%; border: none; background: #f8fafc; border-radius: 14px; padding: 12px; font-size: 14px; color: #1e293b; font-weight: 600; resize: none; min-height: 80px; outline: none; margin-top: 8px; border: 1px solid #f1f5f9; }
     input, select { width: 100%; border: none; background: none; font-size: 15px; font-weight: 700; color: #1e293b; outline: none; }
     .footer-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 24px; }
     .btn-cancel { background: white; color: #64748b; border: 1.5px solid #e2e8f0; padding: 14px; border-radius: 18px; font-weight: 700; cursor: pointer; }
