@@ -4,17 +4,17 @@
     export let timeColWidth;
 </script>
 
-<div class="cursor-guide" style="top: {y}px">
-    <!-- ЛИПКИЙ БЕЙДЖИК: Всегда по центру шкалы времени -->
-    <div class="sticky-label-wrapper" style="width: {timeColWidth}px">
-        <div class="guide-label">{timeStr}</div>
+<div class="guide-root" style="top: {y}px">
+    <!-- БЕЙДЖИК: Липнет к левому краю, всегда в колонке времени -->
+    <div class="sticky-label-container" style="width: {timeColWidth}px">
+        <div class="label-box">{timeStr}</div>
     </div>
-    <!-- ЛИНИЯ: Тянется вправо через сетку -->
-    <div class="guide-line"></div>
+    <!-- ЛИНИЯ: Тянется вправо -->
+    <div class="line"></div>
 </div>
 
 <style>
-    .cursor-guide {
+    .guide-root {
         position: absolute;
         left: 0;
         right: 0;
@@ -26,19 +26,16 @@
         height: 1px;
     }
 
-    .sticky-label-wrapper {
+    .sticky-label-container {
         position: sticky;
         left: 0;
         flex-shrink: 0;
-        height: 20px;
-        z-index: 410;
-        pointer-events: none;
         display: flex;
-        align-items: center;
-        justify-content: center; /* Центрируем бейджик внутри ширины шкалы */
+        justify-content: center;
+        z-index: 410;
     }
 
-    .guide-label {
+    .label-box {
         background: #3b82f6;
         color: white;
         font-size: 10px;
@@ -47,16 +44,11 @@
         border-radius: 6px;
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
         white-space: nowrap;
-        /* Убеждаемся, что бейджик не "прыгает" */
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
     }
 
-    .guide-line {
+    .line {
         flex: 1;
         height: 1px;
         border-top: 1.5px dashed rgba(59, 130, 246, 0.4);
-        /* Линия начинается сразу за шкалой времени */
     }
 </style>

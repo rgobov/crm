@@ -65,7 +65,6 @@
     onMount(async () => {
         updateLayoutSizes();
         window.addEventListener('resize', updateLayoutSizes);
-
         await timeSyncService.sync();
         await fetchBranchData();
 
@@ -74,7 +73,6 @@
             updateNowPosition();
         }, 30000);
 
-        currentTime = timeSyncService.getNow();
         updateNowPosition();
         setTimeout(scrollToCurrentTime, 600);
 
@@ -95,17 +93,16 @@
     }
 
     function updateNowPosition() {
-        const isToday = currentTime.toDateString() === day.toDateString();
-        if (isToday) {
-            // ИСПОЛЬЗУЕМ УТИЛИТУ ДЛЯ ТОЧНОГО ПОЗИЦИОНИРОВАНИЯ ЛИНИИ
-            nowLinePos = timeUtils.getTimeOffset(
-                currentTime.toISOString(),
-                startHour,
-                HOUR_HEIGHT,
-                currentBranch?.timezone
-            );
+        if (!currentBranch) return;
 
-            branchTime = timeUtils.formatTime(currentTime.toISOString(), currentBranch?.timezone);
+        // Сверяем даты с учетом часового пояса филиала
+        const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: currentBranch.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+        const branchTodayStr = formatter.format(currentTime);
+        const daySelectedStr = formatter.format(day);
+
+        if (branchTodayStr === daySelectedStr) {
+            nowLinePos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, currentBranch.timezone);
+            branchTime = timeUtils.formatTime(currentTime.toISOString(), currentBranch.timezone);
         } else {
             nowLinePos = -1;
             branchTime = "";
@@ -115,20 +112,22 @@
     $: if ($activeBranchId) fetchBranchData();
     $: if (day || startHour || currentBranch) updateNowPosition();
 
-    function handleMouseDown(e) {
+    // УНИВЕРСАЛЬНАЯ ЛОГИКА СКРОЛЛА (TOUCH + MOUSE)
+    function handleStart(e) {
         isDown = true;
-        startX = e.pageX - scrollBody.offsetLeft;
+        const pageX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
+        startX = pageX - scrollBody.offsetLeft;
         scrollLeft = scrollBody.scrollLeft;
         showGuide = false;
     }
 
-    function handleMouseMove(e) {
+    function handleMove(e) {
         if (gridCanvas) {
             const rect = gridCanvas.getBoundingClientRect();
-            const y = e.clientY - rect.top;
+            const clientY = e.clientY || (e.touches ? e.touches[0].clientY : -1);
+            const y = clientY - rect.top;
             if (y >= 0 && y <= rect.height) {
                 hoverY = y;
-                // Расчет времени под курсором с учетом TZ филиала
                 const totalMinutes = (y / (HOUR_HEIGHT / 60));
                 const h = Math.floor(totalMinutes / 60) + startHour;
                 const m = Math.floor(totalMinutes % 60);
@@ -140,14 +139,14 @@
         }
 
         if (!isDown) return;
-        e.preventDefault();
-        const x = e.pageX - scrollBody.offsetLeft;
+        const pageX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
+        const x = pageX - scrollBody.offsetLeft;
         const walk = (x - startX) * 1.5;
         scrollBody.scrollLeft = scrollLeft - walk;
         showGuide = false;
     }
 
-    function handleMouseUp() { isDown = false; }
+    function handleEnd() { isDown = false; }
 
     function syncScroll(e) {
         if (scrollHeader && e.target === scrollBody) scrollHeader.scrollLeft = scrollBody.scrollLeft;
@@ -160,12 +159,24 @@
         }
     }
 
+    // РАСЧЕТ ГРАНИЦ ШКАЛЫ С УЧЕТОМ ЧАСОВОГО ПОЯСА
     $: {
         let minH = 9, maxH = 20;
-        [...staff, ...appointments.map(a => ({workStartTime: new Date(a.startTime).getHours()+':00'}))].forEach(item => {
-            const h = item.workStartTime ? parseInt(item.workStartTime.split(':')[0]) : null;
-            if (h !== null) { minH = Math.min(minH, h); maxH = Math.max(maxH, h + 1); }
+        const tz = currentBranch?.timezone || 'Europe/Moscow';
+
+        appointments.forEach(a => {
+            const date = new Date(a.startTime);
+            const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', hour12: false });
+            const h = parseInt(formatter.format(date));
+            minH = Math.min(minH, h);
+            maxH = Math.max(maxH, h + 1);
         });
+
+        staff.forEach(s => {
+            if (s.workStartTime) minH = Math.min(minH, parseInt(s.workStartTime.split(':')[0]));
+            if (s.workEndTime) maxH = Math.max(maxH, parseInt(s.workEndTime.split(':')[0]));
+        });
+
         startHour = Math.max(0, minH - 1);
         endHour = Math.min(24, maxH + 1);
         hours = Array.from({length: endHour - startHour + 1}, (_, i) => startHour + i);
@@ -199,10 +210,13 @@
     <div class="timeline-body-scroll"
          bind:this={scrollBody}
          on:scroll={syncScroll}
-         on:mousedown={handleMouseDown}
-         on:mousemove={handleMouseMove}
-         on:mouseup={handleMouseUp}
-         on:mouseleave={handleMouseUp}
+         on:mousedown={handleStart}
+         on:mousemove={handleMove}
+         on:mouseup={handleEnd}
+         on:mouseleave={handleEnd}
+         on:touchstart={handleStart}
+         on:touchmove={handleMove}
+         on:touchend={handleEnd}
          class:grabbing={isDown}>
 
         <div class="body-layout-wrapper" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
@@ -211,6 +225,10 @@
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px"><span class="h-label">{h}:00</span></div>
                 {/each}
                 <TimelineNowIndicator {nowLinePos} label={branchTime} mode="dot" />
+
+                {#if showGuide}
+                    <TimelineCursorGuide y={hoverY} timeStr={hoverTimeStr} mode="label" />
+                {/if}
             </div>
 
             <div class="grid-canvas" bind:this={gridCanvas}>
@@ -231,25 +249,16 @@
                                     {#if status === 'BREAK' && m === 0}<div class="break-overlay"><span class="break-txt">ПЕРЕРЫВ ДО {s.breakEndTime?.slice(0,5)}</span></div>{/if}
                                 </button>
                             {/each}
-
                             {#each appointments.filter(a => (a.staffMemberId === s.id) || (!s.id && !staffIds.has(a.staffMemberId))) as appt (appt.id)}
-                                <!-- ПЕРЕДАЕМ ТАЙМЗОНУ В КАРТОЧКУ -->
-                                <TimelineAppointment
-                                    {appt}
-                                    {startHour}
-                                    hourHeight={HOUR_HEIGHT}
-                                    timezone={currentBranch?.timezone}
-                                    on:click={(e) => dispatch('appointmentTap', e.detail)}
-                                />
+                                <TimelineAppointment {appt} {startHour} hourHeight={HOUR_HEIGHT} timezone={currentBranch?.timezone} on:click={(e) => dispatch('appointmentTap', e.detail)} />
                             {/each}
                         </div>
                     {/each}
                 </div>
 
                 {#if showGuide}
-                    <TimelineCursorGuide y={hoverY} timeStr={hoverTimeStr} timeColWidth={TIME_COL_WIDTH} />
+                    <TimelineCursorGuide y={hoverY} mode="line" />
                 {/if}
-
                 <TimelineNowIndicator {nowLinePos} mode="line" />
             </div>
         </div>
