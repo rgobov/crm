@@ -1,20 +1,27 @@
 <script>
     import { createEventDispatcher, onMount } from 'svelte';
     import { staffService } from '$lib/services/staffService.js';
+    import { branchService } from '$lib/services/branchService.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
-    import { fade, scale } from 'svelte/transition';
+    import { fade, scale, slide } from 'svelte/transition';
 
     export let staffId;
     const dispatch = createEventDispatcher();
 
     let staff = null;
+    let allBranches = [];
     let isLoading = true;
 
     // Режимы редактирования полей
-    let editMode = { name: false, specialty: false, phone: false, role: false, photo: false };
-    let tempValues = { name: '', specialty: '', phone: '', role: '', active: true, photoUrl: '' };
+    let editMode = { name: false, specialty: false, phone: false, role: false, photo: false, branches: false };
+    let tempValues = {
+        name: '', specialty: '', phone: '', role: '',
+        active: true, photoUrl: '', branchIds: []
+    };
 
-    onMount(loadStaff);
+    onMount(async () => {
+        await Promise.all([loadStaff(), loadBranches()]);
+    });
 
     async function loadStaff() {
         isLoading = true;
@@ -28,6 +35,14 @@
         }
     }
 
+    async function loadBranches() {
+        try {
+            allBranches = await branchService.getBranches();
+        } catch (e) {
+            console.error('Branches Load Error');
+        }
+    }
+
     function syncTemp() {
         if (!staff) return;
         tempValues = {
@@ -36,7 +51,8 @@
             phone: staff.phone || '',
             role: staff.role || 'EMPLOYEE',
             active: staff.active,
-            photoUrl: staff.photoUrl || ''
+            photoUrl: staff.photoUrl || '',
+            branchIds: staff.branches ? staff.branches.map(b => b.id) : []
         };
     }
 
@@ -44,7 +60,8 @@
         try {
             const requestData = {
                 ...tempValues,
-                available: tempValues.active // Маппинг на поле бэкенда
+                available: tempValues.active, // Маппинг на поле active в бэкенде через CreateStaffRequest
+                branchIds: tempValues.branchIds // Отправляем массив ID выбранных филиалов
             };
 
             const result = await staffService.updateStaff(staffId, requestData);
@@ -54,6 +71,14 @@
         } catch (e) {
             alert('Не удалось сохранить изменения');
             syncTemp();
+        }
+    }
+
+    function toggleBranch(branchId) {
+        if (tempValues.branchIds.includes(branchId)) {
+            tempValues.branchIds = tempValues.branchIds.filter(id => id !== branchId);
+        } else {
+            tempValues.branchIds = [...tempValues.branchIds, branchId];
         }
     }
 
@@ -74,7 +99,7 @@
             {#if isLoading}
                 <div class="center"><span class="spinner"></span></div>
             {:else if staff}
-                <!-- ГЕРОЙ-СЕКЦИЯ (Поддержка аватара) -->
+                <!-- ГЕРОЙ-СЕКЦИЯ -->
                 <div class="hero-section">
                     <div class="avatar-box">
                         {#if staff.photoUrl}
@@ -105,18 +130,38 @@
                 </div>
 
                 <div class="details-list">
-                    <!-- ПЛИТКА: ФОТО (URL) -->
-                    <div class="info-tile">
-                        <label>Ссылка на фото / аватар</label>
-                        {#if editMode.photo}
-                            <div class="edit-input-group">
-                                <input type="text" bind:value={tempValues.photoUrl} placeholder="https://..." autofocus />
-                                <button class="btn-tick" on:click={() => saveField('photo')}>✓</button>
+                    <!-- НОВОЕ: СЕКЦИЯ ФИЛИАЛОВ -->
+                    <div class="info-tile branch-tile">
+                        <label>Доступные филиалы</label>
+                        {#if editMode.branches}
+                            <div class="branch-selector-grid" in:slide>
+                                {#each allBranches as b}
+                                    <button
+                                        class="branch-chip"
+                                        class:selected={tempValues.branchIds.includes(b.id)}
+                                        on:click={() => toggleBranch(b.id)}
+                                    >
+                                        {b.name}
+                                    </button>
+                                {/each}
+                            </div>
+                            <div class="edit-actions-row">
+                                <button class="btn-save-mini" on:click={() => saveField('branches')}>СОХРАНИТЬ</button>
+                                <button class="btn-cancel-mini" on:click={() => { editMode.branches = false; syncTemp(); }}>ОТМЕНА</button>
                             </div>
                         {:else}
-                            <p class="photo-link-val" on:click={() => editMode.photo = true}>
-                                {staff.photoUrl ? 'Изменить фото' : 'Добавить фото...'} <span>✎</span>
-                            </p>
+                            <div class="branch-view-row" on:click={() => editMode.branches = true}>
+                                <div class="chips-list">
+                                    {#if tempValues.branchIds.length > 0}
+                                        {#each allBranches.filter(b => tempValues.branchIds.includes(b.id)) as b}
+                                            <span class="chip-static">{b.name}</span>
+                                        {/each}
+                                    {:else}
+                                        <span class="no-branches">Не привязан к филиалам</span>
+                                    {/if}
+                                </div>
+                                <span>✎</span>
+                            </div>
                         {/if}
                     </div>
 
@@ -173,9 +218,9 @@
 
 <style>
     .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-    .modal-content { background: #f8fafc; width: 100%; max-width: 460px; border-radius: 32px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); }
+    .modal-content { background: #f8fafc; width: 100%; max-width: 460px; border-radius: 32px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: 90vh; overflow-y: auto; }
 
-    .modal-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; }
+    .modal-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; z-index: 10; }
     .modal-header h2 { margin: 0; font-size: 17px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
     .btn-close { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; font-weight: 800; cursor: pointer; color: #94a3b8; }
 
@@ -199,13 +244,25 @@
 
     .details-list { display: grid; gap: 12px; }
     .info-tile { background: white; padding: 16px; border-radius: 20px; border: 1px solid #f1f5f9; cursor: pointer; transition: transform 0.1s; }
-    .info-tile:active { transform: scale(0.98); }
+    .info-tile:active { transform: scale(0.99); }
 
-    label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
     p { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; display: flex; align-items: center; justify-content: space-between; }
-    p span, .photo-link-val span { color: var(--primary-color); opacity: 0.4; }
+    p span { color: var(--primary-color); opacity: 0.4; }
 
-    .photo-link-val { color: var(--primary-color); font-weight: 700; text-decoration: underline; }
+    /* СТИЛИ ФИЛИАЛОВ */
+    .branch-view-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .chips-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip-static { background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; }
+    .no-branches { color: #94a3b8; font-style: italic; font-size: 14px; }
+
+    .branch-selector-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .branch-chip { border: 1.5px solid #e2e8f0; background: white; color: #64748b; padding: 8px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+    .branch-chip.selected { border-color: var(--primary-color); background: #eff6ff; color: var(--primary-color); }
+
+    .edit-actions-row { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-save-mini { flex: 1; background: var(--primary-color); color: white; border: none; padding: 8px; border-radius: 10px; font-weight: 800; font-size: 11px; cursor: pointer; }
+    .btn-cancel-mini { background: #f1f5f9; color: #64748b; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 11px; cursor: pointer; }
 
     .badge-role { background: #eff6ff; color: var(--primary-color); padding: 2px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; }
 
