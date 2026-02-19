@@ -20,6 +20,14 @@ public class ResourceService {
         return resourceRepository.findByTenantId(tenantId);
     }
 
+    // НОВОЕ: Метод для получения ресурсов филиала (или всех, если branchId не указан)
+    public List<Resource> getResources(String tenantId, String branchId) {
+        if (branchId == null || branchId.isEmpty() || "null".equals(branchId)) {
+            return resourceRepository.findByTenantId(tenantId);
+        }
+        return resourceRepository.findByTenantIdAndBranchId(tenantId, branchId);
+    }
+
     public Resource addResource(Resource resource, String tenantId) {
         resource.setTenantId(tenantId);
         return resourceRepository.save(resource);

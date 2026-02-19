@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +56,14 @@ public class AdminController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ID компании не найден");
         }
         return tenantId;
+    }
+
+    // НОВОЕ: Эндпоинт для синхронизации времени
+    @GetMapping("/server-time")
+    public Map<String, Object> getServerTime() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("currentTime", OffsetDateTime.now());
+        return response;
     }
 
     @GetMapping("/staff")
@@ -139,7 +148,6 @@ public class AdminController {
         return stats;
     }
 
-    // Используем branch_id для точности
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(
             @RequestAttribute("tenantId") String tenantId, 
@@ -183,8 +191,10 @@ public class AdminController {
     }
 
     @GetMapping("/resources")
-    public List<Resource> getAllResources(@RequestAttribute("tenantId") String tenantId) {
-        return resourceService.getAllResources(getRequiredTenantId(tenantId));
+    public List<Resource> getAllResources(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(value = "branch_id", required = false) String branchId) {
+        return resourceService.getResources(getRequiredTenantId(tenantId), branchId);
     }
 
     @GetMapping("/services")

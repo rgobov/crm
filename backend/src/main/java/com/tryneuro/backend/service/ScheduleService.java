@@ -59,31 +59,23 @@ public class ScheduleService {
 
     @Transactional
     public Appointment addAppointment(Appointment appointment) {
-        log.info("--- Appointment Creation DEBUG ---");
-        log.info("Received appointment for client: {}", appointment.getClientName());
-        
-        // Проверяем, какой branchId пришел от фронтенда
+        // Упрощенная логика привязки филиала без лишних WARN
         if (appointment.getBranch() != null && appointment.getBranch().getId() != null) {
-            log.info("Branch object is present. ID: {}", appointment.getBranch().getId());
             appointment.setBranchId(appointment.getBranch().getId());
-        } else {
-            log.warn("Branch object is NULL or has no ID.");
         }
-
-        log.info("Final branchId before save: {}", appointment.getBranchId());
+        
+        log.info("🚀 Creating appointment for client '{}' in branch '{}'", appointment.getClientName(), appointment.getBranchId());
 
         validateAvailability(appointment);
         Appointment saved = appointmentRepository.save(appointment);
-        log.info("Saved appointment ID: {}. Branch ID in saved object: {}", saved.getId(), saved.getBranchId());
-        log.info("-----------------------------------");
         notifyChange(saved.getTenantId());
         return saved;
     }
 
     @Transactional
     public Appointment updateAppointment(String id, Appointment details) {
-        // ... (логика обновления)
         Appointment appointment = appointmentRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
+        
         appointment.setStartTime(details.getStartTime());
         appointment.setDurationInMinutes(details.getDurationInMinutes());
         appointment.setClientName(details.getClientName());
@@ -94,9 +86,14 @@ public class ScheduleService {
         appointment.setStatus(details.getStatus());
         appointment.setComment(details.getComment());
         appointment.setAllowReminder(details.isAllowReminder());
-        if (details.getBranch() != null && details.getBranch().getId() != null) {
+        appointment.setReminderLeadTimeHours(details.getReminderLeadTimeHours());
+
+        if (details.getBranchId() != null) {
+            appointment.setBranchId(details.getBranchId());
+        } else if (details.getBranch() != null && details.getBranch().getId() != null) {
             appointment.setBranchId(details.getBranch().getId());
         }
+
         validateAvailability(appointment);
         Appointment updated = appointmentRepository.save(appointment);
         notifyChange(updated.getTenantId());
@@ -149,12 +146,9 @@ public class ScheduleService {
     }
 
     public List<WorkloadDto> getWorkloadForMonth(String tenantId, int year, int month, String branchId) {
-        log.info("📊 Workload Request: tenant={}, branch={}, year={}, month={}", tenantId, branchId, year, month);
         if (branchId == null || branchId.isEmpty() || "null".equals(branchId)) {
-            log.info("🔍 Calling GLOBAL workload query");
             return appointmentRepository.getWorkloadForMonth(tenantId, year, month);
         } else {
-            log.info("🔍 Calling BRANCH-SPECIFIC workload query for: {}", branchId);
             return appointmentRepository.getWorkloadForMonthAndBranch(tenantId, year, month, branchId);
         }
     }

@@ -1,6 +1,7 @@
 <script>
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { timeUtils } from '$lib/utils/timeUtils.js';
+    import { timeSyncService } from '$lib/services/timeSyncService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchService } from '$lib/services/branchService.js';
     import TimelineAppointment from './TimelineAppointment.svelte';
@@ -42,7 +43,7 @@
     let startX;
     let scrollLeft;
 
-    // Состояние направляющей курсора
+    // Состояние направляющей
     let hoverY = -1;
     let hoverTimeStr = "";
     let showGuide = false;
@@ -64,13 +65,19 @@
     onMount(async () => {
         updateLayoutSizes();
         window.addEventListener('resize', updateLayoutSizes);
+
+        await timeSyncService.sync();
         await fetchBranchData();
+
         const timer = setInterval(() => {
-            currentTime = new Date();
+            currentTime = timeSyncService.getNow();
             updateNowPosition();
-        }, 60000);
+        }, 30000);
+
+        currentTime = timeSyncService.getNow();
         updateNowPosition();
         setTimeout(scrollToCurrentTime, 600);
+
         return () => {
             window.removeEventListener('resize', updateLayoutSizes);
             clearInterval(timer);
@@ -83,18 +90,24 @@
             const branches = await branchService.getBranches();
             currentBranch = branches.find(b => b.id === $activeBranchId);
         } catch (e) {
-            console.error('Failed to fetch branch timezone', e);
+            console.error('Failed to fetch branch data', e);
         }
     }
 
     function updateNowPosition() {
         const isToday = currentTime.toDateString() === day.toDateString();
-        nowLinePos = isToday ? ((currentTime.getHours() - startHour) * 60 + currentTime.getMinutes()) * (HOUR_HEIGHT / 60) : -1;
         if (isToday) {
-            branchTime = currentBranch?.timezone
-                ? currentTime.toLocaleTimeString('ru-RU', { timeZone: currentBranch.timezone, hour: '2-digit', minute: '2-digit' })
-                : currentTime.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            // ИСПОЛЬЗУЕМ УТИЛИТУ ДЛЯ ТОЧНОГО ПОЗИЦИОНИРОВАНИЯ ЛИНИИ
+            nowLinePos = timeUtils.getTimeOffset(
+                currentTime.toISOString(),
+                startHour,
+                HOUR_HEIGHT,
+                currentBranch?.timezone
+            );
+
+            branchTime = timeUtils.formatTime(currentTime.toISOString(), currentBranch?.timezone);
         } else {
+            nowLinePos = -1;
             branchTime = "";
         }
     }
@@ -102,7 +115,6 @@
     $: if ($activeBranchId) fetchBranchData();
     $: if (day || startHour || currentBranch) updateNowPosition();
 
-    // ЛОГИКА СКРОЛЛА И КУРСОРA
     function handleMouseDown(e) {
         isDown = true;
         startX = e.pageX - scrollBody.offsetLeft;
@@ -116,6 +128,7 @@
             const y = e.clientY - rect.top;
             if (y >= 0 && y <= rect.height) {
                 hoverY = y;
+                // Расчет времени под курсором с учетом TZ филиала
                 const totalMinutes = (y / (HOUR_HEIGHT / 60));
                 const h = Math.floor(totalMinutes / 60) + startHour;
                 const m = Math.floor(totalMinutes % 60);
@@ -193,7 +206,6 @@
          class:grabbing={isDown}>
 
         <div class="body-layout-wrapper" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
-            <!-- ШКАЛА ВРЕМЕНИ -->
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px"><span class="h-label">{h}:00</span></div>
@@ -201,7 +213,6 @@
                 <TimelineNowIndicator {nowLinePos} label={branchTime} mode="dot" />
             </div>
 
-            <!-- СЕТКА И ЗАПИСИ -->
             <div class="grid-canvas" bind:this={gridCanvas}>
                 <div class="grid-lines">
                     {#each Array(hours.length * 4) as _, i}
@@ -220,20 +231,27 @@
                                     {#if status === 'BREAK' && m === 0}<div class="break-overlay"><span class="break-txt">ПЕРЕРЫВ ДО {s.breakEndTime?.slice(0,5)}</span></div>{/if}
                                 </button>
                             {/each}
+
                             {#each appointments.filter(a => (a.staffMemberId === s.id) || (!s.id && !staffIds.has(a.staffMemberId))) as appt (appt.id)}
-                                <TimelineAppointment {appt} {startHour} hourHeight={HOUR_HEIGHT} on:click={(e) => dispatch('appointmentTap', e.detail)} />
+                                <!-- ПЕРЕДАЕМ ТАЙМЗОНУ В КАРТОЧКУ -->
+                                <TimelineAppointment
+                                    {appt}
+                                    {startHour}
+                                    hourHeight={HOUR_HEIGHT}
+                                    timezone={currentBranch?.timezone}
+                                    on:click={(e) => dispatch('appointmentTap', e.detail)}
+                                />
                             {/each}
                         </div>
                     {/each}
                 </div>
 
+                {#if showGuide}
+                    <TimelineCursorGuide y={hoverY} timeStr={hoverTimeStr} timeColWidth={TIME_COL_WIDTH} />
+                {/if}
+
                 <TimelineNowIndicator {nowLinePos} mode="line" />
             </div>
-
-            <!-- ФИКС: ВЫНЕСЛИ СЮДА, ЧТОБЫ left: 0 БЫЛО НАЧАЛОМ ШКАЛЫ -->
-            {#if showGuide}
-                <TimelineCursorGuide y={hoverY} timeStr={hoverTimeStr} timeColWidth={TIME_COL_WIDTH} />
-            {/if}
         </div>
     </div>
 </div>
@@ -252,16 +270,7 @@
     .timeline-body-scroll { flex: 1; overflow: auto; position: relative; cursor: grab; touch-action: pan-y; }
     .timeline-body-scroll.grabbing { cursor: grabbing; }
     .body-layout-wrapper { display: flex; min-height: 100%; align-items: flex-start; position: relative; }
-
-    .time-axis-col {
-        flex-shrink: 0;
-        background: #f8fafc;
-        border-right: 1px solid #e2e8f0;
-        position: sticky;
-        left: 0;
-        z-index: 200;
-    }
-
+    .time-axis-col { flex-shrink: 0; background: #f8fafc; border-right: 1px solid #e2e8f0; position: sticky; left: 0; z-index: 200; }
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 900; color: #64748b; background: #f8fafc; padding: 4px 8px; border-radius: 8px; border: 1px solid #e2e8f0; }
     .grid-canvas { position: relative; flex: 1; margin: 0; padding: 0; overflow: hidden; }

@@ -4,9 +4,11 @@
     import { contactService } from '$lib/services/contactService.js';
     import { serviceService } from '$lib/services/serviceService.js';
     import { resourceService } from '$lib/services/resourceService.js';
+    import { branchService } from '$lib/services/branchService.js';
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
-    import SearchDropdownItem from './SearchDropdownItem.svelte'; // <<< НОВЫЙ КОМПОНЕНТ
+    import { timeUtils } from '$lib/utils/timeUtils.js';
+    import SearchDropdownItem from './SearchDropdownItem.svelte';
     import { fade, slide, scale } from 'svelte/transition';
 
     export let appointment = null;
@@ -50,18 +52,12 @@
     let staffList = [];
     let services = [];
     let resources = [];
+    let currentBranchData = null;
 
     $: formData.durationInMinutes = (durationHours * 60) + durationMinutes;
 
     export function setCreatedContact(contact) {
         if (contact) selectContact(contact);
-    }
-
-    function toLocalISO(date) {
-        if (!date || isNaN(date.getTime())) return '';
-        const offset = date.getTimezoneOffset() * 60000;
-        const localDate = new Date(date.getTime() - offset);
-        return localDate.toISOString().slice(0, 16);
     }
 
     onMount(async () => {
@@ -71,11 +67,16 @@
     async function loadInitialData() {
         isLoading = true;
         try {
+            // Сначала загружаем данные филиала, чтобы знать его часовой пояс
+            const allBranches = await branchService.getBranches();
+            currentBranchData = allBranches.find(b => b.id === $activeBranchId);
+
             const [servicesData, resourcesData, staffData] = await Promise.all([
                 serviceService.getServices(),
-                resourceService.getResources(),
+                resourceService.getResources($activeBranchId),
                 adminService.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId)
             ]);
+
             services = servicesData;
             resources = resourcesData;
             staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
@@ -91,7 +92,9 @@
                 };
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
-                formData.startTime = toLocalISO(new Date(appointment.startTime));
+
+                // Отображаем время в инпуте по часовому поясу филиала
+                formData.startTime = timeUtils.toBranchLocalISO(appointment.startTime, currentBranchData?.timezone);
                 serviceSearchInput = appointment.service;
 
                 if (appointment.contactId) {
@@ -101,9 +104,12 @@
             } else {
                 formData.staffMemberId = preselected.staffId || '';
                 formData.branchId = $activeBranchId;
+
+                // Для новой записи: преобразуем кликнутое "визуальное" время в формат для инпута
                 const d = new Date(preselected.date);
                 d.setHours(preselected.hour, preselected.min, 0, 0);
-                formData.startTime = toLocalISO(d);
+                const pad = n => n < 10 ? '0'+n : n;
+                formData.startTime = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
             }
         } catch (e) {
             console.error('Load failed', e);
@@ -148,6 +154,8 @@
     async function handleSave() {
         if (!selectedContact) return alert('Выберите клиента');
         if (!serviceSearchInput.trim()) return alert('Укажите услугу');
+        if (!currentBranchData) return alert('Данные филиала еще загружаются...');
+
         isSaving = true;
         try {
             let sName = serviceSearchInput.trim();
@@ -155,12 +163,16 @@
                 const ns = await serviceService.addService({ name: sName, durationInMinutes: formData.durationInMinutes });
                 sName = ns.name;
             }
+
+            // ПРЕОБРАЗУЕМ ВРЕМЯ ИЗ ИНПУТА В UTC ДЛЯ СОХРАНЕНИЯ В БАЗУ
+            const correctedStartTime = timeUtils.fromBranchLocalToUTC(formData.startTime, currentBranchData.timezone);
+
             const payload = {
                 ...formData,
                 service: sName,
                 clientName: selectedContact.name,
                 contactId: selectedContact.id,
-                startTime: new Date(formData.startTime).toISOString(),
+                startTime: correctedStartTime,
                 branchId: $activeBranchId
             };
 
@@ -172,6 +184,7 @@
             scheduleRefreshSignal.set({ ts: Date.now() });
             dispatch('saved');
         } catch (e) {
+            console.error('Save failed', e);
             alert('Ошибка сохранения');
         } finally {
             isSaving = false;
@@ -232,7 +245,10 @@
                 </div>
 
                 <div class="tile-card dual">
-                    <div class="part date-part"><label>КОГДА</label><input type="datetime-local" bind:value={formData.startTime} /></div>
+                    <div class="part date-part">
+                        <label>КОГДА (ВРЕМЯ ФИЛИАЛА)</label>
+                        <input type="datetime-local" bind:value={formData.startTime} />
+                    </div>
                     <div class="part duration-part" on:click|stopPropagation>
                         <label>ДЛИТЕЛЬНОСТЬ</label>
                         <button class="duration-v2-trigger" on:click={() => showDurationPicker = !showDurationPicker}>
@@ -341,4 +357,5 @@
     .btn-save { background: var(--primary-gradient); color: white; border: none; padding: 14px; border-radius: 18px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); }
     .spinner { width: 28px; height: 28px; border: 3px solid #f1f5f9; border-top-color: #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-center { display: flex; justify-content: center; align-items: center; height: 200px; }
 </style>
