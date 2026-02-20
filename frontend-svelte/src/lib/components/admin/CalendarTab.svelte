@@ -13,11 +13,13 @@
     let viewMode = 'month';
     let showModal = null;
     let showNestedAddContact = false;
-    let selectedClientId = null; // ДЛЯ МОДАЛКИ КЛИЕНТА
+    let selectedClientId = null;
 
     let currentAppointment = null;
     let preselectedData = null;
     let appointmentEditRef;
+
+    let onlyBusyStaff = false;
 
     $: if (forcedDate) {
         selectedDate.set(new Date(forcedDate));
@@ -65,7 +67,6 @@
         showNestedAddContact = false;
     }
 
-    // ОБРАБОТЧИК КЛИКА ПО ИМЕНИ КЛИЕНТА
     function handleOpenClient(id) {
         selectedClientId = id;
         showModal = 'client-profile';
@@ -85,19 +86,32 @@
     {:else if viewMode === 'day'}
         <div class="day-view-wrapper" in:fade>
             <div class="day-top-bar">
-                <button class="btn-to-month" on:click={() => { viewMode = 'month'; activeTab.set('calendar'); }}>‹ Месяц</button>
+                <div class="filter-toggle-wrap">
+                    <button
+                        class="toggle-pill"
+                        class:active={onlyBusyStaff}
+                        on:click={() => onlyBusyStaff = !onlyBusyStaff}
+                        title={onlyBusyStaff ? "Показать всех мастеров" : "Скрыть пустые столбцы"}
+                    >
+                        <span class="icon">{onlyBusyStaff ? '🎯' : '👥'}</span>
+                        <span class="label">{onlyBusyStaff ? 'Занятые' : 'Все'}</span>
+                    </button>
+                </div>
+
                 <div class="date-info">
                     <span class="d">{$selectedDate.getDate()}</span>
                     <span class="m">
                         {$selectedDate.toLocaleDateString('ru-RU', { month: 'long' }).replace(/^./, str => str.toUpperCase())}
                     </span>
                 </div>
+
                 <button class="btn-add" on:click={() => openNewAppointment({ detail: {} })}>+ Запись</button>
             </div>
 
             <div class="timeline-container">
                 <ScheduleScreen
                     branchId={$activeBranchId}
+                    {onlyBusyStaff}
                     on:emptySlotTap={openNewAppointment}
                     on:appointmentTap={openDetail}
                 />
@@ -165,14 +179,35 @@
     .today-btn { background: var(--primary-gradient); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 700; cursor: pointer; }
 
     .day-view-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-    .day-top-bar { padding: 16px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-    .btn-to-month { background: none; border: none; color: var(--primary-color); font-weight: 700; cursor: pointer; }
 
-    .date-info { display: flex; align-items: baseline; gap: 8px; }
+    .day-top-bar {
+        padding: 12px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        display: grid;
+        grid-template-columns: 130px 1fr 130px;
+        align-items: center;
+        flex-shrink: 0;
+        gap: 10px;
+    }
+
+    .filter-toggle-wrap { display: flex; align-items: center; }
+    .toggle-pill {
+        display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+        border-radius: 20px; border: 1.5px solid #f1f5f9; background: #f8fafc;
+        cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .toggle-pill.active {
+        background: #eff6ff; border-color: #3b82f6;
+    }
+    .toggle-pill .label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .toggle-pill.active .label { color: #3b82f6; }
+
+    /* ВОССТАНОВЛЕННЫЕ СТИЛИ ДАТЫ */
+    .date-info { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
     .date-info .d { font-size: 24px; font-weight: 900; color: var(--primary-color); letter-spacing: -0.5px; }
     .date-info .m { font-size: 15px; font-weight: 700; color: #64748b; letter-spacing: -0.2px; }
 
-    .btn-add { background: #eff6ff; color: var(--primary-color); border: none; padding: 10px 20px; border-radius: 12px; font-weight: 800; cursor: pointer; }
+    .btn-add { background: var(--primary-gradient); color: white; border: none; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.2); }
 
     .timeline-container { flex: 1; overflow: hidden; position: relative; }
 
@@ -183,6 +218,9 @@
     .modal-body-scroll { flex: 1; overflow-y: auto; background: #f8fafc; }
 
     @media (max-width: 640px) {
+        .day-top-bar { padding: 12px 16px; grid-template-columns: 100px 1fr 100px; }
+        .date-info .d { font-size: 20px; }
+        .date-info .m { font-size: 13px; }
         .modal-backdrop { padding: 0; }
         .modal-content { height: 95vh; border-radius: 32px 32px 0 0; }
     }

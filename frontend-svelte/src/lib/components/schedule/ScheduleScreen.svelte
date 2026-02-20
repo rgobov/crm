@@ -7,13 +7,23 @@
     import DayTimeline from './DayTimeline.svelte';
 
     export let branchId = null;
+    export let onlyBusyStaff = false; // <<< НОВЫЙ ПРОПС ДЛЯ ФИЛЬТРАЦИИ
+
     const dispatch = createEventDispatcher();
 
     let appointments = [];
     let staff = [];
     let isLoading = true;
 
-    // РЕАКТИВНОСТЬ: Перегружаем данные при смене даты ИЛИ филиала
+    // РЕАКТИВНАЯ ФИЛЬТРАЦИЯ МАСТЕРОВ
+    $: displayedStaff = (() => {
+        if (!onlyBusyStaff) return staff;
+
+        // Получаем набор ID мастеров, у которых есть записи сегодня
+        const busyStaffIds = new Set(appointments.map(a => a.staffMemberId));
+        return staff.filter(s => busyStaffIds.has(s.id));
+    })();
+
     $: if ($selectedDate && branchId) {
         loadDayData($selectedDate, branchId);
     } else {
@@ -22,7 +32,6 @@
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
         if (signal && signal.ts > 0 && branchId) {
-            console.log('🔄 ScheduleScreen: WebSocket signal received, refreshing...');
             loadDayData($selectedDate, branchId, true);
         }
     });
@@ -41,7 +50,6 @@
 
         if (!silent) {
             isLoading = true;
-            // Очищаем списки только при "полной" загрузке, чтобы не моргало при WS-обновлении
             appointments = [];
             staff = [];
         }
@@ -51,29 +59,6 @@
                 adminService.getAppointmentsForDay(date, bId),
                 adminService.getStaffForSchedule(date, bId)
             ]);
-
-            // --- ПОДРОБНОЕ ЛОГИРОВАНИЕ ДЛЯ ОТЛАДКИ ---
-            console.group('📅 Schedule Update Debug');
-            console.log('Branch:', bId);
-            console.log('Date:', date.toLocaleDateString());
-
-            console.log('👥 Staff from API:', staffData?.length || 0);
-            if (staffData?.length > 0) {
-                console.table(staffData.map(s => ({ id: s.id, name: s.name, active: s.active, branchIds: s.branches?.map(b=>b.id) })));
-            }
-
-            console.log('📝 Appointments from API:', apptsData?.length || 0);
-            if (apptsData?.length > 0) {
-                console.table(apptsData.map(a => ({
-                    id: a.id,
-                    client: a.clientName,
-                    staffId: a.staffMemberId,
-                    branchId: a.branchId,
-                    time: a.startTime
-                })));
-            }
-            console.groupEnd();
-            // ----------------------------------------
 
             appointments = apptsData || [];
             staff = (staffData || []).filter(s => s.role === 'ROLE_EMPLOYEE' || s.role === 'EMPLOYEE');
@@ -116,10 +101,11 @@
                 <p>В этом филиале пока нет работающих мастеров</p>
             </div>
         {:else}
+            <!-- ПЕРЕДАЕМ ОТФИЛЬТРОВАННЫЙ СПИСОК displayedStaff -->
             <DayTimeline
                 day={$selectedDate}
                 {appointments}
-                {staff}
+                staff={displayedStaff}
                 on:appointmentTap={handleAppointment}
                 on:emptySlotTap={handleEmptySlot}
             />
