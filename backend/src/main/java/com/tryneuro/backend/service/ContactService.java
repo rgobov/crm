@@ -1,6 +1,7 @@
 package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.model.Contact;
+import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.ContactRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import java.util.Optional;
 public class ContactService {
 
     private final ContactRepository contactRepository;
+    private final AppointmentRepository appointmentRepository;
 
     public Page<Contact> getContactsPaged(String tenantId, String query, boolean showAll, int page, int size) {
         if (query != null && !query.isEmpty()) {
@@ -30,10 +32,8 @@ public class ContactService {
         return contactRepository.findById(id);
     }
 
-    // ВОССТАНОВЛЕНО: Поиск клиента по номеру телефона (для Flutter)
     public Optional<Contact> findContactByPhone(String phone, String tenantId) {
         if (phone == null || phone.isEmpty()) return Optional.empty();
-        // Очищаем номер от лишних символов перед поиском
         String cleanPhone = phone.replaceAll("[^0-9]", "");
         if (cleanPhone.length() == 11 && cleanPhone.startsWith("8")) {
             cleanPhone = "7" + cleanPhone.substring(1);
@@ -47,31 +47,38 @@ public class ContactService {
         return contactRepository.save(contact);
     }
 
+    @Transactional
     public Contact updateContact(String id, Contact details, String tenantId) {
         Contact contact = contactRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Contact not found"));
-        contact.setName(details.getName());
+        
+        String oldName = contact.getName();
+        String newName = details.getName();
+
+        contact.setName(newName);
         contact.setPhones(details.getPhones());
         contact.setEmail(details.getEmail());
         contact.setNotes(details.getNotes());
         contact.setTags(details.getTags());
-        return contactRepository.save(contact);
+        
+        Contact saved = contactRepository.save(contact);
+
+        // СИНХРОНИЗАЦИЯ: Если имя изменилось, обновляем его во всех записях (таймлайн)
+        if (!newName.equals(oldName)) {
+            appointmentRepository.updateClientNameForContact(id, newName, tenantId);
+        }
+
+        return saved;
     }
 
-    /**
-     * Добавляет тег в массив клиента, если его там еще нет (для автоматического обучения по машинам)
-     */
     @Transactional
     public void addTagIfMissing(String contactId, String newTag) {
         if (newTag == null || newTag.trim().isEmpty()) return;
-        
         contactRepository.findById(contactId).ifPresent(contact -> {
             List<String> tags = contact.getTags();
             if (tags == null) tags = new ArrayList<>();
-            
             String trimmedTag = newTag.trim();
             boolean exists = tags.stream().anyMatch(t -> t.equalsIgnoreCase(trimmedTag));
-            
             if (!exists) {
                 tags.add(trimmedTag);
                 contact.setTags(tags);
