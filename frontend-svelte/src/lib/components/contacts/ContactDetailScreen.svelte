@@ -13,8 +13,8 @@
     let isLoading = true;
 
     // Константы для локализации (в будущем можно брать из настроек компании)
-    const ASSET_LABEL = "Связанные объекты"; // Универсальное название
-    const ASSET_ICON = "🚗"; // Можно менять на 🐾 или 🧪
+    const ASSET_LABEL = "Связанные объекты";
+    const ASSET_ICON = "🚗";
     const ASSET_PLACEHOLDER = "Марка, госномер, S/N...";
 
     let editMode = { name: false, email: false, notes: false, phoneIdx: -1, isAddingPhone: false, isAddingTag: false };
@@ -60,7 +60,8 @@
         try {
             let finalPhones = tempValues.phones.map(p => phoneUtils.clean(p)).filter(p => p);
             if (type === 'addPhone') {
-                finalPhones = [...finalPhones, phoneUtils.clean(tempValues.newPhone)];
+                const cleaned = phoneUtils.clean(tempValues.newPhone);
+                if (cleaned) finalPhones = [...finalPhones, cleaned];
             }
 
             let finalTags = [...tempValues.tags];
@@ -87,7 +88,7 @@
             contact = res.data;
             cancelAllEdits();
 
-            // Обновляем таймлайн, так как теги могли измениться
+            // Обновляем таймлайн
             scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
             dispatch('updated', contact);
         } catch (e) {
@@ -115,69 +116,74 @@
             <div class="title-section">
                 {#if editMode.name}
                     <div class="edit-row">
-                        <input type="text" bind:value={tempValues.name} class="name-input" autofocus />
-                        <button class="save-btn-icon" on:click={() => saveField('name')}>✓</button>
+                        <input id="edit-name" type="text" bind:value={tempValues.name} class="name-input" autofocus
+                               on:keydown={(e) => e.key === 'Enter' && saveField('name')} />
+                        <button class="save-btn-icon" on:click={() => saveField('name')} type="button" aria-label="Сохранить имя">✓</button>
                     </div>
                 {:else}
-                    <h2 on:click={() => editMode.name = true}>{contact.name} <span>✎</span></h2>
+                    <button class="h2-btn" on:click={() => editMode.name = true} type="button" aria-label="Редактировать имя">
+                        <h2>{contact.name} <span>✎</span></h2>
+                    </button>
                 {/if}
                 <p class="id-hint">ID: {contact.id.split('-')[0]}</p>
             </div>
         </header>
 
         <div class="details-grid">
-            <!-- СЕКЦИЯ ОБЪЕКТОВ (ТЕГИ) -->
+            <!-- СЕКЦИЯ ОБЪЕКТОВ -->
             <section class="info-group">
-                <label>{ASSET_LABEL}</label>
+                <label for="new-tag-input">{ASSET_LABEL}</label>
                 <div class="tags-cloud">
                     {#each contact.tags || [] as tag, i}
                         <div class="tag-badge" in:scale>
                             <span class="tag-icon">{ASSET_ICON}</span>
                             <span class="tag-text">{tag}</span>
-                            <button class="tag-remove" on:click={() => removeTag(i)}>✕</button>
+                            <button class="tag-remove" on:click={() => removeTag(i)} type="button" aria-label="Удалить объект">✕</button>
                         </div>
                     {/each}
 
                     {#if !editMode.isAddingTag}
-                        <button class="btn-add-tag" on:click={() => editMode.isAddingTag = true}>+ Объект</button>
+                        <button class="btn-add-tag" on:click={() => editMode.isAddingTag = true} type="button">+ Объект</button>
                     {:else}
                         <div class="tag-edit-inline" transition:slide={{axis:'x'}}>
-                            <input type="text" bind:value={tempValues.newTag} placeholder={ASSET_PLACEHOLDER} autofocus
+                            <input id="new-tag-input" type="text" bind:value={tempValues.newTag} placeholder={ASSET_PLACEHOLDER} autofocus
                                    on:keydown={(e) => e.key === 'Enter' && saveField('addTag')} />
-                            <button class="save-mini" on:click={() => saveField('addTag')}>✓</button>
-                            <button class="btn-close-mini" on:click={() => editMode.isAddingTag = false}>✕</button>
+                            <button class="save-mini" on:click={() => saveField('addTag')} type="button">✓</button>
+                            <button class="btn-close-mini" on:click={() => editMode.isAddingTag = false} type="button">✕</button>
                         </div>
                     {/if}
                 </div>
             </section>
 
             <section class="info-group">
-                <label>Контактные телефоны</label>
+                <label for="add-phone-input">Контактные телефоны</label>
                 <div class="tiles-container">
                     {#each contact.phones as phone, i}
                         <div class="tile">
                             {#if editMode.phoneIdx === i}
                                 <div class="tile-edit">
-                                    <input type="tel" bind:value={tempValues.phones[i]} autofocus />
-                                    <button class="save-mini" on:click={() => saveField('phones')}>✓</button>
+                                    <input id="edit-phone-{i}" type="tel" bind:value={tempValues.phones[i]} autofocus
+                                           on:keydown={(e) => e.key === 'Enter' && saveField('phones')} />
+                                    <button class="save-mini" on:click={() => saveField('phones')} type="button">✓</button>
                                 </div>
                             {:else}
-                                <span class="phone-val" on:click={() => editMode.phoneIdx = i}>
-                                    {phoneUtils.format(phone)}
-                                </span>
+                                <button class="phone-val-btn" on:click={() => editMode.phoneIdx = i} type="button">
+                                    <span class="phone-val">{phoneUtils.format(phone)}</span>
+                                </button>
                                 <a href="tel:+{phoneUtils.clean(phone)}" class="btn-call" title="Позвонить">📞</a>
                             {/if}
                         </div>
                     {/each}
 
                     {#if !editMode.isAddingPhone}
-                        <button class="btn-add-tile" on:click={() => editMode.isAddingPhone = true}>+ Номер</button>
+                        <button class="btn-add-tile" on:click={() => editMode.isAddingPhone = true} type="button">+ Номер</button>
                     {:else}
                         <div class="tile full" transition:slide>
                             <div class="tile-edit">
-                                <input type="tel" bind:value={tempValues.newPhone} placeholder="+7..." autofocus />
-                                <button class="save-mini" on:click={() => saveField('addPhone')}>✓</button>
-                                <button class="btn-close-mini" on:click={cancelAllEdits}>✕</button>
+                                <input id="add-phone-input" type="tel" bind:value={tempValues.newPhone} placeholder="+7..." autofocus
+                                       on:keydown={(e) => e.key === 'Enter' && saveField('addPhone')} />
+                                <button class="save-mini" on:click={() => saveField('addPhone')} type="button">✓</button>
+                                <button class="btn-close-mini" on:click={cancelAllEdits} type="button">✕</button>
                             </div>
                         </div>
                     {/if}
@@ -185,34 +191,37 @@
             </section>
 
             <section class="info-group">
-                <label>E-mail адрес</label>
+                <label for="edit-email">E-mail адрес</label>
                 <div class="tile full">
                     {#if editMode.email}
                         <div class="tile-edit">
-                            <input type="email" bind:value={tempValues.email} autofocus />
-                            <button class="save-mini" on:click={() => saveField('email')}>✓</button>
+                            <input id="edit-email" type="email" bind:value={tempValues.email} autofocus
+                                   on:keydown={(e) => e.key === 'Enter' && saveField('email')} />
+                            <button class="save-mini" on:click={() => saveField('email')} type="button">✓</button>
                         </div>
                     {:else}
-                        <span class="val-text" on:click={() => editMode.email = true}>
-                            {contact.email || 'Добавить почту...'}
-                        </span>
+                        <button class="email-val-btn" on:click={() => editMode.email = true} type="button">
+                            <span class="val-text">{contact.email || 'Добавить почту...'}</span>
+                        </button>
                     {/if}
                 </div>
             </section>
 
             <section class="info-group">
-                <label>Заметки и особенности</label>
-                <div class="tile full notes-area" on:click={() => !editMode.notes && (editMode.notes = true)}>
+                <label for="notes-textarea">Заметки и особенности</label>
+                <div class="tile full notes-area-wrapper">
                     {#if editMode.notes}
                         <div class="notes-edit-box" transition:slide>
-                            <textarea bind:value={tempValues.notes} rows="4" autofocus></textarea>
+                            <textarea id="notes-textarea" bind:value={tempValues.notes} rows="4" autofocus></textarea>
                             <div class="actions-row">
-                                <button class="btn-text" on:click|stopPropagation={cancelAllEdits}>Отмена</button>
-                                <button class="btn-save-pill" on:click|stopPropagation={() => saveField('notes')}>Сохранить ✓</button>
+                                <button class="btn-text" on:click={cancelAllEdits} type="button">Отмена</button>
+                                <button class="btn-save-pill" on:click={() => saveField('notes')} type="button">Сохранить ✓</button>
                             </div>
                         </div>
                     {:else}
-                        <p class="notes-text">{contact.notes || 'Нажмите, чтобы добавить описание...'}</p>
+                        <button class="notes-display-btn" on:click={() => editMode.notes = true} type="button">
+                            <p class="notes-text">{contact.notes || 'Нажмите, чтобы добавить описание...'}</p>
+                        </button>
                     {/if}
                 </div>
             </section>
@@ -225,39 +234,41 @@
     .card-header { display: flex; align-items: center; gap: 24px; margin-bottom: 32px; }
     .avatar-big { width: 84px; height: 84px; background: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 950; color: var(--primary-color); box-shadow: 0 10px 20px rgba(56, 151, 240, 0.1); border: 1px solid #eff6ff; }
     .badge-role { margin-top: 8px; font-size: 9px; font-weight: 900; color: var(--primary-color); background: #eff6ff; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px; }
-    .title-section h2 { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; cursor: pointer; }
+
+    .h2-btn, .phone-val-btn, .email-val-btn, .notes-display-btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; width: 100%; display: block; }
+    .title-section h2 { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; }
     .title-section h2 span { font-size: 16px; opacity: 0.2; margin-left: 8px; }
     .id-hint { margin: 4px 0 0 4px; font-size: 11px; color: #cbd5e1; font-weight: 700; }
     .details-grid { display: flex; flex-direction: column; gap: 24px; }
     label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px; margin-left: 4px; }
 
-    /* ТЕГИ / ОБЪЕКТЫ */
     .tags-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
     .tag-badge { background: #f0fdf4; border: 1.5px solid #dcfce7; padding: 8px 14px; border-radius: 14px; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
-    .tag-badge:hover { border-color: #10b981; }
-    .tag-icon { font-size: 14px; }
     .tag-text { font-weight: 700; color: #166534; font-size: 13px; }
     .tag-remove { background: none; border: none; color: #10b981; cursor: pointer; font-weight: 800; padding: 0 2px; }
-    .tag-remove:hover { color: #ef4444; }
 
-    .btn-add-tag { background: none; border: 1.5px dashed #d1d5db; padding: 8px 16px; border-radius: 14px; color: #94a3b8; font-weight: 700; font-size: 12px; cursor: pointer; transition: 0.2s; }
-    .btn-add-tag:hover { border-color: var(--primary-color); color: var(--primary-color); }
+    .btn-add-tag { background: none; border: 1.5px dashed #d1d5db; padding: 8px 16px; border-radius: 14px; color: #94a3b8; font-weight: 700; font-size: 12px; cursor: pointer; }
     .tag-edit-inline { display: flex; gap: 8px; align-items: center; background: white; padding: 4px; border-radius: 14px; border: 1.5px solid var(--primary-color); }
     .tag-edit-inline input { border: none; padding: 6px 10px; font-size: 13px; width: 160px; background: none; outline: none; }
 
     .tiles-container { display: flex; flex-wrap: wrap; gap: 12px; }
     .tile { background: white; padding: 14px 18px; border-radius: 18px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
     .tile.full { width: 100%; box-sizing: border-box; }
-    .phone-val { font-weight: 700; color: #1e293b; cursor: pointer; font-size: 16px; }
-    .val-text { font-weight: 600; color: #1e293b; cursor: pointer; }
+
+    .phone-val { font-weight: 700; color: #1e293b; font-size: 16px; }
+    .val-text { font-weight: 600; color: #1e293b; }
+
     .btn-call { text-decoration: none; font-size: 18px; opacity: 0.8; transition: 0.2s; }
     .btn-add-tile { background: none; border: 2px dashed #e2e8f0; padding: 12px 20px; border-radius: 18px; color: #94a3b8; font-weight: 700; cursor: pointer; }
-    .notes-area { min-height: 90px; align-items: flex-start; cursor: pointer; }
+
+    .notes-area-wrapper { min-height: 90px; }
     .notes-text { margin: 0; color: #64748b; font-size: 14px; line-height: 1.6; font-style: italic; }
+
     .edit-row, .tile-edit, .notes-edit-box { display: flex; gap: 10px; width: 100%; }
     .notes-edit-box { flex-direction: column; }
+
     input, textarea { width: 100%; padding: 10px 14px; border: 2px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc; color: #0f172a; }
-    .save-btn-icon, .save-mini { background: #10b981; color: white; border: none; width: 40px; height: 40px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .save-btn-icon, .save-mini { background: #10b981; color: white; border: none; width: 40px; height: 40px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .btn-close-mini { background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; }
     .actions-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
     .btn-text { background: none; border: none; color: #94a3b8; font-weight: 700; cursor: pointer; }
