@@ -101,6 +101,7 @@
                             class="toggle-pill"
                             class:active={onlyWorkingStaff}
                             on:click={() => onlyWorkingStaff = !onlyWorkingStaff}
+                            title="Показать только работающих сегодня"
                         >
                             <span class="icon">{onlyWorkingStaff ? '⚡' : '💤'}</span>
                             <span class="label">{onlyWorkingStaff ? 'В смене' : 'Все'}</span>
@@ -110,6 +111,7 @@
                             class="toggle-pill"
                             class:active={onlyBusyStaff}
                             on:click={() => onlyBusyStaff = !onlyBusyStaff}
+                            title="Только мастера с записями"
                         >
                             <span class="icon">{onlyBusyStaff ? '🎯' : '👥'}</span>
                             <span class="label">{onlyBusyStaff ? 'Занятые' : 'Все'}</span>
@@ -148,7 +150,7 @@
                 <header class="modal-header">
                     <h3>
                         {#if showModal === 'edit'}
-                            {currentAppointment ? 'Редактирование' : 'Новая запись'}
+                            Редактирование
                         {:else if showModal === 'detail'}
                             Детали визита
                         {:else if showModal === 'client-profile'}
@@ -203,18 +205,27 @@
 </div>
 
 <style>
-    .calendar-tab-root { height: 100%; display: flex; flex-direction: column; background: white; position: relative; overflow: hidden; }
+    /* ТЕМА SOLARIZED LIGHT ДЛЯ ВСЕГО ЭКРАНА */
+    .calendar-tab-root {
+        height: 100%; display: flex; flex-direction: column;
+        background: #fdf6e3; /* Base3 */
+        position: relative; overflow: hidden;
+    }
+
     .month-view { padding: 24px; flex: 1; overflow-y: auto; }
     .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    h2 { font-size: 24px; font-weight: 800; margin: 0; color: #0f172a; }
-    .today-btn { background: var(--primary-gradient); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 700; cursor: pointer; }
+    h2 { font-size: 24px; font-weight: 800; margin: 0; color: #073642; /* Base02 */ }
+
+    .today-btn { background: #eee8d5; color: #268bd2; border: 1.5px solid #ddd6c1; padding: 10px 20px; border-radius: 14px; font-weight: 800; cursor: pointer; transition: 0.2s; }
+    .today-btn:hover { background: #268bd2; color: white; }
 
     .day-view-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 
-    /* СИММЕТРИЧНАЯ СЕТКА ДЛЯ ЦЕНТРИРОВАНИЯ ДАТЫ */
+    /* ШАПКА ТАЙМЛАЙНА */
     .day-top-bar {
         padding: 12px 24px;
-        border-bottom: 1px solid #f1f5f9;
+        background: #fdf6e3; /* Base3 */
+        border-bottom: 1.5px solid #eee8d5; /* Base2 */
         display: grid;
         grid-template-columns: 250px 1fr 250px;
         align-items: center;
@@ -227,31 +238,46 @@
     .filters-group { display: flex; gap: 8px; align-items: center; }
 
     .toggle-pill {
-        display: flex; align-items: center; gap: 6px; padding: 6px 10px;
-        border-radius: 16px; border: 1.5px solid #f1f5f9; background: #f8fafc;
+        display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+        border-radius: 16px; border: 1.5px solid #ddd6c1; background: #eee8d5; /* Base2 */
         cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        color: #586e75; /* Base01 */
     }
-    .toggle-pill.active { background: #eff6ff; border-color: #3b82f6; }
-    .toggle-pill .label { font-size: 10px; font-weight: 850; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
-    .toggle-pill.active .label { color: #3b82f6; }
+    .toggle-pill.active {
+        background: #fdf6e3; border-color: #268bd2;
+        color: #268bd2;
+        box-shadow: 0 4px 12px rgba(38, 139, 210, 0.1);
+    }
+    .toggle-pill .label { font-size: 10px; font-weight: 850; text-transform: uppercase; letter-spacing: 0.3px; }
 
+    /* ДАТА */
     .date-info { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
-    .date-info .d { font-size: 24px; font-weight: 900; color: var(--primary-color); letter-spacing: -0.5px; }
-    .date-info .m { font-size: 15px; font-weight: 700; color: #64748b; letter-spacing: -0.2px; }
+    .date-info .d { font-size: 24px; font-weight: 900; color: #268bd2; /* Solarized Blue */ letter-spacing: -0.5px; }
+    .date-info .m { font-size: 15px; font-weight: 700; color: #93a1a1; /* Base1 */ text-transform: uppercase; }
 
-    .btn-add { background: var(--primary-gradient); color: white; border: none; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.2); }
+    /* КНОПКА ДОБАВЛЕНИЯ */
+    .btn-add {
+        background: linear-gradient(135deg, #268bd2 0%, #2aa198 100%);
+        color: white; border: none; padding: 10px 20px;
+        border-radius: 14px; font-weight: 800; font-size: 13px;
+        cursor: pointer; box-shadow: 0 4px 15px rgba(38, 139, 210, 0.3);
+        transition: 0.2s;
+    }
+    .btn-add:active { transform: scale(0.95); }
 
     .timeline-container { flex: 1; overflow: hidden; position: relative; }
 
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .modal-content { background: white; width: 100%; max-width: 550px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
-    .modal-header { padding: 24px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-    .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; font-weight: bold; }
-    .modal-body-scroll { flex: 1; overflow-y: auto; background: #f8fafc; }
+    /* МОДАЛКИ В ТЕМЕ */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 43, 54, 0.6); /* Глубокий Solarized фоновый цвет */ backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-content { background: #fdf6e3; width: 100%; max-width: 550px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); border: 1px solid #ddd6c1; }
+    .modal-header { background: #eee8d5; padding: 24px 32px; border-bottom: 1.5px solid #ddd6c1; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { color: #073642; margin: 0; font-size: 18px; font-weight: 800; }
+    .close-btn { background: #fdf6e3; border: 1px solid #ddd6c1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #586e75; font-weight: bold; }
+    .modal-body-scroll { flex: 1; overflow-y: auto; background: #fdf6e3; }
 
     @media (max-width: 850px) {
         .day-top-bar { grid-template-columns: 1fr 1fr; padding: 12px 16px; }
-        .side-col.left { display: none; } /* Скрываем фильтры на малых экранах для центрирования даты */
+        .side-col.left { display: none; }
         .date-info { justify-content: flex-start; }
     }
 </style>
