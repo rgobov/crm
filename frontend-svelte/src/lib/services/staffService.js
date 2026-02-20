@@ -28,5 +28,24 @@ export const staffService = {
 
     async deleteStaff(id) {
         await api.delete(`/admin/staff/${id}`);
+    },
+
+    // --- НОВОЕ: Управление сменами (для администратора) ---
+
+    /**
+     * Обновить смену конкретного мастера на конкретную дату
+     */
+    async updateShift(staffId, shiftData) {
+        const response = await api.put(`/admin/staff/${staffId}/shift`, shiftData);
+        return response.data;
+    },
+
+    /**
+     * Копировать график мастера на указанное количество дней
+     */
+    async copyShift(staffId, sourceShift, days) {
+        await api.post(`/admin/staff/${staffId}/shift/copy`, sourceShift, {
+            params: { days }
+        });
     }
 };

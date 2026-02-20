@@ -6,6 +6,7 @@ import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.model.Resource;
 import com.tryneuro.backend.model.StaffMember;
+import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.service.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequestMapping("/api/admin")
-@RequiredArgsConstructor // Используем Lombok для конструктора
+@RequiredArgsConstructor
 public class AdminController {
 
     private final StaffMemberService staffMemberService;
@@ -32,7 +33,7 @@ public class AdminController {
     private final ContactService contactService;
     private final AppServiceService appServiceService;
     private final ResourceService resourceService;
-    private final DashboardService dashboardService; // <<< НОВЫЙ СЕРВИС
+    private final DashboardService dashboardService;
 
     private String getRequiredTenantId(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
@@ -51,7 +52,7 @@ public class AdminController {
         return dashboardService.getAdminStats(getRequiredTenantId(tenantId));
     }
 
-    // --- STAFF ---
+    // --- STAFF & SHIFTS ---
     @GetMapping("/staff")
     public Page<StaffMember> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
@@ -67,6 +68,32 @@ public class AdminController {
         return staffMemberService.getStaffMemberById(id)
                 .filter(s -> s.getTenantId().equals(getRequiredTenantId(tenantId)))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
+    }
+
+    // НОВОЕ: Управление сменами для администратора
+    @PutMapping("/staff/{id}/shift")
+    public ResponseEntity<StaffShift> updateStaffShift(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody StaffShift shift) {
+        shift.setStaffId(id);
+        shift.setTenantId(getRequiredTenantId(tenantId));
+        return ResponseEntity.ok(staffMemberService.saveShift(shift));
+    }
+
+    @PostMapping("/staff/{id}/shift/copy")
+    public ResponseEntity<Void> copyStaffShift(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody StaffShift sourceShift, @RequestParam int days) {
+        String tId = getRequiredTenantId(tenantId);
+        for (int i = 1; i <= days; i++) {
+            StaffShift newShift = new StaffShift();
+            newShift.setStaffId(id);
+            newShift.setTenantId(tId);
+            newShift.setDate(sourceShift.getDate().plusDays(i));
+            newShift.setWorkStartTime(sourceShift.getWorkStartTime());
+            newShift.setWorkEndTime(sourceShift.getWorkEndTime());
+            newShift.setBreakStartTime(sourceShift.getBreakStartTime());
+            newShift.setBreakEndTime(sourceShift.getBreakEndTime());
+            newShift.setDayOff(sourceShift.isDayOff());
+            staffMemberService.saveShift(newShift);
+        }
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/staff")
@@ -117,6 +144,29 @@ public class AdminController {
         contactService.deleteContact(id);
     }
 
+    // --- RESOURCES ---
+    @GetMapping("/resources")
+    public List<Resource> getAllResources(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(value = "branch_id", required = false) String branchId) {
+        return resourceService.getResources(getRequiredTenantId(tenantId), branchId);
+    }
+
+    @PostMapping("/resources")
+    public Resource createResource(@RequestAttribute("tenantId") String tenantId, @RequestBody Resource resource) {
+        return resourceService.addResource(resource, getRequiredTenantId(tenantId));
+    }
+
+    @PutMapping("/resources/{id}")
+    public Resource updateResource(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody Resource details) {
+        return resourceService.updateResource(id, details, getRequiredTenantId(tenantId));
+    }
+
+    @DeleteMapping("/resources/{id}")
+    public void deleteResource(@PathVariable String id) {
+        resourceService.deleteResource(id);
+    }
+
     // --- APPOINTMENTS & SCHEDULE ---
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(
@@ -158,13 +208,6 @@ public class AdminController {
     public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
         scheduleService.deleteAppointment(id);
         return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/resources")
-    public List<Resource> getAllResources(
-            @RequestAttribute("tenantId") String tenantId,
-            @RequestParam(value = "branch_id", required = false) String branchId) {
-        return resourceService.getResources(getRequiredTenantId(tenantId), branchId);
     }
 
     @GetMapping("/services")

@@ -1,41 +1,33 @@
 <script>
     export let y;
-    export let timeStr;
-    export let timeColWidth;
+    export let timeStr = "";
+    export let mode = "line"; // 'label' или 'line'
 </script>
 
-<div class="guide-root" style="top: {y}px">
-    <!-- БЕЙДЖИК: Липнет к левому краю, всегда в колонке времени -->
-    <div class="sticky-label-container" style="width: {timeColWidth}px">
-        <div class="label-box">{timeStr}</div>
-    </div>
-    <!-- ЛИНИЯ: Тянется вправо -->
-    <div class="line"></div>
-</div>
+{#if y >= 0}
+    {#if mode === 'label'}
+        <div class="guide-label-wrapper" style="top: {y}px">
+            <div class="guide-label">{timeStr}</div>
+        </div>
+    {:else}
+        <div class="guide-line" style="top: {y}px"></div>
+    {/if}
+{/if}
 
 <style>
-    .guide-root {
+    .guide-label-wrapper {
         position: absolute;
         left: 0;
         right: 0;
-        pointer-events: none;
-        z-index: 400;
-        display: flex;
-        align-items: center;
-        transform: translateY(-50%);
-        height: 1px;
-    }
-
-    .sticky-label-container {
-        position: sticky;
-        left: 0;
-        flex-shrink: 0;
         display: flex;
         justify-content: center;
+        align-items: center;
         z-index: 410;
+        transform: translateY(-50%);
+        pointer-events: none;
     }
 
-    .label-box {
+    .guide-label {
         background: #3b82f6;
         color: white;
         font-size: 10px;
@@ -46,9 +38,14 @@
         white-space: nowrap;
     }
 
-    .line {
-        flex: 1;
+    .guide-line {
+        position: absolute;
+        left: 0;
+        right: 0;
         height: 1px;
         border-top: 1.5px dashed rgba(59, 130, 246, 0.4);
+        z-index: 110;
+        transform: translateY(-50%);
+        pointer-events: none;
     }
 </style>

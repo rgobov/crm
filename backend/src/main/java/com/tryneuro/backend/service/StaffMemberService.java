@@ -12,24 +12,29 @@ import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.StaffShiftRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate; // <<< ДОБАВЛЯЕМ
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class StaffMemberService {
     private final StaffMemberRepository staffMemberRepository;
@@ -38,6 +43,7 @@ public class StaffMemberService {
     private final AppointmentRepository appointmentRepository;
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SimpMessagingTemplate messagingTemplate; // <<< ДОБАВЛЯЕМ
 
     @Autowired
     public StaffMemberService(StaffMemberRepository staffMemberRepository,
@@ -45,14 +51,18 @@ public class StaffMemberService {
                               UserRepository userRepository,
                               AppointmentRepository appointmentRepository,
                               BranchRepository branchRepository,
-                              PasswordEncoder passwordEncoder) {
+                              PasswordEncoder passwordEncoder,
+                              SimpMessagingTemplate messagingTemplate) {
         this.staffMemberRepository = staffMemberRepository;
         this.staffShiftRepository = staffShiftRepository;
         this.userRepository = userRepository;
         this.appointmentRepository = appointmentRepository;
         this.branchRepository = branchRepository;
         this.passwordEncoder = passwordEncoder;
+        this.messagingTemplate = messagingTemplate;
     }
+
+    // ... (остальные методы без изменений)
 
     public Optional<StaffMember> getStaffMemberById(String id) {
         Optional<StaffMember> staffOpt = staffMemberRepository.findById(id);
@@ -81,21 +91,17 @@ public class StaffMemberService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Email уже занят");
             });
         }
-
         StaffMember staffMember = new StaffMember();
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
         staffMember.setPhone(request.getPhone());
         staffMember.setTenantId(tenantId);
         staffMember.setActive(true);
-
         if (request.getBranchIds() != null && !request.getBranchIds().isEmpty()) {
             Set<Branch> branches = new HashSet<>(branchRepository.findAllById(request.getBranchIds()));
             staffMember.setBranches(branches);
         }
-
         StaffMember saved = staffMemberRepository.save(staffMember);
-
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             User newUser = new User();
             newUser.setId(UUID.randomUUID().toString());
@@ -106,7 +112,6 @@ public class StaffMemberService {
             newUser.setStaffId(saved.getId());
             userRepository.save(newUser);
         }
-
         enrichWithUserData(saved);
         return saved;
     }
@@ -115,30 +120,24 @@ public class StaffMemberService {
     public StaffMember updateStaffMember(String id, CreateStaffRequest request, String tenantId) {
         StaffMember staffMember = staffMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
-
         if (!staffMember.getTenantId().equals(tenantId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
         }
-
         staffMember.setName(request.getName());
         staffMember.setSpecialty(request.getSpecialty());
         staffMember.setPhone(request.getPhone());
         staffMember.setActive(request.isAvailable());
-
         if (request.getBranchIds() != null) {
             Set<Branch> branches = new HashSet<>(branchRepository.findAllById(request.getBranchIds()));
             staffMember.setBranches(branches);
         }
-
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
-        
         userRepository.findByStaffId(id).ifPresent(user -> {
             if (request.getRole() != null) user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
             if (request.getEmail() != null && !request.getEmail().isEmpty()) user.setEmail(request.getEmail());
             if (request.getPassword() != null && !request.getPassword().isEmpty()) user.setPassword(passwordEncoder.encode(request.getPassword()));
             userRepository.save(user);
         });
-
         enrichWithUserData(savedStaff);
         return savedStaff;
     }
@@ -147,7 +146,6 @@ public class StaffMemberService {
     public void deleteStaffMember(String id) {
         userRepository.findByStaffId(id).ifPresent(userRepository::delete);
         boolean hasAppointments = appointmentRepository.existsByStaffMemberId(id);
-
         if (hasAppointments) {
             staffMemberRepository.findById(id).ifPresent(staff -> {
                 staff.setActive(false);
@@ -177,7 +175,6 @@ public class StaffMemberService {
         });
     }
 
-    // ИСПРАВЛЕНО: Добавлен branchId в сигнатуру
     public List<StaffMember> getStaffForDate(String tenantId, LocalDate date, String branchId) {
         List<StaffMember> staffList;
         if (branchId != null && !branchId.isEmpty() && !"null".equals(branchId)) {
@@ -185,7 +182,6 @@ public class StaffMemberService {
         } else {
             staffList = staffMemberRepository.findByTenantId(tenantId);
         }
-
         return staffList.stream()
                 .filter(StaffMember::isActive)
                 .map(staff -> {
@@ -203,11 +199,33 @@ public class StaffMemberService {
 
     @Transactional
     public StaffShift saveShift(StaffShift shift) {
-        return staffShiftRepository.findByStaffIdAndDate(shift.getStaffId(), shift.getDate())
+        log.info("📅 Saving shift for staff {}: Date={}, Start={}, End={}, Off={}", 
+                 shift.getStaffId(), shift.getDate(), shift.getWorkStartTime(), shift.getWorkEndTime(), shift.isDayOff());
+        
+        StaffShift saved = staffShiftRepository.findByStaffIdAndDate(shift.getStaffId(), shift.getDate())
                 .map(existing -> {
-                    shift.setId(existing.getId());
-                    return staffShiftRepository.save(shift);
+                    existing.setWorkStartTime(shift.getWorkStartTime());
+                    existing.setWorkEndTime(shift.getWorkEndTime());
+                    existing.setBreakStartTime(shift.getBreakStartTime());
+                    existing.setBreakEndTime(shift.getBreakEndTime());
+                    existing.setDayOff(shift.isDayOff());
+                    return staffShiftRepository.save(existing);
                 })
                 .orElseGet(() -> staffShiftRepository.save(shift));
+
+        // ФИКС: Уведомляем систему через WebSocket прямо из сервиса
+        notifyChange(saved.getTenantId());
+        
+        return saved;
+    }
+
+    private void notifyChange(String tenantId) {
+        if (tenantId != null) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "SCHEDULE_UPDATED");
+            payload.put("timestamp", System.currentTimeMillis());
+            messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
+            log.info("📡 WebSocket notification sent for tenant: {}", tenantId);
+        }
     }
 }

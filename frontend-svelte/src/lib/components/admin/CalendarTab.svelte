@@ -5,6 +5,7 @@
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
+    import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte'; // <<< НОВЫЙ ИМПОРТ
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
 
@@ -14,6 +15,7 @@
     let showModal = null;
     let showNestedAddContact = false;
     let selectedClientId = null;
+    let selectedStaffForShift = null; // <<< ВЫБРАННЫЙ МАСТЕР
 
     let currentAppointment = null;
     let preselectedData = null;
@@ -48,6 +50,12 @@
         showModal = 'edit';
     }
 
+    // ОТКРЫТИЕ УПРАВЛЕНИЯ СМЕНОЙ
+    function handleStaffTap(event) {
+        selectedStaffForShift = event.detail;
+        showModal = 'shift';
+    }
+
     function openDetail(event) {
         currentAppointment = event.detail;
         showModal = 'detail';
@@ -57,6 +65,7 @@
         showModal = null;
         showNestedAddContact = false;
         selectedClientId = null;
+        selectedStaffForShift = null;
     }
 
     function handleContactAdded(event) {
@@ -114,6 +123,7 @@
                     {onlyBusyStaff}
                     on:emptySlotTap={openNewAppointment}
                     on:appointmentTap={openDetail}
+                    on:staffTap={handleStaffTap}
                 />
             </div>
         </div>
@@ -130,6 +140,8 @@
                             Детали визита
                         {:else if showModal === 'client-profile'}
                             Карточка клиента
+                        {:else if showModal === 'shift'}
+                            График работы
                         {/if}
                     </h3>
                     <button class="close-btn" on:click={closeModal}>✕</button>
@@ -157,6 +169,12 @@
                             contactId={selectedClientId}
                             on:updated={closeModal}
                         />
+                    {:else if showModal === 'shift'}
+                        <ShiftEditScreen
+                            staff={selectedStaffForShift}
+                            date={$selectedDate}
+                            on:success={closeModal}
+                        />
                     {/if}
                 </div>
             </div>
@@ -179,7 +197,6 @@
     .today-btn { background: var(--primary-gradient); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 700; cursor: pointer; }
 
     .day-view-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-
     .day-top-bar {
         padding: 12px 24px;
         border-bottom: 1px solid #f1f5f9;
@@ -196,13 +213,10 @@
         border-radius: 20px; border: 1.5px solid #f1f5f9; background: #f8fafc;
         cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .toggle-pill.active {
-        background: #eff6ff; border-color: #3b82f6;
-    }
+    .toggle-pill.active { background: #eff6ff; border-color: #3b82f6; }
     .toggle-pill .label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
     .toggle-pill.active .label { color: #3b82f6; }
 
-    /* ВОССТАНОВЛЕННЫЕ СТИЛИ ДАТЫ */
     .date-info { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
     .date-info .d { font-size: 24px; font-weight: 900; color: var(--primary-color); letter-spacing: -0.5px; }
     .date-info .m { font-size: 15px; font-weight: 700; color: #64748b; letter-spacing: -0.2px; }
@@ -214,7 +228,7 @@
     .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .modal-content { background: white; width: 100%; max-width: 550px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
     .modal-header { padding: 24px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-    .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; }
+    .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; font-weight: bold; }
     .modal-body-scroll { flex: 1; overflow-y: auto; background: #f8fafc; }
 
     @media (max-width: 640px) {

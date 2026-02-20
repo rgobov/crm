@@ -7,7 +7,7 @@
     import DayTimeline from './DayTimeline.svelte';
 
     export let branchId = null;
-    export let onlyBusyStaff = false; // <<< НОВЫЙ ПРОПС ДЛЯ ФИЛЬТРАЦИИ
+    export let onlyBusyStaff = false;
 
     const dispatch = createEventDispatcher();
 
@@ -15,11 +15,8 @@
     let staff = [];
     let isLoading = true;
 
-    // РЕАКТИВНАЯ ФИЛЬТРАЦИЯ МАСТЕРОВ
     $: displayedStaff = (() => {
         if (!onlyBusyStaff) return staff;
-
-        // Получаем набор ID мастеров, у которых есть записи сегодня
         const busyStaffIds = new Set(appointments.map(a => a.staffMemberId));
         return staff.filter(s => busyStaffIds.has(s.id));
     })();
@@ -32,7 +29,9 @@
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
         if (signal && signal.ts > 0 && branchId) {
-            loadDayData($selectedDate, branchId, true);
+            console.log('🔄 ScheduleScreen: Global refresh triggered...');
+            // ФИКС: Для обновления смен мастеров делаем полную (не silent) загрузку
+            loadDayData($selectedDate, branchId, false);
         }
     });
 
@@ -50,8 +49,7 @@
 
         if (!silent) {
             isLoading = true;
-            appointments = [];
-            staff = [];
+            // Не очищаем списки сразу, чтобы избежать "моргания"
         }
 
         try {
@@ -80,6 +78,10 @@
     function handleAppointment(event) {
         dispatch('appointmentTap', event.detail);
     }
+
+    function handleStaffTap(event) {
+        dispatch('staffTap', event.detail);
+    }
 </script>
 
 <div class="schedule-screen">
@@ -101,13 +103,13 @@
                 <p>В этом филиале пока нет работающих мастеров</p>
             </div>
         {:else}
-            <!-- ПЕРЕДАЕМ ОТФИЛЬТРОВАННЫЙ СПИСОК displayedStaff -->
             <DayTimeline
                 day={$selectedDate}
                 {appointments}
                 staff={displayedStaff}
                 on:appointmentTap={handleAppointment}
                 on:emptySlotTap={handleEmptySlot}
+                on:staffTap={handleStaffTap}
             />
         {/if}
     </div>

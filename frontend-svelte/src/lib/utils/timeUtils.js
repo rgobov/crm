@@ -3,52 +3,41 @@
  */
 
 export const timeUtils = {
-    /**
-     * Преобразует UTC ISO строку из базы в формат YYYY-MM-DDTHH:mm для инпута
-     * строго по часовому поясу филиала
-     */
+    // Вспомогательная функция: перевод HH:mm:ss в минуты от начала дня
+    toMinutes(timeStr) {
+        if (!timeStr) return -1;
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    },
+
     toBranchLocalISO(isoStr, timezone = 'Europe/Moscow') {
         if (!isoStr) return "";
         const date = new Date(isoStr);
-
-        // sv-SE формат дает YYYY-MM-DD HH:mm, что идеально для datetime-local
         const formatter = new Intl.DateTimeFormat('sv-SE', {
             timeZone: timezone,
             year: 'numeric', month: '2-digit', day: '2-digit',
             hour: '2-digit', minute: '2-digit',
             hour12: false
         });
-
         return formatter.format(date).replace(' ', 'T');
     },
 
-    /**
-     * Преобразует "наивное" время из инпута (без пояса) в UTC ISO строку,
-     * считая, что введенное время принадлежит часовому поясу филиала
-     */
     fromBranchLocalToUTC(localStr, timezone = 'Europe/Moscow') {
         if (!localStr) return null;
-        const date = new Date(localStr); // Это "наивная" дата
-
-        // Магия Intl: определяем, какое сейчас время в филиале относительно UTC
+        const date = new Date(localStr);
         const formatter = new Intl.DateTimeFormat('en-US', {
             timeZone: timezone,
             year: 'numeric', month: 'numeric', day: 'numeric',
             hour: 'numeric', minute: 'numeric', second: 'numeric',
             hour12: false
         });
-
         const parts = formatter.formatToParts(date);
         const map = Object.fromEntries(parts.map(p => [p.type, p.value]));
         const branchDate = new Date(`${map.year}-${map.month.padStart(2,'0')}-${map.day.padStart(2,'0')}T${map.hour.padStart(2,'0')}:${map.minute.padStart(2,'0')}`);
-
         const diff = branchDate.getTime() - date.getTime();
         return new Date(date.getTime() - diff).toISOString();
     },
 
-    /**
-     * Расчет отступа в пикселях для отображения на таймлайне
-     */
     getTimeOffset(timeStr, startHour, hourHeight, timezone = 'Europe/Moscow') {
         const date = new Date(timeStr);
         const formatter = new Intl.DateTimeFormat('en-GB', {
@@ -66,14 +55,36 @@ export const timeUtils = {
         });
     },
 
+    /**
+     * ОПРЕДЕЛЕНИЕ СТАТУСА СЛОТА (УЛУЧШЕНО)
+     * Используем сравнение минут вместо строк для 100% точности
+     */
     getSlotStatus(staff, hour, minute) {
         if (!staff) return 'WORK';
-        const slotTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
-        if (staff.breakStartTime && staff.breakEndTime) {
-            if (slotTime >= staff.breakStartTime && slotTime < staff.breakEndTime) return 'BREAK';
+        if (staff.dayOff) return 'OFF';
+
+        const slotMin = hour * 60 + minute;
+
+        const workStartMin = this.toMinutes(staff.workStartTime);
+        const workEndMin = this.toMinutes(staff.workEndTime);
+        const breakStartMin = this.toMinutes(staff.breakStartTime);
+        const breakEndMin = this.toMinutes(staff.breakEndTime);
+
+        // 1. Проверка перерыва
+        if (breakStartMin !== -1 && breakEndMin !== -1) {
+            if (slotMin >= breakStartMin && slotMin < breakEndMin) return 'BREAK';
         }
-        if (staff.isDayOff || !staff.workStartTime || !staff.workEndTime) return 'OFF';
-        if (slotTime < staff.workStartTime || slotTime >= staff.workEndTime) return 'OFF';
-        return 'WORK';
+
+        // 2. Проверка рабочего времени
+        if (workStartMin === -1 || workEndMin === -1) return 'OFF';
+
+        // Обработка перехода через полночь (если End < Start)
+        if (workEndMin < workStartMin) {
+            if (slotMin >= workStartMin || slotMin < workEndMin) return 'WORK';
+        } else {
+            if (slotMin >= workStartMin && slotMin < workEndMin) return 'WORK';
+        }
+
+        return 'OFF';
     }
 };
