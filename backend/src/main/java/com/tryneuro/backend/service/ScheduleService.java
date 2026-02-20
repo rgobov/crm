@@ -55,23 +55,19 @@ public class ScheduleService {
         return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
     }
 
+    // ВОССТАНОВЛЕНО: Получение всех записей конкретного клиента (для Flutter)
     public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
         return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
     }
 
     @Transactional
     public Appointment addAppointment(Appointment appointment) {
-        // Мы полагаемся на branchId, который пришел в JSON как строка
         log.info("🚀 Creating appointment for client '{}' in branch '{}'", appointment.getClientName(), appointment.getBranchId());
-
         validateAvailability(appointment);
         Appointment saved = appointmentRepository.save(appointment);
-        
-        // Автоматически запоминаем объект визита (машину) в карточке клиента
         if (saved.getContactId() != null && saved.getReferenceTag() != null && !saved.getReferenceTag().isEmpty()) {
             contactService.addTagIfMissing(saved.getContactId(), saved.getReferenceTag());
         }
-
         notifyChange(saved.getTenantId());
         return saved;
     }
@@ -93,19 +89,13 @@ public class ScheduleService {
         appointment.setReminderLeadTimeHours(details.getReminderLeadTimeHours());
         appointment.setReferenceTag(details.getReferenceTag());
         
-        // Обновляем филиал, если он изменился
-        if (details.getBranchId() != null) {
-            appointment.setBranchId(details.getBranchId());
-        }
+        if (details.getBranchId() != null) appointment.setBranchId(details.getBranchId());
 
         validateAvailability(appointment);
         Appointment updated = appointmentRepository.save(appointment);
-
-        // Автоматически запоминаем объект визита
         if (updated.getContactId() != null && updated.getReferenceTag() != null && !updated.getReferenceTag().isEmpty()) {
             contactService.addTagIfMissing(updated.getContactId(), updated.getReferenceTag());
         }
-
         notifyChange(updated.getTenantId());
         return updated;
     }
@@ -131,22 +121,28 @@ public class ScheduleService {
     private void validateAvailability(Appointment app) {
         String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
         if (app.getStaffMemberId() != null) {
-            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят на это время");
+            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId, app.getBranchId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят или не работает в этом филиале в это время");
             }
         }
     }
 
-    public boolean isStaffMemberAvailable(String tenantId, String staffMemberId, LocalDate date, LocalTime time, int duration, String currentAppointmentId) {
-        Optional<StaffShift> shiftOpt = staffShiftRepository.findByStaffIdAndDate(staffMemberId, date);
-        if (shiftOpt.isEmpty() || shiftOpt.get().isDayOff()) return false;
+    public boolean isStaffMemberAvailable(String tenantId, String staffId, LocalDate date, LocalTime time, int duration, String currentAppId, String branchId) {
+        Optional<StaffShift> shiftInBranch = staffShiftRepository.findByStaffIdAndDateAndBranchId(staffId, date, branchId);
+        if (shiftInBranch.isEmpty() || shiftInBranch.get().isDayOff()) return false;
 
         LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
         LocalTime end = start.plusMinutes(duration);
+        StaffShift shift = shiftInBranch.get();
+        
+        if (start.isBefore(shift.getWorkStartTime()) || end.isAfter(shift.getWorkEndTime())) return false;
+        if (shift.getBreakStartTime() != null && shift.getBreakEndTime() != null) {
+            if (start.isBefore(shift.getBreakEndTime()) && end.isAfter(shift.getBreakStartTime())) return false;
+        }
 
-        List<Appointment> staffAppointments = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffMemberId, date);
-        for (Appointment existing : staffAppointments) {
-            if (currentAppointmentId != null && existing.getId().equals(currentAppointmentId)) continue;
+        List<Appointment> allStaffApps = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
+        for (Appointment existing : allStaffApps) {
+            if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
             if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
             LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
             LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());

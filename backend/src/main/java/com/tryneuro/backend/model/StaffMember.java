@@ -1,5 +1,6 @@
 package com.tryneuro.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,6 +14,7 @@ import java.util.Set;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class StaffMember {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -34,6 +36,7 @@ public class StaffMember {
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;
 
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "staff_member_branches",

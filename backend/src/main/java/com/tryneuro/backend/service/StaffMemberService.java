@@ -19,7 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.messaging.simp.SimpMessagingTemplate; // <<< ДОБАВЛЯЕМ
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -43,7 +43,7 @@ public class StaffMemberService {
     private final AppointmentRepository appointmentRepository;
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
-    private final SimpMessagingTemplate messagingTemplate; // <<< ДОБАВЛЯЕМ
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     public StaffMemberService(StaffMemberRepository staffMemberRepository,
@@ -61,8 +61,6 @@ public class StaffMemberService {
         this.passwordEncoder = passwordEncoder;
         this.messagingTemplate = messagingTemplate;
     }
-
-    // ... (остальные методы без изменений)
 
     public Optional<StaffMember> getStaffMemberById(String id) {
         Optional<StaffMember> staffOpt = staffMemberRepository.findById(id);
@@ -164,13 +162,16 @@ public class StaffMemberService {
 
     public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
         return getStaffMemberById(id).map(staff -> {
-            staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresent(shift -> {
+            // ФИКС: Используем List и берем первую смену для базового отображения в профиле
+            List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staff.getId(), date);
+            if (!shifts.isEmpty()) {
+                StaffShift shift = shifts.get(0);
                 staff.setDayOff(shift.isDayOff());
                 staff.setWorkStartTime(shift.getWorkStartTime());
                 staff.setWorkEndTime(shift.getWorkEndTime());
                 staff.setBreakStartTime(shift.getBreakStartTime());
                 staff.setBreakEndTime(shift.getBreakEndTime());
-            });
+            }
             return staff;
         });
     }
@@ -186,7 +187,7 @@ public class StaffMemberService {
                 .filter(StaffMember::isActive)
                 .map(staff -> {
                     enrichWithUserData(staff);
-                    staffShiftRepository.findByStaffIdAndDate(staff.getId(), date).ifPresentOrElse(shift -> {
+                    staffShiftRepository.findByStaffIdAndDateAndBranchId(staff.getId(), date, branchId).ifPresentOrElse(shift -> {
                         staff.setDayOff(shift.isDayOff());
                         staff.setWorkStartTime(shift.getWorkStartTime());
                         staff.setWorkEndTime(shift.getWorkEndTime());
@@ -199,10 +200,11 @@ public class StaffMemberService {
 
     @Transactional
     public StaffShift saveShift(StaffShift shift) {
-        log.info("📅 Saving shift for staff {}: Date={}, Start={}, End={}, Off={}", 
-                 shift.getStaffId(), shift.getDate(), shift.getWorkStartTime(), shift.getWorkEndTime(), shift.isDayOff());
+        log.info("📅 Saving shift for staff {}: Date={}, Branch={}, Off={}", 
+                 shift.getStaffId(), shift.getDate(), shift.getBranchId(), shift.isDayOff());
         
-        StaffShift saved = staffShiftRepository.findByStaffIdAndDate(shift.getStaffId(), shift.getDate())
+        // Пытаемся найти существующую смену именно в этом филиале
+        return staffShiftRepository.findByStaffIdAndDateAndBranchId(shift.getStaffId(), shift.getDate(), shift.getBranchId())
                 .map(existing -> {
                     existing.setWorkStartTime(shift.getWorkStartTime());
                     existing.setWorkEndTime(shift.getWorkEndTime());
@@ -212,11 +214,6 @@ public class StaffMemberService {
                     return staffShiftRepository.save(existing);
                 })
                 .orElseGet(() -> staffShiftRepository.save(shift));
-
-        // ФИКС: Уведомляем систему через WebSocket прямо из сервиса
-        notifyChange(saved.getTenantId());
-        
-        return saved;
     }
 
     private void notifyChange(String tenantId) {
@@ -225,7 +222,6 @@ public class StaffMemberService {
             payload.put("type", "SCHEDULE_UPDATED");
             payload.put("timestamp", System.currentTimeMillis());
             messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
-            log.info("📡 WebSocket notification sent for tenant: {}", tenantId);
         }
     }
 }
