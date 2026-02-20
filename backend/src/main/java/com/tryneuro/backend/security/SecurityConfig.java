@@ -63,9 +63,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        
+        // Настройка разрешенных источников для стабильной работы на сервере и локально
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "https://crm.109.248.203.156.sslip.io",
+            "https://api.109.248.203.156.sslip.io",
+            "https://*.109.248.203.156.sslip.io",
+            "http://localhost:*",
+            "http://127.0.0.1:*",
+            "https://*.sslip.io"
+        ));
+        
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-Internal-Secret"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(List.of("Authorization"));
         
