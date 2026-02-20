@@ -5,7 +5,7 @@
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
-    import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte'; // <<< НОВЫЙ ИМПОРТ
+    import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
 
@@ -15,13 +15,14 @@
     let showModal = null;
     let showNestedAddContact = false;
     let selectedClientId = null;
-    let selectedStaffForShift = null; // <<< ВЫБРАННЫЙ МАСТЕР
+    let selectedStaffForShift = null;
 
     let currentAppointment = null;
     let preselectedData = null;
     let appointmentEditRef;
 
     let onlyBusyStaff = false;
+    let onlyWorkingStaff = false;
 
     $: if (forcedDate) {
         selectedDate.set(new Date(forcedDate));
@@ -50,7 +51,6 @@
         showModal = 'edit';
     }
 
-    // ОТКРЫТИЕ УПРАВЛЕНИЯ СМЕНОЙ
     function handleStaffTap(event) {
         selectedStaffForShift = event.detail;
         showModal = 'shift';
@@ -95,16 +95,26 @@
     {:else if viewMode === 'day'}
         <div class="day-view-wrapper" in:fade>
             <div class="day-top-bar">
-                <div class="filter-toggle-wrap">
-                    <button
-                        class="toggle-pill"
-                        class:active={onlyBusyStaff}
-                        on:click={() => onlyBusyStaff = !onlyBusyStaff}
-                        title={onlyBusyStaff ? "Показать всех мастеров" : "Скрыть пустые столбцы"}
-                    >
-                        <span class="icon">{onlyBusyStaff ? '🎯' : '👥'}</span>
-                        <span class="label">{onlyBusyStaff ? 'Занятые' : 'Все'}</span>
-                    </button>
+                <div class="side-col left">
+                    <div class="filters-group">
+                        <button
+                            class="toggle-pill"
+                            class:active={onlyWorkingStaff}
+                            on:click={() => onlyWorkingStaff = !onlyWorkingStaff}
+                        >
+                            <span class="icon">{onlyWorkingStaff ? '⚡' : '💤'}</span>
+                            <span class="label">{onlyWorkingStaff ? 'В смене' : 'Все'}</span>
+                        </button>
+
+                        <button
+                            class="toggle-pill"
+                            class:active={onlyBusyStaff}
+                            on:click={() => onlyBusyStaff = !onlyBusyStaff}
+                        >
+                            <span class="icon">{onlyBusyStaff ? '🎯' : '👥'}</span>
+                            <span class="label">{onlyBusyStaff ? 'Занятые' : 'Все'}</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="date-info">
@@ -114,13 +124,16 @@
                     </span>
                 </div>
 
-                <button class="btn-add" on:click={() => openNewAppointment({ detail: {} })}>+ Запись</button>
+                <div class="side-col right">
+                    <button class="btn-add" on:click={() => openNewAppointment({ detail: {} })}>+ Запись</button>
+                </div>
             </div>
 
             <div class="timeline-container">
                 <ScheduleScreen
                     branchId={$activeBranchId}
                     {onlyBusyStaff}
+                    {onlyWorkingStaff}
                     on:emptySlotTap={openNewAppointment}
                     on:appointmentTap={openDetail}
                     on:staffTap={handleStaffTap}
@@ -197,24 +210,29 @@
     .today-btn { background: var(--primary-gradient); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 700; cursor: pointer; }
 
     .day-view-wrapper { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+
+    /* СИММЕТРИЧНАЯ СЕТКА ДЛЯ ЦЕНТРИРОВАНИЯ ДАТЫ */
     .day-top-bar {
         padding: 12px 24px;
         border-bottom: 1px solid #f1f5f9;
         display: grid;
-        grid-template-columns: 130px 1fr 130px;
+        grid-template-columns: 250px 1fr 250px;
         align-items: center;
         flex-shrink: 0;
-        gap: 10px;
     }
 
-    .filter-toggle-wrap { display: flex; align-items: center; }
+    .side-col { display: flex; align-items: center; }
+    .side-col.right { justify-content: flex-end; }
+
+    .filters-group { display: flex; gap: 8px; align-items: center; }
+
     .toggle-pill {
-        display: flex; align-items: center; gap: 8px; padding: 6px 12px;
-        border-radius: 20px; border: 1.5px solid #f1f5f9; background: #f8fafc;
-        cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+        border-radius: 16px; border: 1.5px solid #f1f5f9; background: #f8fafc;
+        cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .toggle-pill.active { background: #eff6ff; border-color: #3b82f6; }
-    .toggle-pill .label { font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .toggle-pill .label { font-size: 10px; font-weight: 850; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; }
     .toggle-pill.active .label { color: #3b82f6; }
 
     .date-info { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
@@ -231,11 +249,9 @@
     .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; font-weight: bold; }
     .modal-body-scroll { flex: 1; overflow-y: auto; background: #f8fafc; }
 
-    @media (max-width: 640px) {
-        .day-top-bar { padding: 12px 16px; grid-template-columns: 100px 1fr 100px; }
-        .date-info .d { font-size: 20px; }
-        .date-info .m { font-size: 13px; }
-        .modal-backdrop { padding: 0; }
-        .modal-content { height: 95vh; border-radius: 32px 32px 0 0; }
+    @media (max-width: 850px) {
+        .day-top-bar { grid-template-columns: 1fr 1fr; padding: 12px 16px; }
+        .side-col.left { display: none; } /* Скрываем фильтры на малых экранах для центрирования даты */
+        .date-info { justify-content: flex-start; }
     }
 </style>

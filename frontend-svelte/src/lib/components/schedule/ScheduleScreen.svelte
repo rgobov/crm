@@ -8,6 +8,7 @@
 
     export let branchId = null;
     export let onlyBusyStaff = false;
+    export let onlyWorkingStaff = false; // <<< НОВЫЙ ПРОП
 
     const dispatch = createEventDispatcher();
 
@@ -15,10 +16,22 @@
     let staff = [];
     let isLoading = true;
 
+    // СОГЛАСОВАННАЯ ФИЛЬТРАЦИЯ (AND)
     $: displayedStaff = (() => {
-        if (!onlyBusyStaff) return staff;
-        const busyStaffIds = new Set(appointments.map(a => a.staffMemberId));
-        return staff.filter(s => busyStaffIds.has(s.id));
+        let result = staff;
+
+        // 1. Фильтр по сменам (сегодня рабочий день)
+        if (onlyWorkingStaff) {
+            result = result.filter(s => !s.dayOff);
+        }
+
+        // 2. Фильтр по записям (есть хотя бы один клиент)
+        if (onlyBusyStaff) {
+            const busyStaffIds = new Set(appointments.map(a => a.staffMemberId));
+            result = result.filter(s => busyStaffIds.has(s.id));
+        }
+
+        return result;
     })();
 
     $: if ($selectedDate && branchId) {
@@ -29,8 +42,6 @@
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
         if (signal && signal.ts > 0 && branchId) {
-            console.log('🔄 ScheduleScreen: Global refresh triggered...');
-            // ФИКС: Для обновления смен мастеров делаем полную (не silent) загрузку
             loadDayData($selectedDate, branchId, false);
         }
     });
@@ -46,18 +57,13 @@
             isLoading = false;
             return;
         }
-
-        if (!silent) {
-            isLoading = true;
-            // Не очищаем списки сразу, чтобы избежать "моргания"
-        }
+        if (!silent) isLoading = true;
 
         try {
             const [apptsData, staffData] = await Promise.all([
                 adminService.getAppointmentsForDay(date, bId),
                 adminService.getStaffForSchedule(date, bId)
             ]);
-
             appointments = apptsData || [];
             staff = (staffData || []).filter(s => s.role === 'ROLE_EMPLOYEE' || s.role === 'EMPLOYEE');
         } catch (e) {

@@ -1,5 +1,6 @@
 package com.tryneuro.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Branch {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,7 +25,6 @@ public class Branch {
     @Column(nullable = false)
     private String timezone;
 
-    // ЯВНО УКАЗЫВАЕМ ИМЯ КОЛОНКИ ДЛЯ HIBERNATE
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 }

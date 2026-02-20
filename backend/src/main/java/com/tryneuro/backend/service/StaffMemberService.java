@@ -1,6 +1,7 @@
 package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.dto.CreateStaffRequest;
+import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Branch;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.StaffShift;
@@ -162,7 +163,6 @@ public class StaffMemberService {
 
     public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
         return getStaffMemberById(id).map(staff -> {
-            // ФИКС: Используем List и берем первую смену для базового отображения в профиле
             List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staff.getId(), date);
             if (!shifts.isEmpty()) {
                 StaffShift shift = shifts.get(0);
@@ -203,8 +203,18 @@ public class StaffMemberService {
         log.info("📅 Saving shift for staff {}: Date={}, Branch={}, Off={}", 
                  shift.getStaffId(), shift.getDate(), shift.getBranchId(), shift.isDayOff());
         
-        // Пытаемся найти существующую смену именно в этом филиале
-        return staffShiftRepository.findByStaffIdAndDateAndBranchId(shift.getStaffId(), shift.getDate(), shift.getBranchId())
+        // ЗАЩИТА: Если ставим выходной, проверяем наличие записей
+        if (shift.isDayOff()) {
+            List<Appointment> apps = appointmentRepository.findByStaffIdAndBranchIdAndDate(
+                shift.getStaffId(), shift.getBranchId(), shift.getDate()
+            );
+            if (!apps.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, 
+                    "Нельзя установить выходной: в этом филиале у мастера " + apps.size() + " активных записей");
+            }
+        }
+
+        StaffShift saved = staffShiftRepository.findByStaffIdAndDateAndBranchId(shift.getStaffId(), shift.getDate(), shift.getBranchId())
                 .map(existing -> {
                     existing.setWorkStartTime(shift.getWorkStartTime());
                     existing.setWorkEndTime(shift.getWorkEndTime());
@@ -213,7 +223,13 @@ public class StaffMemberService {
                     existing.setDayOff(shift.isDayOff());
                     return staffShiftRepository.save(existing);
                 })
-                .orElseGet(() -> staffShiftRepository.save(shift));
+                .orElseGet(() -> {
+                    // Гарантируем привязку ID если это создание
+                    return staffShiftRepository.save(shift);
+                });
+
+        notifyChange(saved.getTenantId());
+        return saved;
     }
 
     private void notifyChange(String tenantId) {
