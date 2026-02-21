@@ -5,6 +5,7 @@ import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentStatus;
 import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.repository.AppointmentRepository;
+import com.tryneuro.backend.repository.BranchRepository;
 import com.tryneuro.backend.repository.StaffShiftRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
@@ -29,35 +32,25 @@ public class ScheduleService {
 
     private final AppointmentRepository appointmentRepository;
     private final StaffShiftRepository staffShiftRepository;
+    private final BranchRepository branchRepository;
     private final ContactService contactService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     public ScheduleService(AppointmentRepository appointmentRepository, 
                            StaffShiftRepository staffShiftRepository,
+                           BranchRepository branchRepository,
                            ContactService contactService,
                            SimpMessagingTemplate messagingTemplate) {
         this.appointmentRepository = appointmentRepository;
         this.staffShiftRepository = staffShiftRepository;
+        this.branchRepository = branchRepository;
         this.contactService = contactService;
         this.messagingTemplate = messagingTemplate;
     }
 
     public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId, String branchId) {
         return appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
-    }
-
-    public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {
-        return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
-    }
-
-    public List<WorkloadDto> getWorkloadForStaffAndMonth(String staffId, int year, int month) {
-        return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
-    }
-
-    // ВОССТАНОВЛЕНО: Получение всех записей конкретного клиента (для Flutter)
-    public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
-        return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
     }
 
     @Transactional
@@ -100,6 +93,82 @@ public class ScheduleService {
         return updated;
     }
 
+    private void validateAvailability(Appointment app) {
+        if (app.getStaffMemberId() == null) return;
+
+        // 1. Получаем таймзону филиала надежно
+        String timezone = branchRepository.findById(app.getBranchId())
+                .map(b -> b.getTimezone())
+                .orElse("Europe/Moscow");
+
+        // 2. Вычисляем ЛОКАЛЬНУЮ дату и время записи
+        ZonedDateTime branchDateTime = app.getStartTime().atZoneSameInstant(ZoneId.of(timezone));
+        LocalDate localDate = branchDateTime.toLocalDate();
+        LocalTime localTime = branchDateTime.toLocalTime();
+
+        String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
+
+        if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), localDate, localTime, app.getDurationInMinutes(), appId, app.getBranchId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят или не работает в этом филиале в это время");
+        }
+    }
+
+    public boolean isStaffMemberAvailable(String tenantId, String staffId, LocalDate date, LocalTime time, int duration, String currentAppId, String branchId) {
+        Optional<StaffShift> shiftInBranch = staffShiftRepository.findByStaffIdAndDateAndBranchId(staffId, date, branchId);
+        
+        if (shiftInBranch.isEmpty() || shiftInBranch.get().isDayOff()) {
+            log.warn("Check fail: No shift found for staff {} on {} in branch {}", staffId, date, branchId);
+            return false;
+        }
+
+        LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
+        LocalTime end = start.plusMinutes(duration);
+        StaffShift shift = shiftInBranch.get();
+        
+        // Проверка вхождения в рабочий график
+        if (start.isBefore(shift.getWorkStartTime()) || end.isAfter(shift.getWorkEndTime())) {
+            log.warn("Check fail: Outside working hours. App: {}-{}, Shift: {}-{}", start, end, shift.getWorkStartTime(), shift.getWorkEndTime());
+            return false;
+        }
+
+        // Проверка на перерыв
+        if (shift.getBreakStartTime() != null && shift.getBreakEndTime() != null) {
+            if (start.isBefore(shift.getBreakEndTime()) && end.isAfter(shift.getBreakStartTime())) {
+                log.warn("Check fail: Intersection with break");
+                return false;
+            }
+        }
+
+        // Проверка на пересечение с другими записями
+        List<Appointment> allStaffApps = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
+        for (Appointment existing : allStaffApps) {
+            if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
+            if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
+            
+            // ВАЖНО: Существующие записи тоже пересчитываем в лок. время для сравнения
+            LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
+            LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
+            
+            if (start.isBefore(eEnd) && end.isAfter(eStart)) {
+                log.warn("Check fail: Intersection with another appointment ID {}", existing.getId());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {
+        return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
+    }
+
+    public List<WorkloadDto> getWorkloadForStaffAndMonth(String staffId, int year, int month) {
+        return appointmentRepository.getWorkloadForStaffAndMonth(staffId, year, month);
+    }
+
+    public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
+        return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
+    }
+
     @Transactional
     public void deleteAppointment(String id) {
         appointmentRepository.findById(id).ifPresent(app -> {
@@ -116,39 +185,6 @@ public class ScheduleService {
             payload.put("timestamp", System.currentTimeMillis());
             messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
         }
-    }
-
-    private void validateAvailability(Appointment app) {
-        String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
-        if (app.getStaffMemberId() != null) {
-            if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), app.getDate(), app.getTime(), app.getDurationInMinutes(), appId, app.getBranchId())) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят или не работает в этом филиале в это время");
-            }
-        }
-    }
-
-    public boolean isStaffMemberAvailable(String tenantId, String staffId, LocalDate date, LocalTime time, int duration, String currentAppId, String branchId) {
-        Optional<StaffShift> shiftInBranch = staffShiftRepository.findByStaffIdAndDateAndBranchId(staffId, date, branchId);
-        if (shiftInBranch.isEmpty() || shiftInBranch.get().isDayOff()) return false;
-
-        LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
-        LocalTime end = start.plusMinutes(duration);
-        StaffShift shift = shiftInBranch.get();
-        
-        if (start.isBefore(shift.getWorkStartTime()) || end.isAfter(shift.getWorkEndTime())) return false;
-        if (shift.getBreakStartTime() != null && shift.getBreakEndTime() != null) {
-            if (start.isBefore(shift.getBreakEndTime()) && end.isAfter(shift.getBreakStartTime())) return false;
-        }
-
-        List<Appointment> allStaffApps = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
-        for (Appointment existing : allStaffApps) {
-            if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
-            if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
-            LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
-            LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
-            if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
-        }
-        return true;
     }
 
     public List<WorkloadDto> getWorkloadForMonth(String tenantId, int year, int month, String branchId) {
