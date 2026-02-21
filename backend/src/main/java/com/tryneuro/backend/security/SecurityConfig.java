@@ -44,9 +44,7 @@ public class SecurityConfig {
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // РАЗРЕШАЕМ ВНУТРЕННЮЮ СИНХРОНИЗАЦИЮ (защищена секретным заголовком в контроллере)
                 .requestMatchers("/api/admin/telegram/internal/**").permitAll()
-                // ОСТАЛЬНЫЕ ПУТИ
                 .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/api/ws/**", "/ws/**", "/error").permitAll()
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")
@@ -64,7 +62,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // РАЗРЕШАЕМ ДОМЕНЫ ДЛЯ СЕРВЕРА И ЛОКАЛЬНОЙ РАБОТЫ (Звездочка запрещена при allowCredentials=true)
+        // РАЗРЕШАЕМ ВСЕ ЗАГОЛОВКИ И ДОМЕНЫ (Звездочка запрещена при allowCredentials=true)
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "https://crm.109.248.203.156.sslip.io",
             "https://api.109.248.203.156.sslip.io",
@@ -74,9 +72,9 @@ public class SecurityConfig {
         ));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-Internal-Secret"));
+        configuration.setAllowedHeaders(List.of("*")); // Разрешаем любые заголовки
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "X-Internal-Secret"));
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

@@ -49,10 +49,6 @@ public class ScheduleService {
         this.messagingTemplate = messagingTemplate;
     }
 
-    public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId, String branchId) {
-        return appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
-    }
-
     @Transactional
     public Appointment addAppointment(Appointment appointment) {
         log.info("🚀 [ADD] Creating appointment for client '{}' in branch '{}'", appointment.getClientName(), appointment.getBranchId());
@@ -95,64 +91,53 @@ public class ScheduleService {
     }
 
     private void validateAvailability(Appointment app) {
-        if (app.getStaffMemberId() == null) {
-            log.info("⚠️ [AVAIL] No staff member assigned, skipping availability check.");
-            return;
-        }
+        if (app.getStaffMemberId() == null) return;
 
-        // 1. Получаем таймзону филиала надежно
         String timezone = branchRepository.findById(app.getBranchId())
                 .map(b -> b.getTimezone())
                 .orElse("Europe/Moscow");
 
-        // 2. Вычисляем ЛОКАЛЬНУЮ дату и время записи
         ZonedDateTime branchDateTime = app.getStartTime().atZoneSameInstant(ZoneId.of(timezone));
         LocalDate localDate = branchDateTime.toLocalDate();
         LocalTime localTime = branchDateTime.toLocalTime();
 
-        log.info("🔍 [AVAIL] Checking for staff: {}, Branch: {} ({})", app.getStaffMemberId(), app.getBranchId(), timezone);
-        log.info("🔍 [AVAIL] Appointment Start (UTC): {}, Localized: {} {}", app.getStartTime(), localDate, localTime);
-
         String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
 
         if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), localDate, localTime, app.getDurationInMinutes(), appId, app.getBranchId())) {
-            log.error("❌ [AVAIL] CONFLICT DETECTED for staff {}. Time: {} {}", app.getStaffMemberId(), localDate, localTime);
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят или не работает в этом филиале в это время");
         }
-        log.info("✅ [AVAIL] No conflicts found.");
     }
 
     public boolean isStaffMemberAvailable(String tenantId, String staffId, LocalDate date, LocalTime time, int duration, String currentAppId, String branchId) {
         Optional<StaffShift> shiftInBranch = staffShiftRepository.findByStaffIdAndDateAndBranchId(staffId, date, branchId);
         
-        if (shiftInBranch.isEmpty()) {
-            log.warn("❌ [CHECK] Master {} HAS NO SHIFT on {} in branch {}", staffId, date, branchId);
-            return false;
-        }
-        
-        StaffShift shift = shiftInBranch.get();
-        if (shift.isDayOff()) {
-            log.warn("❌ [CHECK] Master {} has a DAY OFF on {}", staffId, date);
-            return false;
-        }
+        if (shiftInBranch.isEmpty() || shiftInBranch.get().isDayOff()) return false;
 
+        StaffShift shift = shiftInBranch.get();
         LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
         LocalTime end = start.plusMinutes(duration);
         
-        log.info("📊 [CHECK] App Range: {} - {}. Master Shift: {} - {}", start, end, shift.getWorkStartTime(), shift.getWorkEndTime());
+        LocalTime sStart = shift.getWorkStartTime();
+        LocalTime sEnd = shift.getWorkEndTime();
 
-        // Проверка вхождения в рабочий график
-        if (start.isBefore(shift.getWorkStartTime()) || end.isAfter(shift.getWorkEndTime())) {
-            log.warn("❌ [CHECK] OUTSIDE WORKING HOURS. App: {}-{}, Shift: {}-{}", start, end, shift.getWorkStartTime(), shift.getWorkEndTime());
+        // УМНЫЙ УЧЕТ ПЕРЕХОДА ЧЕРЕЗ ПОЛНОЧЬ
+        boolean withinHours;
+        if (sEnd.isAfter(sStart)) {
+            // Обычная смена (например, 09:00 - 21:00)
+            withinHours = !start.isBefore(sStart) && !end.isAfter(sEnd);
+        } else {
+            // Ночная смена (например, 13:00 - 01:00)
+            withinHours = !start.isBefore(sStart) || !end.isAfter(sEnd);
+        }
+
+        if (!withinHours) {
+            log.warn("❌ [CHECK] Outside hours. App: {}-{}, Shift: {}-{}", start, end, sStart, sEnd);
             return false;
         }
 
         // Проверка на перерыв
         if (shift.getBreakStartTime() != null && shift.getBreakEndTime() != null) {
-            if (start.isBefore(shift.getBreakEndTime()) && end.isAfter(shift.getBreakStartTime())) {
-                log.warn("❌ [CHECK] CONFLICT WITH BREAK: {} - {}", shift.getBreakStartTime(), shift.getBreakEndTime());
-                return false;
-            }
+            if (start.isBefore(shift.getBreakEndTime()) && end.isAfter(shift.getBreakStartTime())) return false;
         }
 
         // Проверка на пересечение с другими записями
@@ -161,16 +146,16 @@ public class ScheduleService {
             if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
             if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
             
-            // ВАЖНО: Существующие записи тоже пересчитываем в лок. время для сравнения
             LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
             LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
             
-            if (start.isBefore(eEnd) && end.isAfter(eStart)) {
-                log.warn("❌ [CHECK] CONFLICT WITH APPOINTMENT ID: {}. Range: {} - {}", existing.getId(), eStart, eEnd);
-                return false;
-            }
+            if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
         }
         return true;
+    }
+
+    public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId, String branchId) {
+        return appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
     }
 
     public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {
