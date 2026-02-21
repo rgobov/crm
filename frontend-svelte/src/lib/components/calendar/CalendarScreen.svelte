@@ -73,12 +73,20 @@
         loadWorkload();
     }
 
+    // Цвета для фона ячеек и легенды
+    const colors = {
+        low: '#dcfce7',
+        medium: '#fef9c3',
+        high: '#ffedd5',
+        max: '#fee2e2'
+    };
+
     function getWorkloadColor(count) {
         if (!count || count === 0) return 'transparent';
-        if (count <= 2) return '#dcfce7'; // Light Green
-        if (count <= 5) return '#fef9c3'; // Light Yellow
-        if (count <= 8) return '#ffedd5'; // Light Orange
-        return '#fee2e2'; // Light Red
+        if (count <= 2) return colors.low;
+        if (count <= 5) return colors.medium;
+        if (count <= 8) return colors.high;
+        return colors.max;
     }
 
     function selectDate(day) {
@@ -116,10 +124,22 @@
         </div>
 
         <div class="legend">
-            <div class="item"><span class="dot green"></span> 1-2</div>
-            <div class="item"><span class="dot yellow"></span> 3-5</div>
-            <div class="item"><span class="dot orange"></span> 6-8</div>
-            <div class="item"><span class="dot red"></span> 9+</div>
+            <div class="item">
+                <span class="dot" style="background: {colors.low}"></span>
+                <span class="lbl">1-2</span>
+            </div>
+            <div class="item">
+                <span class="dot" style="background: {colors.medium}"></span>
+                <span class="lbl">3-5</span>
+            </div>
+            <div class="item">
+                <span class="dot" style="background: {colors.high}"></span>
+                <span class="lbl">6-8</span>
+            </div>
+            <div class="item">
+                <span class="dot" style="background: {colors.max}"></span>
+                <span class="lbl">9+</span>
+            </div>
         </div>
     </div>
 </div>
@@ -128,7 +148,7 @@
     .calendar-page-limiter { width: 100%; box-sizing: border-box; }
     .calendar-container {
         padding: 16px;
-        background: #fdf6e3; /* Base3 - кремовый */
+        background: #fdf6e3;
         border-radius: 24px;
         border: 1.5px solid #ddd6c1;
     }
@@ -137,7 +157,7 @@
     .cal-header h3 { margin: 0; font-size: 15px; font-weight: 850; color: #073642; }
 
     .nav-btn {
-        background: #eee8d5; /* Base2 */
+        background: #eee8d5;
         border: 1px solid #ddd6c1;
         width: 32px; height: 32px; border-radius: 10px;
         font-size: 18px; cursor: pointer; color: #268bd2;
@@ -149,7 +169,7 @@
     .weekdays {
         display: grid; grid-template-columns: repeat(7, 1fr);
         text-align: center; font-size: 10px; font-weight: 800;
-        color: #93a1a1; /* Base1 */
+        color: #93a1a1;
         text-transform: uppercase; margin-bottom: 10px;
     }
 
@@ -158,32 +178,36 @@
     .day-cell {
         aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
         border-radius: 50%; cursor: pointer; position: relative; transition: 0.2s;
-        border: 2px solid transparent; /* Для выделения сегодня через border */
+        border: 2px solid transparent;
     }
     .day-cell:hover:not(.inactive) { background: #eee8d5; }
 
-    .day-num { font-size: 14px; font-weight: 750; color: #586e75; /* Base01 */ z-index: 2; }
+    .day-num { font-size: 14px; font-weight: 750; color: #586e75; z-index: 2; }
 
     .inactive { opacity: 0.15; pointer-events: none; }
 
-    /* ВЫДЕЛЕНИЕ СЕГОДНЯ: СИНЯЯ РАМКА */
     .is-today {
-        border-color: #268bd2 !important; /* Яркий синий контур */
+        border-color: #268bd2 !important;
     }
     .today-text {
-        color: #073642 !important; /* Стандартный темный цвет */
-        font-weight: 900 !important; /* Чуть жирнее */
+        color: #073642 !important;
+        font-weight: 900 !important;
     }
 
-    /* ФОН ЗАГРУЗКИ - ОСТАВЛЯЕМ КАК БЫЛО */
     .workload-bg { position: absolute; width: 30px; height: 30px; border-radius: 50%; z-index: 1; }
 
+    /* УЛУЧШЕННАЯ ЛЕГЕНДА */
     .legend {
-        display: flex; justify-content: space-around;
-        margin-top: 20px; padding-top: 12px; border-top: 1px solid #ddd6c1;
+        display: flex; justify-content: space-between;
+        margin-top: 20px; padding: 12px 4px 0; border-top: 1px solid #ddd6c1;
     }
-    .legend .item { display: flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 800; color: #93a1a1; }
+    .legend .item { display: flex; align-items: center; gap: 6px; }
+    .legend .lbl { font-size: 11px; font-weight: 800; color: #586e75; } /* Base01 - более четкий текст */
 
-    .dot { width: 6px; height: 6px; border-radius: 50%; }
-    .dot.green { background: #dcfce7; } .dot.yellow { background: #fef9c3; } .dot.orange { background: #ffedd5; } .dot.red { background: #fee2e2; }
+    .dot {
+        width: 12px; height: 12px; /* Увеличено */
+        border-radius: 50%;
+        display: inline-block;
+        border: 1px solid rgba(7, 54, 66, 0.1); /* Тонкий контур для четкости */
+    }
 </style>
