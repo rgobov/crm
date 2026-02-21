@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "appointments")
@@ -29,6 +30,9 @@ public class Appointment {
 
     @Column(name = "client_name", nullable = false)
     private String clientName;
+
+    @Column(name = "client_phone")
+    private String clientPhone;
 
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
@@ -90,11 +94,21 @@ public class Appointment {
     @Column(name = "reminder_lead_time_hours")
     private Integer reminderLeadTimeHours = 24;
 
+    /**
+     * Возвращает дату, пересчитанную в часовой пояс филиала
+     */
     public LocalDate getDate() {
-        return startTime != null ? startTime.toLocalDate() : null;
+        if (startTime == null) return null;
+        String tz = (branch != null && branch.getTimezone() != null) ? branch.getTimezone() : "Europe/Moscow";
+        return startTime.atZoneSameInstant(ZoneId.of(tz)).toLocalDate();
     }
 
+    /**
+     * Возвращает время, пересчитанное в часовой пояс филиала
+     */
     public LocalTime getTime() {
-        return startTime != null ? startTime.toLocalTime() : null;
+        if (startTime == null) return null;
+        String tz = (branch != null && branch.getTimezone() != null) ? branch.getTimezone() : "Europe/Moscow";
+        return startTime.atZoneSameInstant(ZoneId.of(tz)).toLocalTime();
     }
 }
