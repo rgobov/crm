@@ -20,32 +20,25 @@
         renderCalendar();
     }
 
-    // ДЕБАГ: Логируем смену филиала
     $: if ($activeBranchId !== undefined) {
-        console.log('✅ CalendarScreen: Branch changed! New activeBranchId:', $activeBranchId);
         loadWorkload();
     }
 
     onMount(async () => {
-        console.log('✅ CalendarScreen: Component Mounted. Initial activeBranchId:', $activeBranchId);
         await loadWorkload();
     });
 
     async function loadWorkload() {
-        if ($activeBranchId === undefined) return; // Не грузим, если филиал еще не определен
+        if ($activeBranchId === undefined) return;
         isLoading = true;
-
-        console.log(`🚀 CalendarScreen: Loading workload for ${currYear}-${currMonth + 1} and branch: ${$activeBranchId}`);
-
         try {
             const data = await adminService.getWorkloadForMonth(currYear, currMonth + 1, $activeBranchId);
-            console.log('📦 CalendarScreen: Received workload data:', data);
             workloadData = {};
             data.forEach(item => {
                 workloadData[item.day] = item.appointmentCount;
             });
         } catch (e) {
-            console.error('❌ Workload load failed', e);
+            console.error('Workload load failed', e);
         } finally {
             isLoading = false;
         }
@@ -82,10 +75,10 @@
 
     function getWorkloadColor(count) {
         if (!count || count === 0) return 'transparent';
-        if (count <= 2) return '#dcfce7';
-        if (count <= 5) return '#fef9c3';
-        if (count <= 8) return '#ffedd5';
-        return '#fee2e2';
+        if (count <= 2) return '#dcfce7'; // Light Green
+        if (count <= 5) return '#fef9c3'; // Light Yellow
+        if (count <= 8) return '#ffedd5'; // Light Orange
+        return '#fee2e2'; // Light Red
     }
 
     function selectDate(day) {
@@ -97,9 +90,9 @@
 <div class="calendar-page-limiter">
     <div class="calendar-container">
         <div class="cal-header">
-            <button on:click={() => changeMonth(-1)}>‹</button>
+            <button class="nav-btn" on:click={() => changeMonth(-1)}>‹</button>
             <h3>{monthNames[currMonth]} {currYear}</h3>
-            <button on:click={() => changeMonth(1)}>›</button>
+            <button class="nav-btn" on:click={() => changeMonth(1)}>›</button>
         </div>
 
         <div class="weekdays">
@@ -117,7 +110,7 @@
                     {#if d.current && d.count > 0}
                         <div class="workload-bg" style="background-color: {getWorkloadColor(d.count)}"></div>
                     {/if}
-                    <span class="day-num">{d.day}</span>
+                    <span class="day-num" class:today-text={d.today}>{d.day}</span>
                 </div>
             {/each}
         </div>
@@ -133,20 +126,64 @@
 
 <style>
     .calendar-page-limiter { width: 100%; box-sizing: border-box; }
-    .calendar-container { padding: 20px; background: white; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; }
-    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .cal-header h3 { margin: 0; font-size: 17px; font-weight: 800; color: #0f172a; }
-    .cal-header button { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 12px; font-size: 20px; cursor: pointer; color: var(--primary-color); }
-    .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 12px; }
-    .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-    .day-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer; position: relative; transition: 0.2s; }
-    .day-cell:hover { background: #f8fafc; }
-    .day-num { font-size: 15px; font-weight: 700; color: #1e293b; z-index: 2; }
+    .calendar-container {
+        padding: 16px;
+        background: #fdf6e3; /* Base3 - кремовый */
+        border-radius: 24px;
+        border: 1.5px solid #ddd6c1;
+    }
+
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .cal-header h3 { margin: 0; font-size: 15px; font-weight: 850; color: #073642; }
+
+    .nav-btn {
+        background: #eee8d5; /* Base2 */
+        border: 1px solid #ddd6c1;
+        width: 32px; height: 32px; border-radius: 10px;
+        font-size: 18px; cursor: pointer; color: #268bd2;
+        display: flex; align-items: center; justify-content: center;
+        transition: 0.2s;
+    }
+    .nav-btn:hover { background: #fdf6e3; border-color: #268bd2; }
+
+    .weekdays {
+        display: grid; grid-template-columns: repeat(7, 1fr);
+        text-align: center; font-size: 10px; font-weight: 800;
+        color: #93a1a1; /* Base1 */
+        text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+
+    .day-cell {
+        aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+        border-radius: 50%; cursor: pointer; position: relative; transition: 0.2s;
+        border: 2px solid transparent; /* Для выделения сегодня через border */
+    }
+    .day-cell:hover:not(.inactive) { background: #eee8d5; }
+
+    .day-num { font-size: 14px; font-weight: 750; color: #586e75; /* Base01 */ z-index: 2; }
+
     .inactive { opacity: 0.15; pointer-events: none; }
-    .is-today { outline: 2px solid var(--primary-color); background: #eff6ff; }
-    .workload-bg { position: absolute; width: 32px; height: 32px; border-radius: 50%; z-index: 1; }
-    .legend { display: flex; justify-content: space-around; margin-top: 24px; padding-top: 16px; border-top: 1px solid #f1f5f9; }
-    .legend .item { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; color: #94a3b8; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ВЫДЕЛЕНИЕ СЕГОДНЯ: СИНЯЯ РАМКА */
+    .is-today {
+        border-color: #268bd2 !important; /* Яркий синий контур */
+    }
+    .today-text {
+        color: #073642 !important; /* Стандартный темный цвет */
+        font-weight: 900 !important; /* Чуть жирнее */
+    }
+
+    /* ФОН ЗАГРУЗКИ - ОСТАВЛЯЕМ КАК БЫЛО */
+    .workload-bg { position: absolute; width: 30px; height: 30px; border-radius: 50%; z-index: 1; }
+
+    .legend {
+        display: flex; justify-content: space-around;
+        margin-top: 20px; padding-top: 12px; border-top: 1px solid #ddd6c1;
+    }
+    .legend .item { display: flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 800; color: #93a1a1; }
+
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
     .dot.green { background: #dcfce7; } .dot.yellow { background: #fef9c3; } .dot.orange { background: #ffedd5; } .dot.red { background: #fee2e2; }
 </style>
