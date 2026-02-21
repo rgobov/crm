@@ -25,19 +25,21 @@ public class NotificationManager {
 
     public void sendNotification(Appointment appointment, String type) {
         String tenantId = appointment.getTenantId();
+        log.info("🔔 [MANAGER] Notification request received. AppID: {}, Type: {}, Tenant: {}", appointment.getId(), type, tenantId);
         
         if (!appointment.isAllowReminder()) {
-            log.info("Notifications disabled for appointment: {}", appointment.getId());
+            log.info("🔕 [MANAGER] Reminders are DISABLED for appointment: {}", appointment.getId());
             return;
         }
 
         TelegramSettings tg = telegramSettingsService.getSettings(tenantId);
         if (tg != null && tg.isActive()) {
+            log.info("📤 [MANAGER] Found ACTIVE Telegram provider for tenant {}. Starting sendViaTelegram...", tenantId);
             sendViaTelegram(appointment, type);
             return;
         }
 
-        log.warn("No active notification provider found for tenant: {}", tenantId);
+        log.warn("⚠️ [MANAGER] No active notification provider found for tenant: {}. Check telegram_settings in DB.", tenantId);
     }
 
     private void sendViaTelegram(Appointment appointment, String type) {
@@ -45,11 +47,15 @@ public class NotificationManager {
         String template = templateService.getTemplateContent(tenantId, type);
         String message = templateEngine.process(template, appointment);
 
+        log.info("🔍 [TELEGRAM] Checking contact data for app {}. Contact object: {}", 
+                appointment.getId(), appointment.getContact() != null ? "FOUND" : "NULL");
+
         if (appointment.getContact() != null && 
             appointment.getContact().getPhones() != null && 
             !appointment.getContact().getPhones().isEmpty()) {
             
             String rawPhone = appointment.getContact().getPhones().get(0);
+            log.info("📱 [TELEGRAM] Phone from DB: {}", rawPhone);
             
             // 1. Очищаем от всего, кроме цифр
             String cleanPhone = rawPhone.replaceAll("[^0-9]", "");
@@ -59,23 +65,21 @@ public class NotificationManager {
                 cleanPhone = "7" + cleanPhone.substring(1);
             }
             
-            // 3. Если номер все еще начинается с 8 (и длина не 11), 
-            // мы его не трогаем, так как это может быть международный номер другой страны (например, Японии 81...)
-            
-            log.info("Telegram notification phone: {}", cleanPhone);
+            log.info("🚀 [TELEGRAM] Dispatching message to microservice. Phone: {}, Tenant: {}", cleanPhone, tenantId);
             
             try {
-                notificationClient.sendTelegramMessage(internalSecret, Map.of(
+                Map<String, String> response = notificationClient.sendTelegramMessage(internalSecret, Map.of(
                     "tenantId", tenantId,
                     "phone", cleanPhone,
                     "text", message
                 ));
+                log.info("✅ [TELEGRAM] SUCCESS! Microservice response: {}", response);
             } catch (Exception e) {
-                log.error("Failed to send to microservice: {}", e.getMessage());
+                log.error("❌ [TELEGRAM] FAILED to send to microservice for {}: {}", cleanPhone, e.getMessage());
                 throw e;
             }
         } else {
-            log.warn("Cannot send Telegram notification: No phone found for contact");
+            log.error("❌ [TELEGRAM] ABORT: No phone number found for contact in appointment {}", appointment.getId());
         }
     }
 }

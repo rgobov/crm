@@ -1,10 +1,17 @@
 version: '3.8'
 
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "3"
+
 services:
   tryneuro_database:
     image: postgres:15-alpine
     container_name: tryneuro_db
     restart: always
+    logging: *default-logging
     environment:
       POSTGRES_DB: tryneuro_db
       POSTGRES_USER: postgres
@@ -20,6 +27,7 @@ services:
       dockerfile: Dockerfile
     container_name: tryneuro_backend
     restart: always
+    logging: *default-logging
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://tryneuro_database:5432/tryneuro_db
       SPRING_DATASOURCE_USERNAME: postgres
@@ -39,6 +47,7 @@ services:
       dockerfile: Dockerfile
     container_name: tryneuro_notifications
     restart: always
+    logging: *default-logging
     environment:
       TELEGRAM_API_ID: ${TELEGRAM_API_ID}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
@@ -56,6 +65,7 @@ services:
       dockerfile: Dockerfile
     container_name: tryneuro_svelte
     restart: always
+    logging: *default-logging
     environment:
       ORIGIN: https://crm.109.248.203.156.sslip.io
       PROTOCOL_HEADER: x-forwarded-proto
@@ -72,6 +82,7 @@ services:
     image: 'jc21/nginx-proxy-manager:latest'
     container_name: tryneuro_proxy
     restart: always
+    logging: *default-logging
     ports:
       - '80:80'
       - '81:81'
@@ -88,4 +99,4 @@ networks:
 
 volumes:
   postgres_data:
-  tg_sessions: # Хранилище для сессий Telegram
+  tg_sessions:
