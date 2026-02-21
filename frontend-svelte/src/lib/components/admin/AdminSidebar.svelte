@@ -17,10 +17,11 @@
         { id: 'timeline', label: 'Таймлайн', icon: '🕒' }
     ];
 
-    onMount(async () => {
+    async function loadBranches() {
         try {
+            isLoadingBranches = true;
             branches = await branchService.getBranches();
-            if (!$activeBranchId && branches.length > 0) {
+            if (branches.length > 0 && !$activeBranchId) {
                 activeBranchId.set(branches[0].id);
             }
         } catch (e) {
@@ -28,6 +29,10 @@
         } finally {
             isLoadingBranches = false;
         }
+    }
+
+    onMount(() => {
+        loadBranches();
     });
 
     function handleNav(id) {
@@ -58,20 +63,19 @@
             </div>
         </div>
 
-        <!-- ГЛОБАЛЬНЫЙ ПЕРЕКЛЮЧАТЕЛЬ ФИЛИАЛОВ -->
         <div class="branch-nav-section">
             <label class="section-micro-label">ТЕКУЩИЙ ФИЛИАЛ</label>
             <div class="branch-select-box">
                 {#if isLoadingBranches}
-                    <div class="branch-loading">...</div>
-                {:else if branches.length > 0}
+                    <div class="branch-loading">Загрузка...</div>
+                {:else if branches && branches.length > 0}
                     <select class="branch-select" bind:value={$activeBranchId}>
                         {#each branches as b}
                             <option value={b.id}>{b.name}</option>
                         {/each}
                     </select>
                 {:else}
-                    <div class="no-branches">Нет филиалов</div>
+                    <button class="no-branches-btn" on:click={loadBranches}>Обновить список</button>
                 {/if}
             </div>
         </div>
@@ -106,10 +110,9 @@
 </aside>
 
 <style>
-    /* ПАЛИТРА SOLARIZED LIGHT ДЛЯ САЙДБАРА */
     .sidebar {
         width: 100%; height: 100%;
-        background: #eee8d5; /* Base2 - чуть темнее основного кремового */
+        background: #eee8d5;
         display: flex; flex-direction: column; overflow: hidden;
         border-right: 1.5px solid #ddd6c1;
     }
@@ -123,30 +126,36 @@
         display: flex; justify-content: center; align-items: center;
         font-weight: 900; font-size: 16px; flex-shrink: 0;
     }
-    .logo-text h1 { font-size: 17px; margin: 0; color: #073642; /* Base02 */ font-weight: 800; letter-spacing: -0.2px; }
-    .logo-text span { font-size: 9px; color: #93a1a1; /* Base1 */ font-weight: 700; letter-spacing: 0.5px; }
+    .logo-text h1 { font-size: 17px; margin: 0; color: #073642; font-weight: 800; letter-spacing: -0.2px; }
+    .logo-text span { font-size: 9px; color: #93a1a1; font-weight: 700; letter-spacing: 0.5px; }
 
-    /* СТИЛИ ПЕРЕКЛЮЧАТЕЛЯ */
-    .branch-nav-section { background: #fdf6e3; /* Base3 - светлый фон для контраста */ padding: 12px; border-radius: 16px; border: 1px solid #ddd6c1; }
+    .branch-nav-section { background: #fdf6e3; padding: 12px; border-radius: 16px; border: 1px solid #ddd6c1; }
     .section-micro-label { display: block; font-size: 8px; font-weight: 900; color: #93a1a1; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+
     .branch-select {
         width: 100%; background: transparent; border: none;
-        font-size: 13px; font-weight: 800; color: #268bd2; /* Solarized Blue */
-        outline: none; cursor: pointer;
+        font-size: 13px; font-weight: 800; color: #268bd2;
+        outline: none; cursor: pointer; padding: 4px 0;
     }
-    .branch-loading, .no-branches { font-size: 12px; font-weight: 600; color: #93a1a1; padding: 4px; }
+
+    .branch-loading { font-size: 12px; font-weight: 600; color: #93a1a1; padding: 4px; }
+
+    .no-branches-btn {
+        background: none; border: none; color: #dc322f;
+        font-size: 11px; font-weight: 800; cursor: pointer; text-decoration: underline;
+    }
 
     .nav-menu { display: flex; flex-direction: column; gap: 6px; }
     .nav-btn {
         display: flex; align-items: center; gap: 12px; padding: 12px 16px;
         border: none; background: none; border-radius: 14px;
-        color: #586e75; /* Base01 */ font-weight: 750;
+        color: #586e75; font-weight: 750;
         cursor: pointer; transition: all 0.2s;
     }
     .nav-btn:hover { background: rgba(253, 246, 227, 0.5); color: #073642; }
     .nav-btn.active {
-        background: #fdf6e3; /* Активная кнопка - светлая */
-        color: #268bd2; /* Синий текст */
+        background: #fdf6e3;
+        color: #268bd2;
         box-shadow: 0 4px 12px rgba(0,0,0,0.03);
     }
 
@@ -158,7 +167,7 @@
     .logout-btn-desktop {
         display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 16px;
         border: 1px solid #eee8d5; background: #fdf6e3;
-        color: #dc322f; /* Solarized Red */
+        color: #dc322f;
         border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer;
         transition: 0.2s;
     }
