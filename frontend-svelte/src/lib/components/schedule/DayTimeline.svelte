@@ -15,6 +15,7 @@
     export let appointments = [];
     export let staff = [];
 
+    // Константы размеров
     let HOUR_HEIGHT = 140;
     let SLOT_HEIGHT = HOUR_HEIGHT / 4;
     let STAFF_WIDTH = 200;
@@ -33,6 +34,7 @@
     let gridCanvas;
 
     let isDown = false;
+    let isTouch = false; // НОВОЕ: Флаг режима касания
     let startX;
     let scrollLeft;
 
@@ -102,6 +104,7 @@
     $: if (day || startHour || currentBranch) updateNowPosition();
 
     function handleStart(e) {
+        isTouch = e.type === 'touchstart'; // Проверяем, касание это или клик
         isDown = true;
         const pageX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
         startX = pageX - scrollBody.offsetLeft;
@@ -110,7 +113,8 @@
     }
 
     function handleMove(e) {
-        if (gridCanvas) {
+        // Гайд-линия при наведении (только для мыши)
+        if (!isTouch && gridCanvas) {
             const rect = gridCanvas.getBoundingClientRect();
             const clientY = e.clientY || (e.touches ? e.touches[0].clientY : -1);
             const y = clientY - rect.top;
@@ -125,8 +129,11 @@
                 showGuide = false;
             }
         }
-        if (!isDown) return;
-        const pageX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
+
+        if (!isDown || isTouch) return; // Если это тач - не мешаем нативному скроллу браузера
+
+        e.preventDefault(); // Предотвращаем выделение текста при перетаскивании мышью
+        const pageX = e.pageX;
         const x = pageX - scrollBody.offsetLeft;
         const walk = (x - startX) * 1.5;
         scrollBody.scrollLeft = scrollLeft - walk;
@@ -212,7 +219,7 @@
          on:touchstart={handleStart}
          on:touchmove={handleMove}
          on:touchend={handleEnd}
-         class:grabbing={isDown}>
+         class:grabbing={isDown && !isTouch}>
 
         <div class="body-layout-wrapper" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
             <!-- ШКАЛА ВРЕМЕНИ -->
@@ -300,7 +307,14 @@
     .off-badge { display: inline-block; font-size: 8px; font-weight: 900; background: #dc322f; color: white; padding: 1px 4px; border-radius: 4px; margin-top: 2px; }
     .work-time { font-size: 9px; color: #859900; font-weight: 800; }
 
-    .timeline-body-scroll { flex: 1; overflow: auto; position: relative; cursor: grab; touch-action: pan-y; }
+    .timeline-body-scroll {
+        flex: 1;
+        overflow: auto;
+        position: relative;
+        cursor: grab;
+        touch-action: pan-x pan-y; /* ВАЖНО: Разрешаем нативную прокрутку */
+        -webkit-overflow-scrolling: touch; /* Включаем инерцию на iOS */
+    }
     .timeline-body-scroll.grabbing { cursor: grabbing; }
 
     .body-layout-wrapper { display: flex; min-height: 100%; align-items: flex-start; position: relative; }
