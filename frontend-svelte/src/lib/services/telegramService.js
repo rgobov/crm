@@ -2,13 +2,14 @@ import api from '../api.js';
 
 export const telegramService = {
     async getStatus() {
-        const res = await api.get('/admin/telegram/status');
+        // Запрашиваем статус. Бэкенд теперь может вернуть {status: "FLOOD_WAIT_238", ...}
+        const res = await api.get('/api/admin/telegram/status');
         return res.data;
     },
     async connect() {
-        await api.post('/admin/telegram/connect');
+        await api.post('/api/admin/telegram/connect');
     },
     async disconnect() {
-        await api.post('/admin/telegram/disconnect');
+        await api.post('/api/admin/telegram/disconnect');
     }
 };
