@@ -3,15 +3,13 @@ import { writable } from 'svelte/store';
 
 export const wsConnected = writable(false);
 export const scheduleRefreshSignal = writable({ ts: 0 });
-export const telegramStatusSignal = writable({ ts: 0 }); // НОВЫЙ СТОР ДЛЯ ТЕЛЕГРАМА
+// ТЕПЕРЬ СТОР ХРАНИТ ПОЛНЫЙ ОБЪЕКТ СТАТУСА
+export const telegramStatusSignal = writable({ status: null, ts: 0 });
 
 let stompClient = null;
 let reconnectTimeout = null;
 let isConnecting = false;
 
-/**
- * Безопасное извлечение tenantId для подписки
- */
 function getTenantFromToken() {
     if (typeof window === 'undefined') return null;
     const token = localStorage.getItem('token');
@@ -55,16 +53,18 @@ export const websocketService = {
                 wsConnected.set(true);
                 console.log('✅ WS: Connected');
 
-                // Подписка на расписание
                 stompClient.subscribe(`/topic/schedule/${tenantId}`, (message) => {
-                    console.log('📥 WS: Schedule refresh received');
                     scheduleRefreshSignal.set({ ts: Date.now() });
                 });
 
-                // Подписка на ТЕЛЕГРАМ
                 stompClient.subscribe(`/topic/telegram/${tenantId}`, (message) => {
-                    console.log('📥 WS: Telegram update received');
-                    telegramStatusSignal.set({ ts: Date.now() });
+                    const data = JSON.parse(message.body);
+                    console.log('📥 WS: Telegram status update:', data.status);
+                    // ОБНОВЛЯЕМ СТОР РЕАЛЬНЫМИ ДАННЫМИ
+                    telegramStatusSignal.set({
+                        status: data.status,
+                        ts: data.ts || Date.now()
+                    });
                 });
 
             }, (error) => {
@@ -87,7 +87,6 @@ export const websocketService = {
         if (stompClient) {
             stompClient.disconnect();
             wsConnected.set(false);
-            console.log('📡 WS: Disconnected');
         }
     }
 };

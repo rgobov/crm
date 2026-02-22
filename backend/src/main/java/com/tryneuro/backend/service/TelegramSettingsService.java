@@ -52,44 +52,36 @@ public class TelegramSettingsService {
         } catch (Exception e) {
             log.warn("Microservice disconnect failed: {}", e.getMessage());
         }
-        // Принудительно ставим статус в базе
         updateDatabaseStatus(tenantId, false);
         notifyFrontend(tenantId, "DISCONNECTED");
     }
 
     @Transactional
     public void updateStatus(String tenantId, String status) {
-        // Всегда уведомляем фронтенд о текущем статусе (для спиннеров и QR)
+        // Уведомляем фронтенд СРАЗУ с передачей статуса
         notifyFrontend(tenantId, status);
 
-        // В базу пишем ТОЛЬКО финальные состояния
         if ("CONNECTED".equals(status)) {
             updateDatabaseStatus(tenantId, true);
         } else if ("DISCONNECTED".equals(status)) {
             updateDatabaseStatus(tenantId, false);
         }
-        // Промежуточные статусы (INITIALIZING, WAITING_QR) базу НЕ трогают
     }
 
     private void updateDatabaseStatus(String tenantId, boolean active) {
-        Optional<TelegramSettings> settingsOpt = telegramSettingsRepository.findById(tenantId);
-        boolean wasActive = settingsOpt.map(TelegramSettings::isActive).orElse(false);
-
-        if (wasActive != active || settingsOpt.isEmpty()) {
-            log.info("💾 Database state sync for {}: {} -> {}", tenantId, wasActive, active);
-            jdbcTemplate.update(
-                "INSERT INTO telegram_settings (tenant_id, is_active, connected_at) " +
-                "VALUES (?, ?, ?) ON CONFLICT (tenant_id) DO UPDATE SET is_active = ?, connected_at = ?",
-                tenantId, active, LocalDateTime.now(), active, LocalDateTime.now()
-            );
-        }
+        jdbcTemplate.update(
+            "INSERT INTO telegram_settings (tenant_id, is_active, connected_at) " +
+            "VALUES (?, ?, ?) ON CONFLICT (tenant_id) DO UPDATE SET is_active = ?, connected_at = ?",
+            tenantId, active, LocalDateTime.now(), active, LocalDateTime.now()
+        );
     }
 
     private void notifyFrontend(String tenantId, String status) {
         try {
+            // ПЕРЕДАЕМ СТАТУС В СООБЩЕНИИ
             messagingTemplate.convertAndSend("/topic/telegram/" + tenantId, Map.of(
                 "status", status,
-                "timestamp", LocalDateTime.now().toString()
+                "ts", System.currentTimeMillis()
             ));
         } catch (Exception e) {
             log.warn("WebSocket notification failed: {}", e.getMessage());

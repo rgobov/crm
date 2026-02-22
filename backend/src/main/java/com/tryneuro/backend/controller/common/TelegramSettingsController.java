@@ -28,14 +28,11 @@ public class TelegramSettingsController {
     public ResponseEntity<?> getStatus() {
         String tenantId = (String) request.getAttribute("tenantId");
         
-        // ВСЕГДА запрашиваем реальный статус у микросервиса (прощупывание)
+        // Только запрашиваем реальное состояние у микросервиса
         Map<String, String> realTimeStatus = telegramSettingsService.getRealTimeStatus(tenantId);
         String status = realTimeStatus.get("status");
 
-        // Синхронизируем локальную БД на основе реального ответа
-        telegramSettingsService.updateStatus(tenantId, status);
-
-        // Если подключено, добавляем номер телефона из базы для красоты UI
+        // Если реально подключено, обогащаем данными из БД
         if ("CONNECTED".equals(status)) {
             TelegramSettings settings = telegramSettingsService.getSettings(tenantId);
             return ResponseEntity.ok(Map.of(
@@ -44,12 +41,14 @@ public class TelegramSettingsController {
             ));
         }
 
+        // Возвращаем как есть (WAITING_QR, DISCONNECTED, etc), НЕ вызывая updateStatus
         return ResponseEntity.ok(realTimeStatus);
     }
 
     @PostMapping("/connect")
     public ResponseEntity<?> connect() {
         String tenantId = (String) request.getAttribute("tenantId");
+        log.info("🚀 Received connect request for tenant: {}", tenantId);
         telegramSettingsService.connect(tenantId);
         return ResponseEntity.ok().build();
     }
@@ -57,6 +56,7 @@ public class TelegramSettingsController {
     @PostMapping("/disconnect")
     public ResponseEntity<?> disconnect() {
         String tenantId = (String) request.getAttribute("tenantId");
+        log.info("🗑 Received disconnect request for tenant: {}", tenantId);
         telegramSettingsService.disconnect(tenantId);
         return ResponseEntity.ok().build();
     }
@@ -67,12 +67,13 @@ public class TelegramSettingsController {
             @RequestBody Map<String, Object> data) {
         
         if (incomingSecret == null || !incomingSecret.equals(internalSecret)) {
-            log.warn("Unauthorized internal sync attempt with secret: {}", incomingSecret);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
         String tenantId = (String) data.get("tenantId");
         String status = (String) data.get("status");
+        
+        // Сюда приходят реальные обновления статуса. Только здесь вызываем обновление и рассылку в WS.
         telegramSettingsService.updateStatus(tenantId, status);
         return ResponseEntity.ok().build();
     }

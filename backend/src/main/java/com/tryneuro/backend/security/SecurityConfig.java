@@ -44,8 +44,12 @@ public class SecurityConfig {
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // ЯВНОЕ РАЗРЕШЕНИЕ ДЛЯ ТЕЛЕГРАМ-ЭНДПОИНТОВ (Внутренних и Админских)
                 .requestMatchers("/api/admin/telegram/internal/**").permitAll()
+                .requestMatchers("/api/admin/telegram/**").hasAnyRole("ADMIN", "MANAGER")
+                // ПУБЛИЧНЫЕ
                 .requestMatchers("/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/api/ws/**", "/ws/**", "/error").permitAll()
+                // ОСТАЛЬНОЙ АДМИН-ФУНКЦИОНАЛ
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")
                 .requestMatchers("/api/employee/**").hasAnyRole("EMPLOYEE", "ADMIN")
@@ -61,8 +65,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // РАЗРЕШАЕМ ВСЕ ЗАГОЛОВКИ И ДОМЕНЫ (Звездочка запрещена при allowCredentials=true)
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "https://crm.109.248.203.156.sslip.io",
             "https://api.109.248.203.156.sslip.io",
@@ -70,9 +72,8 @@ public class SecurityConfig {
             "http://localhost:*",
             "http://127.0.0.1:*"
         ));
-        
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*")); // Разрешаем любые заголовки
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(Arrays.asList("Authorization", "X-Internal-Secret"));
         
