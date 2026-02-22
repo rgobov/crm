@@ -34,7 +34,7 @@
     let gridCanvas;
 
     let isDown = false;
-    let isTouch = false; // НОВОЕ: Флаг режима касания
+    let isTouch = false;
     let startX;
     let scrollLeft;
 
@@ -104,7 +104,7 @@
     $: if (day || startHour || currentBranch) updateNowPosition();
 
     function handleStart(e) {
-        isTouch = e.type === 'touchstart'; // Проверяем, касание это или клик
+        isTouch = e.type === 'touchstart';
         isDown = true;
         const pageX = e.pageX || (e.touches ? e.touches[0].pageX : 0);
         startX = pageX - scrollBody.offsetLeft;
@@ -113,7 +113,6 @@
     }
 
     function handleMove(e) {
-        // Гайд-линия при наведении (только для мыши)
         if (!isTouch && gridCanvas) {
             const rect = gridCanvas.getBoundingClientRect();
             const clientY = e.clientY || (e.touches ? e.touches[0].clientY : -1);
@@ -129,10 +128,8 @@
                 showGuide = false;
             }
         }
-
-        if (!isDown || isTouch) return; // Если это тач - не мешаем нативному скроллу браузера
-
-        e.preventDefault(); // Предотвращаем выделение текста при перетаскивании мышью
+        if (!isDown || isTouch) return;
+        e.preventDefault();
         const pageX = e.pageX;
         const x = pageX - scrollBody.offsetLeft;
         const walk = (x - startX) * 1.5;
@@ -178,6 +175,14 @@
 
     $: staffIds = new Set(staff.map(s => s.id));
     $: unassignedAppts = appointments.filter(a => !a.staffMemberId || !staffIds.has(a.staffMemberId));
+
+    // БЕЗОПАСНАЯ ОБРАБОТКА КЛИКА ПО СЛОТУ
+    function handleEmptySlotClick(staffId, hour, minute, status) {
+        if (status === 'OFF' || status === 'BREAK') {
+            return; // Просто выходим, блокируя открытие модалки
+        }
+        dispatch('emptySlotTap', { hour, min: minute, staffId });
+    }
 </script>
 
 <div class="timeline-root" on:mouseleave={() => showGuide = false}>
@@ -222,17 +227,13 @@
          class:grabbing={isDown && !isTouch}>
 
         <div class="body-layout-wrapper" style="width: {(staff.length + (unassignedAppts.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
-            <!-- ШКАЛА ВРЕМЕНИ -->
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
                         <span class="h-label">{h}:00</span>
                     </div>
                 {/each}
-
-                <!-- 1. ТОЧКА ВРЕМЕНИ (В САМОМ КОНЦЕ СЛОЯ) -->
                 <TimelineNowIndicator {nowLinePos} label={branchTime} mode="dot" />
-
                 {#if showGuide}
                     <TimelineCursorGuide y={hoverY} timeStr={hoverTimeStr} mode="label" />
                 {/if}
@@ -251,7 +252,7 @@
                                         class:is-off={status === 'OFF'}
                                         class:zebra={h % 2 === 0}
                                         style="height: {SLOT_HEIGHT}px"
-                                        on:click|stopPropagation={() => dispatch('emptySlotTap', { hour: h, min: m, staffId: s.id })}>
+                                        on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}>
                                     {#if status === 'BREAK' && m === 0}
                                         <div class="break-overlay"><span class="break-txt">ОБЕД ДО {s.breakEndTime?.slice(0,5)}</span></div>
                                     {/if}
@@ -277,8 +278,6 @@
                 {#if showGuide}
                     <TimelineCursorGuide y={hoverY} mode="line" />
                 {/if}
-
-                <!-- 2. ЛИНИЯ ВРЕМЕНИ (В САМОМ КОНЦЕ СЛОЯ) -->
                 <TimelineNowIndicator {nowLinePos} mode="line" />
             </div>
         </div>
@@ -302,7 +301,7 @@
     .avatar { width: 44px; height: 44px; background: var(--primary-gradient); color: white; border-radius: 16px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 18px; }
     .avatar.is-off { background: #93a1a1; }
 
-    .n { display: block; font-size: 14px; font-weight: 850; color: #586e75; }
+    .n { display: block; font-size: 14px; font-weight: 850; color: #073642; }
     .s { display: block; font-size: 9px; color: #93a1a1; font-weight: 700; text-transform: uppercase; }
     .off-badge { display: inline-block; font-size: 8px; font-weight: 900; background: #dc322f; color: white; padding: 1px 4px; border-radius: 4px; margin-top: 2px; }
     .work-time { font-size: 9px; color: #859900; font-weight: 800; }
@@ -312,8 +311,8 @@
         overflow: auto;
         position: relative;
         cursor: grab;
-        touch-action: pan-x pan-y; /* ВАЖНО: Разрешаем нативную прокрутку */
-        -webkit-overflow-scrolling: touch; /* Включаем инерцию на iOS */
+        touch-action: pan-x pan-y;
+        -webkit-overflow-scrolling: touch;
     }
     .timeline-body-scroll.grabbing { cursor: grabbing; }
 
