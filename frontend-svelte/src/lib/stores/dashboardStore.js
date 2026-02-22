@@ -35,9 +35,8 @@ function createDashboardStore() {
 export const dashboardStore = createDashboardStore();
 export const activeTab = writable('management');
 export const selectedDate = writable(new Date());
-
-// ГЛОБАЛЬНЫЙ КОНТЕКСТ ФИЛИАЛА (ИСТОЧНИК ИСТИНЫ)
 export const activeBranchId = writable(null);
-
-// ТРИГГЕР ДЛЯ ПРИНУДИТЕЛЬНОГО ОБНОВЛЕНИЯ ДАННЫХ
 export const refreshTrigger = writable(0);
+
+// НОВОЕ: Флаг мобильного устройства
+export const isMobile = writable(false);

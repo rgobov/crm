@@ -1,6 +1,6 @@
 <script>
     import { createEventDispatcher } from 'svelte';
-    import { scale } from 'svelte/transition';
+    import { scale, fade } from 'svelte/transition'; // ДОБАВИЛИ fade
     import { timeUtils } from '$lib/utils/timeUtils.js';
 
     export let appt;
@@ -30,7 +30,7 @@
     $: isShort = appt.durationInMinutes < 40;
 </script>
 
-<div class="appt-box"
+<button class="appt-box btn-reset"
      style="{apptStyle} --status-color: {color}"
      on:click|stopPropagation={() => dispatch('click', appt)}
      in:scale={{duration: 200, start: 0.95}}>
@@ -59,15 +59,17 @@
             {/if}
         </div>
     </div>
-</div>
+</button>
 
 <style>
+    .btn-reset { background: none; border: none; padding: 0; margin: 0; text-align: left; cursor: pointer; width: auto; font-family: inherit; }
+
     .appt-box {
         position: absolute; left: 6px; right: 6px;
         background: #fdf6e3;
         border-radius: 16px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         border: 1.5px solid #eee8d5;
         overflow: hidden;
     }
@@ -92,7 +94,6 @@
 
     .sv { font-size: 10px; color: #657b83; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ПРЕВЬЮ КОММЕНТАРИЯ */
     .cmt-preview {
         margin-top: 4px;
         font-size: 11px;
@@ -100,7 +101,7 @@
         color: #586e75;
         font-weight: 500;
         display: -webkit-box;
-        -webkit-line-clamp: 2; /* Показываем до 2 строк комментария */
+        -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
         word-break: break-word;

@@ -6,7 +6,7 @@
     import NotificationTemplatesModal from './NotificationTemplatesModal.svelte';
     import { fade, scale } from 'svelte/transition';
 
-    export let forcedDate = null;
+    // Убрали неиспользуемый forcedDate
 
     let stats = {
         totalClients: 0,
@@ -51,7 +51,7 @@
         {#if error}
             <div class="error-banner">
                 <span>⚠️ {error}</span>
-                <button on:click={loadStats}>Повторить</button>
+                <button on:click={loadStats} type="button">Повторить</button>
             </div>
         {/if}
 
@@ -70,33 +70,31 @@
             </div>
         </div>
 
-        <div class="section-label">УПРАВЛЕНИЕ СПРАВОЧНИКАМИ</div>
+        <h2 class="section-label">УПРАВЛЕНИЕ СПРАВОЧНИКАМИ</h2>
 
-        <div class="menu-list">
+        <nav class="menu-list">
             {#each menuCards as card}
-                <button class="menu-item" on:click={() => goto(card.link)}>
-                    <div class="item-icon">{card.icon}</div>
+                <button class="menu-item" on:click={() => goto(card.link)} type="button">
+                    <div class="item-icon" aria-hidden="true">{card.icon}</div>
                     <div class="item-text">
                         <h3>{card.title}</h3>
                         <p>{card.desc}</p>
                     </div>
-                    <span class="arrow">›</span>
+                    <span class="arrow" aria-hidden="true">›</span>
                 </button>
             {/each}
 
-            <!-- ШАБЛОНЫ СООБЩЕНИЙ -->
-            <button class="menu-item templates-item" on:click={() => showTemplatesModal = true}>
-                <div class="item-icon templates-bg">📝</div>
+            <button class="menu-item templates-item" on:click={() => showTemplatesModal = true} type="button">
+                <div class="item-icon templates-bg" aria-hidden="true">📝</div>
                 <div class="item-text">
                     <h3>Шаблоны сообщений</h3>
                     <p>Тексты уведомлений клиентам</p>
                 </div>
-                <span class="arrow">›</span>
+                <span class="arrow" aria-hidden="true">›</span>
             </button>
 
-            <!-- TELEGRAM НАСТРОЙКИ -->
-            <button class="menu-item telegram-item" on:click={() => showTelegramModal = true}>
-                <div class="item-icon tg-bg">
+            <button class="menu-item telegram-item" on:click={() => showTelegramModal = true} type="button">
+                <div class="item-icon tg-bg" aria-hidden="true">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
                     </svg>
@@ -105,17 +103,16 @@
                     <h3>Telegram Уведомления</h3>
                     <p>Настройка канала связи</p>
                 </div>
-                <span class="arrow">›</span>
+                <span class="arrow" aria-hidden="true">›</span>
             </button>
-        </div>
+        </nav>
 
-        <!-- Отступ снизу для мобильных -->
         <div class="bottom-spacer"></div>
     </div>
 </div>
 
 {#if showTelegramModal}
-    <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTelegramModal = false}>
+    <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTelegramModal = false} role="presentation">
         <div class="modal-wrapper" in:scale={{start: 0.95, duration: 200}}>
             <TelegramSettingsModal on:close={() => showTelegramModal = false} />
         </div>
@@ -123,7 +120,7 @@
 {/if}
 
 {#if showTemplatesModal}
-    <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTemplatesModal = false}>
+    <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTemplatesModal = false} role="presentation">
         <div class="modal-wrapper" in:scale={{start: 0.95, duration: 200}}>
             <NotificationTemplatesModal on:close={() => showTemplatesModal = false} />
         </div>
@@ -145,7 +142,7 @@
     .stat-card {
         background: #eee8d5;
         padding: 16px; border-radius: 20px; text-align: center;
-        border: 1.5px solid #ddd6c1; box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        border: 1.5px solid #ddd6c1;
     }
     .stat-card .val { display: block; font-size: 22px; font-weight: 900; color: #268bd2; margin-bottom: 4px; }
     .stat-card .lbl { font-size: 9px; font-weight: 850; color: #93a1a1; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -158,6 +155,7 @@
         background: #eee8d5;
         border: 1.5px solid #ddd6c1; border-radius: 22px; cursor: pointer; text-align: left;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        width: 100%;
     }
     .menu-item:hover { background: #fdf6e3; border-color: #268bd2; transform: translateY(-1px); }
     .menu-item:active { transform: scale(0.98); }

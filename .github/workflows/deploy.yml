@@ -3,7 +3,7 @@ name: Deploy to VPS
 on:
   push:
     branches:
-      - feature/staff-shifts-and-solarized-ui # ВЕТКА ДЛЯ ДЕПЛОЯ
+      - mobile-ui-split # ТЕПЕРЬ ДЕПЛОИМ ИЗ ЭТОЙ ВЕТКИ
 
 jobs:
   deploy:
@@ -19,9 +19,9 @@ jobs:
             set -e
             cd ~/crm
             
-            echo "--- ОБНОВЛЕНИЕ КОДА (ветка feature/staff-shifts-and-solarized-ui) ---"
-            git fetch origin feature/staff-shifts-and-solarized-ui
-            git reset --hard origin/feature/staff-shifts-and-solarized-ui
+            echo "--- ОБНОВЛЕНИЕ КОДА (ветка mobile-ui-split) ---"
+            git fetch origin mobile-ui-split
+            git reset --hard origin/mobile-ui-split
             
             echo "--- ПОДГОТОВКА СРЕДЫ (СЕКРЕТЫ) ---"
             echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env

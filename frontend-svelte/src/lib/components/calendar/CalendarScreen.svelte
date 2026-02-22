@@ -73,7 +73,6 @@
         loadWorkload();
     }
 
-    // Цвета для фона ячеек и легенды
     const colors = {
         low: '#dcfce7',
         medium: '#fef9c3',
@@ -98,32 +97,34 @@
 <div class="calendar-page-limiter">
     <div class="calendar-container">
         <div class="cal-header">
-            <button class="nav-btn" on:click={() => changeMonth(-1)}>‹</button>
+            <button class="nav-btn" on:click={() => changeMonth(-1)} type="button" aria-label="Предыдущий месяц">‹</button>
             <h3>{monthNames[currMonth]} {currYear}</h3>
-            <button class="nav-btn" on:click={() => changeMonth(1)}>›</button>
+            <button class="nav-btn" on:click={() => changeMonth(1)} type="button" aria-label="Следующий месяц">›</button>
         </div>
 
-        <div class="weekdays">
+        <div class="weekdays" aria-hidden="true">
             <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
         </div>
 
         <div class="days-grid" class:loading={isLoading}>
             {#each days as d}
-                <div
+                <button
                     class="day-cell"
                     class:inactive={!d.current}
                     class:is-today={d.today}
                     on:click={() => d.current && selectDate(d.day)}
+                    type="button"
+                    disabled={!d.current}
                 >
                     {#if d.current && d.count > 0}
                         <div class="workload-bg" style="background-color: {getWorkloadColor(d.count)}"></div>
                     {/if}
                     <span class="day-num" class:today-text={d.today}>{d.day}</span>
-                </div>
+                </button>
             {/each}
         </div>
 
-        <div class="legend">
+        <div class="legend" aria-label="Легенда загрузки">
             <div class="item">
                 <span class="dot" style="background: {colors.low}"></span>
                 <span class="lbl">1-2</span>
@@ -178,9 +179,10 @@
     .day-cell {
         aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
         border-radius: 50%; cursor: pointer; position: relative; transition: 0.2s;
-        border: 2px solid transparent;
+        border: 2px solid transparent; background: none; padding: 0;
     }
     .day-cell:hover:not(.inactive) { background: #eee8d5; }
+    .day-cell:focus { outline: 2px solid #268bd2; outline-offset: -2px; }
 
     .day-num { font-size: 14px; font-weight: 750; color: #586e75; z-index: 2; }
 
@@ -196,18 +198,17 @@
 
     .workload-bg { position: absolute; width: 30px; height: 30px; border-radius: 50%; z-index: 1; }
 
-    /* УЛУЧШЕННАЯ ЛЕГЕНДА */
     .legend {
         display: flex; justify-content: space-between;
         margin-top: 20px; padding: 12px 4px 0; border-top: 1px solid #ddd6c1;
     }
     .legend .item { display: flex; align-items: center; gap: 6px; }
-    .legend .lbl { font-size: 11px; font-weight: 800; color: #586e75; } /* Base01 - более четкий текст */
+    .legend .lbl { font-size: 11px; font-weight: 800; color: #586e75; }
 
     .dot {
-        width: 12px; height: 12px; /* Увеличено */
+        width: 12px; height: 12px;
         border-radius: 50%;
         display: inline-block;
-        border: 1px solid rgba(7, 54, 66, 0.1); /* Тонкий контур для четкости */
+        border: 1px solid rgba(7, 54, 66, 0.1);
     }
 </style>
