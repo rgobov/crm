@@ -31,4 +31,10 @@ public interface NotificationClient {
         @RequestHeader("X-Internal-Secret") String secret,
         @RequestParam("tenantId") String tenantId
     );
+
+    @PostMapping("/api/telegram/password")
+    void checkPassword(
+        @RequestHeader("X-Internal-Secret") String secret,
+        @RequestBody Map<String, String> request
+    );
 }

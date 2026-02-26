@@ -36,17 +36,13 @@ public class TelegramController {
         
         if (!isAuthorized(secret)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        String qrLink = clientManager.getQrLink(tenantId);
         String status = clientManager.getExtendedStatus(tenantId);
+        String qrLink = clientManager.getQrLink(tenantId);
 
-        // КРИТИЧНО: Если есть ссылка, превращаем её в Base64 картинку
         if (qrLink != null && !qrLink.isEmpty()) {
             try {
                 String base64Image = qrCodeService.generateQrBase64(qrLink);
-                return ResponseEntity.ok(Map.of(
-                    "status", "WAITING_QR", 
-                    "qrCode", base64Image
-                ));
+                return ResponseEntity.ok(Map.of("status", "WAITING_QR", "qrCode", base64Image));
             } catch (Exception e) {
                 log.error("Failed to generate QR for tenant {}: {}", tenantId, e.getMessage());
             }
@@ -68,6 +64,22 @@ public class TelegramController {
 
         log.info("🔄 Reconnect (atomic) request for tenant: {}", tenantId);
         clientManager.initiateReconnect(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/password")
+    public ResponseEntity<?> checkPassword(
+            @RequestHeader(value = "X-Internal-Secret", required = false) String secret,
+            @RequestBody Map<String, String> body) {
+        
+        if (!isAuthorized(secret)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        String tenantId = body.get("tenantId");
+        String password = body.get("password");
+        
+        if (tenantId == null || password == null) return ResponseEntity.badRequest().build();
+
+        clientManager.checkPassword(tenantId, password);
         return ResponseEntity.ok().build();
     }
 
@@ -101,4 +113,4 @@ public class TelegramController {
                 .exceptionally(ex -> ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(Map.of("status", "FAILED", "error", ex.getMessage())));
     }
-}//
+}

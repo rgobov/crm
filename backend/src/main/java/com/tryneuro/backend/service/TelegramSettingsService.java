@@ -45,6 +45,17 @@ public class TelegramSettingsService {
         }
     }
 
+    public void checkPassword(String tenantId, String password) {
+        try {
+            notificationClient.checkPassword(internalSecret, Map.of(
+                "tenantId", tenantId,
+                "password", password
+            ));
+        } catch (Exception e) {
+            log.error("Failed to proxy TG password: {}", e.getMessage());
+        }
+    }
+
     @Transactional
     public void disconnect(String tenantId) {
         try {
@@ -58,7 +69,6 @@ public class TelegramSettingsService {
 
     @Transactional
     public void updateStatus(String tenantId, String status) {
-        // Уведомляем фронтенд СРАЗУ с передачей статуса
         notifyFrontend(tenantId, status);
 
         if ("CONNECTED".equals(status)) {
@@ -78,7 +88,6 @@ public class TelegramSettingsService {
 
     private void notifyFrontend(String tenantId, String status) {
         try {
-            // ПЕРЕДАЕМ СТАТУС В СООБЩЕНИИ
             messagingTemplate.convertAndSend("/topic/telegram/" + tenantId, Map.of(
                 "status", status,
                 "ts", System.currentTimeMillis()

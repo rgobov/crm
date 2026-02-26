@@ -27,12 +27,9 @@ public class TelegramSettingsController {
     @GetMapping("/status")
     public ResponseEntity<?> getStatus() {
         String tenantId = (String) request.getAttribute("tenantId");
-        
-        // Только запрашиваем реальное состояние у микросервиса
         Map<String, String> realTimeStatus = telegramSettingsService.getRealTimeStatus(tenantId);
         String status = realTimeStatus.get("status");
 
-        // Если реально подключено, обогащаем данными из БД
         if ("CONNECTED".equals(status)) {
             TelegramSettings settings = telegramSettingsService.getSettings(tenantId);
             return ResponseEntity.ok(Map.of(
@@ -41,7 +38,6 @@ public class TelegramSettingsController {
             ));
         }
 
-        // Возвращаем как есть (WAITING_QR, DISCONNECTED, etc), НЕ вызывая updateStatus
         return ResponseEntity.ok(realTimeStatus);
     }
 
@@ -50,6 +46,15 @@ public class TelegramSettingsController {
         String tenantId = (String) request.getAttribute("tenantId");
         log.info("🚀 Received connect request for tenant: {}", tenantId);
         telegramSettingsService.connect(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/password")
+    public ResponseEntity<?> checkPassword(@RequestBody Map<String, String> body) {
+        String tenantId = (String) request.getAttribute("tenantId");
+        String password = body.get("password");
+        log.info("🔑 Received password request for tenant: {}", tenantId);
+        telegramSettingsService.checkPassword(tenantId, password);
         return ResponseEntity.ok().build();
     }
 
@@ -73,7 +78,6 @@ public class TelegramSettingsController {
         String tenantId = (String) data.get("tenantId");
         String status = (String) data.get("status");
         
-        // Сюда приходят реальные обновления статуса. Только здесь вызываем обновление и рассылку в WS.
         telegramSettingsService.updateStatus(tenantId, status);
         return ResponseEntity.ok().build();
     }

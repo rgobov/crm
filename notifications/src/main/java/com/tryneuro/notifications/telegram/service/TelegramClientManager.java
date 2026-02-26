@@ -36,7 +36,6 @@ public class TelegramClientManager {
     private final Map<String, Long> floodWaitUntil = new ConcurrentHashMap<>();
     private final Map<String, ReentrantLock> sessionLocks = new ConcurrentHashMap<>();
     private final Map<String, CompletableFuture<Void>> pendingCloses = new ConcurrentHashMap<>();
-    // НОВОЕ: Для дедупликации спама WAITING_QR
     private final Map<String, String> lastSyncedQrLink = new ConcurrentHashMap<>();
     
     private final AtomicBoolean isStopping = new AtomicBoolean(false);
@@ -72,9 +71,7 @@ public class TelegramClientManager {
         if (isStopping.get()) return;
         try {
             backendClient.syncStatus(internalSecret, Map.of("tenantId", tenantId, "status", status));
-            if (!"WAITING_QR".equals(status)) {
-                log.info("📡 Sync status '{}' for tenant {}", status, tenantId);
-            }
+            log.info("📡 Sync status '{}' for tenant {}", status, tenantId);
         } catch (Exception e) {
             log.warn("⚠️ Sync failed for {}: {}", tenantId, e.getMessage());
         }
@@ -98,24 +95,13 @@ public class TelegramClientManager {
         
         if (activeClients.containsKey(tenantId)) return "CONNECTED";
         
-        Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId).resolve("db");
-        if (new File(sessionPath.toString()).exists()) {
-            return "INITIALIZING";
-        }
-        
         return "DISCONNECTED";
-    }
-
-    public boolean isSessionActive(String tenantId) {
-        String status = getExtendedStatus(tenantId);
-        return status.equals("CONNECTED") || status.startsWith("FLOOD_WAIT");
     }
 
     public void initiateReconnect(String tenantId) {
         ReentrantLock lock = getSessionLock(tenantId);
         lock.lock();
         try {
-            log.info("🔄 Atomic Reconnect starting for {}", tenantId);
             forceDisconnect(tenantId);
             getClient(tenantId);
         } finally {
@@ -138,17 +124,30 @@ public class TelegramClientManager {
         }
     }
 
+    public void checkPassword(String tenantId, String password) {
+        SimpleTelegramClient client = activeClients.get(tenantId);
+        if (client != null) {
+            log.info("🔑 Sending 2FA password for tenant: {}", tenantId);
+            client.send(new TdApi.CheckAuthenticationPassword(password), res -> {
+                if (res.isError()) {
+                    log.error("❌ 2FA Password incorrect for {}: {}", tenantId, res.getError().message);
+                    syncStatusWithBackend(tenantId, "PASSWORD_ERROR");
+                } else {
+                    log.info("✅ 2FA Password accepted for {}", tenantId);
+                }
+            });
+        }
+    }
+
     private final Set<String> tenantsToCleanup = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     public void forceDisconnect(String tenantId) {
         ReentrantLock lock = getSessionLock(tenantId);
         lock.lock();
         try {
-            log.info("🗑 Forced atomic disconnect for {}", tenantId);
             tenantsToCleanup.add(tenantId);
             pendingQrLinks.remove(tenantId);
-            floodWaitUntil.remove(tenantId);
-            lastSyncedQrLink.remove(tenantId); // НОВОЕ: Очистка кэша синхронизации
+            lastSyncedQrLink.remove(tenantId);
 
             SimpleTelegramClient client = activeClients.remove(tenantId);
             if (client != null) {
@@ -158,7 +157,6 @@ public class TelegramClientManager {
                     client.close();
                     closeFut.get(10, TimeUnit.SECONDS); 
                 } catch (Exception e) {
-                    log.warn("Close await timeout for {}: {}", tenantId, e.getMessage());
                     pendingCloses.remove(tenantId);
                 }
             }
@@ -180,17 +178,12 @@ public class TelegramClientManager {
                 FileSystemUtils.deleteRecursively(directory);
                 log.info("✨ Files cleared for {}", tenantId);
             }
-        } catch (Exception e) {
-            log.error("❌ Cleanup error: {}", e.getMessage());
-        }
+        } catch (Exception e) {}
     }
 
     private SimpleTelegramClient createNewClientInstance(String tenantId) {
-        log.info("🚀 Creating Telegram instance: {}", tenantId);
         Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId);
         sessionPath.toFile().mkdirs();
-
-        pendingQrLinks.put(tenantId, "");
 
         APIToken apiToken = new APIToken(properties.getApiId(), properties.getApiHash());
         TDLibSettings settings = TDLibSettings.create(apiToken);
@@ -200,29 +193,24 @@ public class TelegramClientManager {
 
         builder.addUpdateHandler(TdApi.UpdateAuthorizationState.class, update -> {
             TdApi.AuthorizationState state = update.authorizationState;
-            log.info("🔄 AuthState change [{}]: {}", tenantId, state.getClass().getSimpleName());
             
             if (state instanceof TdApi.AuthorizationStateWaitOtherDeviceConfirmation qrState) {
                 String newLink = qrState.link;
                 pendingQrLinks.put(tenantId, newLink);
-
-                // НОВОЕ: Дедупликация - шлем WS только если ссылка реально изменилась
                 if (!newLink.equals(lastSyncedQrLink.get(tenantId))) {
                     lastSyncedQrLink.put(tenantId, newLink);
                     syncStatusWithBackend(tenantId, "WAITING_QR");
                 }
-            } else if (state instanceof TdApi.AuthorizationStateReady) {
-                log.info("🌟 SUCCESS! Tenant {} connected.", tenantId);
+            } else if (state instanceof TdApi.AuthorizationStateWaitPassword) {
+                log.warn("🔐 2FA Password required for {}", tenantId);
                 pendingQrLinks.remove(tenantId);
-                floodWaitUntil.remove(tenantId);
-                lastSyncedQrLink.remove(tenantId); // Очистка
+                syncStatusWithBackend(tenantId, "WAITING_PASSWORD");
+            } else if (state instanceof TdApi.AuthorizationStateReady) {
+                pendingQrLinks.remove(tenantId);
                 syncStatusWithBackend(tenantId, "CONNECTED");
             } else if (state instanceof TdApi.AuthorizationStateClosed) {
-                log.warn("🔒 Connection CLOSED for {}", tenantId);
                 activeClients.remove(tenantId);
                 pendingQrLinks.remove(tenantId);
-                lastSyncedQrLink.remove(tenantId); // Очистка
-
                 CompletableFuture<Void> fut = pendingCloses.remove(tenantId);
                 if (fut != null) fut.complete(null);
                 syncStatusWithBackend(tenantId, "DISCONNECTED");
@@ -240,9 +228,14 @@ public class TelegramClientManager {
         contact.phoneNumber = phoneNumber;
         contact.firstName = "Client";
 
+        // Исправляем цепочку типов CompletableFuture
         return client.send(new TdApi.ImportContacts(new TdApi.Contact[]{contact}))
             .thenCompose(imported -> {
-                if (imported.userIds.length == 0 || imported.userIds[0] == 0) throw new RuntimeException("404");
+                if (imported.userIds.length == 0 || imported.userIds[0] == 0) {
+                    CompletableFuture<TdApi.Chat> fail = new CompletableFuture<>();
+                    fail.completeExceptionally(new RuntimeException("404"));
+                    return fail;
+                }
                 return client.send(new TdApi.CreatePrivateChat(imported.userIds[0], false));
             })
             .thenCompose(chat -> {
@@ -250,6 +243,8 @@ public class TelegramClientManager {
                 content.text = new TdApi.FormattedText(text, new TdApi.TextEntity[0]);
                 return client.send(new TdApi.SendMessage(chat.id, 0, null, null, null, content));
             })
-            .thenAccept(msg -> log.info("✅ Sent to {}", phoneNumber));
+            .thenAccept(msg -> {
+                log.info("✅ Sent to {}", phoneNumber);
+            });
     }
 }

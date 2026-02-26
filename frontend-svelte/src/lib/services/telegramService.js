@@ -2,7 +2,6 @@ import api from '../api.js';
 
 export const telegramService = {
     async getStatus() {
-        // Убрали /api, так как он уже есть в baseURL в api.js
         const res = await api.get('/admin/telegram/status');
         return res.data;
     },
@@ -11,5 +10,8 @@ export const telegramService = {
     },
     async disconnect() {
         await api.post('/admin/telegram/disconnect');
+    },
+    async sendPassword(password) {
+        await api.post('/admin/telegram/password', { password });
     }
 };
