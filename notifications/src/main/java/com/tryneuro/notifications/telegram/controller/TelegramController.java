@@ -26,7 +26,7 @@ public class TelegramController {
     private String internalSecret;
 
     private boolean isAuthorized(String incomingSecret) {
-        return incomingSecret != null && incomingSecret.equals(internalSecret);
+        return internalSecret.equals(incomingSecret);
     }
 
     @GetMapping("/qr")
@@ -37,16 +37,26 @@ public class TelegramController {
         if (!isAuthorized(secret)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         String qrLink = clientManager.getQrLink(tenantId);
+        String status = clientManager.getExtendedStatus(tenantId);
+
+        // КРИТИЧНО: Если есть ссылка, превращаем её в Base64 картинку
         if (qrLink != null && !qrLink.isEmpty()) {
-            String base64Image = qrCodeService.generateQrBase64(qrLink);
-            return ResponseEntity.ok(Map.of("status", "WAITING_QR", "qrCode", base64Image));
+            try {
+                String base64Image = qrCodeService.generateQrBase64(qrLink);
+                return ResponseEntity.ok(Map.of(
+                    "status", "WAITING_QR", 
+                    "qrCode", base64Image
+                ));
+            } catch (Exception e) {
+                log.error("Failed to generate QR for tenant {}: {}", tenantId, e.getMessage());
+            }
         }
         
-        if (clientManager.isSessionActive(tenantId)) {
+        if ("CONNECTED".equals(status)) {
             return ResponseEntity.ok(Map.of("status", "CONNECTED", "qrCode", ""));
         }
 
-        return ResponseEntity.ok(Map.of("status", "INITIALIZING", "qrCode", ""));
+        return ResponseEntity.ok(Map.of("status", status, "qrCode", ""));
     }
 
     @PostMapping("/connect")
@@ -56,8 +66,8 @@ public class TelegramController {
         
         if (!isAuthorized(secret)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
-        log.info("🚀 Manual connect request for tenant: {}", tenantId);
-        clientManager.getClient(tenantId);
+        log.info("🔄 Reconnect (atomic) request for tenant: {}", tenantId);
+        clientManager.initiateReconnect(tenantId);
         return ResponseEntity.ok().build();
     }
 
@@ -69,7 +79,7 @@ public class TelegramController {
         if (!isAuthorized(secret)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         log.info("🗑 Request to delete session for tenant: {}", tenantId);
-        clientManager.deleteSession(tenantId);
+        clientManager.forceDisconnect(tenantId);
         return ResponseEntity.ok().build();
     }
 
@@ -85,10 +95,6 @@ public class TelegramController {
         String tenantId = request.get("tenantId");
         String phone = request.get("phone");
         String text = request.get("text");
-
-        if (tenantId == null || phone == null || text == null) {
-            return CompletableFuture.completedFuture(ResponseEntity.badRequest().body(Map.of("status", "FAILED", "error", "Missing parameters")));
-        }
 
         return clientManager.sendMessageByPhone(tenantId, phone, text)
                 .thenApply(v -> ResponseEntity.ok(Map.of("status", "SUCCESS")))
