@@ -20,11 +20,11 @@
     let formData = {
         startTime: '',
         durationInMinutes: 60,
-        contactId: '',
+        contactId: null, // ПРАВИЛЬНО: null вместо ""
         clientName: '',
         service: '',
-        staffMemberId: '',
-        resourceId: '',
+        staffMemberId: null, // ПРАВИЛЬНО: null вместо ""
+        resourceId: null,    // ПРАВИЛЬНО: null вместо ""
         branchId: '',
         comment: '',
         referenceTag: '',
@@ -84,7 +84,7 @@
             if (isEditing) {
                 formData = {
                     ...appointment,
-                    staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : ''),
+                    staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : null),
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
@@ -101,7 +101,7 @@
                     if (c) selectContact(c);
                 }
             } else {
-                formData.staffMemberId = preselected.staffId || '';
+                formData.staffMemberId = preselected.staffId || null;
                 formData.branchId = $activeBranchId;
                 const d = new Date(preselected.date);
                 d.setHours(preselected.hour, preselected.min, 0, 0);
@@ -152,10 +152,9 @@
     function startInlineCreation() {
         isNewClientMode = true;
         selectedContact = null;
-        formData.contactId = "";
-        formData.clientName = searchInput; // Имя берем из поиска
+        formData.contactId = null;
+        formData.clientName = searchInput;
 
-        // Пытаемся вытащить телефон, если в поиске были цифры
         const digits = searchInput.replace(/\D/g, "");
         if (digits.length >= 10) newClientPhone = digits;
 
@@ -169,7 +168,6 @@
 
         isSaving = true;
         try {
-            // 1. ЕСЛИ НОВЫЙ КЛИЕНТ - СОЗДАЕМ ЕГО ИНЛАЙН
             let contactId = formData.contactId;
             let clientName = searchInput.trim();
 
@@ -182,7 +180,6 @@
                 contactId = newContact.id;
             }
 
-            // 2. ОБРАБОТКА УСЛУГИ
             let sName = serviceSearchInput.trim() || "Стандарт";
             if (isNewService && sName !== "Стандарт") {
                 const ns = await serviceService.addService({ name: sName, durationInMinutes: formData.durationInMinutes });
@@ -195,7 +192,9 @@
                 ...formData,
                 service: sName,
                 clientName: clientName,
-                contactId: contactId,
+                contactId: contactId || null,
+                staffMemberId: formData.staffMemberId || null,
+                resourceId: formData.resourceId || null,
                 startTime: correctedStartTime,
                 branchId: $activeBranchId
             };
@@ -259,7 +258,6 @@
                         {/if}
                     </div>
 
-                    <!-- ИНЛАЙН ПОЛЕ ТЕЛЕФОНА ДЛЯ НОВОГО КЛИЕНТА -->
                     {#if isNewClientMode}
                         <div class="inline-phone-field" in:slide>
                             <input type="tel" bind:value={newClientPhone} placeholder="Номер телефона..." autofocus />
@@ -333,8 +331,18 @@
                     </div>
                 </div>
 
-                <div class="tile-card"><label>ИСПОЛНИТЕЛЬ</label><select bind:value={formData.staffMemberId}><option value="">Не назначен</option>{#each staffList as s}<option value={s.id}>{s.name}</option>{/each}</select></div>
-                <div class="tile-card"><label>КАБИНЕТ / РЕСУРС</label><select bind:value={formData.resourceId}><option value="">Без ресурса</option>{#each resources as r}<option value={r.id}>{r.name}</option>{/each}</select></div>
+                <div class="tile-card"><label>ИСПОЛНИТЕЛЬ</label>
+                    <select bind:value={formData.staffMemberId}>
+                        <option value={null}>Не назначен</option>
+                        {#each staffList as s}<option value={s.id}>{s.name}</option>{/each}
+                    </select>
+                </div>
+                <div class="tile-card"><label>КАБИНЕТ / РЕСУРС</label>
+                    <select bind:value={formData.resourceId}>
+                        <option value={null}>Без ресурса</option>
+                        {#each resources as r}<option value={r.id}>{r.name}</option>{/each}
+                    </select>
+                </div>
 
                 <div class="tile-card reminder-panel">
                     <div class="rem-main">

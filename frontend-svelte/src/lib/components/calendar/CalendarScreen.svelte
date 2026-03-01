@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { scheduleRefreshSignal } from '$lib/services/websocketService.js'; // ИМПОРТ СИГНАЛА
     import { createEventDispatcher } from 'svelte';
 
     const dispatch = createEventDispatcher();
@@ -16,11 +17,18 @@
 
     const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 
+    // РЕАКТИВНОСТЬ: Обновляем календарь при изменении данных или даты
     $: if (workloadData || currMonth || currYear) {
         renderCalendar();
     }
 
+    // РЕАКТИВНОСТЬ: Слушаем смену филиала
     $: if ($activeBranchId !== undefined) {
+        loadWorkload();
+    }
+
+    // РЕАКТИВНОСТЬ: Слушаем сигнал из WebSocket
+    $: if ($scheduleRefreshSignal) {
         loadWorkload();
     }
 
@@ -30,7 +38,7 @@
 
     async function loadWorkload() {
         if ($activeBranchId === undefined) return;
-        isLoading = true;
+        // Не ставим isLoading в true здесь, чтобы не мерцал весь календарь при фоновом обновлении
         try {
             const data = await adminService.getWorkloadForMonth(currYear, currMonth + 1, $activeBranchId);
             workloadData = {};
@@ -97,16 +105,16 @@
 <div class="calendar-page-limiter">
     <div class="calendar-container">
         <div class="cal-header">
-            <button class="nav-btn" on:click={() => changeMonth(-1)} type="button" aria-label="Предыдущий месяц">‹</button>
+            <button class="nav-btn" on:click={() => changeMonth(-1)} type="button">‹</button>
             <h3>{monthNames[currMonth]} {currYear}</h3>
-            <button class="nav-btn" on:click={() => changeMonth(1)} type="button" aria-label="Следующий месяц">›</button>
+            <button class="nav-btn" on:click={() => changeMonth(1)} type="button">›</button>
         </div>
 
-        <div class="weekdays" aria-hidden="true">
+        <div class="weekdays">
             <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
         </div>
 
-        <div class="days-grid" class:loading={isLoading}>
+        <div class="days-grid">
             {#each days as d}
                 <button
                     class="day-cell"
@@ -124,7 +132,7 @@
             {/each}
         </div>
 
-        <div class="legend" aria-label="Легенда загрузки">
+        <div class="legend">
             <div class="item">
                 <span class="dot" style="background: {colors.low}"></span>
                 <span class="lbl">1-2</span>
@@ -182,7 +190,6 @@
         border: 2px solid transparent; background: none; padding: 0;
     }
     .day-cell:hover:not(.inactive) { background: #eee8d5; }
-    .day-cell:focus { outline: 2px solid #268bd2; outline-offset: -2px; }
 
     .day-num { font-size: 14px; font-weight: 750; color: #586e75; z-index: 2; }
 

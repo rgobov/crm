@@ -55,6 +55,15 @@ export const timeUtils = {
         });
     },
 
+    // НОВОЕ: Возвращает время окончания в формате HH:mm
+    getEndTime(startTimeStr, durationMinutes, timezone = 'Europe/Moscow') {
+        const date = new Date(startTimeStr);
+        const endDate = new Date(date.getTime() + durationMinutes * 60000);
+        return endDate.toLocaleTimeString('ru-RU', {
+            timeZone: timezone, hour: '2-digit', minute: '2-digit'
+        });
+    },
+
     /**
      * ОПРЕДЕЛЕНИЕ СТАТУСА СЛОТА (УЛУЧШЕНО)
      * Используем сравнение минут вместо строк для 100% точности

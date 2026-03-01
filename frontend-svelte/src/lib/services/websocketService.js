@@ -3,7 +3,6 @@ import { writable } from 'svelte/store';
 
 export const wsConnected = writable(false);
 export const scheduleRefreshSignal = writable({ ts: 0 });
-// ТЕПЕРЬ СТОР ХРАНИТ ПОЛНЫЙ ОБЪЕКТ СТАТУСА
 export const telegramStatusSignal = writable({ status: null, ts: 0 });
 
 let stompClient = null;
@@ -23,10 +22,14 @@ function getTenantFromToken() {
 }
 
 const getWsUrl = () => {
-    if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8080' : window.location.host;
-    return `${protocol}//${host}/ws`;
+    // ВАЖНО: Браузерный WebSocket требует полный URL (ws://...)
+    // Мы строим его динамически на основе текущего адреса сайта
+    if (typeof window !== 'undefined') {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host; // Это будет либо localhost:5173, либо 192.168...
+        return `${protocol}//${host}/ws`;
+    }
+    return 'ws://localhost:8080/ws';
 };
 
 export const websocketService = {
@@ -41,6 +44,8 @@ export const websocketService = {
         const url = getWsUrl();
         const token = localStorage.getItem('token');
 
+        console.log('🔌 WS: Connecting to:', url);
+
         try {
             const socket = new WebSocket(url);
             stompClient = Stomp.over(socket);
@@ -53,14 +58,15 @@ export const websocketService = {
                 wsConnected.set(true);
                 console.log('✅ WS: Connected');
 
+                // Подписка на обновление расписания
                 stompClient.subscribe(`/topic/schedule/${tenantId}`, (message) => {
+                    console.log('📥 WS: Schedule update received');
                     scheduleRefreshSignal.set({ ts: Date.now() });
                 });
 
+                // Подписка на статусы Telegram
                 stompClient.subscribe(`/topic/telegram/${tenantId}`, (message) => {
                     const data = JSON.parse(message.body);
-                    console.log('📥 WS: Telegram status update:', data.status);
-                    // ОБНОВЛЯЕМ СТОР РЕАЛЬНЫМИ ДАННЫМИ
                     telegramStatusSignal.set({
                         status: data.status,
                         ts: data.ts || Date.now()
@@ -68,11 +74,13 @@ export const websocketService = {
                 });
 
             }, (error) => {
+                console.warn('⚠️ WS: Connection lost', error);
                 isConnecting = false;
                 wsConnected.set(false);
                 this.reconnect();
             });
         } catch (e) {
+            console.error('❌ WS: Setup error', e);
             isConnecting = false;
             this.reconnect();
         }

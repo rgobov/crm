@@ -74,7 +74,6 @@ public class Appointment {
 
     private String comment;
 
-    // НОВОЕ: Объект визита (Марка машины, госномер, порода собаки и т.д.)
     @Column(name = "reference_tag")
     private String referenceTag;
 
@@ -94,18 +93,21 @@ public class Appointment {
     @Column(name = "reminder_lead_time_hours")
     private Integer reminderLeadTimeHours = 24;
 
-    /**
-     * Возвращает дату, пересчитанную в часовой пояс филиала
-     */
+    // ТЕХНИЧЕСКОЕ РЕШЕНИЕ: Автоматическая очистка пустых ID перед сохранением в БД
+    @PrePersist
+    @PreUpdate
+    private void sanitizeIds() {
+        if (resourceId != null && resourceId.trim().isEmpty()) resourceId = null;
+        if (staffMemberId != null && staffMemberId.trim().isEmpty()) staffMemberId = null;
+        if (contactId != null && contactId.trim().isEmpty()) contactId = null;
+    }
+
     public LocalDate getDate() {
         if (startTime == null) return null;
         String tz = (branch != null && branch.getTimezone() != null) ? branch.getTimezone() : "Europe/Moscow";
         return startTime.atZoneSameInstant(ZoneId.of(tz)).toLocalDate();
     }
 
-    /**
-     * Возвращает время, пересчитанное в часовой пояс филиала
-     */
     public LocalTime getTime() {
         if (startTime == null) return null;
         String tz = (branch != null && branch.getTimezone() != null) ? branch.getTimezone() : "Europe/Moscow";

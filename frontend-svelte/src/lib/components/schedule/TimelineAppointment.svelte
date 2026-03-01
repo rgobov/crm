@@ -1,6 +1,6 @@
 <script>
     import { createEventDispatcher } from 'svelte';
-    import { scale, fade } from 'svelte/transition'; // ДОБАВИЛИ fade
+    import { scale, fade } from 'svelte/transition';
     import { timeUtils } from '$lib/utils/timeUtils.js';
 
     export let appt;
@@ -25,8 +25,6 @@
     };
 
     $: color = statusColors[appt.status] || statusColors['SCHEDULED'];
-
-    // Определяем, насколько "тесно" в карточке (для адаптации контента)
     $: isShort = appt.durationInMinutes < 40;
 </script>
 
@@ -36,7 +34,9 @@
      in:scale={{duration: 200, start: 0.95}}>
     <div class="appt-content" class:compact={isShort}>
         <div class="t-row">
-            <span class="tm">{timeUtils.formatTime(appt.startTime, timezone)}</span>
+            <span class="tm">
+                {timeUtils.formatTime(appt.startTime, timezone)} — {timeUtils.getEndTime(appt.startTime, appt.durationInMinutes, timezone)}
+            </span>
             <div class="indicators">
                 <span class="st-dot" style="background: {color}"></span>
             </div>
@@ -69,11 +69,11 @@
         background: #fdf6e3;
         border-radius: 16px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         border: 1.5px solid #eee8d5;
         overflow: hidden;
+        transition: box-shadow 0.2s;
     }
-    .appt-box:hover { transform: translateY(-1px) scale(1.01); z-index: 300 !important; box-shadow: 0 12px 24px rgba(0,0,0,0.12); border-color: var(--status-color); }
+    .appt-box:hover { z-index: 300 !important; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
 
     .appt-content { height: 100%; border-left: 4px solid var(--status-color); padding: 6px 10px; display: flex; flex-direction: column; gap: 1px; }
     .appt-content.compact { padding: 4px 8px; }
@@ -84,31 +84,23 @@
     .indicators { display: flex; align-items: center; }
     .st-dot { width: 7px; height: 7px; border-radius: 50%; }
 
-    .main-info { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 1px; overflow: hidden; }
-
     .cl { font-size: 13px; font-weight: 850; color: #073642; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .sub-details { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow: hidden; }
-
-    .ref-tag { font-size: 10px; font-weight: 900; color: #2aa198; white-space: nowrap; flex-shrink: 0; }
-
-    .sv { font-size: 10px; color: #657b83; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub-details { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+    .ref-tag { font-size: 10px; font-weight: 900; color: #2aa198; }
+    .sv { font-size: 10px; color: #657b83; font-weight: 700; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
 
     .cmt-preview {
         margin-top: 4px;
         font-size: 11px;
         line-height: 1.3;
         color: #586e75;
-        font-weight: 500;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
-        word-break: break-word;
         padding-top: 4px;
         border-top: 1px solid rgba(147, 161, 161, 0.1);
     }
-    .cmt-icon { font-size: 9px; opacity: 0.6; margin-right: 2px; }
-
+    .cmt-icon { font-size: 9px; opacity: 0.6; }
     .compact .cmt-preview { display: none; }
 </style>
