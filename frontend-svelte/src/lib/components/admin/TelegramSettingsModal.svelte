@@ -8,7 +8,6 @@
 
     let status = 'DISCONNECTED';
     let qrCode = '';
-    let waitSeconds = 0;
     let isLoading = true;
     let isProcessing = false;
     let connectStep = '';
@@ -18,9 +17,8 @@
     let lastUpdateTs = 0;
     let userInitiated = false;
     let qrJustUpdated = false;
-    let qrVersion = 0;
+    let qrVersion = 0; // ИСПОЛЬЗУЕМ ДЛЯ ПРИНУДИТЕЛЬНОЙ ПЕРЕРИСОВКИ
 
-    // Для 2FA
     let cloudPassword = '';
 
     $: isAuthorized = status === 'CONNECTED';
@@ -30,19 +28,25 @@
     onMount(async () => {
         unsubscribeWS = telegramStatusSignal.subscribe(signal => {
             if (signal && signal.status && signal.ts > lastUpdateTs) {
-                console.log('📡 Telegram WS Sync:', signal.status, 'ts:', signal.ts);
+                console.log('📡 Telegram WS Sync:', signal.status);
                 lastUpdateTs = signal.ts;
 
-                if (isAuthorized || isFloodWait || signal.status === 'WAITING_QR' || signal.status.includes('PASSWORD')) {
+                if (signal.status === 'WAITING_QR') {
+                    // ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ ВЕРСИЮ, чтобы Svelte перерисовал картинку
+                    qrVersion = Date.now();
+                    if (signal.qrCode) {
+                        applyStatusUpdate(signal.status, signal.qrCode);
+                    } else {
+                        refreshStatus(false);
+                    }
+                } else {
+                    applyStatusUpdate(signal.status, '');
+                }
+
+                if (isAuthorized || isFloodWait || signal.status === 'WAITING_QR' || isWaitPassword) {
                     isProcessing = false;
                     connectStep = '';
                 }
-
-                if (signal.status === 'WAITING_QR' && userInitiated) {
-                    refreshStatus();
-                }
-
-                applyStatusUpdate(signal.status, '');
             }
         });
 
@@ -55,17 +59,9 @@
 
     async function refreshStatus(isInitial = false) {
         if (isInitial) isLoading = true;
-        const requestTs = Date.now();
         try {
             const data = await telegramService.getStatus();
-            const isWaiting = data.status === 'WAITING_QR' || status === 'WAITING_QR';
-
-            if (isWaiting && userInitiated) {
-                applyStatusUpdate(data.status, data.qrCode || '');
-            } else if (requestTs > lastUpdateTs) {
-                applyStatusUpdate(data.status, data.qrCode || '');
-                lastUpdateTs = requestTs;
-            }
+            applyStatusUpdate(data.status, data.qrCode || '');
         } catch (e) {
             errorMessage = 'Ошибка связи';
         } finally {
@@ -77,7 +73,9 @@
         status = newStatus;
 
         if (newStatus === 'WAITING_QR' && newQr) {
+            // Даже если строка base64 та же самая, мы обновляем версию для анимации
             if (qrCode !== newQr) {
+                console.log('🖼 New QR Code texture detected');
                 qrCode = newQr;
                 qrVersion = Date.now();
                 qrJustUpdated = true;
@@ -87,13 +85,8 @@
             qrCode = '';
         }
 
-        if (isAuthorized || isFloodWait) {
+        if (isAuthorized || isFloodWait || status === 'DISCONNECTED') {
             if (!isProcessing) userInitiated = false;
-        }
-
-        if (status === 'DISCONNECTED' && !isProcessing) {
-            userInitiated = false;
-            qrCode = '';
         }
     }
 
@@ -119,7 +112,6 @@
         isProcessing = true;
         errorMessage = '';
         try {
-            // В telegramService.js должен быть метод sendPassword
             await telegramService.sendPassword(cloudPassword);
             cloudPassword = '';
         } catch (e) {
@@ -219,8 +211,9 @@
                             </div>
                             <div class="qr-container">
                                 {#if qrCode}
+                                    <!-- ПРИНУДИТЕЛЬНАЯ ПЕРЕРИСОВКА ЧЕРЕЗ KEY -->
                                     {#key qrVersion}
-                                        <img src="data:image/png;base64,{qrCode}" alt="QR" in:fade />
+                                        <img src="data:image/png;base64,{qrCode}" alt="QR" in:fade={{duration: 300}} />
                                     {/key}
                                 {:else}
                                     <div class="qr-loading-box">

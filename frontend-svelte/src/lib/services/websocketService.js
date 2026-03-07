@@ -3,7 +3,7 @@ import { writable } from 'svelte/store';
 
 export const wsConnected = writable(false);
 export const scheduleRefreshSignal = writable({ ts: 0 });
-export const telegramStatusSignal = writable({ status: null, ts: 0 });
+export const telegramStatusSignal = writable({ status: null, qrCode: null, ts: 0 });
 
 let stompClient = null;
 let reconnectTimeout = null;
@@ -22,11 +22,9 @@ function getTenantFromToken() {
 }
 
 const getWsUrl = () => {
-    // ВАЖНО: Браузерный WebSocket требует полный URL (ws://...)
-    // Мы строим его динамически на основе текущего адреса сайта
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host; // Это будет либо localhost:5173, либо 192.168...
+        const host = window.location.host;
         return `${protocol}//${host}/ws`;
     }
     return 'ws://localhost:8080/ws';
@@ -58,23 +56,22 @@ export const websocketService = {
                 wsConnected.set(true);
                 console.log('✅ WS: Connected');
 
-                // Подписка на обновление расписания
                 stompClient.subscribe(`/topic/schedule/${tenantId}`, (message) => {
-                    console.log('📥 WS: Schedule update received');
                     scheduleRefreshSignal.set({ ts: Date.now() });
                 });
 
-                // Подписка на статусы Telegram
                 stompClient.subscribe(`/topic/telegram/${tenantId}`, (message) => {
                     const data = JSON.parse(message.body);
+                    console.log('📥 WS: Telegram Update:', data.status);
                     telegramStatusSignal.set({
                         status: data.status,
+                        qrCode: data.qrCode || null, // ТЕПЕРЬ ПЕРЕДАЕМ И QR
                         ts: data.ts || Date.now()
                     });
                 });
 
             }, (error) => {
-                console.warn('⚠️ WS: Connection lost', error);
+                console.warn('⚠️ WS: Connection lost');
                 isConnecting = false;
                 wsConnected.set(false);
                 this.reconnect();

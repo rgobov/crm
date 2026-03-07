@@ -10,6 +10,8 @@ import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
 
@@ -17,6 +19,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -31,6 +34,7 @@ public class TelegramClientManager {
 
     private final TelegramProperties properties;
     private final BackendClient backendClient;
+    private final QrCodeService qrCodeService; // ДОБАВИЛИ
     private final Map<String, SimpleTelegramClient> activeClients = new ConcurrentHashMap<>();
     private final Map<String, String> pendingQrLinks = new ConcurrentHashMap<>();
     private final Map<String, Long> floodWaitUntil = new ConcurrentHashMap<>();
@@ -50,15 +54,16 @@ public class TelegramClientManager {
         try {
             Init.init();
             log.info("✅ TDLib system initialized.");
-            warmupClients(); // ВОССТАНОВЛЕНО: Авто-запуск существующих сессий
         } catch (Exception e) {
             log.error("❌ Failed to initialize TDLib system", e);
         }
     }
 
-    /**
-     * Сканирует папку сессий и автоматически подключает всех клиентов
-     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        warmupClients();
+    }
+
     private void warmupClients() {
         try {
             File sessionsDir = new File(properties.getSessionsPath());
@@ -69,7 +74,6 @@ public class TelegramClientManager {
                     for (File folder : folders) {
                         String tenantId = folder.getName();
                         log.info("💤 Waking up client for tenant: {}", tenantId);
-                        // Запускаем в фоновом режиме, чтобы не тормозить старт приложения
                         CompletableFuture.runAsync(() -> getClient(tenantId));
                     }
                 }
@@ -91,10 +95,24 @@ public class TelegramClientManager {
         return sessionLocks.computeIfAbsent(tenantId, k -> new ReentrantLock());
     }
 
-    private void syncStatusWithBackend(String tenantId, String status) {
+    // УЛУЧШЕННЫЙ МЕТОД: Теперь умеет передавать QR-код
+    private void syncStatusWithBackend(String tenantId, String status, String qrLink) {
         if (isStopping.get()) return;
         try {
-            backendClient.syncStatus(internalSecret, Map.of("tenantId", tenantId, "status", status));
+            Map<String, Object> data = new HashMap<>();
+            data.put("tenantId", tenantId);
+            data.put("status", status);
+            
+            // Если есть ссылка на QR, сразу генерируем base64 и шлем в сокет
+            if (qrLink != null && !qrLink.isEmpty()) {
+                try {
+                    data.put("qrCode", qrCodeService.generateQrBase64(qrLink));
+                } catch (Exception e) {
+                    log.error("QR base64 generation failed");
+                }
+            }
+
+            backendClient.syncStatus(internalSecret, data);
             log.info("📡 Sync status '{}' for tenant {}", status, tenantId);
         } catch (Exception e) {
             log.warn("⚠️ Sync failed for {}: {}", tenantId, e.getMessage());
@@ -107,18 +125,12 @@ public class TelegramClientManager {
 
     public String getExtendedStatus(String tenantId) {
         if (tenantsToCleanup.contains(tenantId)) return "DISCONNECTING";
-        
         Long waitTime = floodWaitUntil.get(tenantId);
         if (waitTime != null && waitTime > System.currentTimeMillis()) {
             return "FLOOD_WAIT_" + ((waitTime - System.currentTimeMillis()) / 1000);
         }
-
-        if (pendingQrLinks.containsKey(tenantId)) {
-            return "WAITING_QR";
-        }
-        
+        if (pendingQrLinks.containsKey(tenantId)) return "WAITING_QR";
         if (activeClients.containsKey(tenantId)) return "CONNECTED";
-        
         return "DISCONNECTED";
     }
 
@@ -139,7 +151,6 @@ public class TelegramClientManager {
         try {
             if (tenantsToCleanup.contains(tenantId)) return null;
             if (activeClients.containsKey(tenantId)) return activeClients.get(tenantId);
-            
             SimpleTelegramClient client = createNewClientInstance(tenantId);
             activeClients.put(tenantId, client);
             return client;
@@ -151,13 +162,10 @@ public class TelegramClientManager {
     public void checkPassword(String tenantId, String password) {
         SimpleTelegramClient client = activeClients.get(tenantId);
         if (client != null) {
-            log.info("🔑 Sending 2FA password for tenant: {}", tenantId);
             client.send(new TdApi.CheckAuthenticationPassword(password), res -> {
                 if (res.isError()) {
                     log.error("❌ 2FA Password incorrect for {}: {}", tenantId, res.getError().message);
-                    syncStatusWithBackend(tenantId, "PASSWORD_ERROR");
-                } else {
-                    log.info("✅ 2FA Password accepted for {}", tenantId);
+                    syncStatusWithBackend(tenantId, "PASSWORD_ERROR", null);
                 }
             });
         }
@@ -172,21 +180,19 @@ public class TelegramClientManager {
             tenantsToCleanup.add(tenantId);
             pendingQrLinks.remove(tenantId);
             lastSyncedQrLink.remove(tenantId);
-
             SimpleTelegramClient client = activeClients.remove(tenantId);
             if (client != null) {
                 CompletableFuture<Void> closeFut = new CompletableFuture<>();
                 pendingCloses.put(tenantId, closeFut);
                 try {
                     client.close();
-                    closeFut.get(10, TimeUnit.SECONDS); 
+                    closeFut.get(5, TimeUnit.SECONDS); 
                 } catch (Exception e) {
                     pendingCloses.remove(tenantId);
                 }
             }
-
             cleanupFiles(tenantId);
-            syncStatusWithBackend(tenantId, "DISCONNECTED");
+            syncStatusWithBackend(tenantId, "DISCONNECTED", null);
         } finally {
             tenantsToCleanup.remove(tenantId);
             lock.unlock();
@@ -196,12 +202,8 @@ public class TelegramClientManager {
     private void cleanupFiles(String tenantId) {
         try {
             Path sessionPath = Paths.get(properties.getSessionsPath()).resolve(tenantId);
-            File directory = sessionPath.toFile();
-            if (directory.exists()) {
-                Thread.sleep(200); 
-                FileSystemUtils.deleteRecursively(directory);
-                log.info("✨ Files cleared for {}", tenantId);
-            }
+            FileSystemUtils.deleteRecursively(sessionPath.toFile());
+            log.info("✨ Files cleared for {}", tenantId);
         } catch (Exception e) {}
     }
 
@@ -223,21 +225,20 @@ public class TelegramClientManager {
                 pendingQrLinks.put(tenantId, newLink);
                 if (!newLink.equals(lastSyncedQrLink.get(tenantId))) {
                     lastSyncedQrLink.put(tenantId, newLink);
-                    syncStatusWithBackend(tenantId, "WAITING_QR");
+                    syncStatusWithBackend(tenantId, "WAITING_QR", newLink); // ПЕРЕДАЕМ ССЫЛКУ
                 }
             } else if (state instanceof TdApi.AuthorizationStateWaitPassword) {
-                log.warn("🔐 2FA Password required for {}", tenantId);
                 pendingQrLinks.remove(tenantId);
-                syncStatusWithBackend(tenantId, "WAITING_PASSWORD");
+                syncStatusWithBackend(tenantId, "WAITING_PASSWORD", null);
             } else if (state instanceof TdApi.AuthorizationStateReady) {
                 pendingQrLinks.remove(tenantId);
-                syncStatusWithBackend(tenantId, "CONNECTED");
+                syncStatusWithBackend(tenantId, "CONNECTED", null);
             } else if (state instanceof TdApi.AuthorizationStateClosed) {
                 activeClients.remove(tenantId);
                 pendingQrLinks.remove(tenantId);
                 CompletableFuture<Void> fut = pendingCloses.remove(tenantId);
                 if (fut != null) fut.complete(null);
-                syncStatusWithBackend(tenantId, "DISCONNECTED");
+                syncStatusWithBackend(tenantId, "DISCONNECTED", null);
             }
         });
 
@@ -247,27 +248,18 @@ public class TelegramClientManager {
     public CompletableFuture<Void> sendMessageByPhone(String tenantId, String phoneNumber, String text) {
         SimpleTelegramClient client = getClient(tenantId);
         if (client == null) return CompletableFuture.failedFuture(new RuntimeException("OFFLINE"));
-
         TdApi.Contact contact = new TdApi.Contact();
         contact.phoneNumber = phoneNumber;
         contact.firstName = "Client";
-
         return client.send(new TdApi.ImportContacts(new TdApi.Contact[]{contact}))
             .thenCompose(imported -> {
-                if (imported.userIds.length == 0 || imported.userIds[0] == 0) {
-                    CompletableFuture<TdApi.Chat> fail = new CompletableFuture<>();
-                    fail.completeExceptionally(new RuntimeException("404"));
-                    return fail;
-                }
+                if (imported.userIds.length == 0 || imported.userIds[0] == 0) return CompletableFuture.failedFuture(new RuntimeException("404"));
                 return client.send(new TdApi.CreatePrivateChat(imported.userIds[0], false));
             })
             .thenCompose(chat -> {
                 TdApi.InputMessageText content = new TdApi.InputMessageText();
                 content.text = new TdApi.FormattedText(text, new TdApi.TextEntity[0]);
                 return client.send(new TdApi.SendMessage(chat.id, 0, null, null, null, content));
-            })
-            .thenAccept(msg -> {
-                log.info("✅ Sent to {}", phoneNumber);
-            });
+            }).thenAccept(msg -> log.info("✅ Sent to {}", phoneNumber));
     }
 }

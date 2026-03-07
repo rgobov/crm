@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional;
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -64,12 +64,24 @@ public class TelegramSettingsService {
             log.warn("Microservice disconnect failed: {}", e.getMessage());
         }
         updateDatabaseStatus(tenantId, false);
-        notifyFrontend(tenantId, "DISCONNECTED");
+        Map<String, Object> data = new HashMap<>();
+        data.put("status", "DISCONNECTED");
+        updateStatus(tenantId, data);
     }
 
     @Transactional
-    public void updateStatus(String tenantId, String status) {
-        notifyFrontend(tenantId, status);
+    public void updateStatus(String tenantId, Map<String, Object> data) {
+        String status = (String) data.get("status");
+        
+        // ФИКС: Передаем всё содержимое (включая qrCode и ts) во фронтенд
+        Map<String, Object> payload = new HashMap<>(data);
+        payload.put("ts", System.currentTimeMillis());
+        
+        try {
+            messagingTemplate.convertAndSend("/topic/telegram/" + tenantId, payload);
+        } catch (Exception e) {
+            log.warn("WebSocket notification failed: {}", e.getMessage());
+        }
 
         if ("CONNECTED".equals(status)) {
             updateDatabaseStatus(tenantId, true);
@@ -84,17 +96,6 @@ public class TelegramSettingsService {
             "VALUES (?, ?, ?) ON CONFLICT (tenant_id) DO UPDATE SET is_active = ?, connected_at = ?",
             tenantId, active, LocalDateTime.now(), active, LocalDateTime.now()
         );
-    }
-
-    private void notifyFrontend(String tenantId, String status) {
-        try {
-            messagingTemplate.convertAndSend("/topic/telegram/" + tenantId, Map.of(
-                "status", status,
-                "ts", System.currentTimeMillis()
-            ));
-        } catch (Exception e) {
-            log.warn("WebSocket notification failed: {}", e.getMessage());
-        }
     }
 
     public TelegramSettings getSettings(String tenantId) {

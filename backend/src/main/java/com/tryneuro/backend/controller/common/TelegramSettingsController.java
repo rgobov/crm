@@ -76,9 +76,9 @@ public class TelegramSettingsController {
         }
 
         String tenantId = (String) data.get("tenantId");
-        String status = (String) data.get("status");
         
-        telegramSettingsService.updateStatus(tenantId, status);
+        // ФИКС: Передаем всю карту data (Map<String, Object>), как и требует сервис
+        telegramSettingsService.updateStatus(tenantId, data);
         return ResponseEntity.ok().build();
     }
 }
