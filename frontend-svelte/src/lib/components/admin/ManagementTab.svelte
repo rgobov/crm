@@ -6,8 +6,6 @@
     import NotificationTemplatesModal from './NotificationTemplatesModal.svelte';
     import { fade, scale } from 'svelte/transition';
 
-    // Убрали неиспользуемый forcedDate
-
     let stats = {
         totalClients: 0,
         todayAppointments: 0,
@@ -134,53 +132,61 @@
         overflow-y: auto;
         background: #fdf6e3;
         -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
     }
 
-    .management-tab { padding: 24px; animation: fadeIn 0.3s ease-out; max-width: 600px; margin: 0 auto; }
+    .management-tab {
+        padding: 20px;
+        animation: fadeIn 0.3s ease-out;
+        max-width: 500px; /* Сузили для лучшего вида на мобильных */
+        margin: 0 auto;
+        box-sizing: border-box;
+    }
 
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
     .stat-card {
         background: #eee8d5;
-        padding: 16px; border-radius: 20px; text-align: center;
+        padding: 14px 8px; border-radius: 18px; text-align: center;
         border: 1.5px solid #ddd6c1;
     }
-    .stat-card .val { display: block; font-size: 22px; font-weight: 900; color: #268bd2; margin-bottom: 4px; }
-    .stat-card .lbl { font-size: 9px; font-weight: 850; color: #93a1a1; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-card .val { display: block; font-size: 20px; font-weight: 900; color: #268bd2; margin-bottom: 2px; }
+    .stat-card .lbl { font-size: 8px; font-weight: 850; color: #93a1a1; text-transform: uppercase; letter-spacing: 0.5px; }
 
-    .section-label { font-size: 10px; font-weight: 900; color: #93a1a1; letter-spacing: 1.5px; margin-bottom: 16px; text-transform: uppercase; }
+    .section-label { font-size: 9px; font-weight: 900; color: #93a1a1; letter-spacing: 1.2px; margin-bottom: 12px; text-transform: uppercase; padding-left: 4px; }
 
-    .menu-list { display: flex; flex-direction: column; gap: 10px; }
+    .menu-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
     .menu-item {
-        display: flex; align-items: center; padding: 16px;
+        display: flex; align-items: center; padding: 14px;
         background: #eee8d5;
-        border: 1.5px solid #ddd6c1; border-radius: 22px; cursor: pointer; text-align: left;
+        border: 1.5px solid #ddd6c1; border-radius: 20px; cursor: pointer; text-align: left;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         width: 100%;
+        box-sizing: border-box;
     }
-    .menu-item:hover { background: #fdf6e3; border-color: #268bd2; transform: translateY(-1px); }
-    .menu-item:active { transform: scale(0.98); }
+    .menu-item:active { transform: scale(0.98); background: #fdf6e3; }
 
-    .item-icon { width: 48px; height: 48px; background: #fdf6e3; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-right: 16px; border: 1px solid #ddd6c1; }
+    .item-icon { width: 44px; height: 44px; background: #fdf6e3; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-right: 14px; border: 1px solid #ddd6c1; flex-shrink: 0; }
     .tg-bg { color: #268bd2; }
     .templates-bg { color: #d33682; }
 
-    .item-text h3 { margin: 0; font-size: 16px; color: #073642; font-weight: 850; letter-spacing: -0.2px; }
-    .item-text p { margin: 2px 0 0 0; font-size: 12px; color: #586e75; font-weight: 600; }
-    .arrow { margin-left: auto; font-size: 24px; color: #93a1a1; font-weight: 300; }
+    .item-text { flex: 1; min-width: 0; }
+    .item-text h3 { margin: 0; font-size: 15px; color: #073642; font-weight: 850; letter-spacing: -0.2px; }
+    .item-text p { margin: 1px 0 0 0; font-size: 11px; color: #586e75; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .arrow { font-size: 20px; color: #93a1a1; font-weight: 300; margin-left: 8px; }
 
-    .bottom-spacer { height: 100px; }
+    .bottom-spacer { height: 80px; }
 
     .modal-overlay {
-        position: fixed; inset: 0; background: rgba(7, 54, 66, 0.8);
-        backdrop-filter: blur(10px); z-index: 1000;
-        display: flex; align-items: center; justify-content: center; padding: 20px;
+        position: fixed; inset: 0; background: rgba(7, 54, 66, 0.85);
+        backdrop-filter: blur(8px); z-index: 2000;
+        display: flex; align-items: center; justify-content: center; padding: 16px;
     }
     .modal-wrapper {
-        width: 100%; max-width: 440px; height: auto; max-height: 90vh;
-        background: #fdf6e3; border-radius: 32px; overflow: hidden;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        width: 100%; max-width: 400px; height: auto; max-height: 85vh;
+        background: #fdf6e3; border-radius: 28px; overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
         border: 1.5px solid #ddd6c1;
     }
 
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 </style>

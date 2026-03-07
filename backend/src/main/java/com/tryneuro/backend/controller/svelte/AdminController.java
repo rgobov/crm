@@ -70,7 +70,6 @@ public class AdminController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
     }
 
-    // НОВОЕ: Управление сменами для администратора
     @PutMapping("/staff/{id}/shift")
     public ResponseEntity<StaffShift> updateStaffShift(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody StaffShift shift) {
         shift.setStaffId(id);
@@ -81,10 +80,13 @@ public class AdminController {
     @PostMapping("/staff/{id}/shift/copy")
     public ResponseEntity<Void> copyStaffShift(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody StaffShift sourceShift, @RequestParam int days) {
         String tId = getRequiredTenantId(tenantId);
+        log.info("📋 Copying shift for staff {} in branch {} for {} days", id, sourceShift.getBranchId(), days);
+        
         for (int i = 1; i <= days; i++) {
             StaffShift newShift = new StaffShift();
             newShift.setStaffId(id);
             newShift.setTenantId(tId);
+            newShift.setBranchId(sourceShift.getBranchId()); // ФИКС: Проставляем branchId
             newShift.setDate(sourceShift.getDate().plusDays(i));
             newShift.setWorkStartTime(sourceShift.getWorkStartTime());
             newShift.setWorkEndTime(sourceShift.getWorkEndTime());
