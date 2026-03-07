@@ -2,9 +2,12 @@ import axios from 'axios';
 import { token } from './stores/auth.js';
 import { get } from 'svelte/store';
 
-// ТЕХНИЧЕСКОЕ РЕШЕНИЕ: Относительный путь для корректной работы Vite Proxy в WSL + Эмулятор
+// УНИВЕРСАЛЬНОЕ РЕШЕНИЕ: используем переменную окружения для продакшена (сервера)
+// и относительный путь для локальной разработки (WSL/Эмулятор)
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-    baseURL: '/api'
+    baseURL: API_URL
 });
 
 // Автоматически добавляем токен в каждый запрос
