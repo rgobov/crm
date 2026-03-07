@@ -93,7 +93,7 @@ public class Appointment {
     @Column(name = "reminder_lead_time_hours")
     private Integer reminderLeadTimeHours = 24;
 
-    // ТЕХНИЧЕСКОЕ РЕШЕНИЕ: Автоматическая очистка пустых ID перед сохранением в БД
+    // ФИНАЛЬНЫЙ ФИКС: Автоматически превращаем пустые строки в NULL перед сохранением
     @PrePersist
     @PreUpdate
     private void sanitizeIds() {

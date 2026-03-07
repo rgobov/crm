@@ -2,11 +2,9 @@ import axios from 'axios';
 import { token } from './stores/auth.js';
 import { get } from 'svelte/store';
 
-// Vite автоматически подставит нужный URL в зависимости от режима (dev/prod)
-const API_URL = import.meta.env.VITE_API_URL;
-
+// ТЕХНИЧЕСКОЕ РЕШЕНИЕ: Относительный путь для корректной работы Vite Proxy в WSL + Эмулятор
 const api = axios.create({
-    baseURL: API_URL
+    baseURL: '/api'
 });
 
 // Автоматически добавляем токен в каждый запрос

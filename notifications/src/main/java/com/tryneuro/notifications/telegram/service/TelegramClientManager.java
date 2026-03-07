@@ -50,8 +50,32 @@ public class TelegramClientManager {
         try {
             Init.init();
             log.info("✅ TDLib system initialized.");
+            warmupClients(); // ВОССТАНОВЛЕНО: Авто-запуск существующих сессий
         } catch (Exception e) {
             log.error("❌ Failed to initialize TDLib system", e);
+        }
+    }
+
+    /**
+     * Сканирует папку сессий и автоматически подключает всех клиентов
+     */
+    private void warmupClients() {
+        try {
+            File sessionsDir = new File(properties.getSessionsPath());
+            if (sessionsDir.exists() && sessionsDir.isDirectory()) {
+                File[] folders = sessionsDir.listFiles(File::isDirectory);
+                if (folders != null) {
+                    log.info("🚀 Starting auto-warmup for {} telegram clients...", folders.length);
+                    for (File folder : folders) {
+                        String tenantId = folder.getName();
+                        log.info("💤 Waking up client for tenant: {}", tenantId);
+                        // Запускаем в фоновом режиме, чтобы не тормозить старт приложения
+                        CompletableFuture.runAsync(() -> getClient(tenantId));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("⚠️ Failed to warmup telegram clients", e);
         }
     }
 
@@ -228,7 +252,6 @@ public class TelegramClientManager {
         contact.phoneNumber = phoneNumber;
         contact.firstName = "Client";
 
-        // Исправляем цепочку типов CompletableFuture
         return client.send(new TdApi.ImportContacts(new TdApi.Contact[]{contact}))
             .thenCompose(imported -> {
                 if (imported.userIds.length == 0 || imported.userIds[0] == 0) {

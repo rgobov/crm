@@ -39,14 +39,16 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthResponse login(@RequestBody AuthRequest authRequest, @RequestHeader(value = "X-Telegram-Init-Data", required = false) String initData) {
-        log.info("AUTH: Login attempt for email: {}", authRequest.getEmail());
+        // ТЕХНИЧЕСКОЕ РЕШЕНИЕ: Приводим email к нижнему регистру для надежности в эмуляторах
+        String normalizedEmail = authRequest.getEmail().trim().toLowerCase();
+        log.info("AUTH: Login attempt for email: {}", normalizedEmail);
 
         try {
             authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
+                new UsernamePasswordAuthenticationToken(normalizedEmail, authRequest.getPassword())
             );
 
-            final UserDetails userDetails = userDetailsService.loadUserByUsername(authRequest.getEmail());
+            final UserDetails userDetails = userDetailsService.loadUserByUsername(normalizedEmail);
             final User user = (User) userDetails;
 
             if (user.getStaffId() != null) {
@@ -58,11 +60,11 @@ public class AuthController {
             }
 
             final String token = jwtUtil.generateToken(user, user.getTenantId(), user.getStaffId());
-            log.info("AUTH: Login successful for {}, tenant: {}", authRequest.getEmail(), user.getTenantId());
+            log.info("AUTH: Login successful for {}, tenant: {}", normalizedEmail, user.getTenantId());
             return new AuthResponse(token, user.getTenantId());
 
         } catch (BadCredentialsException e) {
-            log.warn("AUTH: Invalid credentials for {}", authRequest.getEmail());
+            log.warn("AUTH: Invalid credentials for {}", normalizedEmail);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Неверный email или пароль");
         } catch (Exception e) {
             log.error("AUTH: Unexpected error during login", e);

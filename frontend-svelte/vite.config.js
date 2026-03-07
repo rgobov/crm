@@ -8,15 +8,17 @@ export default defineConfig({
 		port: 5173,
 		strictPort: true,
 		proxy: {
-			// Прокси для API - используем localhost для WSL
+			// Прокси для API
 			'/api': {
-				target: 'http://localhost:8080',
+				target: 'http://127.0.0.1:8080',
 				changeOrigin: true,
-				secure: false
+				secure: false,
+				// Добавляем поддержку WebSocket для прокси, если нужно
+				ws: true
 			},
 			// Прокси для WebSocket
 			'/ws': {
-				target: 'http://localhost:8080',
+				target: 'http://127.0.0.1:8080',
 				ws: true,
 				changeOrigin: true
 			}
