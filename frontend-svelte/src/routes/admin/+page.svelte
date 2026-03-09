@@ -1,5 +1,5 @@
 <script>
-    import { activeTab } from '$lib/stores/dashboardStore.js';
+    import { activeTab, activeBranchId } from '$lib/stores/dashboardStore.js';
     import ManagementTab from '$lib/components/admin/ManagementTab.svelte';
     import CalendarTab from '$lib/components/admin/CalendarTab.svelte';
 
@@ -9,7 +9,6 @@
         timeline: CalendarTab
     };
 
-    // Входящие пропсы от Layout (если нужно прокинуть дату)
     export let forcedDate = null;
 </script>
 
@@ -17,6 +16,7 @@
     <svelte:component
         this={tabs[$activeTab]}
         {forcedDate}
+        branchId={$activeBranchId}
     />
 </div>
 

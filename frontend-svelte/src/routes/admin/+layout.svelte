@@ -1,21 +1,31 @@
 <script>
     import { onMount } from 'svelte';
-    import { activeTab, selectedDate } from '$lib/stores/dashboardStore.js';
+    import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { websocketService } from '$lib/services/websocketService.js';
+    import { branchService } from '$lib/services/branchService.js';
     import AdminSidebar from '$lib/components/admin/AdminSidebar.svelte';
+    import MobileAdminShell from '$lib/components/mobile/MobileAdminShell.svelte';
+    import { isMobile, isTablet } from '$lib/stores/ui.js';
     import { goto } from '$app/navigation';
     import { initAuth } from '$lib/stores/auth.js';
+    import { activeModal, closeModal } from '$lib/stores/modalStore.js'; // ИМПОРТ
+    import TelegramSettingsModal from '$lib/components/admin/TelegramSettingsModal.svelte';
+    import NotificationTemplatesModal from '$lib/components/admin/NotificationTemplatesModal.svelte';
+    import { fade, scale } from 'svelte/transition';
 
     let sidebarWidth = 300;
     let isResizing = false;
+    let branches = [];
 
-    onMount(() => {
+    onMount(async () => {
         initAuth();
         websocketService.connect();
-
-        // БЛОКИРУЕМ СКРОЛЛ ВСЕГО ТЕЛА БРАУЗЕРА
         document.body.style.overflow = 'hidden';
         document.body.style.height = '100vh';
+
+        try {
+            branches = await branchService.getBranches();
+        } catch (e) { /* ignore */ }
     });
 
     function startResizing() {
@@ -33,44 +43,42 @@
     }
 </script>
 
-<div class="admin-shell" style="--sidebar-width: {sidebarWidth}px">
-    <aside class="sidebar-aside">
-        <AdminSidebar on:dateChange={handleDateChange} />
-        <div class="resize-handle" on:mousedown={startResizing}></div>
-    </aside>
-
-    <main class="content-body">
+{#if $isMobile || $isTablet}
+    <MobileAdminShell {branches}>
         <slot />
+    </MobileAdminShell>
+{:else}
+    <div class="admin-shell" style="--sidebar-width: {sidebarWidth}px">
+        <aside class="sidebar-aside">
+            <AdminSidebar on:dateChange={handleDateChange} />
+            <div class="resize-handle" on:mousedown={startResizing}></div>
+        </aside>
+        <main class="content-body">
+            <slot />
+        </main>
+    </div>
+{/if}
 
-        <nav class="mobile-nav">
-            <button class="nav-item" class:active={$activeTab === 'management'} on:click={() => { activeTab.set('management'); goto('/admin'); }}>
-                <span>📊</span><span class="label">Главная</span>
-            </button>
-            <button class="nav-item" class:active={$activeTab === 'timeline'} on:click={() => { activeTab.set('timeline'); goto('/admin'); }}>
-                <span>🕒</span><span class="label">Таймлайн</span>
-            </button>
-        </nav>
-    </main>
-</div>
+<!-- ГЛОБАЛЬНЫЕ МОДАЛЬНЫЕ ОКНА -->
+{#if $activeModal}
+    <div class="global-modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
+        <div class="global-modal-content" transition:scale={{start: 0.95, duration: 200}}>
+            {#if $activeModal === 'telegram'}
+                <TelegramSettingsModal on:close={closeModal} />
+            {:else if $activeModal === 'templates'}
+                <NotificationTemplatesModal on:close={closeModal} />
+            {/if}
+        </div>
+    </div>
+{/if}
 
 <style>
-    /* Глобальные фиксы для SPA */
-    :global(html, body) {
-        margin: 0; padding: 0;
-        height: 100vh; width: 100vw;
-        overflow: hidden; /* ГАРАНТИРУЕМ УДАЛЕНИЕ ВТОРОГО СКРОЛЛА */
-    }
-
+    :global(html, body) { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
     .admin-shell { display: flex; height: 100vh; width: 100vw; background: #f8fafc; overflow: hidden; }
-
-    .sidebar-aside { width: var(--sidebar-width); background: white; border-right: 1px solid #f1f5f9; height: 100%; display: none; flex-shrink: 0; position: relative; }
+    .sidebar-aside { width: var(--sidebar-width); background: white; border-right: 1px solid #f1f5f9; height: 100%; display: flex; flex-shrink: 0; position: relative; }
     .resize-handle { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 10; }
-
     .content-body { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; position: relative; }
 
-    .mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 10px 0; border-top: 1px solid #f1f5f9; z-index: 1000; }
-    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; border: none; background: none; color: #94a3b8; }
-    .nav-item.active { color: var(--primary-color); }
-
-    @media (min-width: 1024px) { .sidebar-aside { display: flex; } .mobile-nav { display: none; } }
+    .global-modal-backdrop { position: fixed; inset: 0; background: rgba(0, 43, 54, 0.6); backdrop-filter: blur(4px); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .global-modal-content { background: #fdf6e3; width: 100%; max-width: 550px; border-radius: 32px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); border: 1px solid #ddd6c1; }
 </style>
