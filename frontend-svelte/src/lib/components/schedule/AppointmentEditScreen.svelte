@@ -20,11 +20,12 @@
     let formData = {
         startTime: '',
         durationInMinutes: 60,
-        contactId: null, // ПРАВИЛЬНО: null вместо ""
+        contactId: null,
         clientName: '',
+        clientPhone: '', // Поле для сохранения в Appointment
         service: '',
-        staffMemberId: null, // ПРАВИЛЬНО: null вместо ""
-        resourceId: null,    // ПРАВИЛЬНО: null вместо ""
+        staffMemberId: null,
+        resourceId: null,
         branchId: '',
         comment: '',
         referenceTag: '',
@@ -32,9 +33,9 @@
         reminderLeadTimeHours: 24
     };
 
-    // Состояние инлайн-создания клиента
     let isNewClientMode = false;
     let newClientPhone = "";
+    let availablePhones = []; // Список телефонов выбранного контакта
 
     let durationHours = 1;
     let durationMinutes = 0;
@@ -89,7 +90,8 @@
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
                     comment: appointment.comment || '',
-                    referenceTag: appointment.referenceTag || ''
+                    referenceTag: appointment.referenceTag || '',
+                    clientPhone: appointment.clientPhone || ''
                 };
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
@@ -98,7 +100,7 @@
 
                 if (appointment.contactId) {
                     const c = await contactService.getContactById(appointment.contactId);
-                    if (c) selectContact(c);
+                    if (c) selectContact(c, true);
                 }
             } else {
                 formData.staffMemberId = preselected.staffId || null;
@@ -115,38 +117,18 @@
         }
     }
 
-    $: {
-        const query = serviceSearchInput.trim().toLowerCase();
-        filteredServices = query ? services.filter(s => s.name.toLowerCase().includes(query)) : services;
-        isNewService = query !== '' && !services.some(s => s.name.toLowerCase() === query);
-    }
-
-    function selectService(s) {
-        formData.service = s.name;
-        durationHours = Math.floor(s.durationInMinutes / 60);
-        durationMinutes = s.durationInMinutes % 60;
-        serviceSearchInput = s.name;
-        showServiceDropdown = false;
-    }
-
-    function handleClientInput() {
-        if (selectedContact || isNewClientMode) return;
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(async () => {
-            const q = searchInput.trim();
-            if (q.length < 2) { searchResults = []; return; }
-            const res = await contactService.getContacts(q, true, 0, 5);
-            searchResults = res.content || [];
-        }, 400);
-    }
-
-    function selectContact(contact) {
+    function selectContact(contact, keepExistingPhone = false) {
         isNewClientMode = false;
         selectedContact = contact;
         formData.contactId = contact.id;
         formData.clientName = contact.name;
         searchInput = contact.name;
         searchResults = [];
+
+        availablePhones = contact.phones || [];
+        if (!keepExistingPhone) {
+            formData.clientPhone = availablePhones.length > 0 ? availablePhones[0] : '';
+        }
     }
 
     function startInlineCreation() {
@@ -154,17 +136,18 @@
         selectedContact = null;
         formData.contactId = null;
         formData.clientName = searchInput;
+        availablePhones = [];
 
         const digits = searchInput.replace(/\D/g, "");
         if (digits.length >= 10) newClientPhone = digits;
-
         searchResults = [];
     }
 
     async function handleSave() {
         if (!searchInput.trim()) return alert('Укажите имя клиента');
-        if (isNewClientMode && !newClientPhone.trim()) return alert('Укажите телефон нового клиента');
-        if (!currentBranchData) return alert('Данные филиала еще загружаются...');
+
+        let finalPhone = isNewClientMode ? newClientPhone.trim() : formData.clientPhone;
+        if (!finalPhone) return alert('Укажите номер телефона');
 
         isSaving = true;
         try {
@@ -174,7 +157,7 @@
             if (isNewClientMode) {
                 const newContact = await contactService.addContact({
                     name: clientName,
-                    phones: [newClientPhone.trim()],
+                    phones: [finalPhone],
                     tags: formData.referenceTag ? [formData.referenceTag] : []
                 }, $activeBranchId);
                 contactId = newContact.id;
@@ -192,9 +175,8 @@
                 ...formData,
                 service: sName,
                 clientName: clientName,
-                contactId: contactId || null,
-                staffMemberId: formData.staffMemberId || null,
-                resourceId: formData.resourceId || null,
+                clientPhone: finalPhone,
+                contactId: contactId,
                 startTime: correctedStartTime,
                 branchId: $activeBranchId
             };
@@ -213,6 +195,17 @@
             isSaving = false;
         }
     }
+
+    function handleClientInput() {
+        if (selectedContact || isNewClientMode) return;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+            const q = searchInput.trim();
+            if (q.length < 2) { searchResults = []; return; }
+            const res = await contactService.getContacts(q, true, 0, 5);
+            searchResults = res.content || [];
+        }, 400);
+    }
 </script>
 
 <div class="appt-edit-root" on:click={() => { showServiceDropdown = false; searchResults = []; showDurationPicker = false; }}>
@@ -230,7 +223,7 @@
                         {#if selectedContact}
                             <div class="badge" in:scale>
                                 <span class="txt">{selectedContact.name}</span>
-                                <button class="x" on:click={() => { selectedContact = null; searchInput = ''; isNewClientMode = false; }}>✕</button>
+                                <button class="x" on:click={() => { selectedContact = null; searchInput = ''; isNewClientMode = false; availablePhones = []; }}>✕</button>
                             </div>
                         {/if}
 
@@ -262,6 +255,26 @@
                         <div class="inline-phone-field" in:slide>
                             <input type="tel" bind:value={newClientPhone} placeholder="Номер телефона..." autofocus />
                             <button class="btn-cancel-new" on:click={() => isNewClientMode = false}>✕</button>
+                        </div>
+                    {/if}
+
+                    {#if selectedContact && availablePhones.length > 1}
+                        <div class="phone-select-area" in:slide>
+                            <label class="micro-label">ВЫБЕРИТЕ ТЕЛЕФОН ДЛЯ ЭТОЙ ЗАПИСИ:</label>
+                            <div class="phone-chips">
+                                {#each availablePhones as ph}
+                                    <button
+                                        class="ph-chip"
+                                        class:active={formData.clientPhone === ph}
+                                        on:click={() => formData.clientPhone = ph}>
+                                        {ph}
+                                    </button>
+                                {/each}
+                            </div>
+                        </div>
+                    {:else if selectedContact && availablePhones.length === 1}
+                        <div class="phone-info-line" in:fade>
+                            <span>📞 {availablePhones[0]}</span>
                         </div>
                     {/if}
                 </div>
@@ -384,19 +397,27 @@
     .tile-hero { background: white; padding: 20px; border-radius: 28px; display: flex; align-items: center; gap: 16px; border: 1px solid #f1f5f9; margin-bottom: 16px; transition: all 0.3s; }
     .tile-hero.is-new { background: #fff7ed; border-color: #ffedd5; }
     .avatar { width: 56px; height: 56px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; }
-    .hero-body { flex: 1; position: relative; }
+    .hero-body { flex: 1; position: relative; min-width: 0; }
     label { display: block; font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
 
     .rel-pos { position: relative; }
     .search-box { display: flex; align-items: center; gap: 8px; }
     .search-box input { width: 100%; padding: 10px 14px; border-radius: 14px; border: 1.5px solid #f1f5f9; background: white; font-size: 14px; outline: none; }
     .badge { position: absolute; left: 4px; right: 4px; top: 4px; bottom: 4px; background: #eff6ff; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border: 1.5px solid #0ea5e9; }
-    .badge .txt { font-weight: 700; color: #1e40af; }
+    .badge .txt { font-weight: 700; color: #1e40af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .x { background: white; border: none; color: #ef4444; font-weight: 800; cursor: pointer; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
 
     .inline-phone-field { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
     .inline-phone-field input { flex: 1; background: white; padding: 10px 14px; border-radius: 12px; border: 1.5px solid #fbbf24; font-size: 14px; font-weight: 700; color: #92400e; }
     .btn-cancel-new { background: #fef3c7; border: none; color: #d97706; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; font-weight: 800; }
+
+    /* НОВЫЕ СТИЛИ ДЛЯ ВЫБОРА ТЕЛЕФОНА */
+    .phone-select-area { margin-top: 12px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
+    .micro-label { font-size: 8px; color: #cbd5e1; font-weight: 900; margin-bottom: 6px; }
+    .phone-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ph-chip { background: #f8fafc; border: 1.5px solid #f1f5f9; padding: 4px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; color: #64748b; cursor: pointer; transition: all 0.2s; }
+    .ph-chip.active { background: #eff6ff; border-color: #0ea5e9; color: #1e40af; }
+    .phone-info-line { font-size: 12px; color: #64748b; font-weight: 700; margin-top: 6px; }
 
     .tiles-stack { display: flex; flex-direction: column; gap: 10px; }
     .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; }

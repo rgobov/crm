@@ -3,6 +3,7 @@ package com.tryneuro.backend.service;
 import com.tryneuro.backend.dto.WorkloadDto;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentStatus;
+import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.BranchRepository;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ScheduleService {
@@ -49,9 +51,27 @@ public class ScheduleService {
         this.messagingTemplate = messagingTemplate;
     }
 
+    /**
+     * Обогащает запись визита телефоном из контакта, если он отсутствует.
+     * Это решает проблему отображения для старых записей.
+     */
+    private void enrichAppointmentPhone(Appointment app) {
+        if ((app.getClientPhone() == null || app.getClientPhone().isEmpty()) && app.getContactId() != null) {
+            contactService.getContactById(app.getContactId()).ifPresent(contact -> {
+                if (contact.getPhones() != null && !contact.getPhones().isEmpty()) {
+                    app.setClientPhone(contact.getPhones().get(0));
+                }
+            });
+        }
+    }
+
     @Transactional
     public Appointment addAppointment(Appointment appointment) {
         log.info("🚀 [ADD] Creating appointment for client '{}' in branch '{}'", appointment.getClientName(), appointment.getBranchId());
+        
+        // Гарантируем наличие телефона перед сохранением
+        enrichAppointmentPhone(appointment);
+        
         validateAvailability(appointment);
         Appointment saved = appointmentRepository.save(appointment);
         if (saved.getContactId() != null && saved.getReferenceTag() != null && !saved.getReferenceTag().isEmpty()) {
@@ -69,6 +89,7 @@ public class ScheduleService {
         appointment.setStartTime(details.getStartTime());
         appointment.setDurationInMinutes(details.getDurationInMinutes());
         appointment.setClientName(details.getClientName());
+        appointment.setClientPhone(details.getClientPhone()); // Обновляем телефон
         appointment.setContactId(details.getContactId());
         appointment.setService(details.getService());
         appointment.setStaffMemberId(details.getStaffMemberId());
@@ -81,6 +102,9 @@ public class ScheduleService {
         
         if (details.getBranchId() != null) appointment.setBranchId(details.getBranchId());
 
+        // Если телефон всё ещё пуст после апдейта фронтендом - подтягиваем из контакта
+        enrichAppointmentPhone(appointment);
+
         validateAvailability(appointment);
         Appointment updated = appointmentRepository.save(appointment);
         if (updated.getContactId() != null && updated.getReferenceTag() != null && !updated.getReferenceTag().isEmpty()) {
@@ -88,6 +112,13 @@ public class ScheduleService {
         }
         notifyChange(updated.getTenantId());
         return updated;
+    }
+
+    public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId, String branchId) {
+        List<Appointment> apps = appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
+        // Обогащаем КАЖДУЮ запись телефоном перед отправкой на фронтенд
+        apps.forEach(this::enrichAppointmentPhone);
+        return apps;
     }
 
     private void validateAvailability(Appointment app) {
@@ -120,27 +151,19 @@ public class ScheduleService {
         LocalTime sStart = shift.getWorkStartTime();
         LocalTime sEnd = shift.getWorkEndTime();
 
-        // УМНЫЙ УЧЕТ ПЕРЕХОДА ЧЕРЕЗ ПОЛНОЧЬ
         boolean withinHours;
         if (sEnd.isAfter(sStart)) {
-            // Обычная смена (например, 09:00 - 21:00)
             withinHours = !start.isBefore(sStart) && !end.isAfter(sEnd);
         } else {
-            // Ночная смена (например, 13:00 - 01:00)
             withinHours = !start.isBefore(sStart) || !end.isAfter(sEnd);
         }
 
-        if (!withinHours) {
-            log.warn("❌ [CHECK] Outside hours. App: {}-{}, Shift: {}-{}", start, end, sStart, sEnd);
-            return false;
-        }
+        if (!withinHours) return false;
 
-        // Проверка на перерыв
         if (shift.getBreakStartTime() != null && shift.getBreakEndTime() != null) {
             if (start.isBefore(shift.getBreakEndTime()) && end.isAfter(shift.getBreakStartTime())) return false;
         }
 
-        // Проверка на пересечение с другими записями
         List<Appointment> allStaffApps = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
         for (Appointment existing : allStaffApps) {
             if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
@@ -154,12 +177,10 @@ public class ScheduleService {
         return true;
     }
 
-    public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId, String branchId) {
-        return appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
-    }
-
     public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {
-        return appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
+        List<Appointment> apps = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
+        apps.forEach(this::enrichAppointmentPhone);
+        return apps;
     }
 
     public List<WorkloadDto> getWorkloadForStaffAndMonth(String staffId, int year, int month) {
@@ -167,7 +188,9 @@ public class ScheduleService {
     }
 
     public List<Appointment> getAppointmentsForContact(String contactId, String tenantId) {
-        return appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
+        List<Appointment> apps = appointmentRepository.findByContactIdAndTenantIdOrderByDateDesc(contactId, tenantId);
+        apps.forEach(this::enrichAppointmentPhone);
+        return apps;
     }
 
     @Transactional
