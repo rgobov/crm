@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -47,39 +48,39 @@ public class NotificationManager {
         String template = templateService.getTemplateContent(tenantId, type);
         String message = templateEngine.process(template, appointment);
 
-        log.info("🔍 [TELEGRAM] Checking contact data for app {}. Contact object: {}", 
-                appointment.getId(), appointment.getContact() != null ? "FOUND" : "NULL");
+        // ИСПРАВЛЕНО: Берем имя напрямую из поля clientName записи, это надежнее чем LAZY contact
+        String clientName = appointment.getClientName();
+        String rawPhone = appointment.getClientPhone();
 
-        if (appointment.getContact() != null && 
-            appointment.getContact().getPhones() != null && 
-            !appointment.getContact().getPhones().isEmpty()) {
-            
-            String rawPhone = appointment.getContact().getPhones().get(0);
-            log.info("📱 [TELEGRAM] Phone from DB: {}", rawPhone);
-            
-            // 1. Очищаем от всего, кроме цифр
+        // Fallback если телефон не в записи, а в контакте (для старых записей)
+        if ((rawPhone == null || rawPhone.isEmpty()) && appointment.getContact() != null) {
+            rawPhone = (appointment.getContact().getPhones() != null && !appointment.getContact().getPhones().isEmpty()) 
+                       ? appointment.getContact().getPhones().get(0) : null;
+        }
+
+        if (rawPhone != null && !rawPhone.isEmpty()) {
             String cleanPhone = rawPhone.replaceAll("[^0-9]", "");
-            
-            // 2. Умная коррекция для РФ (если 11 цифр и начинается с 8)
             if (cleanPhone.length() == 11 && cleanPhone.startsWith("8")) {
                 cleanPhone = "7" + cleanPhone.substring(1);
             }
             
-            log.info("🚀 [TELEGRAM] Dispatching message to microservice. Phone: {}, Tenant: {}", cleanPhone, tenantId);
+            log.info("🚀 [TELEGRAM] Dispatching message for {} to microservice. Phone: {}", clientName, cleanPhone);
             
             try {
-                Map<String, String> response = notificationClient.sendTelegramMessage(internalSecret, Map.of(
-                    "tenantId", tenantId,
-                    "phone", cleanPhone,
-                    "text", message
-                ));
-                log.info("✅ [TELEGRAM] SUCCESS! Microservice response: {}", response);
+                Map<String, String> requestData = new HashMap<>();
+                requestData.put("tenantId", tenantId);
+                requestData.put("phone", cleanPhone);
+                requestData.put("name", clientName);
+                requestData.put("text", message);
+
+                notificationClient.sendTelegramMessage(internalSecret, requestData);
+                log.info("✅ [TELEGRAM] SUCCESS for {} ({})", clientName, cleanPhone);
             } catch (Exception e) {
                 log.error("❌ [TELEGRAM] FAILED to send to microservice for {}: {}", cleanPhone, e.getMessage());
                 throw e;
             }
         } else {
-            log.error("❌ [TELEGRAM] ABORT: No phone number found for contact in appointment {}", appointment.getId());
+            log.error("❌ [TELEGRAM] ABORT: No phone number found for appointment {}", appointment.getId());
         }
     }
 }

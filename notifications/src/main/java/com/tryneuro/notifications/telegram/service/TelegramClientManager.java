@@ -34,7 +34,7 @@ public class TelegramClientManager {
 
     private final TelegramProperties properties;
     private final BackendClient backendClient;
-    private final QrCodeService qrCodeService; // ДОБАВИЛИ
+    private final QrCodeService qrCodeService;
     private final Map<String, SimpleTelegramClient> activeClients = new ConcurrentHashMap<>();
     private final Map<String, String> pendingQrLinks = new ConcurrentHashMap<>();
     private final Map<String, Long> floodWaitUntil = new ConcurrentHashMap<>();
@@ -95,7 +95,6 @@ public class TelegramClientManager {
         return sessionLocks.computeIfAbsent(tenantId, k -> new ReentrantLock());
     }
 
-    // УЛУЧШЕННЫЙ МЕТОД: Теперь умеет передавать QR-код
     private void syncStatusWithBackend(String tenantId, String status, String qrLink) {
         if (isStopping.get()) return;
         try {
@@ -103,7 +102,6 @@ public class TelegramClientManager {
             data.put("tenantId", tenantId);
             data.put("status", status);
             
-            // Если есть ссылка на QR, сразу генерируем base64 и шлем в сокет
             if (qrLink != null && !qrLink.isEmpty()) {
                 try {
                     data.put("qrCode", qrCodeService.generateQrBase64(qrLink));
@@ -225,7 +223,7 @@ public class TelegramClientManager {
                 pendingQrLinks.put(tenantId, newLink);
                 if (!newLink.equals(lastSyncedQrLink.get(tenantId))) {
                     lastSyncedQrLink.put(tenantId, newLink);
-                    syncStatusWithBackend(tenantId, "WAITING_QR", newLink); // ПЕРЕДАЕМ ССЫЛКУ
+                    syncStatusWithBackend(tenantId, "WAITING_QR", newLink); 
                 }
             } else if (state instanceof TdApi.AuthorizationStateWaitPassword) {
                 pendingQrLinks.remove(tenantId);
@@ -245,21 +243,31 @@ public class TelegramClientManager {
         return builder.build(AuthenticationSupplier.qrCode());
     }
 
-    public CompletableFuture<Void> sendMessageByPhone(String tenantId, String phoneNumber, String text) {
+    // ИСПРАВЛЕНО: Теперь принимает firstName и использует его при импорте контакта
+    public CompletableFuture<Void> sendMessageByPhone(String tenantId, String phoneNumber, String name, String text) {
         SimpleTelegramClient client = getClient(tenantId);
         if (client == null) return CompletableFuture.failedFuture(new RuntimeException("OFFLINE"));
+
         TdApi.Contact contact = new TdApi.Contact();
         contact.phoneNumber = phoneNumber;
-        contact.firstName = "Client";
+        contact.firstName = (name != null && !name.isEmpty()) ? name : "Клиент";
+
         return client.send(new TdApi.ImportContacts(new TdApi.Contact[]{contact}))
             .thenCompose(imported -> {
-                if (imported.userIds.length == 0 || imported.userIds[0] == 0) return CompletableFuture.failedFuture(new RuntimeException("404"));
+                if (imported.userIds.length == 0 || imported.userIds[0] == 0) {
+                    CompletableFuture<TdApi.Chat> fail = new CompletableFuture<>();
+                    fail.completeExceptionally(new RuntimeException("404"));
+                    return fail;
+                }
                 return client.send(new TdApi.CreatePrivateChat(imported.userIds[0], false));
             })
             .thenCompose(chat -> {
                 TdApi.InputMessageText content = new TdApi.InputMessageText();
                 content.text = new TdApi.FormattedText(text, new TdApi.TextEntity[0]);
                 return client.send(new TdApi.SendMessage(chat.id, 0, null, null, null, content));
-            }).thenAccept(msg -> log.info("✅ Sent to {}", phoneNumber));
+            })
+            .thenAccept(msg -> {
+                log.info("✅ Sent to {} ({})", name, phoneNumber);
+            });
     }
 }

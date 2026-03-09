@@ -79,6 +79,13 @@
             dispatch('open-client', appointment.contactId);
         }
     }
+
+    function formatPhone(p) {
+        if (!p) return "";
+        const c = p.replace(/\D/g, "");
+        if (c.length === 11) return `+${c[0]} (${c.slice(1,4)}) ${c.slice(4,7)}-${c.slice(7,9)}-${c.slice(9,11)}`;
+        return p;
+    }
 </script>
 
 <div class="detail-tiles-container" in:scale={{duration: 400, start: 0.95, easing: quintOut}}>
@@ -106,7 +113,21 @@
     </header>
 
     <div class="grid-layout">
-        <!-- НОВОЕ: ПЛИТКА ОБЪЕКТА (МАШИНЫ) -->
+        {#if appointment.clientPhone}
+            <div class="info-tile phone-tile" in:slide>
+                <div class="tile-icon phone">📞</div>
+                <div class="tile-body">
+                    <label>Телефон клиента</label>
+                    <a href="tel:{appointment.clientPhone}" class="val phone-link">
+                        {formatPhone(appointment.clientPhone)}
+                    </a>
+                </div>
+                <div class="call-action">
+                    <a href="tel:{appointment.clientPhone}" class="btn-call-action">ВЫЗОВ</a>
+                </div>
+            </div>
+        {/if}
+
         {#if appointment.referenceTag}
             <div class="info-tile reference-tile" in:slide>
                 <div class="tile-icon car">🚗</div>
@@ -117,7 +138,6 @@
             </div>
         {/if}
 
-        <!-- ИНТЕРАКТИВНАЯ ПЛИТКА ЗАМЕТКИ -->
         <div class="info-tile comment-tile" class:editing={isEditingComment}>
             <div class="tile-icon note">📝</div>
             <div class="tile-body">
@@ -212,16 +232,15 @@
 </div>
 
 <style>
-    .detail-tiles-container { padding: 20px 20px 4px 20px; display: flex; flex-direction: column; gap: 12px; background: #f8fafc; overflow-x: hidden; }
+    .detail-tiles-container { padding: 20px 20px 40px 20px; display: flex; flex-direction: column; gap: 12px; background: #f8fafc; overflow-x: hidden; }
 
-    .hero-card { background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%); padding: 16px 24px; border-radius: 32px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
+    .hero-card { background: white; padding: 16px 24px; border-radius: 32px; display: flex; align-items: center; gap: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
     .avatar-big { width: 64px; height: 64px; background: var(--primary-gradient); color: white; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; }
 
     .hero-info { flex: 1; }
     .hero-info label { display: block; font-size: 9px; font-weight: 850; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
 
-    .client-link-btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; display: block; width: 100%; transition: opacity 0.2s; }
-    .client-link-btn:hover { opacity: 0.7; }
+    .client-link-btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; display: block; width: 100%; }
     .client-link-btn h2 { margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.1; }
     .client-link-btn span { color: #0ea5e9; font-size: 24px; font-weight: 300; vertical-align: middle; margin-left: 4px; }
 
@@ -230,15 +249,17 @@
     .status-btn.active { background: var(--active-bg); color: white; border-color: var(--active-bg); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
     .grid-layout { display: flex; flex-direction: column; gap: 10px; }
-    .info-tile { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); text-align: left; transition: all 0.2s; }
+    .info-tile { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); text-align: left; }
 
-    /* СТИЛИ ОБЪЕКТА (МАШИНЫ) */
+    .phone-tile { background: #eff6ff; border-color: #dbeafe; }
+    .tile-icon.phone { background: #dbeafe; color: #3b82f6; }
+    .phone-link { color: #2563eb !important; text-decoration: none; font-size: 17px !important; }
+    .btn-call-action { background: #3b82f6; color: white; padding: 6px 12px; border-radius: 10px; font-size: 10px; font-weight: 900; text-decoration: none; }
+
     .reference-tile { background: #f0fdf4; border-color: #dcfce7; }
     .tile-icon.car { background: #dcfce7; color: #10b981; }
 
-    /* СТИЛИ ЗАМЕТКИ */
     .comment-tile { background: #fffbeb; border-color: #fef3c7; cursor: pointer; }
-    .comment-tile:hover { background: #fef3c7; }
     .comment-tile.editing { background: white; border-color: #0ea5e9; cursor: default; }
     .tile-icon.note { background: #fef3c7; color: #d97706; }
 
@@ -249,7 +270,6 @@
 
     .inline-editor { width: 100%; margin-top: 8px; }
     textarea { width: 100%; min-height: 80px; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 10px; font-size: 14px; font-family: inherit; color: #1e293b; outline: none; resize: none; margin-bottom: 8px; }
-    textarea:focus { border-color: #0ea5e9; }
 
     .editor-actions { display: flex; gap: 8px; }
     .btn-save-mini { flex: 1; background: #0ea5e9; color: white; border: none; padding: 8px; border-radius: 10px; font-weight: 800; font-size: 11px; cursor: pointer; }
@@ -271,7 +291,7 @@
     .switch-handle { width: 18px; height: 18px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
     .toggle-switch.on .switch-handle { transform: translateX(20px); }
 
-    .actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; padding-bottom: 10px; }
+    .actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .action-tile { height: 52px; border-radius: 20px; border: 1.5px solid #f1f5f9; background: white; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .action-tile.edit { color: var(--primary-color); }
     .action-tile.delete { color: #ef4444; }

@@ -107,8 +107,10 @@ public class TelegramController {
         String tenantId = request.get("tenantId");
         String phone = request.get("phone");
         String text = request.get("text");
+        // Извлекаем имя клиента, если оно передано бэкендом
+        String name = request.getOrDefault("name", "Клиент CRM");
 
-        return clientManager.sendMessageByPhone(tenantId, phone, text)
+        return clientManager.sendMessageByPhone(tenantId, phone, name, text)
                 .thenApply(v -> ResponseEntity.ok(Map.of("status", "SUCCESS")))
                 .exceptionally(ex -> ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(Map.of("status", "FAILED", "error", ex.getMessage())));
