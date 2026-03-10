@@ -22,7 +22,7 @@
         durationInMinutes: 60,
         contactId: null,
         clientName: '',
-        clientPhone: '', // Поле для сохранения в Appointment
+        clientPhone: '',
         service: '',
         staffMemberId: null,
         resourceId: null,
@@ -35,7 +35,7 @@
 
     let isNewClientMode = false;
     let newClientPhone = "";
-    let availablePhones = []; // Список телефонов выбранного контакта
+    let availablePhones = [];
 
     let durationHours = 1;
     let durationMinutes = 0;
@@ -117,6 +117,21 @@
         }
     }
 
+    $: {
+        const query = serviceSearchInput.trim().toLowerCase();
+        filteredServices = query ? services.filter(s => s.name.toLowerCase().includes(query)) : services;
+        isNewService = query !== '' && !services.some(s => s.name.toLowerCase() === query);
+    }
+
+    function selectService(s) {
+        console.log('✅ Service selected:', s.name);
+        formData.service = s.name;
+        durationHours = Math.floor(s.durationInMinutes / 60);
+        durationMinutes = s.durationInMinutes % 60;
+        serviceSearchInput = s.name;
+        showServiceDropdown = false;
+    }
+
     function selectContact(contact, keepExistingPhone = false) {
         isNewClientMode = false;
         selectedContact = contact;
@@ -137,7 +152,6 @@
         formData.contactId = null;
         formData.clientName = searchInput;
         availablePhones = [];
-
         const digits = searchInput.replace(/\D/g, "");
         if (digits.length >= 10) newClientPhone = digits;
         searchResults = [];
@@ -145,7 +159,6 @@
 
     async function handleSave() {
         if (!searchInput.trim()) return alert('Укажите имя клиента');
-
         let finalPhone = isNewClientMode ? newClientPhone.trim() : formData.clientPhone;
         if (!finalPhone) return alert('Укажите номер телефона');
 
@@ -208,7 +221,8 @@
     }
 </script>
 
-<div class="appt-edit-root" on:click={() => { showServiceDropdown = false; searchResults = []; showDurationPicker = false; }}>
+<!-- ФИКС: Убрали глобальный клик с корня, который ломал выбор услуг -->
+<div class="appt-edit-root">
     {#if isLoading}
         <div class="loader-center"><span class="spinner"></span></div>
     {:else}
@@ -228,7 +242,8 @@
                         {/if}
 
                         {#if searchResults.length > 0 || (searchInput.length >= 2 && !selectedContact && !isNewClientMode)}
-                            <div class="drop shadow-xl">
+                            <!-- ФИКС: stopPropagation чтобы клик внутри не закрывал список раньше времени -->
+                            <div class="drop shadow-xl" on:click|stopPropagation>
                                 {#if searchInput.length >= 2 && !selectedContact}
                                     <SearchDropdownItem
                                         title="Создать нового: {searchInput}"
@@ -300,9 +315,14 @@
                 <div class="tile-card rel-pos" on:click|stopPropagation>
                     <label>УСЛУГА</label>
                     <div class="input-rel">
-                        <input type="text" bind:value={serviceSearchInput} placeholder="Оставьте пустым для 'Стандарт'" on:focus={() => showServiceDropdown = true} />
+                        <input
+                            type="text"
+                            bind:value={serviceSearchInput}
+                            placeholder="Оставьте пустым для 'Стандарт'"
+                            on:focus={() => showServiceDropdown = true}
+                        />
                         {#if showServiceDropdown}
-                            <div class="drop shadow-xl">
+                            <div class="drop shadow-xl" on:click|stopPropagation>
                                 {#each filteredServices as s}
                                     <SearchDropdownItem
                                         title={s.name}
@@ -311,6 +331,16 @@
                                         on:select={() => selectService(s)}
                                     />
                                 {/each}
+                                {#if isNewService}
+                                    <div class="divider"></div>
+                                    <SearchDropdownItem
+                                        title="Создать новую услугу: {serviceSearchInput}"
+                                        subtitle="Длительность будет взята из выбора ниже"
+                                        icon="➕"
+                                        type="action"
+                                        on:select={() => { formData.service = serviceSearchInput; showServiceDropdown = false; }}
+                                    />
+                                {/if}
                             </div>
                         {/if}
                     </div>
@@ -411,7 +441,6 @@
     .inline-phone-field input { flex: 1; background: white; padding: 10px 14px; border-radius: 12px; border: 1.5px solid #fbbf24; font-size: 14px; font-weight: 700; color: #92400e; }
     .btn-cancel-new { background: #fef3c7; border: none; color: #d97706; width: 32px; height: 32px; border-radius: 10px; cursor: pointer; font-weight: 800; }
 
-    /* НОВЫЕ СТИЛИ ДЛЯ ВЫБОРА ТЕЛЕФОНА */
     .phone-select-area { margin-top: 12px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
     .micro-label { font-size: 8px; color: #cbd5e1; font-weight: 900; margin-bottom: 6px; }
     .phone-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -445,7 +474,7 @@
     .hours-input { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #1e293b; }
     .hours-input input { width: 40px; padding: 4px; border-radius: 8px; border: 1.5px solid #e2e8f0; text-align: center; font-weight: 800; color: #0ea5e9; background: #f8fafc; }
     .rem-off { margin: 0; font-size: 14px; color: #94a3b8; font-weight: 600; }
-    .toggle-switch { width: 44px; height: 24px; background: #e2e8f0; border-radius: 12px; border: none; position: relative; cursor: pointer; transition: background 0.3s; }
+    .toggle-switch { width: 44px; height: 24px; background: #e2e8f0; border-radius: 12px; border: none; position: absolute; right: 18px; cursor: pointer; transition: background 0.3s; }
     .toggle-switch.on { background: #10b981; }
     .switch-handle { width: 18px; height: 18px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
     .toggle-switch.on .switch-handle { transform: translateX(20px); }
