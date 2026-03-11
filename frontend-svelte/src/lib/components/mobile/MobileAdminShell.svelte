@@ -7,16 +7,18 @@
     import { fade, slide, scale } from 'svelte/transition';
     import { createEventDispatcher } from 'svelte';
     import HorizontalDatePicker from '$lib/components/schedule/HorizontalDatePicker.svelte';
+    import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte'; // ИМПОРТ
 
     const dispatch = createEventDispatcher();
     export let branches = [];
 
     let showMoreMenu = false;
+    let showCalendarModal = false; // Состояние для мобильного календаря
 
     async function handleNav(tab) {
         showMoreMenu = false;
+        showCalendarModal = false;
         activeTab.set(tab);
-        // ФИКС: Принудительный переход на /admin для корректной отрисовки табов
         if ($page.url.pathname !== '/admin') {
             await goto('/admin');
         }
@@ -24,10 +26,23 @@
 
     function handleDateSelected(event) {
         selectedDate.set(new Date(event.detail.date));
+        // При выборе даты из ленты ничего не закрываем, просто скроллим
+    }
+
+    function handleFullCalendarSelect(event) {
+        selectedDate.set(new Date(event.detail.date));
+        activeTab.set('timeline');
+        showCalendarModal = false;
     }
 
     function toggleMoreMenu() {
         showMoreMenu = !showMoreMenu;
+        showCalendarModal = false;
+    }
+
+    function openCalendar() {
+        showCalendarModal = true;
+        showMoreMenu = false;
     }
 
     function handleLogout() {
@@ -45,7 +60,7 @@
     <header class="mobile-header">
         <div class="brand">999 CRM</div>
         <div class="current-branch-tag">
-            {branches.find(b => b.id === $activeBranchId)?.name || 'Филиал не выбран'}
+            {branches.find(b => b.id === $activeBranchId)?.name || 'Филиал'}
         </div>
     </header>
 
@@ -66,6 +81,12 @@
                 <span class="label">Главная</span>
             </button>
 
+            <!-- НОВАЯ КНОПКА КАЛЕНДАРЬ -->
+            <button class:active={showCalendarModal} on:click={openCalendar}>
+                <span class="icon">🗓</span>
+                <span class="label">Календарь</span>
+            </button>
+
             <button class:active={$activeTab === 'timeline'} on:click={() => handleNav('timeline')}>
                 <span class="icon">🕒</span>
                 <span class="label">Таймлайн</span>
@@ -78,6 +99,21 @@
         </nav>
     </div>
 
+    <!-- ПОЛНОЭКРАННЫЙ МОБИЛЬНЫЙ КАЛЕНДАРЬ -->
+    {#if showCalendarModal}
+        <div class="mobile-full-modal" transition:fade={{duration: 200}}>
+            <header class="modal-head">
+                <button class="back-btn" on:click={() => showCalendarModal = false}>✕</button>
+                <h3>Выбор даты</h3>
+                <div style="width: 40px"></div>
+            </header>
+            <div class="modal-scroll-body">
+                <CalendarScreen on:dateSelected={handleFullCalendarSelect} />
+            </div>
+        </div>
+    {/if}
+
+    <!-- ШТОРКА МЕНЮ "ЕЩЁ" -->
     {#if showMoreMenu}
         <div class="more-menu-backdrop" on:click|self={toggleMoreMenu} transition:fade={{duration: 200}}>
             <div class="more-menu-sheet" in:slide={{axis: 'y', duration: 300}}>
@@ -153,8 +189,16 @@
     .bottom-nav button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: none; border: none; color: #93a1a1; gap: 2px; height: 100%; transition: color 0.2s; }
     .bottom-nav button.active { color: #268bd2; }
     .bottom-nav .icon { font-size: 22px; }
-    .bottom-nav .label { font-size: 10px; font-weight: 800; text-transform: uppercase; }
+    .bottom-nav .label { font-size: 9px; font-weight: 800; text-transform: uppercase; }
 
+    /* МОБИЛЬНОЕ МОДАЛЬНОЕ ОКНО КАЛЕНДАРЯ */
+    .mobile-full-modal { position: fixed; inset: 0; background: #fdf6e3; z-index: 4000; display: flex; flex-direction: column; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; }
+    .modal-head h3 { margin: 0; font-size: 18px; font-weight: 800; color: #073642; }
+    .back-btn { background: none; border: none; font-size: 24px; color: #586e75; cursor: pointer; }
+    .modal-scroll-body { flex: 1; overflow-y: auto; padding: 20px; }
+
+    /* ШТОРКА */
     .more-menu-backdrop { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.7); backdrop-filter: blur(8px); z-index: 3000; display: flex; align-items: flex-end; }
     .more-menu-sheet { width: 100%; background: #fdf6e3; border-radius: 32px 32px 0 0; padding: 24px; padding-bottom: calc(30px + env(safe-area-inset-bottom)); border-top: 2px solid #ddd6c1; }
     .sheet-handle { width: 40px; height: 4px; background: #ddd6c1; border-radius: 2px; margin: -10px auto 24px auto; }
@@ -163,7 +207,7 @@
     .sheet-section label { display: block; font-size: 10px; font-weight: 900; color: #93a1a1; letter-spacing: 1px; margin-bottom: 12px; }
 
     .branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .branch-card { background: #eee8d5; border: 1.5px solid #ddd6c1; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; position: relative; text-align: left; width: 100%; }
+    .branch-card { background: #eee8d5; border: 1.5px solid #ddd6c1; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; position: relative; width: 100%; }
     .branch-card.active { border-color: #268bd2; background: white; }
     .b-name { font-size: 14px; font-weight: 800; color: #073642; }
     .active-dot { position: absolute; top: 10px; right: 12px; color: #268bd2; font-weight: 900; }
