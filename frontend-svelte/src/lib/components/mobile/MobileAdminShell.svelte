@@ -1,55 +1,65 @@
 <script>
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { openModal } from '$lib/stores/modalStore.js';
+    import { logout } from '$lib/stores/auth.js';
     import { goto } from '$app/navigation';
-    import { fade, slide } from 'svelte/transition';
+    import { page } from '$app/stores';
+    import { fade, slide, scale } from 'svelte/transition';
     import { createEventDispatcher } from 'svelte';
     import HorizontalDatePicker from '$lib/components/schedule/HorizontalDatePicker.svelte';
 
     const dispatch = createEventDispatcher();
     export let branches = [];
 
-    function handleNav(tab) {
+    let showMoreMenu = false;
+
+    async function handleNav(tab) {
+        showMoreMenu = false;
         activeTab.set(tab);
+        // ФИКС: Принудительный переход на /admin для корректной отрисовки табов
+        if ($page.url.pathname !== '/admin') {
+            await goto('/admin');
+        }
     }
 
     function handleDateSelected(event) {
         selectedDate.set(new Date(event.detail.date));
     }
+
+    function toggleMoreMenu() {
+        showMoreMenu = !showMoreMenu;
+    }
+
+    function handleLogout() {
+        logout();
+        goto('/');
+    }
+
+    function selectBranch(id) {
+        activeBranchId.set(id);
+        showMoreMenu = false;
+    }
 </script>
 
 <div class="mobile-shell">
-    <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
     <header class="mobile-header">
-        <div class="branch-pill">
-            <select bind:value={$activeBranchId}>
-                {#each branches as b}
-                    <option value={b.id}>{b.name}</option>
-                {/each}
-            </select>
-            <span class="chevron">▼</span>
-        </div>
-        <div class="header-right">
-            <button class="logout-mini" on:click={() => goto('/')}>🚪</button>
+        <div class="brand">999 CRM</div>
+        <div class="current-branch-tag">
+            {branches.find(b => b.id === $activeBranchId)?.name || 'Филиал не выбран'}
         </div>
     </header>
 
-    <!-- ОСНОВНОЙ КОНТЕНТ -->
     <main class="mobile-content">
         <slot />
     </main>
 
-    <!-- НИЖНЯЯ ПАНЕЛЬ УПРАВЛЕНИЯ -->
     <div class="mobile-bottom-ui">
-
-        <!-- ФИКС: Лента календаря видна ТОЛЬКО на вкладке Таймлайн -->
         {#if $activeTab === 'timeline'}
             <div class="bottom-date-picker" transition:slide={{duration: 200}}>
                 <HorizontalDatePicker selectedDate={$selectedDate} on:dateSelected={handleDateSelected} />
             </div>
         {/if}
 
-        <!-- МЕНЮ -->
         <nav class="bottom-nav">
             <button class:active={$activeTab === 'management'} on:click={() => handleNav('management')}>
                 <span class="icon">📊</span>
@@ -61,33 +71,74 @@
                 <span class="label">Таймлайн</span>
             </button>
 
-            <div class="fab-wrapper">
-                <button class="fab-btn" on:click={() => dispatch('add')}>+</button>
-            </div>
-
-            <button on:click={() => openModal('telegram')}>
-                <span class="icon">📱</span>
-                <span class="label">Telegram</span>
-            </button>
-
-            <button on:click={() => openModal('templates')}>
-                <span class="icon">✉️</span>
-                <span class="label">Шаблоны</span>
+            <button class:active={showMoreMenu} on:click={toggleMoreMenu}>
+                <span class="icon">{showMoreMenu ? '✕' : '⚙️'}</span>
+                <span class="label">Ещё</span>
             </button>
         </nav>
     </div>
+
+    {#if showMoreMenu}
+        <div class="more-menu-backdrop" on:click|self={toggleMoreMenu} transition:fade={{duration: 200}}>
+            <div class="more-menu-sheet" in:slide={{axis: 'y', duration: 300}}>
+                <div class="sheet-handle"></div>
+
+                <section class="sheet-section">
+                    <label>ВЫБОР ФИЛИАЛА</label>
+                    <div class="branch-grid">
+                        {#each branches as b}
+                            <button
+                                class="branch-card"
+                                class:active={$activeBranchId === b.id}
+                                on:click={() => selectBranch(b.id)}>
+                                <span class="b-icon">🏢</span>
+                                <span class="b-name">{b.name}</span>
+                                {#if $activeBranchId === b.id}
+                                    <span class="active-dot">✓</span>
+                                {/if}
+                            </button>
+                        {/each}
+                    </div>
+                </section>
+
+                <section class="sheet-section">
+                    <label>БЫСТРЫЕ НАСТРОЙКИ</label>
+                    <div class="action-list">
+                        <button class="action-row" on:click={() => { openModal('telegram'); showMoreMenu = false; }}>
+                            <span class="a-icon">📱</span>
+                            <div class="a-text">
+                                <b>Telegram Уведомления</b>
+                                <p>QR-код и статус подключения</p>
+                            </div>
+                        </button>
+                        <button class="action-row" on:click={() => { openModal('templates'); showMoreMenu = false; }}>
+                            <span class="a-icon">✉️</span>
+                            <div class="a-text">
+                                <b>Шаблоны сообщений</b>
+                                <p>Настройка текстов напоминаний</p>
+                            </div>
+                        </button>
+                    </div>
+                </section>
+
+                <div class="sheet-footer">
+                    <button class="btn-logout-full" on:click={handleLogout}>
+                        ВЫЙТИ ИЗ АККАУНТА 🚪
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
 </div>
 
 <style>
     :global(html, body) { position: fixed; width: 100%; height: 100%; overflow: hidden; }
 
-    .mobile-shell { display: flex; flex-direction: column; height: 100dvh; width: 100vw; background: #fdf6e3; overflow: hidden; }
+    .mobile-shell { display: flex; flex-direction: column; height: 100dvh; width: 100vw; background: #fdf6e3; overflow: hidden; position: relative; }
 
-    .mobile-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; z-index: 100; }
-    .branch-pill { position: relative; background: #fdf6e3; padding: 6px 12px; border-radius: 12px; border: 1px solid #ddd6c1; }
-    .branch-pill select { border: none; background: none; font-size: 13px; font-weight: 800; color: #073642; appearance: none; padding-right: 15px; outline: none; }
-    .branch-pill .chevron { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 8px; color: #93a1a1; }
-    .logout-mini { background: none; border: none; font-size: 18px; cursor: pointer; }
+    .mobile-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; z-index: 100; }
+    .brand { font-weight: 900; color: #268bd2; font-size: 14px; letter-spacing: 1px; }
+    .current-branch-tag { font-size: 11px; font-weight: 800; color: #586e75; text-transform: uppercase; background: #fdf6e3; padding: 4px 10px; border-radius: 8px; border: 1px solid #ddd6c1; }
 
     .mobile-content { flex: 1; overflow-y: auto; padding-bottom: 160px; -webkit-overflow-scrolling: touch; }
 
@@ -98,12 +149,31 @@
     :global(.bottom-date-picker .day-btn) { background: #fdf6e3 !important; border-color: #ddd6c1 !important; height: 60px !important; min-width: 50px !important; }
     :global(.bottom-date-picker .day-btn.is-selected) { background: #268bd2 !important; border-color: #268bd2 !important; }
 
-    .bottom-nav { display: flex; align-items: center; height: 65px; }
-    .bottom-nav button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: none; border: none; color: #93a1a1; gap: 2px; height: 100%; }
+    .bottom-nav { display: flex; align-items: center; height: 65px; padding: 0 10px; }
+    .bottom-nav button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: none; border: none; color: #93a1a1; gap: 2px; height: 100%; transition: color 0.2s; }
     .bottom-nav button.active { color: #268bd2; }
-    .bottom-nav .icon { font-size: 20px; }
-    .bottom-nav .label { font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .bottom-nav .icon { font-size: 22px; }
+    .bottom-nav .label { font-size: 10px; font-weight: 800; text-transform: uppercase; }
 
-    .fab-wrapper { position: relative; width: 60px; height: 100%; }
-    .fab-btn { position: absolute; top: -35px; left: 50%; transform: translateX(-50%); width: 56px !important; height: 56px !important; border-radius: 50% !important; background: #268bd2 !important; color: white !important; font-size: 32px !important; font-weight: 300 !important; box-shadow: 0 8px 20px rgba(38, 139, 210, 0.4) !important; border: 3px solid #eee8d5 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+    .more-menu-backdrop { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.7); backdrop-filter: blur(8px); z-index: 3000; display: flex; align-items: flex-end; }
+    .more-menu-sheet { width: 100%; background: #fdf6e3; border-radius: 32px 32px 0 0; padding: 24px; padding-bottom: calc(30px + env(safe-area-inset-bottom)); border-top: 2px solid #ddd6c1; }
+    .sheet-handle { width: 40px; height: 4px; background: #ddd6c1; border-radius: 2px; margin: -10px auto 24px auto; }
+
+    .sheet-section { margin-bottom: 24px; }
+    .sheet-section label { display: block; font-size: 10px; font-weight: 900; color: #93a1a1; letter-spacing: 1px; margin-bottom: 12px; }
+
+    .branch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .branch-card { background: #eee8d5; border: 1.5px solid #ddd6c1; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; position: relative; text-align: left; width: 100%; }
+    .branch-card.active { border-color: #268bd2; background: white; }
+    .b-name { font-size: 14px; font-weight: 800; color: #073642; }
+    .active-dot { position: absolute; top: 10px; right: 12px; color: #268bd2; font-weight: 900; }
+
+    .action-list { display: flex; flex-direction: column; gap: 10px; }
+    .action-row { background: #eee8d5; border: 1px solid #ddd6c1; border-radius: 16px; padding: 14px; display: flex; align-items: center; gap: 16px; text-align: left; width: 100%; }
+    .a-icon { font-size: 24px; }
+    .a-text b { display: block; font-size: 15px; color: #073642; }
+    .a-text p { margin: 0; font-size: 11px; color: #586e75; font-weight: 600; }
+
+    .sheet-footer { margin-top: 10px; }
+    .btn-logout-full { width: 100%; background: #dc322f; color: white; border: none; padding: 16px; border-radius: 16px; font-weight: 900; font-size: 14px; cursor: pointer; }
 </style>
