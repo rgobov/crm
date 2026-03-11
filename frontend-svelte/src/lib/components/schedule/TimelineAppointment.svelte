@@ -13,8 +13,8 @@
     $: apptStyle = (() => {
         const top = timeUtils.getTimeOffset(appt.startTime, startHour, hourHeight, timezone);
         const actualHeight = appt.durationInMinutes * (hourHeight / 60);
-        // ФИКС: Используем left/right 4px чтобы был зазор между колонками
-        return `top: ${top}px; height: ${actualHeight - 2}px; left: 4px; right: 4px; z-index: 200;`;
+        // Оставляем только то, что нельзя сделать в статичном CSS
+        return `top: ${top}px; height: ${actualHeight - 2}px;`;
     })();
 
     const statusColors = {
@@ -46,7 +46,7 @@
         <div class="main-info">
             <div class="cl">{appt.clientName}</div>
 
-            <div class="sub-details">
+            <div class="sub-details-stack">
                 {#if appt.referenceTag}
                     <span class="ref-tag">🚗 {appt.referenceTag}</span>
                 {/if}
@@ -63,44 +63,64 @@
 </button>
 
 <style>
+    /* Глобальный сброс для кнопки-обертки */
     .btn-reset {
         background: none; border: none; padding: 0; margin: 0;
-        text-align: left; cursor: pointer;
-        font-family: inherit;
-        display: block; /* Важно для корректного позиционирования */
+        text-align: left; cursor: pointer; font-family: inherit;
+        display: block;
     }
 
     .appt-box {
         position: absolute;
-        /* Удалили жесткие left/right здесь, так как они в apptStyle для реактивности */
+        /* ФИКС ГЕОМЕТРИИ: Жесткие границы внутри родительской колонки */
+        left: 4px !important;
+        right: 4px !important;
+        width: auto !important; /* Отменяем width: 100% если он был */
+
         background: #fdf6e3;
-        border-radius: 16px;
+        border-radius: 12px; /* Чуть уменьшили закругление для четкости */
         box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         border: 1.5px solid #eee8d5;
         overflow: hidden;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 200;
+        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        box-sizing: border-box; /* Важно: границы внутрь */
     }
-    .appt-box:hover { z-index: 300 !important; box-shadow: 0 12px 24px rgba(0,0,0,0.12); transform: translateY(-1px); }
 
-    .appt-content { height: 100%; border-left: 4px solid var(--status-color); padding: 6px 10px; display: flex; flex-direction: column; gap: 1px; }
-    .appt-content.compact { padding: 4px 8px; }
+    .appt-box:hover {
+        z-index: 300 !important;
+        box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+        transform: translateY(-1px);
+        border-color: var(--status-color);
+    }
 
-    .t-row { display: flex; justify-content: space-between; align-items: center; }
-    .tm { font-size: 10px; font-weight: 900; color: #93a1a1; letter-spacing: 0.2px; }
+    .appt-content {
+        height: 100%;
+        border-left: 4px solid var(--status-color);
+        padding: 6px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        box-sizing: border-box;
+    }
+    .appt-content.compact { padding: 4px 8px; gap: 0; }
 
-    .st-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .t-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px; }
+    .tm { font-size: 10px; font-weight: 900; color: #93a1a1; letter-spacing: 0.1px; white-space: nowrap; }
+
+    .st-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
     .main-info { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 1px; overflow: hidden; }
-    .cl { font-size: 13px; font-weight: 850; color: #073642; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cl { font-size: 12px; font-weight: 850; color: #073642; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .sub-details { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow: hidden; }
-    .ref-tag { font-size: 10px; font-weight: 900; color: #2aa198; white-space: nowrap; flex-shrink: 0; }
-    .sv { font-size: 10px; color: #657b83; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub-details-stack { display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+    .ref-tag { font-size: 9px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sv { font-size: 9px; color: #657b83; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .cmt-preview {
         margin-top: 4px;
-        font-size: 11px;
-        line-height: 1.3;
+        font-size: 10px;
+        line-height: 1.2;
         color: #586e75;
         font-weight: 500;
         display: -webkit-box;
@@ -111,6 +131,6 @@
         padding-top: 4px;
         border-top: 1px solid rgba(147, 161, 161, 0.1);
     }
-    .cmt-icon { font-size: 9px; opacity: 0.6; margin-right: 2px; }
+    .cmt-icon { font-size: 8px; opacity: 0.6; margin-right: 2px; }
     .compact .cmt-preview { display: none; }
 </style>
