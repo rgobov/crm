@@ -4,12 +4,21 @@
     import { goto } from '$app/navigation';
     import { fade, scale } from 'svelte/transition';
 
-    let stats = { totalClients: 0, todayAppointments: 0, totalResources: 0, totalStaff: 0 };
+    let stats = {
+        totalClients: 0,
+        todayAppointments: 0,
+        totalResources: 0,
+        totalStaff: 0
+    };
     let isLoading = true;
 
     onMount(async () => {
-        try { stats = await adminService.getDashboardStats(); }
-        finally { isLoading = false; }
+        try {
+            const data = await adminService.getDashboardStats();
+            stats = data;
+        } finally {
+            isLoading = false;
+        }
     });
 
     const gridItems = [
@@ -19,8 +28,8 @@
         { id: 'services', title: 'Услуги', icon: '✂️', link: '/admin/services' }
     ];
 
-    // Форматирование больших чисел для сторис
     function formatStat(num) {
+        if (!num) return '0';
         if (num >= 1000) return (num/1000).toFixed(1) + 'k';
         return num;
     }
@@ -28,50 +37,60 @@
 
 <div class="stories-dashboard">
 
-    <!-- СЕКЦИЯ СТОРИС (СТАТИСТИКА) -->
+    <!-- СЕКЦИЯ СТОРИС: Финальный дизайн -->
     <div class="stories-container">
         <div class="stories-track">
+
+            <!-- СТОРИС: СЕГОДНЯ -->
             <div class="story-item">
-                <div class="story-circle highlight">
-                    <span class="story-val">{formatStat(stats.todayAppointments)}</span>
+                <div class="story-circle ring-blue">
+                    <div class="story-inner">
+                        <span class="s-icon">📅</span>
+                        <span class="s-val">{formatStat(stats.todayAppointments)}</span>
+                    </div>
                 </div>
-                <span class="story-label">Визиты</span>
+                <span class="story-label">Сегодня</span>
             </div>
 
+            <!-- СТОРИС: КЛИЕНТЫ -->
             <div class="story-item">
-                <div class="story-circle">
-                    <span class="story-val">{formatStat(stats.totalClients)}</span>
+                <div class="story-circle ring-magenta">
+                    <div class="story-inner">
+                        <span class="s-icon">💎</span>
+                        <span class="s-val">{formatStat(stats.totalClients)}</span>
+                    </div>
                 </div>
                 <span class="story-label">Клиенты</span>
             </div>
 
+            <!-- СТОРИС: МАСТЕРА -->
             <div class="story-item">
-                <div class="story-circle">
-                    <span class="story-val">{formatStat(stats.totalStaff)}</span>
+                <div class="story-circle ring-green">
+                    <div class="story-inner">
+                        <span class="s-icon">👤</span>
+                        <span class="s-val">{formatStat(stats.totalStaff)}</span>
+                    </div>
                 </div>
                 <span class="story-label">Мастера</span>
             </div>
 
+            <!-- СТОРИС: РЕСУРСЫ -->
             <div class="story-item">
-                <div class="story-circle secondary">
-                    <span class="story-val">{formatStat(stats.totalResources)}</span>
+                <div class="story-circle ring-orange">
+                    <div class="story-inner">
+                        <span class="s-icon">⚒️</span>
+                        <span class="s-val">{formatStat(stats.totalResources)}</span>
+                    </div>
                 </div>
                 <span class="story-label">Ресурсы</span>
             </div>
 
-            <!-- Задел под будущие истории -->
-            <div class="story-item placeholder">
-                <div class="story-circle dotted">
-                    <span class="story-val">+</span>
-                </div>
-                <span class="story-label">Добавить</span>
-            </div>
         </div>
     </div>
 
-    <!-- СЕКЦИЯ УПРАВЛЕНИЯ (ЗОЛОТАЯ СЕТКА) -->
+    <!-- СЕКЦИЯ УПРАВЛЕНИЯ -->
     <section class="main-controls">
-        <label class="phi-caption">ИНСТРУМЕНТЫ</label>
+        <label class="section-caption">ИНСТРУМЕНТЫ</label>
 
         <div class="phi-grid">
             {#each gridItems as item}
@@ -106,43 +125,51 @@
         box-sizing: border-box;
     }
 
-    /* STORIES: Горизонтальная лента */
     .stories-container {
-        padding: 24px 0 16px 0;
-        border-bottom: 1px solid rgba(147, 161, 161, 0.1);
-        margin-bottom: 24px;
+        padding: 24px 0 20px 0;
+        background: linear-gradient(to bottom, #eee8d5 0%, #fdf6e3 100%);
+        margin-bottom: 16px;
     }
     .stories-track {
-        display: flex; gap: 18px;
+        display: flex; gap: 20px;
         padding: 0 20px;
         overflow-x: auto;
         scrollbar-width: none;
     }
     .stories-track::-webkit-scrollbar { display: none; }
 
-    .story-item { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+    .story-item { display: flex; flex-direction: column; align-items: center; gap: 10px; flex-shrink: 0; }
 
     .story-circle {
-        width: 68px; height: 68px;
+        width: 72px; height: 72px;
         background: #eee8d5;
         border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        border: 2px solid #fdf6e3;
-        box-shadow: 0 0 0 2px #ddd6c1; /* "Обойка" сторис */
+        padding: 3px; /* Место под обводку */
         position: relative;
     }
-    .story-circle.highlight { box-shadow: 0 0 0 2px #268bd2; }
-    .story-circle.secondary { box-shadow: 0 0 0 2px #2aa198; }
 
-    .story-val { font-size: 18px; font-weight: 900; color: #073642; }
-    .story-label { font-size: 10px; font-weight: 800; color: #93a1a1; text-transform: uppercase; letter-spacing: 0.5px; }
+    /* ЦВЕТНЫЕ ОБВОДКИ (Solarized Palette) */
+    .ring-blue { background: linear-gradient(45deg, #268bd2, #2aa198); }
+    .ring-magenta { background: linear-gradient(45deg, #d33682, #6c71c4); }
+    .ring-green { background: linear-gradient(45deg, #859900, #2aa198); }
+    .ring-orange { background: linear-gradient(45deg, #cb4b16, #b58900); }
 
-    .story-circle.dotted { border: 2px dashed #93a1a1; background: transparent; box-shadow: none; }
-    .placeholder .story-val { color: #93a1a1; font-weight: 300; font-size: 24px; }
+    .story-inner {
+        width: 100%; height: 100%;
+        background: #fdf6e3;
+        border-radius: 50%;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 2px;
+    }
 
-    /* GRID: Золотое сечение 1.618 */
+    .s-icon { font-size: 16px; }
+    .s-val { font-size: 18px; font-weight: 900; color: #073642; line-height: 1; }
+    .story-label { font-size: 10px; font-weight: 800; color: #586e75; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* GRID & CONTROLS */
     .main-controls { padding: 0 20px; flex: 1; }
-    .phi-caption { display: block; font-size: 10px; font-weight: 950; color: #93a1a1; letter-spacing: 2px; margin-bottom: 16px; opacity: 0.8; }
+    .section-caption { display: block; font-size: 11px; font-weight: 950; color: #93a1a1; letter-spacing: 2px; margin-bottom: 16px; text-transform: uppercase; padding-left: 4px; }
 
     .phi-grid {
         display: grid;
@@ -155,17 +182,16 @@
         background: #eee8d5;
         border: 1.5px solid #ddd6c1;
         border-radius: 24px;
-        padding: 20px;
-        display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
-        aspect-ratio: 1 / 0.75; /* Приближение к золотому сечению для плитки */
+        padding: 24px 20px;
+        display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+        aspect-ratio: 1 / 0.8;
         cursor: pointer;
         transition: transform 0.2s;
     }
     .phi-card:active { transform: scale(0.96); background: white; border-color: #268bd2; }
-    .card-icon { font-size: 24px; }
-    .phi-card h3 { margin: 0; font-size: 15px; font-weight: 850; color: #073642; }
+    .card-icon { font-size: 26px; }
+    .phi-card h3 { margin: 0; font-size: 16px; font-weight: 850; color: #073642; }
 
-    /* WIDE CARD: Акцент */
     .phi-wide-card {
         width: 100%;
         background: #eee8d5;
@@ -181,8 +207,8 @@
     .wide-inner { display: flex; align-items: center; gap: 20px; }
     .accent-bg { background: #fdf6e3; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd6c1; }
     .wide-text { text-align: left; }
-    .wide-text h3 { margin: 0; font-size: 17px; font-weight: 850; color: #073642; }
-    .wide-text p { margin: 2px 0 0 0; font-size: 11px; color: #586e75; font-weight: 600; }
+    .wide-text h3 { margin: 0; font-size: 18px; font-weight: 850; color: #073642; }
+    .wide-text p { margin: 2px 0 0 0; font-size: 12px; color: #586e75; font-weight: 600; }
     .phi-arrow { font-size: 22px; color: #268bd2; font-weight: 300; }
 
     .bottom-phi-spacer { height: 120px; }

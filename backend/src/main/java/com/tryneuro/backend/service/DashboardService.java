@@ -14,6 +14,7 @@ public class DashboardService {
     private final ContactService contactService;
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
+    private final ResourceService resourceService; // ДОБАВИЛИ
 
     /**
      * Собирает общую статистику для дашборда
@@ -23,8 +24,11 @@ public class DashboardService {
         stats.put("totalClients", contactService.countContacts(tenantId));
         stats.put("totalStaff", staffMemberService.getAllStaff(tenantId).size());
         
-        // Сегодняшние записи по всей компании (без фильтра по филиалу по умолчанию)
+        // Сегодняшние записи по всей компании
         stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tenantId, null).size());
+        
+        // НОВОЕ: Добавляем количество ресурсов
+        stats.put("totalResources", resourceService.getResources(tenantId, null).size());
         
         return stats;
     }
