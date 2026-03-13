@@ -7,13 +7,13 @@
     import { fade, slide, scale } from 'svelte/transition';
     import { createEventDispatcher } from 'svelte';
     import HorizontalDatePicker from '$lib/components/schedule/HorizontalDatePicker.svelte';
-    import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte'; // ИМПОРТ
+    import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte';
 
     const dispatch = createEventDispatcher();
     export let branches = [];
 
     let showMoreMenu = false;
-    let showCalendarModal = false; // Состояние для мобильного календаря
+    let showCalendarModal = false;
 
     async function handleNav(tab) {
         showMoreMenu = false;
@@ -26,7 +26,6 @@
 
     function handleDateSelected(event) {
         selectedDate.set(new Date(event.detail.date));
-        // При выборе даты из ленты ничего не закрываем, просто скроллим
     }
 
     function handleFullCalendarSelect(event) {
@@ -57,12 +56,7 @@
 </script>
 
 <div class="mobile-shell">
-    <header class="mobile-header">
-        <div class="brand">999 CRM</div>
-        <div class="current-branch-tag">
-            {branches.find(b => b.id === $activeBranchId)?.name || 'Филиал'}
-        </div>
-    </header>
+    <!-- ВЕРХНИЙ БЛОК УДАЛЕН ДЛЯ РАСЧИСТКИ МЕСТА -->
 
     <main class="mobile-content">
         <slot />
@@ -81,7 +75,6 @@
                 <span class="label">Главная</span>
             </button>
 
-            <!-- НОВАЯ КНОПКА КАЛЕНДАРЬ -->
             <button class:active={showCalendarModal} on:click={openCalendar}>
                 <span class="icon">🗓</span>
                 <span class="label">Календарь</span>
@@ -99,7 +92,7 @@
         </nav>
     </div>
 
-    <!-- ПОЛНОЭКРАННЫЙ МОБИЛЬНЫЙ КАЛЕНДАРЬ -->
+    <!-- МОДАЛКИ (Календарь и Ещё) ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ -->
     {#if showCalendarModal}
         <div class="mobile-full-modal" transition:fade={{duration: 200}}>
             <header class="modal-head">
@@ -113,7 +106,6 @@
         </div>
     {/if}
 
-    <!-- ШТОРКА МЕНЮ "ЕЩЁ" -->
     {#if showMoreMenu}
         <div class="more-menu-backdrop" on:click|self={toggleMoreMenu} transition:fade={{duration: 200}}>
             <div class="more-menu-sheet" in:slide={{axis: 'y', duration: 300}}>
@@ -172,11 +164,14 @@
 
     .mobile-shell { display: flex; flex-direction: column; height: 100dvh; width: 100vw; background: #fdf6e3; overflow: hidden; position: relative; }
 
-    .mobile-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; z-index: 100; }
-    .brand { font-weight: 900; color: #268bd2; font-size: 14px; letter-spacing: 1px; }
-    .current-branch-tag { font-size: 11px; font-weight: 800; color: #586e75; text-transform: uppercase; background: #fdf6e3; padding: 4px 10px; border-radius: 8px; border: 1px solid #ddd6c1; }
-
-    .mobile-content { flex: 1; overflow-y: auto; padding-bottom: 160px; -webkit-overflow-scrolling: touch; }
+    /* КОНТЕНТ ТЕПЕРЬ ЗАНИМАЕТ ВСЁ МЕСТО ОТ ВЕРХА */
+    .mobile-content {
+        flex: 1;
+        overflow-y: auto;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: 160px;
+        -webkit-overflow-scrolling: touch;
+    }
 
     .mobile-bottom-ui { position: fixed; bottom: 0; left: 0; right: 0; background: #eee8d5; border-top: 1.5px solid #ddd6c1; z-index: 2000; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 25px rgba(0,0,0,0.05); }
 
@@ -189,16 +184,14 @@
     .bottom-nav button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: none; border: none; color: #93a1a1; gap: 2px; height: 100%; transition: color 0.2s; }
     .bottom-nav button.active { color: #268bd2; }
     .bottom-nav .icon { font-size: 22px; }
-    .bottom-nav .label { font-size: 9px; font-weight: 800; text-transform: uppercase; }
+    .bottom-nav .label { font-size: 10px; font-weight: 800; text-transform: uppercase; }
 
-    /* МОБИЛЬНОЕ МОДАЛЬНОЕ ОКНО КАЛЕНДАРЯ */
     .mobile-full-modal { position: fixed; inset: 0; background: #fdf6e3; z-index: 4000; display: flex; flex-direction: column; }
     .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; }
     .modal-head h3 { margin: 0; font-size: 18px; font-weight: 800; color: #073642; }
     .back-btn { background: none; border: none; font-size: 24px; color: #586e75; cursor: pointer; }
     .modal-scroll-body { flex: 1; overflow-y: auto; padding: 20px; }
 
-    /* ШТОРКА */
     .more-menu-backdrop { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.7); backdrop-filter: blur(8px); z-index: 3000; display: flex; align-items: flex-end; }
     .more-menu-sheet { width: 100%; background: #fdf6e3; border-radius: 32px 32px 0 0; padding: 24px; padding-bottom: calc(30px + env(safe-area-inset-bottom)); border-top: 2px solid #ddd6c1; }
     .sheet-handle { width: 40px; height: 4px; background: #ddd6c1; border-radius: 2px; margin: -10px auto 24px auto; }
