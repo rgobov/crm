@@ -1,5 +1,5 @@
 <script>
-    import { onMount, createEventDispatcher, afterUpdate } from 'svelte';
+    import { onMount, createEventDispatcher } from 'svelte';
 
     export let selectedDate = new Date();
     const dispatch = createEventDispatcher();
@@ -8,7 +8,6 @@
     let days = [];
     const weekNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-    // Генерируем 100 дней (50 до и 50 после выбранной даты)
     $: {
         const tempDays = [];
         const start = new Date(selectedDate);
@@ -26,7 +25,6 @@
         scrollToSelected();
     });
 
-    // Центрируем выбранную дату после каждого обновления
     function scrollToSelected() {
         if (!scrollContainer) return;
         const selectedEl = scrollContainer.querySelector('.is-selected');
@@ -87,40 +85,39 @@
     .date-picker-wrapper {
         width: 100%;
         overflow-x: auto;
-        background: white;
-        border-top: 1px solid #f1f5f9;
-        scrollbar-width: none; /* Скрываем скроллбар */
+        background: #eee8d5; /* Solarized Base2 */
+        scrollbar-width: none;
         -ms-overflow-style: none;
     }
     .date-picker-wrapper::-webkit-scrollbar { display: none; }
 
     .days-strip {
         display: flex;
-        padding: 12px 10px;
-        gap: 8px;
+        padding: 8px 10px;
+        gap: 6px;
     }
 
     .day-btn {
-        min-width: 60px;
-        height: 74px;
+        min-width: 48px;
+        height: 58px;
         flex-shrink: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: #f8fafc;
-        border: 1px solid #f1f5f9;
-        border-radius: 16px;
+        background: #fdf6e3; /* Solarized Base3 */
+        border: 1px solid #ddd6c1;
+        border-radius: 12px;
         cursor: pointer;
         position: relative;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .day-btn.is-selected {
-        background: var(--primary-gradient);
-        border-color: var(--primary-color);
-        box-shadow: 0 8px 15px rgba(56, 151, 240, 0.3);
-        transform: translateY(-2px);
+        background: #268bd2; /* Solarized Blue */
+        border-color: #268bd2;
+        box-shadow: 0 4px 12px rgba(38, 139, 210, 0.2);
+        transform: translateY(-1px);
     }
 
     .day-btn.is-selected .week-name,
@@ -129,31 +126,31 @@
     }
 
     .week-name {
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 9px;
+        font-weight: 850;
         text-transform: uppercase;
-        color: #94a3b8;
-        margin-bottom: 4px;
+        color: #93a1a1;
+        margin-bottom: 2px;
     }
-    .week-name.weekend { color: #ef4444; opacity: 0.8; }
+    .week-name.weekend { color: #dc322f; opacity: 0.9; }
 
     .day-num {
-        font-size: 18px;
-        font-weight: 800;
-        color: #1e293b;
+        font-size: 15px;
+        font-weight: 900;
+        color: #073642;
     }
 
     .is-today:not(.is-selected) {
-        border: 1.5px solid var(--primary-color);
-        background: #eff6ff;
+        border: 1.5px solid #268bd2;
+        background: #eee8d5;
     }
 
     .today-dot {
         position: absolute;
-        bottom: 8px;
-        width: 4px;
-        height: 4px;
-        background: var(--primary-color);
+        bottom: 6px;
+        width: 3px;
+        height: 3px;
+        background: #268bd2;
         border-radius: 50%;
     }
 </style>

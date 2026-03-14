@@ -14,7 +14,6 @@
     export let appointments = [];
     export let staff = [];
 
-    // ГАРМОНИЧНЫЕ МОБИЛЬНЫЕ РАЗМЕРЫ
     let TIME_COL_WIDTH = 48;
     let HOUR_HEIGHT = 72;
     let SLOT_HEIGHT = HOUR_HEIGHT / 4;
@@ -37,7 +36,11 @@
     })();
 
     function updateLayout() {
-        STAFF_WIDTH = Math.floor((window.innerWidth - TIME_COL_WIDTH) / 3);
+        const width = window.innerWidth;
+        STAFF_WIDTH = Math.floor((width - TIME_COL_WIDTH) / 3);
+        // Золотое сечение: высота подстраивается под ширину
+        HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.618);
+        SLOT_HEIGHT = HOUR_HEIGHT / 4;
     }
 
     onMount(async () => {
@@ -106,13 +109,12 @@
 <div class="mobile-timeline-unified" bind:this={mainScroll}>
     <div class="scroll-canvas" style="width: {(staff.length + (apptsByStaff['unassigned'].length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
 
-        <!-- СТЕКИРУЕМЫЕ ЛИПКИЕ ЭЛЕМЕНТЫ -->
         <div class="sticky-top-left" style="width: {TIME_COL_WIDTH}px">🕒</div>
 
         <header class="staff-header-sticky">
             <div class="staff-row">
                 {#each staff as s (s.id)}
-                    <button class="staff-cell btn-reset" style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
+                    <button class="staff-cell btn-reset" class:is-off={s.dayOff} style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
                         <div class="avatar-wrap">
                             <div class="avatar" class:is-off={s.dayOff}>{s.name.charAt(0)}</div>
                         </div>
@@ -150,6 +152,7 @@
                             {@const status = timeUtils.getSlotStatus(s.id ? s : null, h, m)}
                             <button class="slot-btn"
                                     class:is-break={status === 'BREAK'}
+                                    class:is-off={status === 'OFF'}
                                     class:zebra={h % 2 === 0}
                                     style="height: {SLOT_HEIGHT}px"
                                     on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}>
@@ -182,7 +185,7 @@
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         scroll-snap-type: x mandatory;
-        scroll-padding-left: 48px; /* TIME_COL_WIDTH */
+        scroll-padding-left: 48px;
         background: #fdf6e3;
     }
     .mobile-timeline-unified::-webkit-scrollbar { display: none; }
@@ -195,20 +198,35 @@
     .grid-body { grid-area: grid; position: relative; background: #fdf6e3; }
 
     .staff-row { display: flex; height: 100%; }
-    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; }
+    .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }
+
+    /* ИНДИКАЦИЯ ВЫХОДНОГО В ШАПКЕ */
+    .staff-cell.is-off { opacity: 0.5; background: #eee8d5; }
+    .staff-cell.is-off .n, .staff-cell.is-off .s { color: #93a1a1; }
 
     .avatar-wrap { flex-shrink: 0; }
     .avatar { width: 32px; height: 32px; background: var(--primary-gradient); color: white; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 13px; }
+    .avatar.is-off { background: #93a1a1; box-shadow: none; }
 
     .meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }
     .n { display: block; font-size: 11px; font-weight: 850; color: #073642; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .s { display: block; font-size: 8px; color: #93a1a1; font-weight: 700; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+    .hour-cell { position: relative; }
+    .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 9px; font-weight: 900; color: #586e75; background: #fdf6e3; padding: 1px 4px; border-radius: 4px; border: 1px solid #ddd6c1; }
+
     .cols-container { display: flex; height: 100%; }
     .staff-col { position: relative; height: 100%; border-right: 1.5px solid #ddd6c1; flex-shrink: 0; scroll-snap-align: start; scroll-snap-stop: always; }
 
-    .slot-btn { width: 100%; border: none; cursor: pointer; display: block; background: #fdf6e3; }
+    .slot-btn { width: 100%; border: none; display: block; background: #fdf6e3; }
     .slot-btn.zebra { background: #f5efdc; }
+
+    /* ШТРИХОВКА ДЛЯ МОБИЛОК */
+    .slot-btn.is-off {
+        background-color: #eee8d5 !important;
+        background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important;
+        opacity: 0.6;
+    }
     .slot-btn.is-break { background: #f5efdc !important; border-left: 3px solid #b58900; }
 
     .grid-lines { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
