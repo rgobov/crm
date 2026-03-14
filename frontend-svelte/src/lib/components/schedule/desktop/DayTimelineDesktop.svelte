@@ -15,9 +15,9 @@
     export let appointments = [];
     export let staff = [];
 
-    let HOUR_HEIGHT = 120;
+    let HOUR_HEIGHT = 124;
     let STAFF_WIDTH = 200;
-    let TIME_COL_WIDTH = 64;
+    let TIME_COL_WIDTH = 75;
     let SLOT_HEIGHT = HOUR_HEIGHT / 4;
 
     let startHour = 8, endHour = 22, hours = [];
@@ -28,7 +28,6 @@
     let isDown = false, startX, scrollLeft;
     let hoverY = -1, hoverTimeStr = "", showGuide = false;
 
-    // Реактивный ключ
     let refreshKey = 0;
     $: if (staff) refreshKey++;
 
@@ -154,10 +153,13 @@
     <div class="timeline-body-scroll" bind:this={scrollBody} on:scroll={syncScroll} on:mousedown={handleStart} on:mousemove={handleMove} on:mouseup={() => isDown = false}>
         <div class="body-layout-wrapper" style="width: {(staff.length + (apptsByStaff['unassigned'].length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
-                {#each hours as h}
+                {#each hours as h (h)}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px"><span class="h-label">{h}:00</span></div>
                 {/each}
                 <TimelineNowIndicator {nowLinePos} label={branchTime} mode="dot" />
+                {#if showGuide}
+                    <TimelineCursorGuide y={hoverY} timeStr={hoverTimeStr} mode="label" />
+                {/if}
             </div>
             <div class="grid-canvas" bind:this={gridCanvas}>
                 <div class="columns-container">
@@ -167,7 +169,12 @@
                                 {@const h = hours[Math.floor(i/4)]}
                                 {@const m = (i%4)*15}
                                 {@const status = timeUtils.getSlotStatus(s.id ? s : null, h, m)}
-                                <button class="slot-btn" class:is-break={status === 'BREAK'} class:is-off={status === 'OFF'} class:zebra={h % 2 === 0} style="height: {SLOT_HEIGHT}px" on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}></button>
+                                <button class="slot-btn"
+                                        class:is-break={status === 'BREAK'}
+                                        class:is-off={status === 'OFF'}
+                                        class:zebra={h % 2 === 0}
+                                        style="height: {SLOT_HEIGHT}px"
+                                        on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}></button>
                             {/each}
                             {#each apptsByStaff[s.id || 'unassigned'] || [] as appt (appt.id)}
                                 <TimelineAppointment {appt} {startHour} hourHeight={HOUR_HEIGHT} timezone={currentBranch?.timezone} on:click={(e) => dispatch('appointmentTap', e.detail)} />
@@ -181,6 +188,9 @@
                         <div class="l" class:bold={isHour} class:dashed={!isHour} style="top: {i * SLOT_HEIGHT}px"></div>
                     {/each}
                 </div>
+                {#if showGuide}
+                    <TimelineCursorGuide y={hoverY} mode="line" />
+                {/if}
                 <TimelineNowIndicator {nowLinePos} mode="line" />
             </div>
         </div>
@@ -200,6 +210,7 @@
 
     .avatar-box { flex-shrink: 0; }
     .avatar { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; }
+    .avatar.is-off { background: #93a1a1; }
 
     .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; }
     .n { display: block; font-size: 13px; font-weight: 850; color: #073642; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -210,13 +221,27 @@
     .time-axis-col { flex-shrink: 0; background: #eee8d5; border-right: 1.5px solid #ddd6c1; position: sticky; left: 0; z-index: 200; }
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 9px; font-weight: 900; color: #586e75; background: #fdf6e3; padding: 1px 4px; border-radius: 4px; border: 1px solid #ddd6c1; }
+
     .grid-canvas { position: relative; flex: 1; background: #fdf6e3; }
     .columns-container { display: flex; height: 100%; }
     .staff-col { position: relative; height: 100%; border-right: 1.5px solid #ddd6c1; flex-shrink: 0; }
-    .slot-btn { width: 100%; border: none; cursor: pointer; display: block; background: #fdf6e3; }
+
+    /* ШТРИХОВКА И КУРСОРЫ */
+    .slot-btn {
+        width: 100%; border: none; cursor: pointer; display: block; background: #fdf6e3;
+        transition: background 0.1s;
+    }
     .slot-btn.zebra { background: #f5efdc; }
-    .slot-btn.is-off { background-color: #eee8d5 !important; opacity: 0.3; }
-    .slot-btn.is-break { background: #f5efdc !important; border-left: 3px solid #b58900; }
+    .slot-btn:hover { background: rgba(38, 139, 210, 0.05); }
+
+    .slot-btn.is-off {
+        background-color: #eee8d5 !important;
+        background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+    .slot-btn.is-break { background: #f5efdc !important; border-left: 4px solid #b58900; cursor: not-allowed; }
+
     .grid-lines-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
     .l { position: absolute; left: 0; right: 0; height: 1px; }
     .l.bold { background: #ddd6c1; height: 1.5px; opacity: 0.6; }
