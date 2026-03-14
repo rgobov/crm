@@ -13,24 +13,35 @@
     $: apptStyle = (() => {
         const top = timeUtils.getTimeOffset(appt.startTime, startHour, hourHeight, timezone);
         const actualHeight = appt.durationInMinutes * (hourHeight / 60);
-        // Оставляем только то, что нельзя сделать в статичном CSS
         return `top: ${top}px; height: ${actualHeight - 2}px;`;
     })();
 
     const statusColors = {
-        'SCHEDULED': '#268bd2',
-        'CONFIRMED': '#859900',
-        'NEEDS_CALL': '#b58900',
-        'COMPLETED': '#93a1a1',
-        'CANCELLED': '#dc322f'
+        'SCHEDULED': '#268bd2', // Blue
+        'CONFIRMED': '#859900', // Green
+        'ARRIVED': '#6c71c4',   // Violet
+        'NEEDS_CALL': '#b58900', // Yellow
+        'COMPLETED': '#586e75', // Grey-blue
+        'CANCELLED': '#dc322f'  // Red
+    };
+
+    // ФОНОВЫЕ ЦВЕТА (пастельные версии основных цветов)
+    const backgroundColors = {
+        'SCHEDULED': '#eef7ff',
+        'CONFIRMED': '#f8fff0',
+        'ARRIVED': '#f5f3ff',
+        'NEEDS_CALL': '#fffbf0',
+        'COMPLETED': '#f1f5f5',
+        'CANCELLED': '#fff5f5'
     };
 
     $: color = statusColors[appt.status] || statusColors['SCHEDULED'];
+    $: bgColor = backgroundColors[appt.status] || '#fdf6e3';
     $: isShort = appt.durationInMinutes < 40;
 </script>
 
 <button class="appt-box btn-reset"
-     style="{apptStyle} --status-color: {color}"
+     style="{apptStyle} --status-color: {color}; --bg-color: {bgColor}"
      on:click|stopPropagation={() => dispatch('click', appt)}
      in:scale={{duration: 200, start: 0.95}}>
     <div class="appt-content" class:compact={isShort}>
@@ -63,7 +74,6 @@
 </button>
 
 <style>
-    /* Глобальный сброс для кнопки-обертки */
     .btn-reset {
         background: none; border: none; padding: 0; margin: 0;
         text-align: left; cursor: pointer; font-family: inherit;
@@ -72,24 +82,27 @@
 
     .appt-box {
         position: absolute;
-        /* ФИКС ГЕОМЕТРИИ: Жесткие границы внутри родительской колонки */
         left: 4px !important;
         right: 4px !important;
-        width: auto !important; /* Отменяем width: 100% если он был */
+        width: auto !important;
 
-        background: #fdf6e3;
-        border-radius: 12px; /* Чуть уменьшили закругление для четкости */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        border: 1.5px solid #eee8d5;
+        /* ИСПОЛЬЗУЕМ ЦВЕТ СТАТУСА ДЛЯ ФОНА */
+        background: var(--bg-color);
+
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border: 1px solid var(--status-color); /* Граница в цвет статуса, но прозрачная */
+        border-color: rgba(0,0,0,0.05);
+
         overflow: hidden;
         z-index: 200;
-        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-        box-sizing: border-box; /* Важно: границы внутрь */
+        transition: all 0.2s;
+        box-sizing: border-box;
     }
 
     .appt-box:hover {
         z-index: 300 !important;
-        box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
         transform: translateY(-1px);
         border-color: var(--status-color);
     }
@@ -129,7 +142,7 @@
         overflow: hidden;
         word-break: break-word;
         padding-top: 4px;
-        border-top: 1px solid rgba(147, 161, 161, 0.1);
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
     }
     .cmt-icon { font-size: 8px; opacity: 0.6; margin-right: 2px; }
     .compact .cmt-preview { display: none; }

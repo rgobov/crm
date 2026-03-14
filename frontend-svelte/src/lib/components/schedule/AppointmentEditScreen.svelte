@@ -27,6 +27,7 @@
         staffMemberId: null,
         resourceId: null,
         branchId: '',
+        status: 'SCHEDULED',
         comment: '',
         referenceTag: '',
         allowReminder: true,
@@ -89,6 +90,7 @@
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
+                    status: appointment.status || 'SCHEDULED',
                     comment: appointment.comment || '',
                     referenceTag: appointment.referenceTag || '',
                     clientPhone: appointment.clientPhone || ''
@@ -124,7 +126,6 @@
     }
 
     function selectService(s) {
-        console.log('✅ Service selected:', s.name);
         formData.service = s.name;
         durationHours = Math.floor(s.durationInMinutes / 60);
         durationMinutes = s.durationInMinutes % 60;
@@ -221,7 +222,6 @@
     }
 </script>
 
-<!-- ФИКС: Убрали глобальный клик с корня, который ломал выбор услуг -->
 <div class="appt-edit-root">
     {#if isLoading}
         <div class="loader-center"><span class="spinner"></span></div>
@@ -242,7 +242,6 @@
                         {/if}
 
                         {#if searchResults.length > 0 || (searchInput.length >= 2 && !selectedContact && !isNewClientMode)}
-                            <!-- ФИКС: stopPropagation чтобы клик внутри не закрывал список раньше времени -->
                             <div class="drop shadow-xl" on:click|stopPropagation>
                                 {#if searchInput.length >= 2 && !selectedContact}
                                     <SearchDropdownItem
@@ -449,7 +448,7 @@
     .phone-info-line { font-size: 12px; color: #64748b; font-weight: 700; margin-top: 6px; }
 
     .tiles-stack { display: flex; flex-direction: column; gap: 10px; }
-    .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; }
+    .tile-card { background: white; padding: 14px 18px; border-radius: 22px; border: 1px solid #f1f5f9; position: relative;}
 
     .reference-card { background: #f0fdf4; border-color: #bbf7d0; }
     .quick-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }

@@ -1,5 +1,7 @@
 package com.tryneuro.backend.controller;
 
+import com.tryneuro.backend.dto.BranchDto;
+import com.tryneuro.backend.dto.DtoMapper;
 import com.tryneuro.backend.model.Branch;
 import com.tryneuro.backend.service.BranchService;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/branches")
@@ -19,7 +22,7 @@ public class BranchController {
     private final BranchService branchService;
 
     @GetMapping
-    public List<Branch> getBranches(Authentication auth, @RequestAttribute("tenantId") String tenantId) {
+    public List<BranchDto> getBranches(Authentication auth, @RequestAttribute("tenantId") String tenantId) {
         log.info("--- DEBUG BRANCHES ---");
         log.info("User Authenticated: {}", auth != null ? auth.getName() : "NULL");
         log.info("Extracted tenantId from RequestAttribute: {}", tenantId);
@@ -27,23 +30,23 @@ public class BranchController {
         List<Branch> branches = branchService.getBranches(tenantId);
         
         log.info("Branches found in DB for this tenantId: {}", branches.size());
-        if (!branches.isEmpty()) {
-            branches.forEach(b -> log.info("Branch: ID={}, Name={}, Tenant={}", b.getId(), b.getName(), b.getTenantId()));
-        }
-        log.info("-----------------------");
         
-        return branches;
+        return branches.stream()
+                .map(DtoMapper::toDto)
+                .collect(Collectors.toList());
     }
 
     @PostMapping
-    public Branch createBranch(@RequestBody Branch branch, @RequestAttribute("tenantId") String tenantId) {
+    public BranchDto createBranch(@RequestBody BranchDto branchDto, @RequestAttribute("tenantId") String tenantId) {
         log.info("Creating branch for tenantId: {}", tenantId);
-        return branchService.createBranch(branch, tenantId);
+        Branch branch = DtoMapper.toEntity(branchDto, tenantId);
+        return DtoMapper.toDto(branchService.createBranch(branch, tenantId));
     }
 
     @PutMapping("/{id}")
-    public Branch updateBranch(@PathVariable String id, @RequestBody Branch branch, @RequestAttribute("tenantId") String tenantId) {
-        return branchService.updateBranch(id, branch, tenantId);
+    public BranchDto updateBranch(@PathVariable String id, @RequestBody BranchDto branchDto, @RequestAttribute("tenantId") String tenantId) {
+        Branch branch = DtoMapper.toEntity(branchDto, tenantId);
+        return DtoMapper.toDto(branchService.updateBranch(id, branch, tenantId));
     }
 
     @DeleteMapping("/{id}")

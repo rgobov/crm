@@ -15,6 +15,7 @@
     const STATUSES = [
         { id: 'SCHEDULED', label: 'Ожидается', color: '#3b82f6' },
         { id: 'CONFIRMED', label: 'Подтвержден', color: '#10b981' },
+        { id: 'ARRIVED', label: 'Пришёл', color: '#6c71c4' }, // НОВЫЙ СТАТУС
         { id: 'COMPLETED', label: 'Завершен', color: '#64748b' },
         { id: 'CANCELLED', label: 'Отменен', color: '#ef4444' }
     ];
@@ -254,7 +255,6 @@
     .grid-layout { display: flex; flex-direction: column; gap: 10px; }
     .info-tile { background: white; padding: 16px 20px; border-radius: 24px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); text-align: left; transition: all 0.2s; }
 
-    /* НОВЫЕ СТИЛИ ТЕЛЕФОНА */
     .phone-tile { background: #eff6ff; border-color: #bfdbfe; }
     .tile-icon.phone { background: #dbeafe; color: #3b82f6; }
     .phone-link { color: #2563eb !important; text-decoration: none; font-size: 17px !important; }

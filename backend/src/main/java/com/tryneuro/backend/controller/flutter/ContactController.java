@@ -1,5 +1,7 @@
 package com.tryneuro.backend.controller.flutter;
 
+import com.tryneuro.backend.dto.ContactDto;
+import com.tryneuro.backend.dto.DtoMapper;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.service.ContactService;
@@ -25,18 +27,20 @@ public class ContactController {
     }
 
     @GetMapping
-    public Page<Contact> getAllContacts(
+    public Page<ContactDto> getAllContacts(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "false") boolean showAll,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
-        return contactService.getContactsPaged(tenantId, query, showAll, page, size);
+        return contactService.getContactsPaged(tenantId, query, showAll, page, size)
+                .map(DtoMapper::toDto);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Contact> getContactById(@PathVariable String id) {
+    public ResponseEntity<ContactDto> getContactById(@PathVariable String id) {
         return contactService.getContactById(id)
+                .map(DtoMapper::toDto)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -45,6 +49,8 @@ public class ContactController {
     public List<Appointment> getContactAppointments(
             @RequestAttribute("tenantId") String tenantId,
             @PathVariable String id) {
+        // Appointments are still using Entity here, but we should probably DTO-ify them too if needed.
+        // For now, keeping as is or using toDto if AppointmentDto is ready.
         return scheduleService.getAppointmentsForContact(id, tenantId);
     }
 
@@ -54,20 +60,23 @@ public class ContactController {
     }
 
     @GetMapping("/by-phone")
-    public ResponseEntity<Contact> findByPhone(@RequestAttribute("tenantId") String tenantId, @RequestParam String phone) {
+    public ResponseEntity<ContactDto> findByPhone(@RequestAttribute("tenantId") String tenantId, @RequestParam String phone) {
         return contactService.findContactByPhone(phone, tenantId)
+                .map(DtoMapper::toDto)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public Contact addContact(@RequestBody Contact contact, @RequestAttribute("tenantId") String tenantId) {
-        return contactService.addContact(contact, tenantId);
+    public ContactDto addContact(@RequestBody ContactDto contactDto, @RequestAttribute("tenantId") String tenantId) {
+        Contact contact = DtoMapper.toEntity(contactDto, tenantId);
+        return DtoMapper.toDto(contactService.addContact(contact, tenantId));
     }
 
     @PutMapping("/{id}")
-    public Contact updateContact(@PathVariable String id, @RequestBody Contact contact, @RequestAttribute("tenantId") String tenantId) {
-        return contactService.updateContact(id, contact, tenantId);
+    public ContactDto updateContact(@PathVariable String id, @RequestBody ContactDto contactDto, @RequestAttribute("tenantId") String tenantId) {
+        Contact contact = DtoMapper.toEntity(contactDto, tenantId);
+        return DtoMapper.toDto(contactService.updateContact(id, contact, tenantId));
     }
 
     @DeleteMapping("/{id}")

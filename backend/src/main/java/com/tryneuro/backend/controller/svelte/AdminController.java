@@ -1,7 +1,6 @@
 package com.tryneuro.backend.controller.svelte;
 
-import com.tryneuro.backend.dto.CreateStaffRequest;
-import com.tryneuro.backend.dto.WorkloadDto;
+import com.tryneuro.backend.dto.*;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.model.Resource;
@@ -21,6 +20,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -54,19 +54,21 @@ public class AdminController {
 
     // --- STAFF & SHIFTS ---
     @GetMapping("/staff")
-    public Page<StaffMember> getStaffPaged(
+    public Page<StaffMemberDto> getStaffPaged(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Boolean active,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return staffMemberService.getStaffPaged(getRequiredTenantId(tenantId), query, active, page, size);
+        return staffMemberService.getStaffPaged(getRequiredTenantId(tenantId), query, active, page, size)
+                .map(DtoMapper::toDto);
     }
 
     @GetMapping("/staff/{id}")
-    public StaffMember getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+    public StaffMemberDto getStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
         return staffMemberService.getStaffMemberById(id)
                 .filter(s -> s.getTenantId().equals(getRequiredTenantId(tenantId)))
+                .map(DtoMapper::toDto)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
     }
 
@@ -86,7 +88,7 @@ public class AdminController {
             StaffShift newShift = new StaffShift();
             newShift.setStaffId(id);
             newShift.setTenantId(tId);
-            newShift.setBranchId(sourceShift.getBranchId()); // ФИКС: Проставляем branchId
+            newShift.setBranchId(sourceShift.getBranchId());
             newShift.setDate(sourceShift.getDate().plusDays(i));
             newShift.setWorkStartTime(sourceShift.getWorkStartTime());
             newShift.setWorkEndTime(sourceShift.getWorkEndTime());
@@ -99,13 +101,13 @@ public class AdminController {
     }
 
     @PostMapping("/staff")
-    public StaffMember createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
-        return staffMemberService.addStaffMember(request, getRequiredTenantId(tenantId));
+    public StaffMemberDto createStaffMember(@RequestAttribute("tenantId") String tenantId, @RequestBody CreateStaffRequest request) {
+        return DtoMapper.toDto(staffMemberService.addStaffMember(request, getRequiredTenantId(tenantId)));
     }
 
     @PutMapping("/staff/{id}")
-    public StaffMember updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
-        return staffMemberService.updateStaffMember(id, request, getRequiredTenantId(tenantId));
+    public StaffMemberDto updateStaffMember(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody CreateStaffRequest request) {
+        return DtoMapper.toDto(staffMemberService.updateStaffMember(id, request, getRequiredTenantId(tenantId)));
     }
 
     @DeleteMapping("/staff/{id}")
@@ -115,30 +117,34 @@ public class AdminController {
 
     // --- CLIENTS ---
     @GetMapping("/clients")
-    public Page<Contact> getClientsPaged(
+    public Page<ContactDto> getClientsPaged(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "true") boolean showAll,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return contactService.getContactsPaged(getRequiredTenantId(tenantId), query, showAll, page, size);
+        return contactService.getContactsPaged(getRequiredTenantId(tenantId), query, showAll, page, size)
+                .map(DtoMapper::toDto);
     }
 
     @GetMapping("/clients/{id}")
-    public Contact getContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+    public ContactDto getContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
         return contactService.getContactById(id)
                 .filter(c -> c.getTenantId().equals(getRequiredTenantId(tenantId)))
+                .map(DtoMapper::toDto)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Клиент не найден"));
     }
 
     @PostMapping("/clients")
-    public Contact createContact(@RequestAttribute("tenantId") String tenantId, @RequestBody Contact contact) {
-        return contactService.addContact(contact, getRequiredTenantId(tenantId));
+    public ContactDto createContact(@RequestAttribute("tenantId") String tenantId, @RequestBody ContactDto contactDto) {
+        Contact contact = DtoMapper.toEntity(contactDto, getRequiredTenantId(tenantId));
+        return DtoMapper.toDto(contactService.addContact(contact, getRequiredTenantId(tenantId)));
     }
 
     @PutMapping("/clients/{id}")
-    public Contact updateContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody Contact contact) {
-        return contactService.updateContact(id, contact, getRequiredTenantId(tenantId));
+    public ContactDto updateContact(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody ContactDto contactDto) {
+        Contact contact = DtoMapper.toEntity(contactDto, getRequiredTenantId(tenantId));
+        return DtoMapper.toDto(contactService.updateContact(id, contact, getRequiredTenantId(tenantId)));
     }
 
     @DeleteMapping("/clients/{id}")
@@ -148,20 +154,23 @@ public class AdminController {
 
     // --- RESOURCES ---
     @GetMapping("/resources")
-    public List<Resource> getAllResources(
+    public List<ResourceDto> getAllResources(
             @RequestAttribute("tenantId") String tenantId,
-            @RequestParam(value = "branch_id", required = false) String branchId) {
-        return resourceService.getResources(getRequiredTenantId(tenantId), branchId);
+            @RequestParam(value = "branchId", required = false) String branchId) {
+        return resourceService.getResources(getRequiredTenantId(tenantId), branchId)
+                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
     }
 
     @PostMapping("/resources")
-    public Resource createResource(@RequestAttribute("tenantId") String tenantId, @RequestBody Resource resource) {
-        return resourceService.addResource(resource, getRequiredTenantId(tenantId));
+    public ResourceDto createResource(@RequestAttribute("tenantId") String tenantId, @RequestBody ResourceDto resourceDto) {
+        Resource resource = DtoMapper.toEntity(resourceDto, getRequiredTenantId(tenantId));
+        return DtoMapper.toDto(resourceService.addResource(resource, getRequiredTenantId(tenantId)));
     }
 
     @PutMapping("/resources/{id}")
-    public Resource updateResource(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody Resource details) {
-        return resourceService.updateResource(id, details, getRequiredTenantId(tenantId));
+    public ResourceDto updateResource(@RequestAttribute("tenantId") String tenantId, @PathVariable String id, @RequestBody ResourceDto details) {
+        Resource resource = DtoMapper.toEntity(details, getRequiredTenantId(tenantId));
+        return DtoMapper.toDto(resourceService.updateResource(id, resource, getRequiredTenantId(tenantId)));
     }
 
     @DeleteMapping("/resources/{id}")
@@ -175,35 +184,38 @@ public class AdminController {
             @RequestAttribute("tenantId") String tenantId, 
             @RequestParam("year") int year, 
             @RequestParam("month") int month,
-            @RequestParam(value = "branch_id", required = false) String branchId) {
+            @RequestParam(value = "branchId", required = false) String branchId) {
         return scheduleService.getWorkloadForMonth(getRequiredTenantId(tenantId), year, month, branchId);
     }
 
     @GetMapping("/appointments/day")
-    public List<Appointment> getAppointmentsForDay(
+    public List<AppointmentDto> getAppointmentsForDay(
             @RequestAttribute("tenantId") String tenantId, 
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(value = "branch_id", required = false) String branchId) {
-        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId), branchId);
+            @RequestParam(value = "branchId", required = false) String branchId) {
+        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId), branchId)
+                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
     }
 
     @GetMapping("/schedule/staff")
-    public List<StaffMember> getStaffForSchedule(
+    public List<StaffMemberDto> getStaffForSchedule(
             @RequestAttribute("tenantId") String tenantId, 
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(value = "branch_id", required = false) String branchId) {
-        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId);
+            @RequestParam(value = "branchId", required = false) String branchId) {
+        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId)
+                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
     }
 
     @PostMapping("/appointments")
-    public Appointment createAppointment(@RequestBody Appointment appointment, @RequestAttribute("tenantId") String tenantId) {
-        appointment.setTenantId(getRequiredTenantId(tenantId));
-        return scheduleService.addAppointment(appointment);
+    public AppointmentDto createAppointment(@RequestBody AppointmentDto appointmentDto, @RequestAttribute("tenantId") String tenantId) {
+        Appointment appointment = DtoMapper.toEntity(appointmentDto, getRequiredTenantId(tenantId));
+        return DtoMapper.toDto(scheduleService.addAppointment(appointment));
     }
 
     @PutMapping("/appointments/{id}")
-    public ResponseEntity<Appointment> updateAppointment(@PathVariable String id, @RequestBody Appointment appointmentDetails) {
-        return ResponseEntity.ok(scheduleService.updateAppointment(id, appointmentDetails));
+    public ResponseEntity<AppointmentDto> updateAppointment(@PathVariable String id, @RequestBody AppointmentDto appointmentDetails, @RequestAttribute("tenantId") String tenantId) {
+        Appointment appointment = DtoMapper.toEntity(appointmentDetails, getRequiredTenantId(tenantId));
+        return ResponseEntity.ok(DtoMapper.toDto(scheduleService.updateAppointment(id, appointment)));
     }
 
     @DeleteMapping("/appointments/{id}")
@@ -213,7 +225,8 @@ public class AdminController {
     }
 
     @GetMapping("/services")
-    public List<com.tryneuro.backend.model.Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
-        return appServiceService.getAllServices(getRequiredTenantId(tenantId));
+    public List<ServiceDto> getAllServices(@RequestAttribute("tenantId") String tenantId) {
+        return appServiceService.getAllServices(getRequiredTenantId(tenantId))
+                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
     }
 }

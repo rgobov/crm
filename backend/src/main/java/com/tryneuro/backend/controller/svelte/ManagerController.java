@@ -1,8 +1,6 @@
 package com.tryneuro.backend.controller.svelte;
 
-import com.tryneuro.backend.dto.WorkloadDto;
-import com.tryneuro.backend.model.Appointment;
-import com.tryneuro.backend.model.StaffMember;
+import com.tryneuro.backend.dto.*;
 import com.tryneuro.backend.model.WappiSettings;
 import com.tryneuro.backend.service.ContactService;
 import com.tryneuro.backend.service.ScheduleService;
@@ -18,6 +16,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/manager")
@@ -52,17 +51,17 @@ public class ManagerController {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalClients", contactService.countContacts(tId));
         stats.put("totalStaff", staffMemberService.getAllStaff(tId).size());
-        // Передаем null для branchId, так как у менеджера нет контекста филиала в дашборде
         stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tId, null).size());
         return stats;
     }
 
     @GetMapping("/appointments/day")
-    public List<Appointment> getAppointmentsForDay(
+    public List<AppointmentDto> getAppointmentsForDay(
             @RequestAttribute("tenantId") String tenantId, 
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) String branchId) {
-        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId), branchId);
+        return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId), branchId)
+                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
     }
 
     @GetMapping("/workload")
@@ -75,11 +74,12 @@ public class ManagerController {
     }
 
     @GetMapping("/schedule/staff")
-    public List<StaffMember> getStaffForSchedule(
+    public List<StaffMemberDto> getStaffForSchedule(
             @RequestAttribute("tenantId") String tenantId, 
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) String branchId) {
-        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId);
+        return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId)
+                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
     }
 
     // Wappi Settings

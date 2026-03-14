@@ -15,24 +15,24 @@ export const adminService = {
         return response.data;
     },
 
-    // Используем branch_id для гарантии передачи
+    // Используем camelCase для branchId в соответствии с новыми DTO
     async getWorkloadForMonth(year, month, branchId) {
         return (await api.get('/admin/workload', {
-            params: { year, month, branch_id: branchId }
+            params: { year, month, branchId: branchId }
         })).data;
     },
 
     async getAppointmentsForDay(date, branchId) {
         const dateStr = toLocalDbDate(date);
         return (await api.get('/admin/appointments/day', {
-            params: { date: dateStr, branch_id: branchId }
+            params: { date: dateStr, branchId: branchId }
         })).data;
     },
 
     async getStaffForSchedule(date, branchId) {
         const dateStr = toLocalDbDate(date);
         return (await api.get('/admin/schedule/staff', {
-            params: { date: dateStr, branch_id: branchId }
+            params: { date: dateStr, branchId: branchId }
         })).data;
     },
 
