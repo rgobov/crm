@@ -56,8 +56,6 @@
 </script>
 
 <div class="mobile-shell">
-    <!-- ВЕРХНИЙ БЛОК УДАЛЕН ДЛЯ РАСЧИСТКИ МЕСТА -->
-
     <main class="mobile-content">
         <slot />
     </main>
@@ -92,7 +90,6 @@
         </nav>
     </div>
 
-    <!-- МОДАЛКИ (Календарь и Ещё) ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ -->
     {#if showCalendarModal}
         <div class="mobile-full-modal" transition:fade={{duration: 200}}>
             <header class="modal-head">
@@ -164,7 +161,6 @@
 
     .mobile-shell { display: flex; flex-direction: column; height: 100dvh; width: 100vw; background: #fdf6e3; overflow: hidden; position: relative; }
 
-    /* КОНТЕНТ ТЕПЕРЬ ЗАНИМАЕТ ВСЁ МЕСТО ОТ ВЕРХА */
     .mobile-content {
         flex: 1;
         overflow-y: auto;
@@ -176,8 +172,9 @@
     .mobile-bottom-ui { position: fixed; bottom: 0; left: 0; right: 0; background: #eee8d5; border-top: 1.5px solid #ddd6c1; z-index: 2000; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 25px rgba(0,0,0,0.05); }
 
     .bottom-date-picker { background: white; border-bottom: 1px solid #ddd6c1; }
+
     :global(.bottom-date-picker .date-picker-wrapper) { border-top: none !important; background: #eee8d5 !important; }
-    :global(.bottom-date-picker .day-btn) { background: #fdf6e3 !important; border-color: #ddd6c1 !important; height: 60px !important; min-width: 50px !important; }
+    :global(.bottom-date-picker .day-btn) { background: #fdf6e3 !important; border-color: #ddd6c1 !important; }
     :global(.bottom-date-picker .day-btn.is-selected) { background: #268bd2 !important; border-color: #268bd2 !important; }
 
     .bottom-nav { display: flex; align-items: center; height: 65px; padding: 0 10px; }

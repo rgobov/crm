@@ -88,35 +88,36 @@
         background: #eee8d5; /* Solarized Base2 */
         scrollbar-width: none;
         -ms-overflow-style: none;
+        border-bottom: 1px solid #ddd6c1;
     }
     .date-picker-wrapper::-webkit-scrollbar { display: none; }
 
     .days-strip {
         display: flex;
-        padding: 8px 10px;
-        gap: 6px;
+        padding: 6px 8px; /* Уменьшены отступы */
+        gap: 5px;
     }
 
     .day-btn {
-        min-width: 48px;
-        height: 58px;
+        min-width: 42px; /* Уменьшено с 48px */
+        height: 48px;    /* Уменьшено с 58px - пропорция золотого сечения к таймлайну */
         flex-shrink: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: #fdf6e3; /* Solarized Base3 */
+        background: #fdf6e3;
         border: 1px solid #ddd6c1;
-        border-radius: 12px;
+        border-radius: 10px;
         cursor: pointer;
         position: relative;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .day-btn.is-selected {
-        background: #268bd2; /* Solarized Blue */
+        background: #268bd2;
         border-color: #268bd2;
-        box-shadow: 0 4px 12px rgba(38, 139, 210, 0.2);
+        box-shadow: 0 3px 8px rgba(38, 139, 210, 0.2);
         transform: translateY(-1px);
     }
 
@@ -126,28 +127,28 @@
     }
 
     .week-name {
-        font-size: 9px;
+        font-size: 8px; /* Уменьшено с 9px */
         font-weight: 850;
         text-transform: uppercase;
         color: #93a1a1;
-        margin-bottom: 2px;
+        margin-bottom: 1px;
     }
     .week-name.weekend { color: #dc322f; opacity: 0.9; }
 
     .day-num {
-        font-size: 15px;
+        font-size: 13px; /* Уменьшено с 15px */
         font-weight: 900;
         color: #073642;
     }
 
     .is-today:not(.is-selected) {
-        border: 1.5px solid #268bd2;
+        border: 1.2px solid #268bd2;
         background: #eee8d5;
     }
 
     .today-dot {
         position: absolute;
-        bottom: 6px;
+        bottom: 4px;
         width: 3px;
         height: 3px;
         background: #268bd2;

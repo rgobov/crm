@@ -12,14 +12,13 @@
     let allBranches = [];
     let isLoading = true;
 
-    // ✅ ДОБАВЛЕНО: email и password в режимы редактирования
+    // Режимы редактирования полей
     let editMode = {
         name: false, specialty: false, phone: false,
         role: false, photo: false, branches: false,
         email: false, password: false
     };
 
-    // ✅ ДОБАВЛЕНО: email и password в буферные значения
     let tempValues = {
         name: '', specialty: '', phone: '', role: '',
         active: true, photoUrl: '', branchIds: [],
@@ -52,7 +51,6 @@
 
     function syncTemp() {
         if (!staff) return;
-        console.log('Syncing staff data:', staff);
 
         tempValues = {
             name: staff.name || '',
@@ -62,9 +60,8 @@
             active: staff.active,
             photoUrl: staff.photoUrl || '',
             branchIds: (staff.branchIds && Array.isArray(staff.branchIds)) ? [...staff.branchIds] : [],
-            // ✅ ДОБАВЛЕНО: подтягиваем email из бэкенда
             email: staff.email || '',
-            password: '' // Пароль всегда пустой при загрузке
+            password: ''
         };
     }
 
@@ -80,7 +77,7 @@
             staff = result;
             editMode[field] = false;
             dispatch('updated', staff);
-            syncTemp(); // Обновляем данные после сохранения
+            syncTemp();
         } catch (e) {
             alert('Не удалось сохранить изменения');
             syncTemp();
@@ -112,7 +109,7 @@
             {#if isLoading}
                 <div class="center"><span class="spinner"></span></div>
             {:else if staff}
-                <!-- ГЕРОЙ-СЕКЦИЯ -->
+                <!-- ГЕРОЙ-СЕКЦИЯ (УМЕНЬШЕНА) -->
                 <div class="hero-section">
                     <div class="avatar-box">
                         {#if staff.photoUrl}
@@ -144,7 +141,7 @@
 
                 <div class="details-list">
                     <!-- СЕКЦИЯ ФИЛИАЛОВ -->
-                    <div class="info-tile branch-tile">
+                    <div class="info-tile">
                         <label>Доступные филиалы</label>
                         {#if editMode.branches}
                             <div class="branch-selector-grid" in:slide>
@@ -206,7 +203,6 @@
                         {/if}
                     </div>
 
-                    <!-- ✅ НОВОЕ: Email -->
                     <div class="info-tile">
                         <label>Email (логин)</label>
                         {#if editMode.email}
@@ -221,7 +217,6 @@
                         {/if}
                     </div>
 
-                    <!-- ✅ НОВОЕ: Пароль -->
                     <div class="info-tile">
                         <label>Пароль</label>
                         {#if editMode.password}
@@ -237,13 +232,13 @@
                     </div>
 
                     <div class="info-tile">
-                        <label>Уровень доступа (Роль)</label>
+                        <label>Уровень доступа</label>
                         {#if editMode.role}
                             <div class="edit-input-group">
                                 <select bind:value={tempValues.role}>
-                                    <option value="ADMIN">ADMIN (Владелец)</option>
-                                    <option value="MANAGER">MANAGER (Управляющий)</option>
-                                    <option value="EMPLOYEE">EMPLOYEE (Мастер)</option>
+                                    <option value="ADMIN">ADMIN</option>
+                                    <option value="MANAGER">MANAGER</option>
+                                    <option value="EMPLOYEE">EMPLOYEE</option>
                                 </select>
                                 <button class="btn-tick" on:click={() => saveField('role')}>✓</button>
                             </div>
@@ -261,60 +256,60 @@
 
 <style>
     .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-    .modal-content { background: #f8fafc; width: 100%; max-width: 460px; border-radius: 32px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: 90vh; overflow-y: auto; }
+    .modal-content { background: #f8fafc; width: 100%; max-width: 420px; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: 90vh; overflow-y: auto; }
 
-    .modal-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; z-index: 10; }
-    .modal-header h2 { margin: 0; font-size: 17px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-    .btn-close { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; font-weight: 800; cursor: pointer; color: #94a3b8; }
+    .modal-header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; z-index: 10; }
+    .modal-header h2 { margin: 0; font-size: 15px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-close { background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 50%; font-weight: 800; cursor: pointer; color: #94a3b8; }
 
-    .modal-body { padding: 24px; }
+    .modal-body { padding: 20px; }
 
-    .hero-section { text-align: center; margin-bottom: 28px; }
-    .avatar-box { width: 84px; height: 84px; background: var(--primary-gradient); color: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 900; margin: 0 auto 16px; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); overflow: hidden; }
+    .hero-section { text-align: center; margin-bottom: 16px; }
+    .avatar-box { width: 64px; height: 64px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; margin: 0 auto 12px; box-shadow: 0 8px 16px rgba(56, 151, 240, 0.2); overflow: hidden; }
     .avatar-image { width: 100%; height: 100%; object-fit: cover; }
 
-    h3 { margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; cursor: pointer; }
-    h3 span { color: var(--primary-color); opacity: 0.4; font-size: 16px; margin-left: 4px; }
+    h3 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; cursor: pointer; }
+    h3 span { color: var(--primary-color); opacity: 0.4; font-size: 14px; margin-left: 4px; }
 
-    .status-toggle-wrap { margin-top: 16px; display: flex; justify-content: center; }
-    .toggle-pill { display: flex; align-items: center; gap: 8px; padding: 6px 16px 6px 8px; border-radius: 20px; border: 1.5px solid #e2e8f0; background: white; cursor: pointer; transition: all 0.3s; }
-    .toggle-pill .dot { width: 12px; height: 12px; border-radius: 50%; background: #94a3b8; }
-    .toggle-pill .label { font-size: 10px; font-weight: 900; color: #94a3b8; letter-spacing: 0.5px; }
+    .status-toggle-wrap { margin-top: 12px; display: flex; justify-content: center; }
+    .toggle-pill { display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 6px; border-radius: 16px; border: 1.5px solid #e2e8f0; background: white; cursor: pointer; transition: all 0.3s; }
+    .toggle-pill .dot { width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; }
+    .toggle-pill .label { font-size: 9px; font-weight: 900; color: #94a3b8; letter-spacing: 0.5px; }
 
     .toggle-pill.active { border-color: #10b981; background: #f0fdf4; }
-    .toggle-pill.active .dot { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .toggle-pill.active .dot { background: #10b981; box-shadow: 0 0 6px #10b981; }
     .toggle-pill.active .label { color: #166534; }
 
-    .details-list { display: grid; gap: 12px; }
-    .info-tile { background: white; padding: 16px; border-radius: 20px; border: 1px solid #f1f5f9; cursor: pointer; transition: transform 0.1s; }
+    .details-list { display: grid; gap: 8px; }
+    .info-tile { background: white; padding: 12px; border-radius: 16px; border: 1px solid #f1f5f9; cursor: pointer; transition: transform 0.1s; }
     .info-tile:active { transform: scale(0.99); }
 
-    label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    p { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; display: flex; align-items: center; justify-content: space-between; }
+    label { display: block; font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    p { margin: 0; font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; justify-content: space-between; }
     p span { color: var(--primary-color); opacity: 0.4; }
 
-    .branch-view-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .chips-list { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip-static { background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; }
-    .no-branches { color: #94a3b8; font-style: italic; font-size: 14px; }
+    .branch-view-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .chips-list { display: flex; flex-wrap: wrap; gap: 4px; }
+    .chip-static { background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+    .no-branches { color: #94a3b8; font-style: italic; font-size: 13px; }
 
-    .branch-selector-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-    .branch-chip { border: 1.5px solid #e2e8f0; background: white; color: #64748b; padding: 8px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer; transition: 0.2s; }
+    .branch-selector-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .branch-chip { border: 1.5px solid #e2e8f0; background: white; color: #64748b; padding: 6px 10px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; }
     .branch-chip.selected { border-color: var(--primary-color); background: #eff6ff; color: var(--primary-color); }
 
-    .edit-actions-row { display: flex; gap: 8px; margin-top: 8px; }
-    .btn-save-mini { flex: 1; background: var(--primary-color); color: white; border: none; padding: 8px; border-radius: 10px; font-weight: 800; font-size: 11px; cursor: pointer; }
-    .btn-cancel-mini { background: #f1f5f9; color: #64748b; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 11px; cursor: pointer; }
+    .edit-actions-row { display: flex; gap: 6px; margin-top: 6px; }
+    .btn-save-mini { flex: 1; background: var(--primary-color); color: white; border: none; padding: 6px; border-radius: 8px; font-weight: 800; font-size: 10px; cursor: pointer; }
+    .btn-cancel-mini { background: #f1f5f9; color: #64748b; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 10px; cursor: pointer; }
 
-    .badge-role { background: #eff6ff; color: var(--primary-color); padding: 2px 10px; border-radius: 6px; font-size: 12px; font-weight: 800; }
+    .badge-role { background: #eff6ff; color: var(--primary-color); padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 800; }
 
-    .edit-input-group { display: flex; gap: 8px; width: 100%; }
-    input, select { flex: 1; padding: 10px 14px; border: 2.5px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: white; color: #0f172a; font-weight: 600; }
+    .edit-input-group { display: flex; gap: 6px; width: 100%; }
+    input, select { flex: 1; padding: 8px 12px; border: 2px solid var(--primary-color); border-radius: 10px; font-size: 14px; outline: none; background: white; color: #0f172a; font-weight: 600; }
 
-    .btn-tick { background: #10b981; color: white; border: none; width: 40px; height: 40px; border-radius: 12px; font-weight: bold; cursor: pointer; }
-    .btn-cross { background: #f1f5f9; color: #64748b; border: none; width: 40px; height: 40px; border-radius: 12px; cursor: pointer; }
+    .btn-tick { background: #10b981; color: white; border: none; width: 34px; height: 34px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+    .btn-cross { background: #f1f5f9; color: #64748b; border: none; width: 34px; height: 34px; border-radius: 10px; cursor: pointer; }
 
-    .spinner { width: 24px; height: 24px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
+    .spinner { width: 20px; height: 20px; border: 2px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .center { display: flex; justify-content: center; padding: 40px; }
+    .center { display: flex; justify-content: center; padding: 20px; }
 </style>
