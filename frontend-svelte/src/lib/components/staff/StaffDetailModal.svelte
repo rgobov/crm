@@ -12,11 +12,18 @@
     let allBranches = [];
     let isLoading = true;
 
-    // Режимы редактирования полей
-    let editMode = { name: false, specialty: false, phone: false, role: false, photo: false, branches: false };
+    // ✅ ДОБАВЛЕНО: email и password в режимы редактирования
+    let editMode = {
+        name: false, specialty: false, phone: false,
+        role: false, photo: false, branches: false,
+        email: false, password: false
+    };
+
+    // ✅ ДОБАВЛЕНО: email и password в буферные значения
     let tempValues = {
         name: '', specialty: '', phone: '', role: '',
-        active: true, photoUrl: '', branchIds: []
+        active: true, photoUrl: '', branchIds: [],
+        email: '', password: ''
     };
 
     onMount(async () => {
@@ -54,25 +61,26 @@
             role: staff.role || 'EMPLOYEE',
             active: staff.active,
             photoUrl: staff.photoUrl || '',
-            // ✅ ИСПРАВЛЕНО: Используем branchIds напрямую из DTO бэкенда
-            branchIds: (staff.branchIds && Array.isArray(staff.branchIds)) ? [...staff.branchIds] : []
+            branchIds: (staff.branchIds && Array.isArray(staff.branchIds)) ? [...staff.branchIds] : [],
+            // ✅ ДОБАВЛЕНО: подтягиваем email из бэкенда
+            email: staff.email || '',
+            password: '' // Пароль всегда пустой при загрузке
         };
-
-        console.log('Initial branchIds set to:', tempValues.branchIds);
     }
 
     async function saveField(field) {
         try {
             const requestData = {
                 ...tempValues,
-                available: tempValues.active, // Маппинг на поле active в бэкенде через CreateStaffRequest
-                branchIds: tempValues.branchIds // Отправляем массив ID выбранных филиалов
+                available: tempValues.active,
+                branchIds: tempValues.branchIds
             };
 
             const result = await staffService.updateStaff(staffId, requestData);
             staff = result;
             editMode[field] = false;
             dispatch('updated', staff);
+            syncTemp(); // Обновляем данные после сохранения
         } catch (e) {
             alert('Не удалось сохранить изменения');
             syncTemp();
@@ -198,14 +206,44 @@
                         {/if}
                     </div>
 
+                    <!-- ✅ НОВОЕ: Email -->
+                    <div class="info-tile">
+                        <label>Email (логин)</label>
+                        {#if editMode.email}
+                            <div class="edit-input-group">
+                                <input type="email" bind:value={tempValues.email} autofocus />
+                                <button class="btn-tick" on:click={() => saveField('email')}>✓</button>
+                            </div>
+                        {:else}
+                            <p on:click={() => editMode.email = true}>
+                                {staff.email || 'Не указан'} <span>✎</span>
+                            </p>
+                        {/if}
+                    </div>
+
+                    <!-- ✅ НОВОЕ: Пароль -->
+                    <div class="info-tile">
+                        <label>Пароль</label>
+                        {#if editMode.password}
+                            <div class="edit-input-group">
+                                <input type="password" bind:value={tempValues.password} placeholder="Новый пароль" autofocus />
+                                <button class="btn-tick" on:click={() => saveField('password')}>✓</button>
+                            </div>
+                        {:else}
+                            <p on:click={() => editMode.password = true}>
+                                <span style="color: #94a3b8; font-size: 13px;">Изменить пароль</span> <span>✎</span>
+                            </p>
+                        {/if}
+                    </div>
+
                     <div class="info-tile">
                         <label>Уровень доступа (Роль)</label>
                         {#if editMode.role}
                             <div class="edit-input-group">
                                 <select bind:value={tempValues.role}>
-                                    <option value="ADMIN">ADMIN</option>
-                                    <option value="MANAGER">MANAGER</option>
-                                    <option value="EMPLOYEE">EMPLOYEE</option>
+                                    <option value="ADMIN">ADMIN (Владелец)</option>
+                                    <option value="MANAGER">MANAGER (Управляющий)</option>
+                                    <option value="EMPLOYEE">EMPLOYEE (Мастер)</option>
                                 </select>
                                 <button class="btn-tick" on:click={() => saveField('role')}>✓</button>
                             </div>

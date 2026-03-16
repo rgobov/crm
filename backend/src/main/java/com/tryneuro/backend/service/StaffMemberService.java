@@ -63,16 +63,28 @@ public class StaffMemberService {
         this.messagingTemplate = messagingTemplate;
     }
 
+    @Transactional
     public Optional<StaffMember> getStaffMemberById(String id) {
         Optional<StaffMember> staffOpt = staffMemberRepository.findById(id);
-        staffOpt.ifPresent(this::enrichWithUserData);
+        staffOpt.ifPresent(staff -> {
+            if (staff.getBranches() != null) {
+                staff.getBranches().size();
+            }
+            enrichWithUserData(staff);
+        });
         return staffOpt;
     }
 
+    @Transactional
     public Page<StaffMember> getStaffPaged(String tenantId, String query, Boolean active, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("active").descending().and(Sort.by("name").ascending()));
         Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, active, pageable);
-        staffPage.forEach(this::enrichWithUserData);
+        staffPage.forEach(staff -> {
+            if (staff.getBranches() != null) {
+                staff.getBranches().size();
+            }
+            enrichWithUserData(staff);
+        });
         return staffPage;
     }
 
@@ -106,11 +118,21 @@ public class StaffMemberService {
             newUser.setId(UUID.randomUUID().toString());
             newUser.setEmail(request.getEmail());
             newUser.setPassword(passwordEncoder.encode(request.getPassword() != null ? request.getPassword() : "qwerty"));
-            newUser.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
+            
+            try {
+                newUser.setRole(UserRole.valueOf(request.getRole().toUpperCase()));
+            } catch (Exception e) {
+                newUser.setRole(UserRole.EMPLOYEE);
+            }
+            
             newUser.setTenantId(tenantId);
             newUser.setStaffId(saved.getId());
             userRepository.save(newUser);
         }
+        
+        // ✅ Уведомляем другие клиенты о появлении нового сотрудника
+        notifyChange(tenantId);
+        
         enrichWithUserData(saved);
         return saved;
     }
@@ -131,36 +153,67 @@ public class StaffMemberService {
             staffMember.setBranches(branches);
         }
         StaffMember savedStaff = staffMemberRepository.save(staffMember);
-        userRepository.findByStaffId(id).ifPresent(user -> {
-            if (request.getRole() != null) user.setRole("MANAGER".equalsIgnoreCase(request.getRole()) ? UserRole.MANAGER : UserRole.EMPLOYEE);
-            if (request.getEmail() != null && !request.getEmail().isEmpty()) user.setEmail(request.getEmail());
-            if (request.getPassword() != null && !request.getPassword().isEmpty()) user.setPassword(passwordEncoder.encode(request.getPassword()));
-            userRepository.save(user);
+        
+        User user = userRepository.findByStaffId(id).orElseGet(() -> {
+            if (request.getEmail() == null || request.getEmail().isEmpty()) return null;
+            User newUser = new User();
+            newUser.setId(UUID.randomUUID().toString());
+            newUser.setStaffId(id);
+            newUser.setTenantId(tenantId);
+            return newUser;
         });
+
+        if (user != null) {
+            if (request.getRole() != null) {
+                try {
+                    user.setRole(UserRole.valueOf(request.getRole().toUpperCase()));
+                } catch (Exception e) {
+                    user.setRole(UserRole.EMPLOYEE);
+                }
+            }
+            if (request.getEmail() != null && !request.getEmail().isEmpty()) user.setEmail(request.getEmail());
+            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
+            } else if (user.getPassword() == null) {
+                user.setPassword(passwordEncoder.encode("qwerty"));
+            }
+            userRepository.save(user);
+        }
+        
+        // ✅ Уведомляем другие клиенты об изменении данных или роли сотрудника
+        notifyChange(tenantId);
+        
         enrichWithUserData(savedStaff);
         return savedStaff;
     }
 
     @Transactional
     public void deleteStaffMember(String id) {
-        userRepository.findByStaffId(id).ifPresent(userRepository::delete);
-        boolean hasAppointments = appointmentRepository.existsByStaffMemberId(id);
-        if (hasAppointments) {
-            staffMemberRepository.findById(id).ifPresent(staff -> {
+        staffMemberRepository.findById(id).ifPresent(staff -> {
+            userRepository.findByStaffId(id).ifPresent(userRepository::delete);
+            boolean hasAppointments = appointmentRepository.existsByStaffMemberId(id);
+            if (hasAppointments) {
                 staff.setActive(false);
                 staffMemberRepository.save(staff);
-            });
-        } else {
-            staffMemberRepository.deleteById(id);
-        }
+            } else {
+                staffMemberRepository.deleteById(id);
+            }
+            // ✅ Уведомляем об удалении сотрудника
+            notifyChange(staff.getTenantId());
+        });
     }
 
+    @Transactional
     public List<StaffMember> getAllStaff(String tenantId) {
         return staffMemberRepository.findByTenantId(tenantId).stream()
-                .map(s -> { enrichWithUserData(s); return s; })
+                .peek(staff -> {
+                    if (staff.getBranches() != null) staff.getBranches().size();
+                    enrichWithUserData(staff);
+                })
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
         return getStaffMemberById(id).map(staff -> {
             List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staff.getId(), date);
@@ -176,6 +229,7 @@ public class StaffMemberService {
         });
     }
 
+    @Transactional
     public List<StaffMember> getStaffForDate(String tenantId, LocalDate date, String branchId) {
         List<StaffMember> staffList;
         if (branchId != null && !branchId.isEmpty() && !"null".equals(branchId)) {
@@ -185,7 +239,8 @@ public class StaffMemberService {
         }
         return staffList.stream()
                 .filter(StaffMember::isActive)
-                .map(staff -> {
+                .peek(staff -> {
+                    if (staff.getBranches() != null) staff.getBranches().size();
                     enrichWithUserData(staff);
                     staffShiftRepository.findByStaffIdAndDateAndBranchId(staff.getId(), date, branchId).ifPresentOrElse(shift -> {
                         staff.setDayOff(shift.isDayOff());
@@ -194,26 +249,11 @@ public class StaffMemberService {
                         staff.setBreakStartTime(shift.getBreakStartTime());
                         staff.setBreakEndTime(shift.getBreakEndTime());
                     }, () -> staff.setDayOff(true));
-                    return staff;
                 }).collect(Collectors.toList());
     }
 
     @Transactional
     public StaffShift saveShift(StaffShift shift) {
-        log.info("📅 Saving shift for staff {}: Date={}, Branch={}, Off={}", 
-                 shift.getStaffId(), shift.getDate(), shift.getBranchId(), shift.isDayOff());
-        
-        // ЗАЩИТА: Если ставим выходной, проверяем наличие записей
-        if (shift.isDayOff()) {
-            List<Appointment> apps = appointmentRepository.findByStaffIdAndBranchIdAndDate(
-                shift.getStaffId(), shift.getBranchId(), shift.getDate()
-            );
-            if (!apps.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, 
-                    "Нельзя установить выходной: в этом филиале у мастера " + apps.size() + " активных записей");
-            }
-        }
-
         StaffShift saved = staffShiftRepository.findByStaffIdAndDateAndBranchId(shift.getStaffId(), shift.getDate(), shift.getBranchId())
                 .map(existing -> {
                     existing.setWorkStartTime(shift.getWorkStartTime());
@@ -223,10 +263,7 @@ public class StaffMemberService {
                     existing.setDayOff(shift.isDayOff());
                     return staffShiftRepository.save(existing);
                 })
-                .orElseGet(() -> {
-                    // Гарантируем привязку ID если это создание
-                    return staffShiftRepository.save(shift);
-                });
+                .orElseGet(() -> staffShiftRepository.save(shift));
 
         notifyChange(saved.getTenantId());
         return saved;

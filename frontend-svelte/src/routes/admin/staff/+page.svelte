@@ -5,11 +5,13 @@
     import { goto } from '$app/navigation';
     import { fade, scale } from 'svelte/transition';
     import StaffDetailModal from '$lib/components/staff/StaffDetailModal.svelte';
+    import AddStaffModal from '$lib/components/staff/AddStaffModal.svelte'; // ✅ ДОБАВИЛИ
 
     let isLoading = false;
     let isFirstLoad = true;
     let debounceTimer;
     let selectedStaffId = null;
+    let showAddModal = false; // ✅ СОСТОЯНИЕ ДЛЯ НОВОГО ОКНА
     let refreshKey = 0;
 
     $: if ($staffSearchQuery !== undefined) {
@@ -53,6 +55,10 @@
     function handleUpdateSuccess() {
         refreshKey += 1;
         loadStaffData($staffMetadata.currentPage, $staffSearchQuery);
+    }
+
+    function handleAddSuccess() {
+        loadStaffData(0, ''); // Сбрасываем фильтры и грузим первую страницу
     }
 
     function closeStaffModal() {
@@ -118,7 +124,6 @@
                     {/each}
                 </div>
 
-                <!-- ИСПРАВЛЕННАЯ ПАГИНАЦИЯ -->
                 {#if $staffMetadata.totalPages > 1}
                     <div class="pagination">
                         <button class="pag-btn"
@@ -144,7 +149,16 @@
         </div>
     </div>
 
-    <button class="fab-btn" on:click={() => goto('/admin/staff/new')}>+</button>
+    <!-- ✅ ИСПРАВЛЕННАЯ КНОПКА: ТЕПЕРЬ ОТКРЫВАЕТ МОДАЛКУ -->
+    <button class="fab-btn" on:click={() => showAddModal = true}>+</button>
+
+    <!-- ✅ МОДАЛКА СОЗДАНИЯ -->
+    {#if showAddModal}
+        <AddStaffModal
+            on:close={() => showAddModal = false}
+            on:added={handleAddSuccess}
+        />
+    {/if}
 
     {#if selectedStaffId}
         <div class="modal-backdrop" on:click|self={closeStaffModal} transition:fade={{duration: 200}}>
@@ -193,37 +207,9 @@
     .name { display: block; font-size: 16px; font-weight: 800; color: #1e293b; }
     .spec { display: block; font-size: 12px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
 
-    /* КРАСИВАЯ ПАГИНАЦИЯ ПО ЦЕНТРУ */
-    .pagination {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 20px;
-        margin-top: 40px;
-        padding: 20px 0;
-    }
-    .pag-btn {
-        background: white;
-        border: 1px solid #e2e8f0;
-        width: 44px;
-        height: 44px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        font-weight: 700;
-        color: #64748b;
-        cursor: pointer;
-        transition: 0.2s;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.02);
-    }
-    .pag-btn:hover:not(:disabled) {
-        border-color: var(--primary-color);
-        color: var(--primary-color);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(56, 151, 240, 0.1);
-    }
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 40px; padding: 20px 0; }
+    .pag-btn { background: white; border: 1px solid #e2e8f0; width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; color: #64748b; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.02); }
+    .pag-btn:hover:not(:disabled) { border-color: var(--primary-color); color: var(--primary-color); transform: translateY(-2px); box-shadow: 0 6px 15px rgba(56, 151, 240, 0.1); }
     .pag-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
     .pag-info { display: flex; align-items: center; gap: 8px; font-weight: 800; }
@@ -237,7 +223,8 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .fab-btn { position: fixed; bottom: 40px; right: 40px; width: 64px; height: 64px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.4); cursor: pointer; z-index: 100; }
+    .fab-btn { position: fixed; bottom: 40px; right: 40px; width: 64px; height: 64px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.4); cursor: pointer; z-index: 100; transition: transform 0.2s; }
+    .fab-btn:active { transform: scale(0.9); }
 
     .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
     .modal-content { background: white; width: 100%; max-width: 480px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); }
