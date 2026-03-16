@@ -45,15 +45,20 @@
 
     function syncTemp() {
         if (!staff) return;
+        console.log('Syncing staff data:', staff);
+
         tempValues = {
-            name: staff.name,
+            name: staff.name || '',
             specialty: staff.specialty || '',
             phone: staff.phone || '',
             role: staff.role || 'EMPLOYEE',
             active: staff.active,
             photoUrl: staff.photoUrl || '',
-            branchIds: staff.branches ? staff.branches.map(b => b.id) : []
+            // ✅ ИСПРАВЛЕНО: Используем branchIds напрямую из DTO бэкенда
+            branchIds: (staff.branchIds && Array.isArray(staff.branchIds)) ? [...staff.branchIds] : []
         };
+
+        console.log('Initial branchIds set to:', tempValues.branchIds);
     }
 
     async function saveField(field) {
@@ -105,7 +110,7 @@
                         {#if staff.photoUrl}
                             <img src={staff.photoUrl} alt={staff.name} class="avatar-image" />
                         {:else}
-                            {staff.name.charAt(0)}
+                            {staff.name ? staff.name.charAt(0) : '?'}
                         {/if}
                     </div>
 
@@ -130,7 +135,7 @@
                 </div>
 
                 <div class="details-list">
-                    <!-- НОВОЕ: СЕКЦИЯ ФИЛИАЛОВ -->
+                    <!-- СЕКЦИЯ ФИЛИАЛОВ -->
                     <div class="info-tile branch-tile">
                         <label>Доступные филиалы</label>
                         {#if editMode.branches}
@@ -250,7 +255,6 @@
     p { margin: 0; font-size: 15px; font-weight: 600; color: #1e293b; display: flex; align-items: center; justify-content: space-between; }
     p span { color: var(--primary-color); opacity: 0.4; }
 
-    /* СТИЛИ ФИЛИАЛОВ */
     .branch-view-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .chips-list { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip-static { background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; }
