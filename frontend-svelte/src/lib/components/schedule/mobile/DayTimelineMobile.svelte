@@ -4,6 +4,7 @@
     import { timeSyncService } from '$lib/services/timeSyncService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchService } from '$lib/services/branchService.js';
+    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import TimelineAppointment from '../TimelineAppointment.svelte';
     import TimelineNowIndicator from '../TimelineNowIndicator.svelte';
     import { fade } from 'svelte/transition';
@@ -38,7 +39,6 @@
     function updateLayout() {
         const width = window.innerWidth;
         STAFF_WIDTH = Math.floor((width - TIME_COL_WIDTH) / 3);
-        // Золотое сечение: высота подстраивается под ширину
         HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.618);
         SLOT_HEIGHT = HOUR_HEIGHT / 4;
     }
@@ -82,6 +82,9 @@
         } else nowLinePos = -1;
     }
 
+    // ✅ РЕАКТИВНОСТЬ НА СМЕНУ ФИЛИАЛА И СИГНАЛ ОБНОВЛЕНИЯ
+    $: if ($activeBranchId) fetchBranchData();
+    $: if ($scheduleRefreshSignal) fetchBranchData();
     $: if (day || startHour || currentBranch) updateNowPosition();
 
     $: {
@@ -200,7 +203,6 @@
     .staff-row { display: flex; height: 100%; }
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }
 
-    /* ИНДИКАЦИЯ ВЫХОДНОГО В ШАПКЕ */
     .staff-cell.is-off { opacity: 0.5; background: #eee8d5; }
     .staff-cell.is-off .n, .staff-cell.is-off .s { color: #93a1a1; }
 
@@ -221,7 +223,6 @@
     .slot-btn { width: 100%; border: none; display: block; background: #fdf6e3; }
     .slot-btn.zebra { background: #f5efdc; }
 
-    /* ШТРИХОВКА ДЛЯ МОБИЛОК */
     .slot-btn.is-off {
         background-color: #eee8d5 !important;
         background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important;

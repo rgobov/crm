@@ -35,8 +35,18 @@ function createDashboardStore() {
 export const dashboardStore = createDashboardStore();
 export const activeTab = writable('management');
 export const selectedDate = writable(new Date());
-export const activeBranchId = writable(null);
-export const refreshTrigger = writable(0);
 
-// НОВОЕ: Флаг мобильного устройства
+// ✅ Инициализация из localStorage для сохранения выбора между сессиями
+const storedBranchId = typeof window !== 'undefined' ? localStorage.getItem('activeBranchId') : null;
+export const activeBranchId = writable(storedBranchId);
+
+// ✅ Подписка на изменения для автосохранения
+if (typeof window !== 'undefined') {
+    activeBranchId.subscribe(id => {
+        if (id) localStorage.setItem('activeBranchId', id);
+        else localStorage.removeItem('activeBranchId');
+    });
+}
+
+export const refreshTrigger = writable(0);
 export const isMobile = writable(false);
