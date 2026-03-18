@@ -4,6 +4,7 @@
     import { timeSyncService } from '$lib/services/timeSyncService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchService } from '$lib/services/branchService.js';
+    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import TimelineAppointment from '../TimelineAppointment.svelte';
     import TimelineNowIndicator from '../TimelineNowIndicator.svelte';
     import TimelineCursorGuide from '../TimelineCursorGuide.svelte';
@@ -29,7 +30,11 @@
     let hoverY = -1, hoverTimeStr = "", showGuide = false;
 
     let refreshKey = 0;
-    $: if (staff) refreshKey++;
+    $: if (staff) {
+        refreshKey++;
+        // Адаптация ширины: если мастер один, делаем колонку шире
+        STAFF_WIDTH = staff.length <= 1 ? Math.max(400, window.innerWidth - TIME_COL_WIDTH - 40) : 200;
+    }
 
     $: apptsByStaff = (() => {
         const map = { 'unassigned': [] };
@@ -42,6 +47,14 @@
         return map;
     })();
 
+    // ПОДПИСКА НА ВЕБСОКЕТЫ
+    const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
+        if (signal && signal.ts > 0 && $activeBranchId) {
+            fetchBranchData();
+            dispatch('refresh'); // 🔄 ✅ Сигнал родителю перезагрузить пропсы
+        }
+    });
+
     onMount(async () => {
         await timeSyncService.sync();
         await fetchBranchData();
@@ -51,8 +64,13 @@
         }, 30000);
         updateNowPosition();
         setTimeout(scrollToCurrentTime, 600);
-        return () => clearInterval(timer);
+        return () => {
+            clearInterval(timer);
+            unsubscribe();
+        };
     });
+
+    onDestroy(() => unsubscribe());
 
     async function fetchBranchData() {
         if (!$activeBranchId) return;
@@ -63,23 +81,26 @@
     }
 
     function updateNowPosition() {
-        if (!currentBranch) return;
+        if (!currentBranch) {
+            nowLinePos = -1; // ✅ Явно скрываем линию если нет филиала
+            branchTime = "";
+            return;
+        }
         const tz = currentBranch.timezone;
         const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
         if (formatter.format(currentTime) === formatter.format(day)) {
             nowLinePos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, tz);
             branchTime = timeUtils.formatTime(currentTime.toISOString(), tz);
-        } else nowLinePos = -1;
+        } else {
+            nowLinePos = -1;
+            branchTime = "";
+        }
     }
 
     $: if ($activeBranchId) fetchBranchData();
     $: if (day || startHour || currentBranch) updateNowPosition();
 
-    function handleStart(e) {
-        isDown = true;
-        startX = e.pageX - scrollBody.offsetLeft;
-        scrollLeft = scrollBody.scrollLeft;
-    }
+    function handleStart(e) { isDown = true; startX = e.pageX - scrollBody.offsetLeft; scrollLeft = scrollBody.scrollLeft; }
     function handleMove(e) {
         if (gridCanvas) {
             const rect = gridCanvas.getBoundingClientRect();
@@ -98,15 +119,9 @@
         const walk = (e.pageX - scrollBody.offsetLeft - startX) * 1.5;
         scrollBody.scrollLeft = scrollLeft - walk;
     }
-
     function syncScroll(e) { if (scrollHeader) scrollHeader.scrollLeft = e.target.scrollLeft; }
     function syncHeaderScroll(e) { if (scrollBody) scrollBody.scrollLeft = e.target.scrollLeft; }
-
-    function scrollToCurrentTime() {
-        if (scrollBody && nowLinePos > 0) {
-            scrollBody.scrollTo({ top: nowLinePos - (scrollBody.clientHeight / 3), behavior: 'smooth' });
-        }
-    }
+    function scrollToCurrentTime() { if (scrollBody && nowLinePos > 0) scrollBody.scrollTo({ top: nowLinePos - (scrollBody.clientHeight / 3), behavior: 'smooth' }); }
 
     $: {
         let minH = 9, maxH = 20;
@@ -226,20 +241,11 @@
     .columns-container { display: flex; height: 100%; }
     .staff-col { position: relative; height: 100%; border-right: 1.5px solid #ddd6c1; flex-shrink: 0; }
 
-    /* ШТРИХОВКА И КУРСОРЫ */
-    .slot-btn {
-        width: 100%; border: none; cursor: pointer; display: block; background: #fdf6e3;
-        transition: background 0.1s;
-    }
+    .slot-btn { width: 100%; border: none; cursor: pointer; display: block; background: #fdf6e3; transition: background 0.1s; }
     .slot-btn.zebra { background: #f5efdc; }
     .slot-btn:hover { background: rgba(38, 139, 210, 0.05); }
 
-    .slot-btn.is-off {
-        background-color: #eee8d5 !important;
-        background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important;
-        cursor: not-allowed;
-        opacity: 0.6;
-    }
+    .slot-btn.is-off { background-color: #eee8d5 !important; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important; cursor: not-allowed; opacity: 0.6; }
     .slot-btn.is-break { background: #f5efdc !important; border-left: 4px solid #b58900; cursor: not-allowed; }
 
     .grid-lines-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
