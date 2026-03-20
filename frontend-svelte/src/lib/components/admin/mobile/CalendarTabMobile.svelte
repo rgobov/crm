@@ -130,7 +130,14 @@
         <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content-mobile" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
-                    <h3>{#if showModal === 'edit'}Редактирование{:else if showModal === 'detail'}Детали{:else if showModal === 'client-profile'}Клиент{:else if showModal === 'shift'}Смена{/if}</h3>
+                    <h3>
+                        {#if showModal === 'edit'}
+                            {currentAppointment ? 'Редактирование записи' : 'Создание записи'}
+                        {:else if showModal === 'detail'} Детали визита
+                        {:else if showModal === 'client-profile'} Карточка клиента
+                        {:else if showModal === 'shift'} График работы
+                        {/if}
+                    </h3>
                     <button class="close-btn" on:click={closeModal}>✕</button>
                 </header>
                 <div class="modal-body">
