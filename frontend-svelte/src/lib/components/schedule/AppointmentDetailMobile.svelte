@@ -12,6 +12,37 @@
     let tempComment = "";
     let isSaving = false;
 
+    let staffMember = appointment.staffMember;
+    let staffName = appointment.staffName;
+    let staffList = [];
+
+    // Загружаем данные сотрудника используя тот же подход что в AppointmentEditScreen
+    async function loadStaffMember() {
+        if (appointment.staffMemberId && !staffMember) {
+            try {
+                // Используем тот же метод что и в AppointmentEditScreen
+                const staffData = await adminService.getStaffForSchedule(
+                    new Date(appointment.startTime), 
+                    appointment.branchId || 'br-virtual'
+                );
+                staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
+                
+                // Находим сотрудника по ID
+                const foundStaff = staffList.find(s => s.id === appointment.staffMemberId);
+                if (foundStaff) {
+                    staffMember = foundStaff;
+                    staffName = foundStaff.name;
+                }
+            } catch (e) {
+                console.error('Failed to load staff list:', e);
+            }
+        }
+    }
+
+    // Загружаем при монтировании компонента
+    import { onMount } from 'svelte';
+    onMount(loadStaffMember);
+
     const STATUSES = [
         { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
         { id: 'CONFIRMED', label: 'Подтвержден', color: '#0891b2' },
@@ -193,7 +224,7 @@
             <div class="tile-icon">👤</div>
             <div class="tile-body">
                 <label>Специалист</label>
-                <p class="val">{appointment.staffName || 'Не назначен'}</p>
+                <p class="val">{staffName || staffMember?.name || appointment.staffName || appointment.staffMember?.name || 'Не назначен'}</p>
             </div>
         </div>
 
