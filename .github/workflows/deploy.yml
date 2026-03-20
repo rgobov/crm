@@ -3,7 +3,7 @@ name: Deploy to VPS
 on:
   push:
     branches:
-      - mobile-refactoring-v2 # ОБНОВЛЕНО: Деплоим из текущей рабочей ветки
+      - feature/employee-permissions # ОБНОВЛЕНО: Деплоим из новой ветки
 
 jobs:
   deploy:
@@ -19,9 +19,9 @@ jobs:
             set -e
             cd ~/crm
             
-            echo "--- ОБНОВЛЕНИЕ КОДА (ветка mobile-refactoring-v2) ---"
-            git fetch origin mobile-refactoring-v2
-            git reset --hard origin/mobile-refactoring-v2
+            echo "--- ОБНОВЛЕНИЕ КОДА (ветка feature/employee-permissions) ---"
+            git fetch origin feature/employee-permissions
+            git reset --hard origin/feature/employee-permissions
             
             echo "--- ПОДГОТОВКА СРЕДЫ (СЕКРЕТЫ) ---"
             echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env
