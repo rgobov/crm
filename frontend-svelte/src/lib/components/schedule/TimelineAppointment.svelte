@@ -95,13 +95,13 @@
         border-color: rgba(0,0,0,0.05);
 
         overflow: hidden;
-        z-index: 200;
+        z-index: 150; /* НИЖЕ time axis (z-index: 200) */
         transition: all 0.2s;
         box-sizing: border-box;
     }
 
     .appt-box:hover {
-        z-index: 300 !important;
+        z-index: 320 !important; /* ВЫШЕ staff header (z-index: 300) */
         box-shadow: 0 8px 16px rgba(0,0,0,0.1);
         transform: translateY(-1px);
         border-color: var(--status-color);
