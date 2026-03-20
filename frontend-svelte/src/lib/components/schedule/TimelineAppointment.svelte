@@ -17,22 +17,22 @@
     })();
 
     const statusColors = {
-        'SCHEDULED': '#268bd2', // Blue
-        'CONFIRMED': '#859900', // Green
-        'ARRIVED': '#6c71c4',   // Violet
-        'NEEDS_CALL': '#b58900', // Yellow
-        'COMPLETED': '#586e75', // Grey-blue
-        'CANCELLED': '#dc322f'  // Red
+        'SCHEDULED': '#64748b',   // Slate Gray (нейтральный)
+        'CONFIRMED': '#0891b2',   // Cyan (отличается от зеленого)
+        'ARRIVED': '#7c3aed',     // Violet
+        'NEEDS_CALL': '#a855f7',   // Purple (требует внимания)
+        'COMPLETED': '#16a34a',   // Green (успешно завершено)
+        'CANCELLED': '#dc2626'     // Red (отмена)
     };
 
-    // ФОНОВЫЕ ЦВЕТА (пастельные версии основных цветов)
+    // ФОНОВЫЕ ЦВЕТА (очень светлые пастельные)
     const backgroundColors = {
-        'SCHEDULED': '#eef7ff',
-        'CONFIRMED': '#f8fff0',
-        'ARRIVED': '#f5f3ff',
-        'NEEDS_CALL': '#fffbf0',
-        'COMPLETED': '#f1f5f5',
-        'CANCELLED': '#fff5f5'
+        'SCHEDULED': '#f8fafc',   // Очень светлый серый
+        'CONFIRMED': '#ecfeff',   // Очень светлый cyan
+        'ARRIVED': '#f3e8ff',     // Очень светлый фиолетовый
+        'NEEDS_CALL': '#faf5ff',   // Очень светлый пурпурный
+        'COMPLETED': '#f0fdf4',   // Очень светлый зеленый
+        'CANCELLED': '#fef2f2'     // Очень светлый красный
     };
 
     $: color = statusColors[appt.status] || statusColors['SCHEDULED'];

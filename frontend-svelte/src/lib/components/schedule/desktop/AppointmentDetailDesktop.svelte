@@ -8,10 +8,12 @@
     const dispatch = createEventDispatcher();
 
     const STATUSES = [
-        { id: 'SCHEDULED', label: 'Ожидается', color: '#268bd2' },
-        { id: 'CONFIRMED', label: 'Подтвержден', color: '#859900' },
-        { id: 'COMPLETED', label: 'Завершен', color: '#93a1a1' },
-        { id: 'CANCELLED', label: 'Отменен', color: '#dc322f' }
+        { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
+        { id: 'CONFIRMED', label: 'Подтвержден', color: '#0891b2' },
+        { id: 'ARRIVED', label: 'Пришёл', color: '#7c3aed' },
+        { id: 'NEEDS_CALL', label: 'Позвонить', color: '#a855f7' },
+        { id: 'COMPLETED', label: 'Завершен', color: '#16a34a' },
+        { id: 'CANCELLED', label: 'Отменен', color: '#dc2626' }
     ];
 
     async function updateStatus(newStatus) {
