@@ -198,10 +198,62 @@
     .mobile-timeline-wrapper { flex: 1; overflow: hidden; position: relative; }
 
     /* МОДАЛКИ ДЛЯ МОБИЛОК */
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.8); z-index: 3500; display: flex; align-items: flex-end; }
-    .modal-content-mobile { width: 100%; background: #fdf6e3; border-radius: 32px 32px 0 0; height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
-    .modal-header { padding: 16px 20px; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; display: flex; justify-content: space-between; align-items: center; }
-    .modal-header h3 { margin: 0; font-size: 16px; font-weight: 800; color: #073642; }
-    .close-btn { background: #fdf6e3; border: 1px solid #ddd6c1; width: 32px; height: 32px; border-radius: 50%; }
-    .modal-body { flex: 1; overflow-y: auto; }
+    .modal-backdrop { 
+        position: fixed; 
+        inset: 0; 
+        background: rgba(7, 54, 66, 0.8); 
+        z-index: 3500; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        padding: 20px; 
+        padding-top: max(20px, env(safe-area-inset-top, 20px)); /* Безопасная зона сверху */
+        box-sizing: border-box; 
+    }
+    
+    .modal-content-mobile { 
+        width: 100%; 
+        max-width: 480px; 
+        min-height: auto; 
+        max-height: calc(100vh - max(20px, env(safe-area-inset-top, 20px)) - 20px); /* Учитываем безопасные зоны */
+        background: #fdf6e3; 
+        border-radius: 24px; 
+        display: flex; 
+        flex-direction: column; 
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); 
+    }
+    
+    .modal-header { 
+        padding: 16px 20px; 
+        background: #eee8d5; 
+        border-bottom: 1.5px solid #ddd6c1; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        flex-shrink: 0; 
+    }
+    
+    .modal-header h3 { 
+        margin: 0; 
+        font-size: 16px; 
+        font-weight: 800; 
+        color: #073642; 
+        line-height: 1.2; 
+    }
+    
+    .close-btn { 
+        background: #fdf6e3; 
+        border: 1px solid #ddd6c1; 
+        width: 32px; 
+        height: 32px; 
+        border-radius: 50%; 
+        flex-shrink: 0; 
+    }
+    
+    .modal-body { 
+        flex: 1; 
+        overflow: visible; 
+        -webkit-overflow-scrolling: touch; 
+        padding: 0; 
+    }
 </style>

@@ -421,8 +421,24 @@
 </div>
 
 <style>
-    .appt-edit-root { height: 100%; display: flex; flex-direction: column; background: #f8fafc; position: relative; overflow-x: hidden; }
-    .tiles-layout { padding: 20px; max-width: 500px; margin: 0 auto; width: 100%; padding-bottom: 40px; }
+    .appt-edit-root { 
+        height: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        background: #f8fafc; 
+        position: relative; 
+        overflow-x: hidden; 
+        align-items: center; /* Центрируем контент для мобильных */
+    }
+    
+    .tiles-layout { 
+        padding: 20px; 
+        max-width: 500px; 
+        width: 100%; 
+        padding-bottom: 40px; 
+        box-sizing: border-box;
+        /* Убираем margin: 0 auto так как он не работает в flex контейнерах */
+    }
     .tile-hero { background: white; padding: 20px; border-radius: 28px; display: flex; align-items: center; gap: 16px; border: 1px solid #f1f5f9; margin-bottom: 16px; transition: all 0.3s; }
     .tile-hero.is-new { background: #fff7ed; border-color: #ffedd5; }
     .avatar { width: 56px; height: 56px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; }
