@@ -22,10 +22,12 @@
         durationInMinutes: 60,
         contactId: '',
         clientName: '',
+        clientPhone: '',
         service: '',
         staffMemberId: '',
         resourceId: '',
         branchId: '',
+        status: 'SCHEDULED',
         comment: '',
         referenceTag: '',
         allowReminder: true,
@@ -86,8 +88,10 @@
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
+                    status: appointment.status || 'SCHEDULED',
                     comment: appointment.comment || '',
-                    referenceTag: appointment.referenceTag || ''
+                    referenceTag: appointment.referenceTag || '',
+                    clientPhone: appointment.clientPhone || ''
                 };
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
