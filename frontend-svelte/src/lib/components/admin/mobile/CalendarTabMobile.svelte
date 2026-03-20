@@ -2,7 +2,7 @@
     import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte';
     import ScheduleScreen from '$lib/components/schedule/ScheduleScreen.svelte';
     import AppointmentEditScreen from '$lib/components/schedule/AppointmentEditScreen.svelte';
-    import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
+    import AppointmentDetailMobile from '$lib/components/schedule/AppointmentDetailMobile.svelte';
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
@@ -144,7 +144,7 @@
                     {#if showModal === 'edit'}
                         <AppointmentEditScreen bind:this={appointmentEditRef} appointment={currentAppointment} preselected={preselectedData} on:cancel={closeModal} on:saved={closeModal} on:open-add-contact-modal={() => showNestedAddContact = true} />
                     {:else if showModal === 'detail'}
-                        <AppointmentDetailScreen appointment={currentAppointment} on:edit={(e) => { currentAppointment = e.detail; showModal = 'edit'; }} on:deleted={closeModal} on:open-client={(e) => handleOpenClient(e.detail)} />
+                        <AppointmentDetailMobile appointment={currentAppointment} on:edit={(e) => { currentAppointment = e.detail; showModal = 'edit'; }} on:deleted={closeModal} on:open-client={(e) => handleOpenClient(e.detail)} />
                     {:else if showModal === 'client-profile'}
                         <ContactDetailScreen contactId={selectedClientId} on:updated={closeModal} />
                     {:else if showModal === 'shift'}
