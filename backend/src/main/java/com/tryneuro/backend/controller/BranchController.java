@@ -22,7 +22,7 @@ public class BranchController {
     private final BranchService branchService;
 
     @GetMapping
-    public List<BranchDto> getBranches(Authentication auth, @RequestAttribute("tenantId") String tenantId) {
+    public ResponseEntity<List<BranchDto>> getBranches(Authentication auth, @RequestAttribute("tenantId") String tenantId) {
         log.info("--- DEBUG BRANCHES ---");
         log.info("User Authenticated: {}", auth != null ? auth.getName() : "NULL");
         log.info("Extracted tenantId from RequestAttribute: {}", tenantId);
@@ -31,16 +31,24 @@ public class BranchController {
         
         log.info("Branches found in DB for this tenantId: {}", branches.size());
         
-        return branches.stream()
-                .map(DtoMapper::toDto)
+        List<BranchDto> result = branches.stream()
+                .map(DtoMapper::toBranchDto)
                 .collect(Collectors.toList());
+        
+        return ResponseEntity.ok()
+                .header("Connection", "keep-alive")
+                .header("Transfer-Encoding", "identity")
+                .body(result);
     }
 
     @PostMapping
-    public BranchDto createBranch(@RequestBody BranchDto branchDto, @RequestAttribute("tenantId") String tenantId) {
+    public ResponseEntity<BranchDto> createBranch(@RequestBody BranchDto branchDto, @RequestAttribute("tenantId") String tenantId) {
         log.info("Creating branch for tenantId: {}", tenantId);
         Branch branch = DtoMapper.toEntity(branchDto, tenantId);
-        return DtoMapper.toDto(branchService.createBranch(branch, tenantId));
+        return ResponseEntity.ok()
+                .header("Connection", "keep-alive")
+                .header("Transfer-Encoding", "identity")
+                .body(DtoMapper.toDto(branchService.createBranch(branch, tenantId)));
     }
 
     @PutMapping("/{id}")

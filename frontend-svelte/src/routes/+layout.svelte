@@ -3,6 +3,10 @@
     import { initAuth } from '$lib/stores/auth.js';
     import '../app.css';
 
+    export let data;
+    export let form; // Для форм авторизации
+    export let params; // Параметры роута
+
     onMount(() => {
         initAuth();
 

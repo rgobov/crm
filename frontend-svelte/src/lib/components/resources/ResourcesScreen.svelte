@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { resourceService } from '$lib/services/resourceService.js';
     import { branchService } from '$lib/services/branchService.js';
+    import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import ResourceEditScreen from './ResourceEditScreen.svelte';
     import { fade, scale } from 'svelte/transition';
 
@@ -21,9 +22,15 @@
     async function loadResources() {
         isLoading = true;
         try {
-            resources = await resourceService.getResources();
+            if (!$activeBranchId) {
+                console.error('Branch ID not available for resource loading');
+                resources = [];
+                return;
+            }
+            resources = await resourceService.getResources($activeBranchId);
         } catch (e) {
-            console.error('Failed to load resources');
+            console.error('Failed to load resources', e);
+            resources = [];
         } finally {
             isLoading = false;
         }
@@ -41,6 +48,11 @@
         if (!branchId) return 'Филиал не указан ⚠️';
         const branch = branches.find(b => b.id === branchId);
         return branch ? branch.name : 'Филиал не найден';
+    }
+
+    // Реактивная загрузка ресурсов при смене филиала
+    $: if ($activeBranchId) {
+        loadResources();
     }
 
     function openCreate() {

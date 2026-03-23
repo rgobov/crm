@@ -43,8 +43,12 @@ public class AdminController {
     }
 
     @GetMapping("/server-time")
-    public Map<String, Object> getServerTime() {
-        return Map.of("currentTime", OffsetDateTime.now());
+    public ResponseEntity<Map<String, Object>> getServerTime() {
+        Map<String, Object> result = Map.of("currentTime", OffsetDateTime.now());
+        return ResponseEntity.ok()
+                .header("Connection", "keep-alive")
+                .header("Transfer-Encoding", "identity")
+                .body(result);
     }
 
     @GetMapping("/dashboard/stats")
@@ -154,11 +158,16 @@ public class AdminController {
 
     // --- RESOURCES ---
     @GetMapping("/resources")
-    public List<ResourceDto> getAllResources(
+    public ResponseEntity<List<ResourceDto>> getAllResources(
             @RequestAttribute("tenantId") String tenantId,
             @RequestParam(value = "branchId", required = false) String branchId) {
-        return resourceService.getResources(getRequiredTenantId(tenantId), branchId)
+        List<ResourceDto> result = resourceService.getResources(getRequiredTenantId(tenantId), branchId)
                 .stream().map(DtoMapper::toDto).collect(Collectors.toList());
+        
+        return ResponseEntity.ok()
+                .header("Connection", "keep-alive")
+                .header("Transfer-Encoding", "identity")
+                .body(result);
     }
 
     @PostMapping("/resources")
@@ -225,8 +234,13 @@ public class AdminController {
     }
 
     @GetMapping("/services")
-    public List<ServiceDto> getAllServices(@RequestAttribute("tenantId") String tenantId) {
-        return appServiceService.getAllServices(getRequiredTenantId(tenantId))
+    public ResponseEntity<List<ServiceDto>> getAllServices(@RequestAttribute("tenantId") String tenantId) {
+        List<ServiceDto> result = appServiceService.getAllServices(getRequiredTenantId(tenantId))
                 .stream().map(DtoMapper::toDto).collect(Collectors.toList());
+        
+        return ResponseEntity.ok()
+                .header("Connection", "keep-alive")
+                .header("Transfer-Encoding", "identity")
+                .body(result);
     }
 }
