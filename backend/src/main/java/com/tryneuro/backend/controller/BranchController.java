@@ -32,7 +32,7 @@ public class BranchController {
         log.info("Branches found in DB for this tenantId: {}", branches.size());
         
         List<BranchDto> result = branches.stream()
-                .map(DtoMapper::toBranchDto)
+                .map(DtoMapper::toDto)
                 .collect(Collectors.toList());
         
         return ResponseEntity.ok()
