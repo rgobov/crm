@@ -214,13 +214,13 @@
     .modal-content-mobile { 
         width: 100%; 
         max-width: 480px; 
-        min-height: auto; 
-        max-height: calc(100vh - max(20px, env(safe-area-inset-top, 20px)) - 20px); /* Учитываем безопасные зоны */
+        height: calc(100vh - max(20px, env(safe-area-inset-top, 20px)) - 20px); /* Фиксированная высота */
         background: #fdf6e3; 
         border-radius: 24px; 
         display: flex; 
         flex-direction: column; 
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); 
+        overflow: hidden; /* Предотвращаем выход контента за границы */
     }
     
     .modal-header { 
@@ -252,8 +252,10 @@
     
     .modal-body { 
         flex: 1; 
-        overflow: visible; 
+        overflow-y: auto; 
+        overflow-x: hidden;
         -webkit-overflow-scrolling: touch; 
         padding: 0; 
+        min-height: 0; /* Важно для flex контейнера */
     }
 </style>

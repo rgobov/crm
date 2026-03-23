@@ -417,8 +417,22 @@
 </div>
 
 <style>
-    .appt-edit-mobile { height: 100%; display: flex; flex-direction: column; background: #fdf6e3; position: relative; overflow-x: hidden; align-items: center; }
-    .tiles-layout { padding: 16px; width: 100%; max-width: 500px; padding-bottom: 40px; }
+    .appt-edit-mobile { 
+        height: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        background: #fdf6e3; 
+        position: relative; 
+        overflow-x: hidden; 
+        align-items: center;
+    }
+    .tiles-layout { 
+        padding: 20px; 
+        width: 100%; 
+        max-width: 500px; 
+        padding-bottom: 60px; 
+        box-sizing: border-box;
+    }
 
     .tile-hero {
         background: #eee8d5; padding: 16px; border-radius: 24px;
@@ -447,12 +461,54 @@
     .x { background: #fdf6e3; border: 1px solid #ddd6c1; color: #dc322f; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; }
 
     .tiles-stack { display: flex; flex-direction: column; gap: 8px; }
-    .tile-card { background: #eee8d5; padding: 12px 16px; border-radius: 20px; border: 1.5px solid #ddd6c1; }
+    .tile-card { background: #eee8d5; padding: 16px 18px; border-radius: 20px; border: 1.5px solid #ddd6c1; }
 
-    .tag-input-wrap input { width: 100%; border: none; background: transparent; font-size: 15px; font-weight: 700; color: #073642; outline: none; }
+    .tag-input-wrap input { 
+        width: 100%; 
+        border: 1.5px solid #ddd6c1; 
+        background: #fdf6e3; 
+        font-size: 15px; 
+        font-weight: 700; 
+        color: #073642; 
+        outline: none; 
+        padding: 12px 14px; 
+        border-radius: 12px;
+        min-height: 44px;
+        box-sizing: border-box;
+        transition: all 0.2s;
+    }
+    
+    .tag-input-wrap input:focus {
+        border-color: #268bd2;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(38, 139, 210, 0.1);
+    }
     .quick-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .tag-chip { background: #fdf6e3; border: 1px solid #ddd6c1; padding: 8px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; color: #859900; cursor: pointer; min-height: 40px; display: flex; align-items: center; }
-    .tag-chip.active { background: #859900; color: #fdf6e3; border-color: #859900; }
+    .tag-chip { 
+        background: #fdf6e3; 
+        border: 1.5px solid #ddd6c1; 
+        padding: 10px 16px; 
+        border-radius: 14px; 
+        font-size: 13px; 
+        font-weight: 700; 
+        color: #859900; 
+        cursor: pointer; 
+        min-height: 44px; 
+        display: flex; 
+        align-items: center;
+        transition: all 0.2s;
+    }
+    
+    .tag-chip:hover {
+        border-color: #859900;
+        transform: translateY(-1px);
+    }
+    
+    .tag-chip.active { 
+        background: #859900; 
+        color: #fdf6e3; 
+        border-color: #859900; 
+    }
 
     .drop { position: absolute; top: calc(100% + 8px); left: 0; right: 0; background: #fdf6e3; border-radius: 18px; z-index: 2000; border: 1.5px solid #ddd6c1; max-height: 250px; overflow-y: auto; padding: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
     .dropdown-action-btn { width: 100%; border: none; background: transparent; padding: 0; text-align: left; cursor: pointer; border-radius: 10px; }
@@ -483,17 +539,104 @@
     .solar-toggle .dot { width: 14px; height: 14px; background: #fdf6e3; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: 0.3s; }
     .solar-toggle.on .dot { transform: translateX(20px); }
 
-    textarea, select, .date-part input { width: 100%; border: none; background: transparent; font-size: 16px; font-weight: 700; color: #073642; outline: none; min-height: 32px; }
-    textarea { font-size: 14px; min-height: 70px; resize: none; }
+    textarea, select, .date-part input { 
+        width: 100%; 
+        border: none; 
+        background: transparent; 
+        font-size: 16px; 
+        font-weight: 700; 
+        color: #073642; 
+        outline: none; 
+        min-height: 44px; /* Увеличиваем для удобства нажатия */
+        padding: 8px 0;
+    }
+    textarea { 
+        font-size: 16px; 
+        min-height: 80px; 
+        resize: none; 
+        line-height: 1.4;
+        padding: 12px;
+        border: 1.5px solid #ddd6c1;
+        background: #fdf6e3;
+        border-radius: 12px;
+        color: #073642;
+        font-weight: 600;
+    }
+    
+    /* Увеличиваем шрифт на больших мобильных экранах */
+    @media (min-width: 414px) {
+        textarea { font-size: 17px; }
+    }
+    
+    @media (min-width: 390px) {
+        textarea { font-size: 16.5px; }
+    }
+    
+    textarea:focus {
+        border-color: #268bd2;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(38, 139, 210, 0.1);
+        outline: none;
+    }
 
-    .footer-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-top: 20px; }
-    .btn-primary-solar { background: #268bd2; color: #fdf6e3; border: none; padding: 14px; border-radius: 16px; font-weight: 900; cursor: pointer; border-bottom: 3px solid #2aa198; }
-    .btn-secondary-solar { background: #fdf6e3; color: #586e75; border: 1.5px solid #ddd6c1; padding: 14px; border-radius: 16px; font-weight: 800; cursor: pointer; }
+    .footer-actions { 
+        display: grid; 
+        grid-template-columns: 1fr 2fr; 
+        gap: 12px; 
+        margin-top: 24px; 
+        padding: 0 20px 20px;
+    }
+    .btn-primary-solar { 
+        background: #268bd2; 
+        color: #fdf6e3; 
+        border: none; 
+        padding: 16px; 
+        border-radius: 16px; 
+        font-weight: 900; 
+        cursor: pointer; 
+        border-bottom: 3px solid #2aa198; 
+        min-height: 52px;
+        font-size: 16px;
+    }
+    .btn-secondary-solar { 
+        background: #fdf6e3; 
+        color: #586e75; 
+        border: 1.5px solid #ddd6c1; 
+        padding: 16px; 
+        border-radius: 16px; 
+        font-weight: 800; 
+        cursor: pointer; 
+        min-height: 52px;
+        font-size: 16px;
+    }
 
     .spinner { width: 24px; height: 24px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loader-center { display: flex; justify-content: center; align-items: center; height: 200px; }
     .rel-pos { position: relative; }
+    
+    .input-rel { position: relative; }
+    
+    .input-rel input {
+        width: 100%;
+        border: 1.5px solid #ddd6c1;
+        background: #fdf6e3;
+        font-size: 16px;
+        font-weight: 700;
+        color: #073642;
+        outline: none;
+        padding: 12px 14px;
+        border-radius: 12px;
+        min-height: 44px;
+        box-sizing: border-box;
+        transition: all 0.2s;
+    }
+    
+    .input-rel input:focus {
+        border-color: #268bd2;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(38, 139, 210, 0.1);
+    }
     .invisible-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
     .solar-divider-thin { height: 1px; background: #ddd6c1; margin: 4px 8px; }
     .inline-phone-field { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
