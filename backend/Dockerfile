@@ -4,14 +4,14 @@ WORKDIR /app
 
 # Кешируем зависимости
 COPY pom.xml .
-RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline
+RUN mvn dependency:go-offline
 
 # Копируем исходный код
 COPY src ./src
 
 # ВКЛЮЧАЕМ ТЕСТЫ ПЕРЕД СБОРКОЙ:
 # Если тесты не пройдут, образ не соберется и деплой не состоится.
-RUN --mount=type=cache,target=/root/.m2 mvn package
+RUN mvn package
 
 # ЭТАП 2: Запуск
 FROM eclipse-temurin:17-jdk-alpine
