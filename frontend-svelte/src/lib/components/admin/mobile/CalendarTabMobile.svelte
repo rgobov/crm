@@ -24,6 +24,12 @@
     let onlyBusyStaff = false;
     let onlyWorkingStaff = false;
 
+    // Функция выбора филиала
+    function selectBranch(branchId) {
+        activeBranchId.set(branchId);
+        viewMode = 'month'; // Возвращаемся к календарю после выбора
+    }
+
     $: if (forcedDate) {
         selectedDate.set(new Date(forcedDate));
         viewMode = 'day';
@@ -85,7 +91,10 @@
         <div class="month-view-mobile" in:fade>
             <div class="header-row">
                 <h2>Календарь</h2>
-                <button class="today-btn" on:click={() => { selectedDate.set(new Date()); viewMode = 'day'; activeTab.set('timeline'); }}>СЕГОДНЯ</button>
+                <div class="header-actions">
+                    <button class="today-btn" on:click={() => { selectedDate.set(new Date()); viewMode = 'day'; activeTab.set('timeline'); }}>СЕГОДНЯ</button>
+                    <button class="more-btn" on:click={() => viewMode = 'more'}>ЕЩЁ</button>
+                </div>
             </div>
             <CalendarScreen on:dateSelected={handleDateSelected} />
         </div>
@@ -121,6 +130,48 @@
                     on:appointmentTap={openDetail}
                     on:staffTap={handleStaffTap}
                 />
+            </div>
+        </div>
+    {:else if viewMode === 'more'}
+        <div class="more-view-mobile" in:fade>
+            <div class="header-row">
+                <h2>Ещё</h2>
+                <button class="back-btn" on:click={() => viewMode = 'month'}>←</button>
+            </div>
+            <div class="branch-selector">
+                <h3>Выбор филиала</h3>
+                <div class="branch-list">
+                    <button 
+                        class="branch-item" 
+                        class:active={$activeBranchId === 1}
+                        on:click={() => selectBranch(1)}
+                    >
+                        <span class="branch-name">Основной филиал</span>
+                        {#if $activeBranchId === 1}
+                            <span class="branch-check">✓</span>
+                        {/if}
+                    </button>
+                    <button 
+                        class="branch-item" 
+                        class:active={$activeBranchId === 2}
+                        on:click={() => selectBranch(2)}
+                    >
+                        <span class="branch-name">Филиал 2</span>
+                        {#if $activeBranchId === 2}
+                            <span class="branch-check">✓</span>
+                        {/if}
+                    </button>
+                    <button 
+                        class="branch-item" 
+                        class:active={$activeBranchId === 3}
+                        on:click={() => selectBranch(3)}
+                    >
+                        <span class="branch-name">Филиал 3</span>
+                        {#if $activeBranchId === 3}
+                            <span class="branch-check">✓</span>
+                        {/if}
+                    </button>
+                </div>
             </div>
         </div>
     {/if}
@@ -165,8 +216,38 @@
 
     .month-view-mobile { flex: 1; padding: 16px; overflow-y: auto; }
     .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
     h2 { font-size: 20px; font-weight: 850; color: #073642; margin: 0; }
     .today-btn { background: #eee8d5; color: #268bd2; border: 1.5px solid #ddd6c1; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 12px; }
+    .more-btn { background: #268bd2; color: #fdf6e3; border: 1.5px solid #268bd2; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 12px; }
+    .back-btn { background: #859900; color: #fdf6e3; border: 1.5px solid #859900; padding: 8px 12px; border-radius: 12px; font-weight: 800; font-size: 14px; }
+    .more-view-mobile { flex: 1; padding: 16px; overflow-y: auto; }
+    .branch-selector { background: #eee8d5; border-radius: 16px; padding: 20px; margin-top: 16px; }
+    .branch-selector h3 { font-size: 18px; font-weight: 800; color: #073642; margin: 0 0 16px 0; }
+    .branch-list { display: flex; flex-direction: column; gap: 8px; }
+    .branch-item { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        background: #fdf6e3; 
+        border: 2px solid #ddd6c1; 
+        padding: 16px; 
+        border-radius: 12px; 
+        cursor: pointer; 
+        transition: all 0.2s ease;
+    }
+    .branch-item:hover { 
+        background: #eee8d5; 
+        border-color: #268bd2; 
+        transform: translateY(-1px);
+    }
+    .branch-item.active { 
+        background: #268bd2; 
+        border-color: #268bd2; 
+        color: #fdf6e3;
+    }
+    .branch-name { font-size: 16px; font-weight: 600; }
+    .branch-check { font-size: 18px; font-weight: bold; }
 
     .day-view-mobile { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
