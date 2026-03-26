@@ -220,11 +220,11 @@
 
     .status-indicator { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 
-    .status-indicator.scheduled { background: #64748b; }      // Мягкий синий
+    .status-indicator.scheduled { background: #64748b; }      /* Мягкий синий */
 
-    .status-indicator.completed { background: #059669; }      // Мягкий зеленый
+    .status-indicator.completed { background: #059669; }      /* Мягкий зеленый */
 
-    .status-indicator.cancelled { background: #dc2626; }      // Мягкий красный
+    .status-indicator.cancelled { background: #dc2626; }      /* Мягкий красный */
 
 
 
