@@ -6,6 +6,10 @@
     import NotificationTemplatesModal from '../NotificationTemplatesModal.svelte';
     import { fade, scale } from 'svelte/transition';
 
+    // Props от родителя (могут использоваться в будущем)
+    export let forcedDate = null;
+    export let branchId = null;
+
     let stats = { totalClients: 0, todayAppointments: 0, totalResources: 0, totalStaff: 0 };
     let isLoading = true;
     let error = null;

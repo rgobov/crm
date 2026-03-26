@@ -10,7 +10,7 @@
     import TimelineCursorGuide from '../TimelineCursorGuide.svelte';
     import { fade } from 'svelte/transition';
 
-    const dispatch = createEventDispatcher();
+const dispatch = createEventDispatcher();
 
     export let day = new Date();
     export let appointments = [];

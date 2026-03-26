@@ -4,6 +4,10 @@
     import { goto } from '$app/navigation';
     import { fade, scale } from 'svelte/transition';
 
+    // Props от родителя (могут использоваться в будущем)
+    export let forcedDate = null;
+    export let branchId = null;
+
     let stats = {
         totalClients: 0,
         todayAppointments: 0,
