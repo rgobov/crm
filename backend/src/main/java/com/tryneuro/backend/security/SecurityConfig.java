@@ -35,7 +35,7 @@ public class SecurityConfig {
     private final UserDetailsServiceImpl userDetailsService;
 
     // Читаем настройки из application-dev.properties
-    @Value("${app.cors.origins:http://localhost:5173,http://127.0.0.1:5173,http://10.0.2.2:5173}")
+    @Value("${app.cors.origins:https://crm.109.248.203.156.sslip.io,https://api.109.248.203.156.sslip.io,http://localhost:5173,http://127.0.0.1:5173,http://10.0.2.2:5173}")
     private String allowedOriginsStr;
 
     @Autowired
@@ -55,7 +55,8 @@ public class SecurityConfig {
                 .collect(Collectors.toList());
 
         // ТЕХНИЧЕСКОЕ РЕШЕНИЕ: Добавляем и паттерны (для портов) и конкретные Origins
-        configuration.setAllowedOriginPatterns(List.of("*")); // ДЛЯ DEV РАЗРЕШАЕМ ВСЁ
+        configuration.setAllowedOriginPatterns(List.of("*")); // ДЛЯ DEV И WebSocket РАЗРЕШАЕМ ВСЁ
+        configuration.setAllowedOrigins(origins); // ДЛЯ КОНКРЕТНЫХ ПРОДАКШЕН ДОМЕНОВ
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*")); 
         configuration.setAllowCredentials(true);
