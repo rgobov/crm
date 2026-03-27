@@ -27,7 +27,7 @@ const getWsUrl = () => {
         const host = window.location.host;
         return `${protocol}//${host}/ws`;
     }
-    return 'ws://localhost:8080/ws';
+    return 'ws://localhost:5173/ws';
 };
 
 export const websocketService = {

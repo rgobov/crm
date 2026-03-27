@@ -36,8 +36,6 @@ public class BranchController {
                 .collect(Collectors.toList());
         
         return ResponseEntity.ok()
-                .header("Connection", "keep-alive")
-                .header("Transfer-Encoding", "identity")
                 .body(result);
     }
 
@@ -46,8 +44,6 @@ public class BranchController {
         log.info("Creating branch for tenantId: {}", tenantId);
         Branch branch = DtoMapper.toEntity(branchDto, tenantId);
         return ResponseEntity.ok()
-                .header("Connection", "keep-alive")
-                .header("Transfer-Encoding", "identity")
                 .body(DtoMapper.toDto(branchService.createBranch(branch, tenantId)));
     }
 
