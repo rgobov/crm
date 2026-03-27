@@ -58,17 +58,5 @@ public class Branch {
 
 
 
-    // Геттеры для обхода проблем с Lombok
-
-    public String getId() { return id; }
-
-    public String getName() { return name; }
-
-    public String getAddress() { return address; }
-
-    public String getTimezone() { return timezone; }
-
-    public String getTenantId() { return tenantId; }
-
-}
+    }
 
