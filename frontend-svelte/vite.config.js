@@ -40,5 +40,13 @@ export default defineConfig({
 				changeOrigin: true
 			}
 		}
+	},
+	build: {
+		rollupOptions: {
+			output: {
+				// Отключаем manualChunks - Vite сам оптимизирует лучше
+				manualChunks: undefined
+			}
+		}
 	}
 });
