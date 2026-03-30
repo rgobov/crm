@@ -51,6 +51,7 @@
     let filteredServices = [];
     let showServiceDropdown = false;
     let isNewService = false;
+    let selectedService = null;
     let isLoading = true;
     let isSaving = false;
     let debounceTimer;
@@ -103,6 +104,9 @@
                 durationMinutes = formData.durationInMinutes % 60;
                 formData.startTime = timeUtils.toBranchLocalISO(appointment.startTime, currentBranchData?.timezone);
                 serviceSearchInput = appointment.service;
+                
+                // Находим услугу в списке услуг
+                selectedService = services.find(s => s.name === appointment.service) || null;
 
                 if (appointment.contactId) {
                     const c = await contactService.getContactById(appointment.contactId);
@@ -125,16 +129,49 @@
 
     $: {
         const query = serviceSearchInput.trim().toLowerCase();
-        filteredServices = query ? services.filter(s => s.name.toLowerCase().includes(query)) : services;
-        isNewService = query !== '' && !services.some(s => s.name.toLowerCase() === query);
+        if (query.length >= 2) {
+            filteredServices = services.filter(s => s.name.toLowerCase().includes(query));
+            isNewService = query !== '' && !services.some(s => s.name.toLowerCase() === query);
+        } else {
+            filteredServices = [];
+            isNewService = false;
+        }
+    }
+
+    // Автоматически закрываем дропдаун при очистке поля
+    $: if (serviceSearchInput.trim().length < 2) {
+        showServiceDropdown = false;
     }
 
     function selectService(s) {
+        selectedService = s;
         formData.service = s.name;
         durationHours = Math.floor(s.durationInMinutes / 60);
         durationMinutes = s.durationInMinutes % 60;
         serviceSearchInput = s.name;
         showServiceDropdown = false;
+        filteredServices = [];
+    }
+
+    function handleServiceInput() {
+        if (selectedService) return;
+        clearTimeout(debounceTimer);
+        const q = serviceSearchInput.trim();
+        if (q.length < 2) { 
+            showServiceDropdown = false; 
+            return; 
+        }
+
+        debounceTimer = setTimeout(() => {
+            showServiceDropdown = true;
+        }, 300);
+    }
+
+    function startServiceCreation() {
+        selectedService = null;
+        formData.service = serviceSearchInput.trim();
+        showServiceDropdown = false;
+        filteredServices = [];
     }
 
     function handleClientInput() {
@@ -197,8 +234,8 @@
                 contactId = newContact.id;
             }
 
-            let sName = serviceSearchInput.trim() || "Стандарт";
-            if (isNewService && sName !== "Стандарт") {
+            let sName = selectedService ? selectedService.name : (serviceSearchInput.trim() || "Стандарт");
+            if (!selectedService && sName !== "Стандарт" && !services.some(s => s.name === sName)) {
                 const ns = await serviceService.addService({ name: sName, durationInMinutes: formData.durationInMinutes });
                 sName = ns.name;
             }
@@ -313,8 +350,37 @@
                 <div class="tile-card rel-pos" role="presentation">
                     <label for="service-search-id">УСЛУГА</label>
                     <div class="input-rel">
-                        <input id="service-search-id" type="text" bind:value={serviceSearchInput} placeholder="Поиск услуги..." on:focus={() => showServiceDropdown = true} />
-                        {#if showServiceDropdown}
+                        <input 
+                            id="service-search-id" 
+                            type="text" 
+                            bind:value={serviceSearchInput} 
+                            placeholder="Поиск услуги..." 
+                            autocomplete="off"
+                            on:input={handleServiceInput}
+                            on:focus={() => {
+                                // При повторном фокусе открываем только если уже введено >= 2 символа
+                                if (serviceSearchInput.trim().length >= 2) {
+                                    showServiceDropdown = true;
+                                }
+                            }}
+                            on:blur={() => {
+                                // Задержка чтобы успеть кликнуть по пункту дропдауна
+                                setTimeout(() => {
+                                    if (serviceSearchInput.trim().length < 2) {
+                                        showServiceDropdown = false;
+                                    }
+                                }, 150);
+                            }}
+                        />
+
+                        {#if selectedService}
+                            <div class="badge" in:scale>
+                                <span class="txt">{selectedService.name}</span>
+                                <button class="x" on:click={() => { selectedService = null; serviceSearchInput = ''; filteredServices = []; isNewService = false; }} type="button" aria-label="Удалить">✕</button>
+                            </div>
+                        {/if}
+
+                        {#if showServiceDropdown && !selectedService}
                             <div class="drop" role="listbox">
                                 {#each filteredServices as s}
                                     <button class="dropdown-action-btn" on:click={() => selectService(s)} type="button" role="option" aria-selected="false">
@@ -325,6 +391,24 @@
                                         />
                                     </button>
                                 {/each}
+
+                                {#if isNewService}
+                                    <div class="solar-divider-thin"></div>
+                                    <button class="dropdown-action-btn" on:click={startServiceCreation} type="button" role="option" aria-selected="false">
+                                        <SearchDropdownItem
+                                            title="Создать новую услугу: {serviceSearchInput}"
+                                            subtitle="Нажмите для регистрации"
+                                            icon="✨"
+                                            type="action"
+                                        />
+                                    </button>
+                                {/if}
+
+                                {#if filteredServices.length === 0 && !isNewService}
+                                    <div class="dropdown-empty" style="padding: 12px; color: #93a1a1; font-size: 13px;">
+                                        Начните вводить название услуги (минимум 2 символа)...
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
                     </div>
