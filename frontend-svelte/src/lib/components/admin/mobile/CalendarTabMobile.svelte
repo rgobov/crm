@@ -288,14 +288,14 @@
         align-items: center; 
         justify-content: center; 
         padding: 20px; 
-        padding-top: max(20px, env(safe-area-inset-top, 20px)); /* Безопасная зона сверху */
+        padding-top: max(40px, calc(env(safe-area-inset-top, 20px) + 20px)); /* Увеличили отступ сверху */
         box-sizing: border-box; 
     }
     
     .modal-content-mobile { 
         width: 100%; 
         max-width: 480px; 
-        height: calc(100vh - max(20px, env(safe-area-inset-top, 20px)) - 20px); /* Фиксированная высота */
+        height: calc(100dvh - max(40px, calc(env(safe-area-inset-top, 20px) + 20px)) - 20px); /* Используем 100dvh и увеличенные отступы */
         background: #fdf6e3; 
         border-radius: 24px; 
         display: flex; 
