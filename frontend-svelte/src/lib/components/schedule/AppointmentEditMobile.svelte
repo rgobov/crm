@@ -272,11 +272,11 @@
         <div class="loader-center"><span class="spinner"></span></div>
     {:else}
         <div class="tiles-layout" in:fade>
+            <!-- Секция Клиент (БЕЗ АВАТАРА, НА ВСЮ ШИРИНУ) -->
             <section class="tile-hero" class:is-new={isNewClientMode}>
-                <div class="avatar" aria-hidden="true">{isNewClientMode ? '✨' : (selectedContact ? selectedContact.name.charAt(0).toUpperCase() : '?')}</div>
-                <div class="hero-body">
+                <div class="hero-body-full">
                     <label for="client-search-input">{isNewClientMode ? 'НОВЫЙ КЛИЕНТ' : 'КЛИЕНТ ЗАПИСИ'}</label>
-                    <div class="search-box rel-pos" role="search">
+                    <div class="search-box">
                         <input
                             id="client-search-input"
                             type="text"
@@ -322,9 +322,8 @@
 
                     {#if isNewClientMode}
                         <div class="inline-phone-field" in:slide>
-                            <label for="new-client-phone" class="invisible-label">Телефон</label>
-                            <input id="new-client-phone" type="tel" bind:value={newClientPhone} placeholder="Номер телефона..." on:keydown={(e) => e.key === 'Enter' && handleSave()} />
-                            <button class="btn-cancel-new" on:click={() => isNewClientMode = false} type="button">✕</button>
+                            <input type="tel" bind:value={newClientPhone} placeholder="Телефон..." />
+                            <button class="btn-cancel-new" on:click={() => isNewClientMode = false} type="button" aria-label="Отмена">✕</button>
                         </div>
                     {/if}
                 </div>
@@ -518,18 +517,18 @@
         box-sizing: border-box;
     }
 
+    /* Плитка клиента: убрали flex, сделали блочной */
     .tile-hero {
-        background: #eee8d5; padding: 16px; border-radius: 24px;
-        display: flex; align-items: center; gap: 12px;
-        border: 1.5px solid #ddd6c1; margin-bottom: 12px; transition: all 0.3s;
+        background: #eee8d5; 
+        padding: 16px; 
+        border-radius: 20px;
+        border: 1.5px solid #ddd6c1; 
+        margin-bottom: 12px;
     }
     .tile-hero.is-new { border-color: #b58900; background: rgba(181, 137, 0, 0.05); }
 
-    .avatar {
-        width: 48px; height: 48px;
-        background: #268bd2; color: #fdf6e3;
-        border-radius: 16px; display: flex; align-items: center; justify-content: center;
-        font-size: 20px; font-weight: 900;
+    .hero-body-full { 
+        width: 100%; 
     }
 
     label { display: block; font-size: 9px; font-weight: 900; color: #93a1a1; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
@@ -539,6 +538,7 @@
         width: 100%; padding: 12px 14px; border-radius: 14px;
         border: 1.5px solid #ddd6c1; background: #fdf6e3;
         font-size: 16px; outline: none; color: #073642; font-weight: 700;
+        box-sizing: border-box;
     }
     .badge { position: absolute; left: 4px; right: 4px; top: 4px; bottom: 4px; background: #eee8d5; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border: 1.5px solid #268bd2; z-index: 5; }
     .badge .txt { font-weight: 800; color: #268bd2; font-size: 14px; }
