@@ -156,7 +156,18 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 640px) {
-        .modal-backdrop { padding: 0; align-items: flex-end; }
-        .modal-content { border-radius: 32px 32px 0 0; max-height: 90vh; }
+        .modal-backdrop { 
+            padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top, 20px));
+            padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content { 
+            max-height: calc(100vh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)));
+            width: 95%;
+            max-width: 400px;
+            border-radius: 32px;
+        }
     }
 </style>
