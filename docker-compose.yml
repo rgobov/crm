@@ -67,7 +67,7 @@ services:
     restart: always
     logging: *default-logging
     environment:
-      ORIGIN: https://crm.109.248.203.156.sslip.io
+      ORIGIN: https://crm.999crm.ru
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
       PORT: 3000
