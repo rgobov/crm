@@ -294,21 +294,21 @@
         background: rgba(0, 0, 0, 0.6);
         z-index: 9999; /* Выше всех элементов */
         display: flex; 
-        align-items: flex-end; /* Bottom sheet стиль */
+        align-items: center; /* Возвращаем в центр */
         justify-content: center; 
-        padding: 0;
+        padding: 20px; /* Отступы от краев экрана */
         box-sizing: border-box; 
     }
     
     .modal-content-mobile { 
         width: 100%; 
-        max-width: 500px;
-        max-height: 92dvh; /* Динамическая высота вьюпорта */
+        max-width: 500px; 
+        max-height: 90dvh; /* Чуть уменьшим, чтобы окно "парило" */
         background: #fdf6e3; 
-        border-radius: 24px 24px 0 0;
+        border-radius: 24px; /* Скругление всех углов */
         display: flex; 
         flex-direction: column; 
-        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); 
         overflow: hidden;
         position: relative;
     }

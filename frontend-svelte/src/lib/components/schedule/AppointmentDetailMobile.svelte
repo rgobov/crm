@@ -263,16 +263,13 @@
 
 <style>
     .detail-tiles-container {
-        /* КРИТИЧНО ДЛЯ iOS: Учет Safe Area внизу */
-        padding: 16px 16px calc(40px + env(safe-area-inset-bottom, 20px)) 16px;
+        /* Оставляем стандартный отступ для парящего окна */
+        padding: 16px 16px 24px 16px; 
         display: flex; 
         flex-direction: column; 
-        gap: 10px;
+        gap: 10px; 
         background: #f8fafc; 
         overflow-x: hidden; 
-        max-width: 100%;
-        box-sizing: border-box;
-        /* iOS Fix: Плавный скролл */
         -webkit-overflow-scrolling: touch;
     }
 
