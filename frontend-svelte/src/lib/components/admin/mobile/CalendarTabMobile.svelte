@@ -187,7 +187,7 @@
 
     <!-- МОДАЛКИ -->
     {#if showModal}
-        <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
+        <div class="modal-backdrop show" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content-mobile" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
                     <h3>
@@ -287,16 +287,16 @@
 
     .mobile-timeline-wrapper { flex: 1; overflow: hidden; position: relative; }
 
-    /* МОДАЛКИ ДЛЯ МОБИЛОК (ОПТИМИЗАЦИЯ ДЛЯ iOS) */
+    /* МОДАЛКИ ДЛЯ МОБИЛОК (MATERIAL DESIGN - ПРИКРЕПЛЕНЫ К НИЗУ) */
     .modal-backdrop { 
         position: fixed; 
         inset: 0; 
         background: rgba(0, 0, 0, 0.6);
-        z-index: 100000; /* ← УВЕЛИЧЕНО ДО 100000 ПО РЕКОМЕНДАЦИИ GPT */
+        z-index: 999999; /* МАКСИМАЛЬНЫЙ ДЛЯ ПРЕОДОЛЕНИЯ СТЕКИНГА */
         display: flex; 
-        align-items: center; /* Возвращаем в центр */
+        align-items: flex-end; /* ПРИКРЕПЛЯЕМ К НИЗУ */
         justify-content: center; 
-        padding: 20px; /* Отступы от краев экрана */
+        padding: 0; 
         box-sizing: border-box; 
         /* БЛОКИРОВКА СКРОЛЛА ФОНА ДЛЯ iOS */
         -webkit-overflow-scrolling: touch;
@@ -312,18 +312,62 @@
     
     .modal-content-mobile { 
         width: 100%; 
-        max-width: 500px; 
-        max-height: 90dvh; /* Чуть уменьшим, чтобы окно "парило" */
+        max-width: none; /* НА ВЕСЬ ШИРИНУ ЭКРАНА */
+        max-height: 85vh; /* 85% ВЫСОТЫ ЭКРАНА */
         background: #fdf6e3; 
-        border-radius: 24px; /* Скругление всех углов */
+        border-radius: 24px 24px 0 0; /* СКРУГЛЕНИЕ ТОЛЬКО СВЕРХУ */
         display: flex; 
         flex-direction: column; 
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); 
+        box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.3); 
         overflow: hidden;
         position: relative;
-        z-index: 100001; /* НА ВЕСЯКИЙ СЛУЧАЙ */
-        padding-bottom: env(safe-area-inset-bottom); /* ДОБАВЛЕНО ПО РЕКОМЕНДАЦИИ GPT */
+        z-index: 999999;
+        padding-bottom: env(safe-area-inset-bottom, 20px); /* СЕЙФ АРЕА ОТСТУПЫ */
         box-sizing: border-box;
+        transform: translateY(100%); /* НАЧАЛЬНОЕ ПОЛОЖЕНИЕ - ПОД ЭКРАНОМ */
+        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    }
+
+    /* АДАПТИВНОСТЬ ПОД РАЗМЕРЫ ЭКРАНА */
+    @media (max-width: 380px) {
+        /* Маленькие экраны */
+        .modal-content-mobile {
+            max-height: 90vh; /* Увеличиваем высоту */
+            border-radius: 16px 16px 0 0; /* Меньше скругление */
+        }
+        .modal-header h3 {
+            font-size: 16px; /* Меньше шрифт */
+        }
+        .close-btn {
+            width: 32px;
+            height: 32px;
+            font-size: 16px;
+        }
+    }
+
+    @media (min-width: 768px) {
+        /* Большие экраны (планшеты) */
+        .modal-content-mobile {
+            max-width: 600px; /* Ограничиваем ширину */
+            margin: 0 auto; /* Центрируем */
+            border-radius: 24px; /* Полное скругление */
+        }
+        .modal-backdrop {
+            align-items: center; /* Центрируем */
+            padding: 20px;
+        }
+    }
+
+    @media (orientation: landscape) {
+        /* Горизонтальная ориентация */
+        .modal-content-mobile {
+            max-height: 95vh; /* Больше высоты */
+            max-width: 80vw; /* Ограничиваем ширину */
+        }
+    }
+    
+    .modal-backdrop.show .modal-content-mobile {
+        transform: translateY(0); /* ПОКАЗАТЬ МОДАЛКУ */
     }
     
     .modal-header { 
@@ -338,7 +382,7 @@
     
     .modal-header h3 { 
         margin: 0; 
-        font-size: 16px; 
+        font-size: 18px; 
         font-weight: 800; 
         color: #073642; 
         line-height: 1.2; 
@@ -347,10 +391,18 @@
     .close-btn { 
         background: #fdf6e3; 
         border: 1px solid #ddd6c1; 
-        width: 32px; 
-        height: 32px; 
+        width: 36px; 
+        height: 36px; 
         border-radius: 50%; 
         flex-shrink: 0; 
+        font-size: 18px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .close-btn:hover {
+        background: #eee8d5;
+        transform: scale(1.1);
     }
     
     .modal-body { 
@@ -359,7 +411,7 @@
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch; 
         padding: 0; 
-        padding-bottom: env(safe-area-inset-bottom, 20px); /* КРИТИЧНО ПО РЕКОМЕНДАЦИИ GPT */
+        padding-bottom: env(safe-area-inset-bottom, 20px); /* ДОПОЛНИТЕЛЬНЫЙ ОТСТУП */
         min-height: 0;
         overscroll-behavior: contain; /* ЧТОБЫ СКРОЛЛ НЕ "ПРИЛИПАЛ" */
     }
