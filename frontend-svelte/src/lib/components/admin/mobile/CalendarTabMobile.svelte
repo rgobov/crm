@@ -24,6 +24,15 @@
     let onlyBusyStaff = false;
     let onlyWorkingStaff = false;
 
+    // Блокировка скролла body при открытой модалке (важно для iOS)
+    $: if (typeof document !== 'undefined') {
+        if (showModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+    }
+
     // Функция выбора филиала
     function selectBranch(branchId) {
         activeBranchId.set(branchId);
@@ -278,30 +287,30 @@
 
     .mobile-timeline-wrapper { flex: 1; overflow: hidden; position: relative; }
 
-    /* МОДАЛКИ ДЛЯ МОБИЛОК */
+    /* МОДАЛКИ ДЛЯ МОБИЛОК (ОПТИМИЗАЦИЯ ДЛЯ iOS) */
     .modal-backdrop { 
         position: fixed; 
         inset: 0; 
-        background: rgba(7, 54, 66, 0.8); 
-        z-index: 3500; 
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 9999; /* Выше всех элементов */
         display: flex; 
-        align-items: center; 
+        align-items: flex-end; /* Bottom sheet стиль */
         justify-content: center; 
-        padding: 20px; 
-        padding-top: max(40px, calc(env(safe-area-inset-top, 20px) + 20px)); /* Увеличили отступ сверху */
+        padding: 0;
         box-sizing: border-box; 
     }
     
     .modal-content-mobile { 
         width: 100%; 
-        max-width: 480px; 
-        height: calc(100dvh - max(40px, calc(env(safe-area-inset-top, 20px) + 20px)) - 20px); /* Используем 100dvh и увеличенные отступы */
+        max-width: 500px;
+        max-height: 92dvh; /* Динамическая высота вьюпорта */
         background: #fdf6e3; 
-        border-radius: 24px; 
+        border-radius: 24px 24px 0 0;
         display: flex; 
         flex-direction: column; 
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); 
-        overflow: hidden; /* Предотвращаем выход контента за границы */
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        position: relative;
     }
     
     .modal-header { 
@@ -337,6 +346,6 @@
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch; 
         padding: 0; 
-        min-height: 0; /* Важно для flex контейнера */
+        min-height: 0;
     }
 </style>

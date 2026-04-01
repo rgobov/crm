@@ -20,14 +20,12 @@
     async function loadStaffMember() {
         if (appointment.staffMemberId && !staffMember) {
             try {
-                // Используем тот же метод что и в AppointmentEditScreen
                 const staffData = await adminService.getStaffForSchedule(
                     new Date(appointment.startTime), 
                     appointment.branchId || 'br-virtual'
                 );
                 staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
                 
-                // Находим сотрудника по ID
                 const foundStaff = staffList.find(s => s.id === appointment.staffMemberId);
                 if (foundStaff) {
                     staffMember = foundStaff;
@@ -39,7 +37,6 @@
         }
     }
 
-    // Загружаем при монтировании компонента
     import { onMount } from 'svelte';
     onMount(loadStaffMember);
 
@@ -146,7 +143,6 @@
     </header>
 
     <div class="grid-layout">
-        <!-- ПЛИТКА ТЕЛЕФОНА (НОВАЯ) -->
         {#if appointment.clientPhone}
             <div class="info-tile phone-tile" in:slide>
                 <div class="tile-icon phone">📞</div>
@@ -172,7 +168,6 @@
             </div>
         {/if}
 
-        <!-- ИНТЕРАКТИВНАЯ ПЛИТКА ЗАМЕТКИ -->
         <div class="info-tile comment-tile" class:editing={isEditingComment}>
             <div class="tile-icon note">📝</div>
             <div class="tile-body">
@@ -267,78 +262,36 @@
 </div>
 
 <style>
-    /* Мобильные оптимизированные стили */
-    .detail-tiles-container { 
-        padding: 16px 16px 32px 16px; 
+    .detail-tiles-container {
+        /* КРИТИЧНО ДЛЯ iOS: Учет Safe Area внизу */
+        padding: 16px 16px calc(40px + env(safe-area-inset-bottom, 20px)) 16px;
         display: flex; 
         flex-direction: column; 
-        gap: 8px; 
+        gap: 10px;
         background: #f8fafc; 
         overflow-x: hidden; 
         max-width: 100%;
         box-sizing: border-box;
+        /* iOS Fix: Плавный скролл */
+        -webkit-overflow-scrolling: touch;
     }
 
-    .hero-card { 
-        background: white; 
-        padding: 14px 18px; 
-        border-radius: 24px; 
-        display: flex; 
-        align-items: center; 
-        gap: 16px; 
-        box-shadow: 0 8px 24px rgba(0,0,0,0.04); 
-        border: 1px solid #f1f5f9; 
-    }
-    
-    .avatar-big { 
-        width: 56px; 
-        height: 56px; 
-        background: var(--primary-gradient); 
-        color: white; 
-        border-radius: 18px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        font-size: 24px; 
-        font-weight: 900; 
-    }
+    .hero-card { background: white; padding: 14px 18px; border-radius: 24px; display: flex; align-items: center; gap: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
+    .avatar-big { width: 56px; height: 56px; background: var(--primary-gradient); color: white; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; }
 
     .hero-info { flex: 1; }
     .hero-info label { display: block; font-size: 8px; font-weight: 850; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
 
     .client-link-btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; display: block; width: 100%; transition: opacity 0.2s; }
-    .client-link-btn:hover { opacity: 0.7; }
     .client-link-btn h2 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; line-height: 1.1; }
     .client-link-btn span { color: #0ea5e9; font-size: 20px; font-weight: 300; vertical-align: middle; margin-left: 4px; }
 
     .status-selector { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-    .status-btn { 
-        padding: 5px 8px; 
-        border-radius: 8px; 
-        border: 1.5px solid #f1f5f9; 
-        background: white; 
-        font-size: 9px; 
-        font-weight: 800; 
-        color: #64748b; 
-        cursor: pointer; 
-        transition: all 0.2s; 
-        text-transform: uppercase; 
-    }
+    .status-btn { padding: 5px 8px; border-radius: 8px; border: 1.5px solid #f1f5f9; background: white; font-size: 9px; font-weight: 800; color: #64748b; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
     .status-btn.active { background: var(--active-bg); color: white; border-color: var(--active-bg); box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
 
     .grid-layout { display: flex; flex-direction: column; gap: 8px; }
-    .info-tile { 
-        background: white; 
-        padding: 14px 16px; 
-        border-radius: 20px; 
-        border: 1px solid #f1f5f9; 
-        display: flex; 
-        align-items: center; 
-        gap: 14px; 
-        box-shadow: 0 3px 10px rgba(0,0,0,0.02); 
-        text-align: left; 
-        transition: all 0.2s; 
-    }
+    .info-tile { background: white; padding: 14px 16px; border-radius: 20px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 14px; box-shadow: 0 3px 10px rgba(0,0,0,0.02); text-align: left; transition: all 0.2s; }
 
     .phone-tile { background: #eff6ff; border-color: #bfdbfe; }
     .tile-icon.phone { background: #dbeafe; color: #3b82f6; }
@@ -359,36 +312,14 @@
     .edit-icon { opacity: 0.3; font-size: 12px; }
 
     .inline-editor { width: 100%; margin-top: 6px; }
-    textarea { 
-        width: 100%; 
-        min-height: 70px; 
-        border: 1.5px solid #e2e8f0; 
-        border-radius: 10px; 
-        padding: 8px; 
-        font-size: 14px; 
-        font-family: inherit; 
-        color: #1e293b; 
-        outline: none; 
-        resize: none; 
-        margin-bottom: 6px; 
-    }
+    textarea { width: 100%; min-height: 70px; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 8px; font-size: 14px; font-family: inherit; color: #1e293b; outline: none; resize: none; margin-bottom: 6px; }
     textarea:focus { border-color: #0ea5e9; }
 
     .editor-actions { display: flex; gap: 6px; }
     .btn-save-mini { flex: 1; background: #0ea5e9; color: white; border: none; padding: 6px; border-radius: 8px; font-weight: 800; font-size: 10px; cursor: pointer; }
     .btn-cancel-mini { background: #f1f5f9; color: #64748b; border: none; padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 10px; cursor: pointer; }
 
-    .tile-icon { 
-        width: 36px; 
-        height: 36px; 
-        background: #f1f5f9; 
-        border-radius: 12px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        font-size: 16px; 
-        flex-shrink: 0; 
-    }
+    .tile-icon { width: 36px; height: 36px; background: #f1f5f9; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
     .tile-icon.tg { background: #e0f2fe; color: #0ea5e9; }
 
     .tile-body { flex: 1; }
@@ -396,37 +327,16 @@
     .tile-body .val { margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; }
     .tile-body small { font-size: 10px; color: #94a3b8; font-weight: 600; }
 
-    .hours-edit { display: flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 800; color: #1e293b; }
-    .hours-edit input { width: 40px; padding: 2px; border: 1.5px solid #e2e8f0; border-radius: 6px; text-align: center; color: #0ea5e9; font-weight: 900; background: #f8fafc; }
+    .hours-edit { display: flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 850; color: #1e293b; }
+    .hours-edit input { width: 44px; padding: 4px; border: 1.5px solid #e2e8f0; border-radius: 8px; text-align: center; color: #0ea5e9; font-weight: 900; background: #f8fafc; font-size: 14px; }
 
-    .toggle-switch { 
-        width: 36px; 
-        height: 20px; 
-        background: #e2e8f0; 
-        border-radius: 10px; 
-        border: none; 
-        position: relative; 
-        cursor: pointer; 
-        transition: background 0.3s; 
-    }
+    .toggle-switch { width: 36px; height: 20px; background: #e2e8f0; border-radius: 10px; border: none; position: relative; cursor: pointer; transition: background 0.3s; }
     .toggle-switch.on { background: #10b981; }
     .switch-handle { width: 14px; height: 14px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.3s; }
     .toggle-switch.on .switch-handle { transform: translateX(16px); }
 
     .actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; padding-bottom: 8px; }
-    .action-tile { 
-        height: 48px; 
-        border-radius: 16px; 
-        border: 1.5px solid #f1f5f9; 
-        background: white; 
-        font-weight: 700; 
-        font-size: 13px; 
-        cursor: pointer; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        gap: 6px; 
-    }
+    .action-tile { height: 48px; border-radius: 16px; border: 1.5px solid #f1f5f9; background: white; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .action-tile.edit { color: var(--primary-color); }
     .action-tile.delete { color: #ef4444; }
 </style>
