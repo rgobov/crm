@@ -135,8 +135,6 @@ public class ScheduleService {
     }
 
     private void validateAvailability(Appointment app) {
-        if (app.getStaffMemberId() == null && app.getResourceId() == null) return;
-
         String timezone = branchRepository.findById(app.getBranchId())
                 .map(b -> b.getTimezone())
                 .orElse("Europe/Moscow");
