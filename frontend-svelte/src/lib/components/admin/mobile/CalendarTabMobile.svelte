@@ -187,7 +187,7 @@
 
     <!-- МОДАЛКИ -->
     {#if showModal}
-        <div class="modal-backdrop show" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
+        <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content-mobile" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
                     <h3>
@@ -287,87 +287,30 @@
 
     .mobile-timeline-wrapper { flex: 1; overflow: hidden; position: relative; }
 
-    /* МОДАЛКИ ДЛЯ МОБИЛОК (MATERIAL DESIGN - ПРИКРЕПЛЕНЫ К НИЗУ) */
+    /* МОДАЛКИ ДЛЯ МОБИЛОК (ЛУЧШИЙ ДИЗАЙН ДЛЯ ANDROID) */
     .modal-backdrop { 
         position: fixed; 
         inset: 0; 
-        background: rgba(0, 0, 0, 0.6);
-        z-index: 999999; /* МАКСИМАЛЬНЫЙ ДЛЯ ПРЕОДОЛЕНИЯ СТЕКИНГА */
+        background: rgba(7, 54, 66, 0.8); /* Темный синеватый фон */
+        z-index: 3500; /* Оптимальный для Android */
         display: flex; 
-        align-items: flex-end; /* ПРИКРЕПЛЯЕМ К НИЗУ */
+        align-items: center; /* Классическое центрирование */
         justify-content: center; 
-        padding: 0; 
+        padding: 20px;
+        padding-top: max(40px, calc(env(safe-area-inset-top, 20px) + 20px)); /* Увеличенные отступы сверху */
         box-sizing: border-box; 
-        /* БЛОКИРОВКА СКРОЛЛА ФОНА ДЛЯ iOS */
-        -webkit-overflow-scrolling: touch;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        touch-action: none;
-        /* ДОПОЛНИТЕЛЬНАЯ БЛОКИРОВКА ФОНА ДЛЯ iOS */
-        backdrop-filter: blur(2px);
-        -webkit-backdrop-filter: blur(2px);
-        transform: translateZ(0);
-        will-change: transform;
     }
     
     .modal-content-mobile { 
         width: 100%; 
-        max-width: none; /* НА ВЕСЬ ШИРИНУ ЭКРАНА */
-        max-height: 85vh; /* 85% ВЫСОТЫ ЭКРАНА */
+        max-width: 480px; /* Компактнее для телефонов */
+        height: calc(100dvh - max(40px, calc(env(safe-area-inset-top, 20px) + 20px)) - 20px); /* Адаптивная высота */
         background: #fdf6e3; 
-        border-radius: 24px 24px 0 0; /* СКРУГЛЕНИЕ ТОЛЬКО СВЕРХУ */
+        border-radius: 24px; /* Полное скругление */
         display: flex; 
         flex-direction: column; 
-        box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.3); 
-        overflow: hidden;
-        position: relative;
-        z-index: 999999;
-        padding-bottom: env(safe-area-inset-bottom, 20px); /* СЕЙФ АРЕА ОТСТУПЫ */
-        box-sizing: border-box;
-        transform: translateY(100%); /* НАЧАЛЬНОЕ ПОЛОЖЕНИЕ - ПОД ЭКРАНОМ */
-        transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
-    }
-
-    /* АДАПТИВНОСТЬ ПОД РАЗМЕРЫ ЭКРАНА */
-    @media (max-width: 380px) {
-        /* Маленькие экраны */
-        .modal-content-mobile {
-            max-height: 90vh; /* Увеличиваем высоту */
-            border-radius: 16px 16px 0 0; /* Меньше скругление */
-        }
-        .modal-header h3 {
-            font-size: 16px; /* Меньше шрифт */
-        }
-        .close-btn {
-            width: 32px;
-            height: 32px;
-            font-size: 16px;
-        }
-    }
-
-    @media (min-width: 768px) {
-        /* Большие экраны (планшеты) */
-        .modal-content-mobile {
-            max-width: 600px; /* Ограничиваем ширину */
-            margin: 0 auto; /* Центрируем */
-            border-radius: 24px; /* Полное скругление */
-        }
-        .modal-backdrop {
-            align-items: center; /* Центрируем */
-            padding: 20px;
-        }
-    }
-
-    @media (orientation: landscape) {
-        /* Горизонтальная ориентация */
-        .modal-content-mobile {
-            max-height: 95vh; /* Больше высоты */
-            max-width: 80vw; /* Ограничиваем ширину */
-        }
-    }
-    
-    .modal-backdrop.show .modal-content-mobile {
-        transform: translateY(0); /* ПОКАЗАТЬ МОДАЛКУ */
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); /* Легкая тень */
+        overflow: hidden; /* Предотвращаем выход контента за границы */
     }
     
     .modal-header { 
