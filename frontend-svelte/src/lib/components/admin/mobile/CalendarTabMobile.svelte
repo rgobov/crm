@@ -292,7 +292,7 @@
         position: fixed; 
         inset: 0; 
         background: rgba(0, 0, 0, 0.6);
-        z-index: 9999; /* Выше всех элементов */
+        z-index: 99999; /* ГАРАНТИРОВАННО ВЫШЕ ВСЕХ ЭЛЕМЕНТОВ НА iPhone */
         display: flex; 
         align-items: center; /* Возвращаем в центр */
         justify-content: center; 
