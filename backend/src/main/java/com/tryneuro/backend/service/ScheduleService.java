@@ -25,6 +25,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -86,6 +87,14 @@ public class ScheduleService {
         log.info("🔄 [UPDATE] Saving changes for appointment ID: {}. Client: {}", id, details.getClientName());
         Appointment appointment = appointmentRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Запись не найдена"));
         
+        // Проверяем изменились ли критические поля для валидации доступности
+        boolean timeChanged = !appointment.getStartTime().equals(details.getStartTime());
+        boolean durationChanged = !appointment.getDurationInMinutes().equals(details.getDurationInMinutes());
+        boolean staffChanged = !Objects.equals(appointment.getStaffMemberId(), details.getStaffMemberId());
+        boolean branchChanged = !Objects.equals(appointment.getBranchId(), details.getBranchId());
+        boolean resourceChanged = !Objects.equals(appointment.getResourceId(), details.getResourceId());
+        
+        // Обновляем все поля
         appointment.setStartTime(details.getStartTime());
         appointment.setDurationInMinutes(details.getDurationInMinutes());
         appointment.setClientName(details.getClientName());
@@ -105,7 +114,11 @@ public class ScheduleService {
         // Если телефон всё ещё пуст после апдейта фронтендом - подтягиваем из контакта
         enrichAppointmentPhone(appointment);
 
-        validateAvailability(appointment);
+        // Валидируем доступность только если изменились время, длительность, мастер, филиал или ресурс
+        if (timeChanged || durationChanged || staffChanged || branchChanged || resourceChanged) {
+            validateAvailability(appointment);
+        }
+        
         Appointment updated = appointmentRepository.save(appointment);
         if (updated.getContactId() != null && updated.getReferenceTag() != null && !updated.getReferenceTag().isEmpty()) {
             contactService.addTagIfMissing(updated.getContactId(), updated.getReferenceTag());
@@ -122,7 +135,7 @@ public class ScheduleService {
     }
 
     private void validateAvailability(Appointment app) {
-        if (app.getStaffMemberId() == null) return;
+        if (app.getStaffMemberId() == null && app.getResourceId() == null) return;
 
         String timezone = branchRepository.findById(app.getBranchId())
                 .map(b -> b.getTimezone())
@@ -134,8 +147,14 @@ public class ScheduleService {
 
         String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
 
-        if (!isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), localDate, localTime, app.getDurationInMinutes(), appId, app.getBranchId())) {
+        // Проверяем доступность мастера
+        if (app.getStaffMemberId() != null && !isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), localDate, localTime, app.getDurationInMinutes(), appId, app.getBranchId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Мастер занят или не работает в этом филиале в это время");
+        }
+
+        // Проверяем доступность ресурса
+        if (app.getResourceId() != null && !isResourceAvailable(app.getTenantId(), app.getResourceId(), localDate, localTime, app.getDurationInMinutes(), appId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ресурс занят в это время");
         }
     }
 
@@ -166,6 +185,24 @@ public class ScheduleService {
 
         List<Appointment> allStaffApps = appointmentRepository.findByTenantIdAndStaffMemberIdAndDate(tenantId, staffId, date);
         for (Appointment existing : allStaffApps) {
+            if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
+            if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
+            
+            LocalTime eStart = existing.getTime().truncatedTo(ChronoUnit.MINUTES);
+            LocalTime eEnd = eStart.plusMinutes(existing.getDurationInMinutes());
+            
+            if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
+        }
+        return true;
+    }
+
+    public boolean isResourceAvailable(String tenantId, String resourceId, LocalDate date, LocalTime time, int duration, String currentAppId) {
+        List<Appointment> allResourceApps = appointmentRepository.findByResourceIdAndDate(resourceId, date);
+        
+        LocalTime start = time.truncatedTo(ChronoUnit.MINUTES);
+        LocalTime end = start.plusMinutes(duration);
+        
+        for (Appointment existing : allResourceApps) {
             if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
             if (existing.getStatus() == AppointmentStatus.CANCELLED) continue;
             
