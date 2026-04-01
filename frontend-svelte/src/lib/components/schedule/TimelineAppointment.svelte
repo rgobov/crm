@@ -144,6 +144,13 @@
         padding-top: 4px;
         border-top: 1px solid rgba(0, 0, 0, 0.05);
     }
+
+    /* Увеличиваем шрифт комментариев только для десктопной версии */
+    @media (min-width: 1024px) {
+        .cmt-preview {
+            font-size: 11px;
+        }
+    }
     .cmt-icon { font-size: 8px; opacity: 0.6; margin-right: 2px; }
     .compact .cmt-preview { display: none; }
 </style>
