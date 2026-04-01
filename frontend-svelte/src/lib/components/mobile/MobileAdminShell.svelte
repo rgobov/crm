@@ -169,7 +169,7 @@
         -webkit-overflow-scrolling: touch;
     }
 
-    .mobile-bottom-ui { position: fixed; bottom: 0; left: 0; right: 0; background: #eee8d5; border-top: 1.5px solid #ddd6c1; z-index: 2000; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 25px rgba(0,0,0,0.05); }
+    .mobile-bottom-ui { position: fixed; bottom: 0; left: 0; right: 0; background: #eee8d5; border-top: 1.5px solid #ddd6c1; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 25px rgba(0,0,0,0.05); }
 
     .bottom-date-picker { background: white; border-bottom: 1px solid #ddd6c1; }
 

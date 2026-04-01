@@ -292,7 +292,7 @@
         position: fixed; 
         inset: 0; 
         background: rgba(0, 0, 0, 0.6);
-        z-index: 99999; /* ГАРАНТИРОВАННО ВЫШЕ ВСЕХ ЭЛЕМЕНТОВ НА iPhone */
+        z-index: 100000; /* ← УВЕЛИЧЕНО ДО 100000 ПО РЕКОМЕНДАЦИИ GPT */
         display: flex; 
         align-items: center; /* Возвращаем в центр */
         justify-content: center; 
@@ -321,6 +321,9 @@
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); 
         overflow: hidden;
         position: relative;
+        z-index: 100001; /* НА ВЕСЯКИЙ СЛУЧАЙ */
+        padding-bottom: env(safe-area-inset-bottom); /* ДОБАВЛЕНО ПО РЕКОМЕНДАЦИИ GPT */
+        box-sizing: border-box;
     }
     
     .modal-header { 
@@ -356,6 +359,8 @@
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch; 
         padding: 0; 
+        padding-bottom: env(safe-area-inset-bottom, 20px); /* КРИТИЧНО ПО РЕКОМЕНДАЦИИ GPT */
         min-height: 0;
+        overscroll-behavior: contain; /* ЧТОБЫ СКРОЛЛ НЕ "ПРИЛИПАЛ" */
     }
 </style>

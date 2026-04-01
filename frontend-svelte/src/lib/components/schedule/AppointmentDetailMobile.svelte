@@ -264,13 +264,17 @@
 <style>
     .detail-tiles-container {
         /* Оставляем стандартный отступ для парящего окна */
-        padding: 16px 16px 24px 16px; 
+        padding: 16px 16px 
+                 calc(40px + env(safe-area-inset-bottom, 34px)) 
+                 16px !important; /* !important НА ВРЕМЯ ТЕСТА ПО РЕКОМЕНДАЦИИ GPT */
         display: flex; 
         flex-direction: column; 
         gap: 10px; 
         background: #f8fafc; 
         overflow-x: hidden; 
         -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
+        min-height: 0; /* ВАЖНО ДЛЯ FLEX */
     }
 
     .hero-card { background: white; padding: 14px 18px; border-radius: 24px; display: flex; align-items: center; gap: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
