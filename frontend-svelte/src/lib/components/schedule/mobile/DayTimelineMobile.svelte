@@ -205,7 +205,7 @@
     .btn-reset { background: none; border: none; padding: 0; margin: 0; text-align: left; cursor: pointer; font-family: inherit; }
     .mobile-timeline-unified { height: 100%; width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x mandatory; scroll-padding-left: 48px; background: #fdf6e3; }
     .mobile-timeline-unified::-webkit-scrollbar { display: none; }
-    .scroll-canvas { display: grid; grid-template-areas: "corner header" "axis grid"; grid-template-columns: auto 1fr; position: relative; }
+    .scroll-canvas { display: grid; grid-template-areas: "corner header" "axis grid"; position: relative; }
     .sticky-top-left { grid-area: corner; position: sticky; top: 0; left: 0; z-index: 500; background: #eee8d5; border-right: 1.5px solid #ddd6c1; border-bottom: 1.5px solid #ddd6c1; height: 60px; display: flex; align-items: center; justify-content: center; color: #93a1a1; font-size: 14px; }
     .staff-header-sticky { grid-area: header; position: sticky; top: 0; z-index: 400; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; height: 60px; }
     .time-axis-sticky { grid-area: axis; position: sticky; left: 0; z-index: 300; background: #eee8d5; border-right: 1.5px solid #ddd6c1; }
