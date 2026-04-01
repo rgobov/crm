@@ -298,6 +298,16 @@
         justify-content: center; 
         padding: 20px; /* Отступы от краев экрана */
         box-sizing: border-box; 
+        /* БЛОКИРОВКА СКРОЛЛА ФОНА ДЛЯ iOS */
+        -webkit-overflow-scrolling: touch;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: none;
+        /* ДОПОЛНИТЕЛЬНАЯ БЛОКИРОВКА ФОНА ДЛЯ iOS */
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        transform: translateZ(0);
+        will-change: transform;
     }
     
     .modal-content-mobile { 
