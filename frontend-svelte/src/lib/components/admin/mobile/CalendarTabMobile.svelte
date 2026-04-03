@@ -287,34 +287,49 @@
 
     .mobile-timeline-wrapper { flex: 1; overflow: hidden; position: relative; }
 
-    /* МОДАЛКИ ДЛЯ МОБИЛОК (ЛУЧШИЙ ДИЗАЙН ДЛЯ ANDROID) */
+    /* МОДАЛКИ ДЛЯ МОБИЛОК (УМНАЯ АДАПТАЦИЯ ANDROID/IOS) */
     .modal-backdrop { 
         position: fixed; 
         inset: 0; 
-        background: rgba(7, 54, 66, 0.8); /* Темный синеватый фон */
-        z-index: 3500; /* Оптимальный для Android */
+        background: rgba(7, 54, 66, 0.85);
+        backdrop-filter: blur(8px);
+        z-index: 99999;
         display: flex; 
-        align-items: center; /* Классическое центрирование */
+        align-items: center; /* По умолчанию ЦЕНТРИРОВАНИЕ (как было на Android) */
         justify-content: center; 
-        padding: 20px;
-        padding-top: max(40px, calc(env(safe-area-inset-top, 20px) + 20px)); /* Увеличенные отступы сверху */
+        padding: 16px;
         box-sizing: border-box; 
+    }
+
+    /* Специфические правки только для iOS (iPhone/iPad) */
+    @supports (-webkit-touch-callout: none) {
+        .modal-backdrop {
+            align-items: flex-end; /* На iOS прижимаем к низу для удобства и обхода багов Viewport */
+            padding-bottom: calc(12px + env(safe-area-inset-bottom, 20px));
+        }
     }
     
     .modal-content-mobile { 
         width: 100%; 
-        max-width: 480px; /* Компактнее для телефонов */
-        height: calc(100dvh - max(40px, calc(env(safe-area-inset-top, 20px) + 20px)) - 20px); /* Адаптивная высота */
+        max-width: 500px;
+        max-height: 90dvh;
         background: #fdf6e3; 
-        border-radius: 24px; /* Полное скругление */
+        border-radius: 30px;
         display: flex; 
         flex-direction: column; 
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); /* Легкая тень */
-        overflow: hidden; /* Предотвращаем выход контента за границы */
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        position: relative;
+    }
+
+    @supports (-webkit-touch-callout: none) {
+        .modal-content-mobile {
+            margin-bottom: 8px; /* Парящий эффект снизу только для iOS */
+        }
     }
     
     .modal-header { 
-        padding: 16px 20px; 
+        padding: 18px 20px;
         background: #eee8d5; 
         border-bottom: 1.5px solid #ddd6c1; 
         display: flex; 
@@ -325,8 +340,8 @@
     
     .modal-header h3 { 
         margin: 0; 
-        font-size: 18px; 
-        font-weight: 800; 
+        font-size: 19px;
+        font-weight: 850;
         color: #073642; 
         line-height: 1.2; 
     }
@@ -341,6 +356,9 @@
         font-size: 18px;
         cursor: pointer;
         transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     .close-btn:hover {
@@ -354,8 +372,8 @@
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch; 
         padding: 0; 
-        padding-bottom: env(safe-area-inset-bottom, 20px); /* ДОПОЛНИТЕЛЬНЫЙ ОТСТУП */
+        padding-bottom: 20px;
         min-height: 0;
-        overscroll-behavior: contain; /* ЧТОБЫ СКРОЛЛ НЕ "ПРИЛИПАЛ" */
+        overscroll-behavior: contain;
     }
 </style>
