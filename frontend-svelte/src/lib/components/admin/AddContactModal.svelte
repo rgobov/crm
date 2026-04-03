@@ -75,30 +75,31 @@
 </div>
 
 <style>
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
-    .modal-content { background: white; width: 100%; max-width: 450px; border-radius: 28px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); display: flex; flex-direction: column; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; box-sizing: border-box; }
+    .modal-content { background: #fdf6e3; width: 100%; max-width: 450px; border-radius: 28px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); max-height: 90vh; display: flex; flex-direction: column; border: 1px solid #ddd6c1; }
 
-    .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
-    .modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; }
-    .close-btn { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; font-weight: bold; }
+    .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd6c1; background: #fdf6e3; }
+    .modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; color: #073642; }
+    .close-btn { background: #eee8d5; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #073642; font-weight: bold; }
 
-    .modal-body { padding: 24px; }
+    .modal-body { padding: 24px; background: #fdf6e3; }
     .form-group { margin-bottom: 20px; }
-    label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    label { display: block; font-size: 10px; font-weight: 800; color: #586e75; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
 
     input, textarea {
-        width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid #f1f5f9;
-        background: #f8fafc; font-size: 15px; outline: none; box-sizing: border-box;
+        width: 100%; padding: 12px 16px; border-radius: 12px; border: 1.5px solid #ddd6c1;
+        background: #eee8d5; font-size: 15px; outline: none; box-sizing: border-box; color: #073642;
     }
-    input:focus, textarea:focus { border-color: var(--primary-color); background: white; }
+    input::placeholder, textarea::placeholder { color: #93a1a1; }
+    input:focus, textarea:focus { border-color: #268bd2; background: #fdf6e3; }
     .mb-8 { margin-bottom: 8px; }
 
-    .add-sub-link { background: none; border: none; color: var(--primary-color); font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+    .add-sub-link { background: none; border: none; color: #268bd2; font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 4px; }
 
-    .modal-footer { padding: 24px; background: #f8fafc; }
+    .modal-footer { padding: 24px; background: #eee8d5; border-top: 1px solid #ddd6c1; }
     .save-btn {
         width: 100%; padding: 16px; border-radius: 16px; border: none;
-        background: var(--primary-gradient); color: white; font-size: 15px;
-        font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2);
+        background: #268bd2; color: white; font-size: 15px;
+        font-weight: 800; cursor: pointer;
     }
 </style>

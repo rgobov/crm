@@ -164,52 +164,52 @@
 </div>
 
 <style>
-    .screen-wrapper { height: 100vh; width: 100%; display: flex; flex-direction: column; background: #f8fafc; overflow: hidden; }
-    .sticky-header { background: white; border-bottom: 1px solid #f1f5f9; z-index: 100; }
+    .screen-wrapper { height: 100vh; width: 100%; display: flex; flex-direction: column; background: #fdf6e3; overflow: hidden; }
+    .sticky-header { background: #fdf6e3; border-bottom: 1px solid #ddd6c1; z-index: 100; }
     .header-inner { max-width: 800px; margin: 0 auto; padding: 20px 24px 12px; }
     .title-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-    .back-btn { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 12px; font-size: 24px; cursor: pointer; color: var(--primary-color); }
-    h1 { font-size: 22px; font-weight: 900; margin: 0; color: #0f172a; }
+    .back-btn { background: #eee8d5; border: none; width: 36px; height: 36px; border-radius: 12px; font-size: 24px; cursor: pointer; color: #268bd2; }
+    h1 { font-size: 22px; font-weight: 900; margin: 0; color: #073642; }
 
-    .mini-top-loader { width: 14px; height: 14px; border: 2px solid #eff6ff; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .mini-top-loader { width: 14px; height: 14px; border: 2px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .filter-tabs { background: #f1f5f9; padding: 4px; border-radius: 14px; display: flex; gap: 4px; margin-bottom: 16px; }
-    .tab { flex: 1; border: none; background: none; padding: 8px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #64748b; cursor: pointer; }
-    .tab.active { background: white; color: var(--primary-color); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .filter-tabs { background: #eee8d5; padding: 4px; border-radius: 14px; display: flex; gap: 4px; margin-bottom: 16px; }
+    .tab { flex: 1; border: none; background: none; padding: 8px; border-radius: 10px; font-size: 13px; font-weight: 700; color: #586e75; cursor: pointer; }
+    .tab.active { background: #fdf6e3; color: #268bd2; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 
-    .search-inner { display: flex; align-items: center; background: #f1f5f9; padding: 12px 16px; border-radius: 18px; }
-    input { border: none; background: none; width: 100%; font-size: 15px; outline: none; font-weight: 600; margin-left: 8px; }
+    .search-inner { display: flex; align-items: center; background: #eee8d5; padding: 12px 16px; border-radius: 18px; }
+    input { border: none; background: none; width: 100%; font-size: 15px; outline: none; font-weight: 600; margin-left: 8px; color: #073642; }
+    input::placeholder { color: #93a1a1; }
 
     .screen-content { flex: 1; overflow-y: auto; width: 100%; }
     .container-inner { max-width: 800px; margin: 0 auto; padding: 20px; }
 
-    /* ФИКСИРОВАННАЯ ВЫСОТА ДЛЯ СТАТИСТИКИ */
-    .stats-area { height: 24px; margin-bottom: 8px; font-size: 12px; color: #94a3b8; font-weight: 600; padding-left: 8px; display: flex; align-items: center; }
+    .stats-area { height: 24px; margin-bottom: 8px; font-size: 12px; color: #586e75; font-weight: 600; padding-left: 8px; display: flex; align-items: center; }
 
     .client-tiles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; transition: opacity 0.2s; }
     .is-loading { opacity: 0.7; }
 
-    .client-tile { display: flex; align-items: center; gap: 16px; padding: 16px; background: white; border-radius: 24px; border: 1px solid #f1f5f9; cursor: pointer; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
-    .avatar-box { width: 48px; height: 48px; background: #eff6ff; color: var(--primary-color); border-radius: 16px; display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 18px; }
-    .name-line { font-size: 15px; font-weight: 800; color: #1e293b; }
-    .phone-line { font-size: 13px; color: #94a3b8; font-weight: 600; }
+    .client-tile { display: flex; align-items: center; gap: 16px; padding: 16px; background: #eee8d5; border-radius: 24px; border: 1px solid #ddd6c1; cursor: pointer; text-align: left; }
+    .avatar-box { width: 48px; height: 48px; background: #fdf6e3; color: #268bd2; border-radius: 16px; display: flex; justify-content: center; align-items: center; font-weight: 800; font-size: 18px; }
+    .name-line { font-size: 15px; font-weight: 800; color: #073642; }
+    .phone-line { font-size: 13px; color: #586e75; font-weight: 600; }
 
-    .add-header-btn { margin-left: auto; width: 44px; height: 44px; background: var(--primary-gradient); color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.35); transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0; }
-    .add-header-btn:active { transform: scale(0.92); box-shadow: 0 2px 6px rgba(56, 151, 240, 0.2); }
+    .add-header-btn { margin-left: auto; width: 44px; height: 44px; background: #268bd2; color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s; flex-shrink: 0; }
+    .add-header-btn:active { transform: scale(0.92); }
 
     /* МОДАЛЬНОЕ ОКНО */
-    :global(.modal-backdrop) { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
-    :global(.modal-content) { background: white; width: 100%; max-width: 500px; max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); }
-    :global(.modal-header) { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; }
+    :global(.modal-backdrop) { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; box-sizing: border-box; }
+    :global(.modal-content) { background: #fdf6e3; width: 100%; max-width: 500px; max-height: 90vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); border: 1px solid #ddd6c1; }
+    :global(.modal-header) { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd6c1; flex-shrink: 0; background: #fdf6e3; color: #073642; }
     :global(.modal-header h2) { margin: 0; font-size: 18px; font-weight: 800; }
-    :global(.close-x) { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
-    :global(.modal-scroll-body) { flex: 1; overflow-y: auto; background: #f8fafc; }
+    :global(.close-x) { background: #eee8d5; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #073642; }
+    :global(.modal-scroll-body) { flex: 1; overflow-y: auto; background: #fdf6e3; }
 
     .clients-initial-loader { display: flex; justify-content: center; padding: 100px 0; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
 
     .pager { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 32px; }
-    .btn-p { background: white; border: 1.5px solid #f1f5f9; padding: 10px 20px; border-radius: 14px; font-weight: 700; color: #64748b; cursor: pointer; }
+    .btn-p { background: #eee8d5; border: 1.5px solid #ddd6c1; padding: 10px 20px; border-radius: 14px; font-weight: 700; color: #586e75; cursor: pointer; }
     .bottom-spacer { height: 120px; }
 </style>

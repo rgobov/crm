@@ -158,42 +158,53 @@
 {/if}
 
 <style>
-    .page { padding: 20px; max-width: 600px; margin: 0 auto; background: var(--bg-color); min-height: 100vh; }
+    .page { padding: 20px; max-width: 600px; margin: 0 auto; background: #fdf6e3; min-height: 100vh; }
     .header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
-    .back-btn { background: none; border: none; color: var(--primary-color); font-weight: 700; cursor: pointer; }
-    h1 { font-size: 22px; font-weight: 800; margin: 0; }
+    .back-btn { background: none; border: none; color: #268bd2; font-weight: 700; cursor: pointer; }
+    h1 { font-size: 22px; font-weight: 800; margin: 0; color: #073642; }
 
     .form-container { display: grid; gap: 16px; padding-bottom: 100px; }
 
-    .toggle-card { display: flex; justify-content: space-between; align-items: center; padding: 20px; }
-    .toggle-card h3 { margin: 0; font-size: 16px; }
-    .toggle-card p { margin: 4px 0 0 0; font-size: 13px; color: var(--hint-color); }
+    .card { background: #eee8d5; border: 1px solid #ddd6c1; border-radius: 20px; padding: 20px; }
 
-    .time-card label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: var(--primary-color); }
+    .toggle-card { display: flex; justify-content: space-between; align-items: center; }
+    .toggle-card h3 { margin: 0; font-size: 16px; color: #073642; }
+    .toggle-card p { margin: 4px 0 0 0; font-size: 13px; color: #586e75; }
+
+    .time-card label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: #268bd2; }
     .time-inputs { display: flex; gap: 16px; }
     .input-group { display: flex; align-items: center; gap: 8px; flex: 1; }
-    .input-group input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; font-weight: 700; text-align: center; }
+    .input-group input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd6c1; font-weight: 700; text-align: center; background: #fdf6e3; color: #073642; }
 
-    .settings-card h3, .template-card h3 { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 16px; }
+    .settings-card h3, .template-card h3 { font-size: 14px; font-weight: 700; color: #586e75; text-transform: uppercase; margin-bottom: 16px; }
     .field { margin-bottom: 16px; }
-    .field label { display: block; font-size: 12px; margin-bottom: 6px; color: #94a3b8; }
-    input, select, textarea { width: 100%; padding: 14px; border-radius: 14px; border: 1.5px solid #f1f5f9; background: #f8fafc; font-size: 15px; box-sizing: border-box; outline: none; }
-    input:focus, textarea:focus { border-color: var(--primary-color); background: white; }
+    .field label { display: block; font-size: 12px; margin-bottom: 6px; color: #586e75; }
+    input, select, textarea { width: 100%; padding: 14px; border-radius: 14px; border: 1.5px solid #ddd6c1; background: #fdf6e3; font-size: 15px; box-sizing: border-box; outline: none; color: #073642; }
+    input::placeholder, textarea::placeholder { color: #93a1a1; }
+    input:focus, textarea:focus { border-color: #268bd2; }
 
-    .hint { font-size: 12px; color: var(--hint-color); margin-top: 8px; }
+    .hint { font-size: 12px; color: #586e75; margin-top: 8px; }
 
     .actions { display: grid; gap: 12px; margin-top: 24px; }
-    .save-btn { background: var(--primary-gradient); color: white; border: none; padding: 18px; border-radius: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); }
-    .test-btn { background: white; color: var(--primary-color); border: 2px solid var(--primary-color); padding: 16px; border-radius: 16px; font-weight: 800; cursor: pointer; }
+    .save-btn { background: #268bd2; color: white; border: none; padding: 18px; border-radius: 16px; font-weight: 800; cursor: pointer; }
+    .test-btn { background: #eee8d5; color: #268bd2; border: 2px solid #268bd2; padding: 16px; border-radius: 16px; font-weight: 800; cursor: pointer; }
 
     /* Modal */
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-    .modal { width: 100%; max-width: 400px; padding: 24px; text-align: center; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(7, 54, 66, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+    .modal { width: 100%; max-width: 400px; padding: 24px; text-align: center; background: #fdf6e3; border: 1px solid #ddd6c1; border-radius: 24px; color: #073642; }
     .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
-    .modal-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
-    .confirm { background: var(--primary-color); color: white; }
+    .modal-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; background: #eee8d5; color: #073642; }
+    .confirm { background: #268bd2 !important; color: white !important; }
 
-    .spinner { width: 30px; height: 30px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
+    .spinner { width: 30px; height: 30px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .center { text-align: center; padding: 40px; }
+
+    /* Switch styling for Solarized */
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ddd6c1; transition: .4s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #268bd2; }
+    input:checked + .slider:before { transform: translateX(20px); }
 </style>

@@ -74,8 +74,22 @@
 
 <style>
     :global(html, body) { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
-    .admin-shell { display: flex; height: 100vh; width: 100vw; background: #f8fafc; overflow: hidden; }
-    .sidebar-aside { width: var(--sidebar-width); background: white; border-right: 1px solid #f1f5f9; height: 100%; display: flex; flex-shrink: 0; position: relative; }
+    .admin-shell {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+        background: #fdf6e3;
+        overflow: hidden;
+    }
+    .sidebar-aside {
+        width: var(--sidebar-width);
+        background: #eee8d5;
+        border-right: 1.5px solid #ddd6c1;
+        height: 100%;
+        display: flex;
+        flex-shrink: 0;
+        position: relative;
+    }
     .resize-handle { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 10; }
     .content-body { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; position: relative; }
 

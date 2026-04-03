@@ -230,50 +230,51 @@
 </div>
 
 <style>
-    .profile-card { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-radius: 32px; padding: 32px; transition: all 0.4s ease; box-shadow: 0 20px 50px rgba(0,0,0,0.04); border: 1px solid #f1f5f9; }
+    .profile-card { background: #fdf6e3; border-radius: 32px; padding: 32px; transition: all 0.4s ease; border: 1px solid #ddd6c1; }
     .card-header { display: flex; align-items: center; gap: 24px; margin-bottom: 32px; }
-    .avatar-big { width: 84px; height: 84px; background: white; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 950; color: var(--primary-color); box-shadow: 0 10px 20px rgba(56, 151, 240, 0.1); border: 1px solid #eff6ff; }
-    .badge-role { margin-top: 8px; font-size: 9px; font-weight: 900; color: var(--primary-color); background: #eff6ff; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px; }
+    .avatar-big { width: 84px; height: 84px; background: #eee8d5; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 950; color: #268bd2; border: 1px solid #ddd6c1; }
+    .badge-role { margin-top: 8px; font-size: 9px; font-weight: 900; color: #268bd2; background: #eee8d5; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px; }
 
     .h2-btn, .phone-val-btn, .email-val-btn, .notes-display-btn { background: none; border: none; padding: 0; text-align: left; cursor: pointer; width: 100%; display: block; }
-    .title-section h2 { margin: 0; font-size: 24px; font-weight: 800; color: #0f172a; }
-    .title-section h2 span { font-size: 16px; opacity: 0.2; margin-left: 8px; }
-    .id-hint { margin: 4px 0 0 4px; font-size: 11px; color: #cbd5e1; font-weight: 700; }
+    .title-section h2 { margin: 0; font-size: 24px; font-weight: 800; color: #073642; }
+    .title-section h2 span { font-size: 16px; opacity: 0.2; margin-left: 8px; color: #586e75; }
+    .id-hint { margin: 4px 0 0 4px; font-size: 11px; color: #93a1a1; font-weight: 700; }
     .details-grid { display: flex; flex-direction: column; gap: 24px; }
-    label { display: block; font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px; margin-left: 4px; }
+    label { display: block; font-size: 10px; font-weight: 800; color: #586e75; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px; margin-left: 4px; }
 
     .tags-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
-    .tag-badge { background: #f0fdf4; border: 1.5px solid #dcfce7; padding: 8px 14px; border-radius: 14px; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
-    .tag-text { font-weight: 700; color: #166534; font-size: 13px; }
-    .tag-remove { background: none; border: none; color: #10b981; cursor: pointer; font-weight: 800; padding: 0 2px; }
+    .tag-badge { background: #eee8d5; border: 1.5px solid #ddd6c1; padding: 8px 14px; border-radius: 14px; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+    .tag-text { font-weight: 700; color: #073642; font-size: 13px; }
+    .tag-remove { background: none; border: none; color: #dc322f; cursor: pointer; font-weight: 800; padding: 0 2px; }
 
-    .btn-add-tag { background: none; border: 1.5px dashed #d1d5db; padding: 8px 16px; border-radius: 14px; color: #94a3b8; font-weight: 700; font-size: 12px; cursor: pointer; }
-    .tag-edit-inline { display: flex; gap: 8px; align-items: center; background: white; padding: 4px; border-radius: 14px; border: 1.5px solid var(--primary-color); }
-    .tag-edit-inline input { border: none; padding: 6px 10px; font-size: 13px; width: 160px; background: none; outline: none; }
+    .btn-add-tag { background: none; border: 1.5px dashed #93a1a1; padding: 8px 16px; border-radius: 14px; color: #586e75; font-weight: 700; font-size: 12px; cursor: pointer; }
+    .tag-edit-inline { display: flex; gap: 8px; align-items: center; background: #fdf6e3; padding: 4px; border-radius: 14px; border: 1.5px solid #268bd2; }
+    .tag-edit-inline input { border: none; padding: 6px 10px; font-size: 13px; width: 160px; background: none; outline: none; color: #073642; }
 
     .tiles-container { display: flex; flex-wrap: wrap; gap: 12px; }
-    .tile { background: white; padding: 14px 18px; border-radius: 18px; border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+    .tile { background: #eee8d5; padding: 14px 18px; border-radius: 18px; border: 1px solid #ddd6c1; display: flex; align-items: center; gap: 12px; }
     .tile.full { width: 100%; box-sizing: border-box; }
 
-    .phone-val { font-weight: 700; color: #1e293b; font-size: 16px; }
-    .val-text { font-weight: 600; color: #1e293b; }
+    .phone-val { font-weight: 700; color: #073642; font-size: 16px; }
+    .val-text { font-weight: 600; color: #073642; }
 
     .btn-call { text-decoration: none; font-size: 18px; opacity: 0.8; transition: 0.2s; }
-    .btn-add-tile { background: none; border: 2px dashed #e2e8f0; padding: 12px 20px; border-radius: 18px; color: #94a3b8; font-weight: 700; cursor: pointer; }
+    .btn-add-tile { background: none; border: 2px dashed #93a1a1; padding: 12px 20px; border-radius: 18px; color: #586e75; font-weight: 700; cursor: pointer; }
 
     .notes-area-wrapper { min-height: 90px; }
-    .notes-text { margin: 0; color: #64748b; font-size: 14px; line-height: 1.6; font-style: italic; }
+    .notes-text { margin: 0; color: #586e75; font-size: 14px; line-height: 1.6; font-style: italic; }
 
     .edit-row, .tile-edit, .notes-edit-box { display: flex; gap: 10px; width: 100%; }
     .notes-edit-box { flex-direction: column; }
 
-    input, textarea { width: 100%; padding: 10px 14px; border: 2px solid var(--primary-color); border-radius: 12px; font-size: 15px; outline: none; background: #f8fafc; color: #0f172a; }
-    .save-btn-icon, .save-mini { background: #10b981; color: white; border: none; width: 40px; height: 40px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .btn-close-mini { background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; }
+    input, textarea { width: 100%; padding: 10px 14px; border: 2px solid #268bd2; border-radius: 12px; font-size: 15px; outline: none; background: #fdf6e3; color: #073642; }
+    input::placeholder, textarea::placeholder { color: #93a1a1; }
+    .save-btn-icon, .save-mini { background: #859900; color: white; border: none; width: 40px; height: 40px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .btn-close-mini { background: none; border: none; color: #586e75; font-size: 18px; cursor: pointer; }
     .actions-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
-    .btn-text { background: none; border: none; color: #94a3b8; font-weight: 700; cursor: pointer; }
-    .btn-save-pill { background: var(--primary-color); color: white; border: none; padding: 10px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+    .btn-text { background: none; border: none; color: #586e75; font-weight: 700; cursor: pointer; }
+    .btn-save-pill { background: #268bd2; color: white; border: none; padding: 10px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; }
     .center-loader { display: flex; justify-content: center; padding: 60px; }
-    .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 </style>

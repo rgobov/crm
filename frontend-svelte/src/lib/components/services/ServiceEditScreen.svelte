@@ -93,31 +93,33 @@
         display: flex;
         align-items: flex-start;
         justify-content: center;
-        padding: 18vh 20px 20px;
+        padding: 10vh 20px 20px;
         overflow-y: auto;
         box-sizing: border-box;
+        background: #fdf6e3;
     }
     .edit-screen .form-container { width: 100%; max-width: 480px; }
-    .form-container { padding: 32px; background: white; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+    .form-container { padding: 32px; background: #eee8d5; border-radius: 24px; border: 1px solid #ddd6c1; }
 
     @media (max-width: 640px) {
-        .edit-screen { padding-top: 10vh; }
+        .edit-screen { padding-top: 5vh; }
         .form-container { padding: 24px 20px; }
     }
 
     .field { margin-bottom: 24px; }
-    label { display: block; font-size: 12px; font-weight: 700; color: var(--primary-color); margin-bottom: 10px; text-transform: uppercase; }
-    input { width: 100%; padding: 16px; border: 2px solid #f1f5f9; border-radius: 16px; font-size: 16px; background: #f8fafc; box-sizing: border-box; outline: none; }
-    input:focus { border-color: var(--primary-color); background: white; }
+    label { display: block; font-size: 12px; font-weight: 700; color: #268bd2; margin-bottom: 10px; text-transform: uppercase; }
+    input { width: 100%; padding: 16px; border: 2px solid #ddd6c1; border-radius: 16px; font-size: 16px; background: #fdf6e3; box-sizing: border-box; outline: none; color: #073642; }
+    input::placeholder { color: #93a1a1; }
+    input:focus { border-color: #268bd2; background: #fdf6e3; }
 
     .duration-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 32px; }
-    .preset-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid #e2e8f0; background: white; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .preset-btn:active { background: #f1f5f9; }
+    .preset-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid #ddd6c1; background: #fdf6e3; font-size: 13px; font-weight: 600; cursor: pointer; color: #073642; }
+    .preset-btn:active { background: #eee8d5; }
 
-    .save-btn { width: 100%; padding: 18px; background: var(--primary-gradient); color: white; border: none; border-radius: 16px; font-weight: 800; font-size: 16px; cursor: pointer; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); }
+    .save-btn { width: 100%; padding: 18px; background: #268bd2; color: white; border: none; border-radius: 16px; font-weight: 800; font-size: 16px; cursor: pointer; }
     .save-btn:disabled { opacity: 0.7; }
 
     .center { display: flex; justify-content: center; padding: 40px; }
-    .spinner { width: 30px; height: 30px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    .spinner { width: 30px; height: 30px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 </style>
