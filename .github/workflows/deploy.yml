@@ -1,13 +1,9 @@
-name: Deploy to VPS (DEV MODE)
+name: Deploy to VPS (FINAL ATTEMPT)
 
 on:
   push:
     branches:
-<<<<<<< Updated upstream
-      - feature/employee-permissions # ОБНОВЛЕНО: Деплоим из новой ветки
-=======
-      - fix/ios-modal-behavior # Деплоим сразу при пуше в эту ветку
->>>>>>> Stashed changes
+      - fix/ios-final-attempt # Деплоим при пуше в эту новую ветку
 
 jobs:
   deploy:
@@ -23,32 +19,18 @@ jobs:
             set -e
             cd ~/crm
             
-<<<<<<< Updated upstream
-            echo "--- ОБНОВЛЕНИЕ КОДА (ветка feature/employee-permissions) ---"
-            git fetch origin feature/employee-permissions
-            git reset --hard origin/feature/employee-permissions
-=======
-            echo "--- ПЕРЕКЛЮЧЕНИЕ НА ВЕТКУ FIX ---"
-            git fetch origin fix/ios-modal-behavior
-            git checkout fix/ios-modal-behavior || git checkout -b fix/ios-modal-behavior origin/fix/ios-modal-behavior
-            git reset --hard origin/fix/ios-modal-behavior
->>>>>>> Stashed changes
+            echo "--- ПЕРЕКЛЮЧЕНИЕ НА НОВУЮ ВЕТКУ ---"
+            git fetch origin fix/ios-final-attempt
+            git checkout fix/ios-final-attempt || git checkout -b fix/ios-final-attempt origin/fix/ios-final-attempt
+            git reset --hard origin/fix/ios-final-attempt
             
-            echo "--- ПОДГОТОВКА СРЕДЫ ---"
-            echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env
-            echo "TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}" >> .env
-            
-            echo "--- ПРИНУДИТЕЛЬНАЯ ПЕРЕСБОРКА (БЕЗ КЭША ДЛЯ ФРОНТЕНДА) ---"
+            echo "--- СБОРКА ФРОНТЕНДА (БЕЗ КЭША) ---"
             export DOCKER_BUILDKIT=1
-            # Мы добавим --no-cache, чтобы Docker точно пересобрал фронтенд с новым кодом
             docker-compose build --no-cache frontend
             docker-compose build backend
             
             echo "--- ПЕРЕЗАПУСК ---"
             docker-compose up -d --force-recreate
-            
-            echo "--- ОЧИСТКА ---"
-            docker system prune -f
             
             echo "--- СТАТУС ---"
             docker-compose ps
