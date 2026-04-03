@@ -8,6 +8,7 @@
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
+    import { portal } from '$lib/actions/portal.js';
 
     export let forcedDate = null;
 
@@ -185,9 +186,12 @@
         </div>
     {/if}
 
-    <!-- МОДАЛКИ -->
+    <!-- МОДАЛКИ — вынесены в <body> через portal для корректной работы z-index на iOS.
+         Проблема: .mobile-bottom-ui имеет backdrop-filter, что создаёт новый Stacking Context
+         на WebKit/iOS. Любой z-index внутри дочернего контекста не может превысить родительский.
+         Portal переносит модалку напрямую в <body>, минуя всю иерархию контекстов. -->
     {#if showModal}
-        <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
+        <div class="modal-backdrop" use:portal on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content-mobile" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
                     <h3>
@@ -216,7 +220,9 @@
     {/if}
 
     {#if showNestedAddContact}
-        <AddContactModal on:close={() => showNestedAddContact = false} on:success={handleContactAdded} />
+        <div use:portal>
+            <AddContactModal on:close={() => showNestedAddContact = false} on:success={handleContactAdded} />
+        </div>
     {/if}
 </div>
 
@@ -287,75 +293,87 @@
 
     .mobile-timeline-wrapper { flex: 1; overflow: hidden; position: relative; }
 
-    /* МОДАЛКИ ДЛЯ МОБИЛОК (ЛУЧШИЙ ДИЗАЙН ДЛЯ ANDROID) */
-    .modal-backdrop { 
-        position: fixed; 
-        inset: 0; 
-        background: rgba(7, 54, 66, 0.8); /* Темный синеватый фон */
-        z-index: 3500; /* Оптимальный для Android */
-        display: flex; 
-        align-items: center; /* Классическое центрирование */
-        justify-content: center; 
+    /*
+     * МОДАЛКИ: стили объявлены через :global() потому что use:portal
+     * физически переносит элементы в <body>, они выходят из скоупа
+     * компонента и Svelte не может применить к ним scoped-стили.
+     *
+     * z-index: 99999 теперь работает корректно на iOS, т.к. элемент
+     * находится напрямую в <body> — вне любых вложенных Stacking Context'ов.
+     */
+
+    :global(.modal-backdrop) {
+        position: fixed;
+        inset: 0;
+        background: rgba(7, 54, 66, 0.8);
+        /* z-index максимальный — теперь безопасно, т.к. нет родительского контекста */
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         padding: 20px;
-        padding-top: max(40px, calc(env(safe-area-inset-top, 20px) + 20px)); /* Увеличенные отступы сверху */
-        box-sizing: border-box; 
+        /* safe-area-inset-top: учитываем notch/Dynamic Island на iPhone */
+        padding-top: max(40px, calc(env(safe-area-inset-top, 20px) + 20px));
+        box-sizing: border-box;
     }
-    
-    .modal-content-mobile { 
-        width: 100%; 
-        max-width: 480px; /* Компактнее для телефонов */
-        height: calc(100dvh - max(40px, calc(env(safe-area-inset-top, 20px) + 20px)) - 20px); /* Адаптивная высота */
-        background: #fdf6e3; 
-        border-radius: 24px; /* Полное скругление */
-        display: flex; 
-        flex-direction: column; 
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); /* Легкая тень */
-        overflow: hidden; /* Предотвращаем выход контента за границы */
+
+    :global(.modal-content-mobile) {
+        width: 100%;
+        max-width: 480px;
+        height: calc(100dvh - max(40px, calc(env(safe-area-inset-top, 20px) + 20px)) - 20px);
+        background: #fdf6e3;
+        border-radius: 24px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
     }
-    
-    .modal-header { 
-        padding: 16px 20px; 
-        background: #eee8d5; 
-        border-bottom: 1.5px solid #ddd6c1; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        flex-shrink: 0; 
+
+    :global(.modal-backdrop .modal-header) {
+        padding: 16px 20px;
+        background: #eee8d5;
+        border-bottom: 1.5px solid #ddd6c1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
     }
-    
-    .modal-header h3 { 
-        margin: 0; 
-        font-size: 18px; 
-        font-weight: 800; 
-        color: #073642; 
-        line-height: 1.2; 
+
+    :global(.modal-backdrop .modal-header h3) {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: #073642;
+        line-height: 1.2;
     }
-    
-    .close-btn { 
-        background: #fdf6e3; 
-        border: 1px solid #ddd6c1; 
-        width: 36px; 
-        height: 36px; 
-        border-radius: 50%; 
-        flex-shrink: 0; 
+
+    :global(.modal-backdrop .close-btn) {
+        background: #fdf6e3;
+        border: 1px solid #ddd6c1;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        flex-shrink: 0;
         font-size: 18px;
         cursor: pointer;
         transition: all 0.2s;
     }
-    
-    .close-btn:hover {
+
+    :global(.modal-backdrop .close-btn:hover) {
         background: #eee8d5;
         transform: scale(1.1);
     }
-    
-    .modal-body { 
-        flex: 1; 
-        overflow-y: auto; 
+
+    :global(.modal-backdrop .modal-body) {
+        flex: 1;
+        overflow-y: auto;
         overflow-x: hidden;
-        -webkit-overflow-scrolling: touch; 
-        padding: 0; 
-        padding-bottom: env(safe-area-inset-bottom, 20px); /* ДОПОЛНИТЕЛЬНЫЙ ОТСТУП */
+        -webkit-overflow-scrolling: touch;
+        padding: 0;
+        /* safe-area-inset-bottom: учитываем home indicator на iPhone */
+        padding-bottom: env(safe-area-inset-bottom, 20px);
         min-height: 0;
-        overscroll-behavior: contain; /* ЧТОБЫ СКРОЛЛ НЕ "ПРИЛИПАЛ" */
+        /* предотвращаем "резиновый" скролл, уходящий на фон */
+        overscroll-behavior: contain;
     }
 </style>

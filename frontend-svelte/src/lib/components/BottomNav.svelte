@@ -42,8 +42,12 @@
         left: 0;
         right: 0;
         height: 65px;
-        background: rgba(255, 255, 255, 0.98);
-        backdrop-filter: blur(15px);
+        /*
+         * backdrop-filter убран намеренно: создаёт Stacking Context на iOS WebKit,
+         * из-за которого position:fixed модалки с любым z-index не может
+         * перекрыть этот элемент. Заменён на непрозрачный белый фон.
+         */
+        background: #ffffff;
         display: flex;
         justify-content: space-around;
         align-items: center;
