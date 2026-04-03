@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart'; // Добавлен пропущенный импорт
 import 'package:intl/intl.dart';
 import 'package:try_neuro/core/network/http_client.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_comment_model.dart';
@@ -10,9 +11,58 @@ import 'package:try_neuro/service_locator.dart';
 class EmployeeService {
   final Dio _dio = sl<HttpClient>().dio;
 
-  Future<StaffMember> getMyProfile() async {
-    final response = await _dio.get('/employee/profile');
+  Future<StaffMember> getMyProfile({DateTime? date}) async {
+    final queryParams = date != null ? {'date': DateFormat('yyyy-MM-dd').format(date)} : null;
+    final response = await _dio.get('/employee/profile', queryParameters: queryParams);
     return StaffMember.fromJson(response.data);
+  }
+
+  Future<void> updateMyShift({
+    required DateTime date,
+    required bool isDayOff,
+    TimeOfDay? workStart,
+    TimeOfDay? workEnd,
+    TimeOfDay? breakStart,
+    TimeOfDay? breakEnd,
+  }) async {
+    String? format(TimeOfDay? t) => t == null ? null : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00';
+
+    await _dio.put(
+      '/employee/profile/shift',
+      data: {
+        'date': DateFormat('yyyy-MM-dd').format(date),
+        'isDayOff': isDayOff,
+        'workStartTime': format(workStart),
+        'workEndTime': format(workEnd),
+        'breakStartTime': format(breakStart),
+        'breakEndTime': format(breakEnd),
+      },
+    );
+  }
+
+  Future<void> repeatSchedule({
+    required DateTime sourceDate,
+    required bool isDayOff,
+    TimeOfDay? workStart,
+    TimeOfDay? workEnd,
+    TimeOfDay? breakStart,
+    TimeOfDay? breakEnd,
+    required int days,
+  }) async {
+    String? format(TimeOfDay? t) => t == null ? null : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00';
+
+    await _dio.post(
+      '/employee/profile/shift/copy',
+      queryParameters: {'days': days},
+      data: {
+        'date': DateFormat('yyyy-MM-dd').format(sourceDate),
+        'isDayOff': isDayOff,
+        'workStartTime': format(workStart),
+        'workEndTime': format(workEnd),
+        'breakStartTime': format(breakStart),
+        'breakEndTime': format(breakEnd),
+      },
+    );
   }
 
   Future<List<Appointment>> getMyAppointmentsForDay(DateTime date) async {
@@ -22,6 +72,7 @@ class EmployeeService {
     return data.map((json) => Appointment.fromJson(json)).toList();
   }
 
+  // --- ВОССТАНОВЛЕНО: Метод для получения истории записей контакта ---
   Future<List<Appointment>> getContactAppointments(String contactId) async {
     final response = await _dio.get('/employee/contacts/$contactId/appointments');
     final List<dynamic> data = response.data;
@@ -36,11 +87,11 @@ class EmployeeService {
     return Appointment.fromJson(response.data);
   }
 
-  // --- НОВЫЙ МЕТОД: Удаление записи ---
   Future<void> deleteAppointment(String id) async {
     await _dio.delete('/employee/appointments/$id');
   }
 
+  // --- ВОССТАНОВЛЕНО: Метод для добавления записи ---
   Future<void> addAppointment(Appointment appointment) async {
     await _dio.post('/employee/appointments', data: appointment.toJson());
   }

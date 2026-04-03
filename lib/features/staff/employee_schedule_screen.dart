@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/network/time_service.dart';
-import 'package:try_neuro/core/network/websocket_service.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/network/websocket_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
@@ -14,7 +14,9 @@ import 'package:try_neuro/service_locator.dart';
 
 class EmployeeScheduleScreen extends StatefulWidget {
   final User user;
-  const EmployeeScheduleScreen({super.key, required this.user});
+  final DateTime? initialDate; // Новое поле для установки даты извне
+
+  const EmployeeScheduleScreen({super.key, required this.user, this.initialDate});
 
   @override
   State<EmployeeScheduleScreen> createState() => _EmployeeScheduleScreenState();
@@ -23,29 +25,35 @@ class EmployeeScheduleScreen extends StatefulWidget {
 class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
   final EmployeeService _employeeService = sl<EmployeeService>();
   final TimeService _timeService = sl<TimeService>();
-  final WebSocketService _wsService = sl<WebSocketService>(); // <<< СЕРВИС
+  final WebSocketService _wsService = sl<WebSocketService>();
 
   late DateTime _selectedDay;
   List<Appointment> _appointmentsForDay = [];
-  List<StaffMember> _self = [];
+  List<StaffMember> _selfAsList = [];
   bool _isLoading = true;
-  
-  // Подписка
   StreamSubscription? _wsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _selectedDay = _timeService.now();
+    _selectedDay = widget.initialDate ?? _timeService.now();
     _loadData();
 
-    // --- ПОДПИСКА НА ОБНОВЛЕНИЯ В РЕАЛЬНОМ ВРЕМЕНИ ---
     _wsSubscription = _wsService.scheduleUpdates.listen((event) {
       if (event == 'refresh' && mounted) {
-        print('EmployeeScheduleScreen: Refreshing due to WebSocket');
         _loadData(silent: true);
       }
     });
+  }
+
+  // --- ВАЖНО: Следим за изменением даты извне (через Navigator/Tabs) ---
+  @override
+  void didUpdateWidget(EmployeeScheduleScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialDate != null && widget.initialDate != oldWidget.initialDate) {
+      setState(() => _selectedDay = widget.initialDate!);
+      _loadData();
+    }
   }
 
   @override
@@ -55,18 +63,19 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
   }
 
   Future<void> _loadData({bool silent = false}) async {
-    if(!silent) setState(() => _isLoading = true);
+    if (!mounted) return;
+    if (!silent) setState(() => _isLoading = true);
 
     try {
       final results = await Future.wait([
         _employeeService.getMyAppointmentsForDay(_selectedDay),
-        _employeeService.getMyProfile(),
+        _employeeService.getMyProfile(date: _selectedDay),
       ]);
 
       if (mounted) {
         setState(() {
           _appointmentsForDay = results[0] as List<Appointment>;
-          _self = [results[1] as StaffMember];
+          _selfAsList = [results[1] as StaffMember];
           _isLoading = false;
         });
       }
@@ -74,7 +83,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (!silent) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: $e')));
         }
       }
     }
@@ -118,7 +127,7 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
         builder: (context) => AppointmentDetailScreen(
           appointment: appointment,
           appointmentsForDay: _appointmentsForDay,
-          staff: _self,
+          staff: _selfAsList,
         ),
       ),
     );
@@ -129,9 +138,12 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Мое расписание'),
+        centerTitle: true,
       ),
       body: Column(
         children: [
@@ -141,26 +153,29 @@ class _EmployeeScheduleScreenState extends State<EmployeeScheduleScreen> {
                 : DayTimeline(
                     day: _selectedDay,
                     appointments: _appointmentsForDay,
-                    staff: _self,
+                    staff: _selfAsList,
                     onAppointmentTap: _navigateToDetail,
                     onEmptySlotTap: _onEmptySlotTap,
                     onAppointmentUpdated: _onAppointmentUpdated,
                   ),
           ),
           const Divider(height: 1),
-          HorizontalDatePicker(
-            initialDate: _selectedDay,
-            onDateSelected: (date) {
-              setState(() => _selectedDay = date);
-              _loadData();
-            },
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            color: colorScheme.surfaceVariant.withOpacity(0.2),
+            child: HorizontalDatePicker(
+              initialDate: _selectedDay,
+              onDateSelected: (date) {
+                setState(() => _selectedDay = date);
+                _loadData();
+              },
+            ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'employee_schedule_fab',
         onPressed: () => _navigateToEdit(preselectedStaffId: widget.user.staffId),
-        tooltip: 'Создать запись',
         child: const Icon(Icons.add),
       ),
     );

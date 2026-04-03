@@ -1,20 +1,16 @@
 package com.tryneuro.backend.dto;
 
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class CreateStaffRequest {
-    // Данные сотрудника
     private String name;
     private String specialty;
-    private boolean available;
-    private String workStartTime; // Будем передавать как строку, например "09:00"
-    private String workEndTime;
-    private String breakStartTime;
-    private String breakEndTime;
-
-    // Данные для входа
+    private String phone;
     private String email;
     private String password;
     private String role;
+    private boolean available;
+    private List<String> branchIds; // ПОДДЕРЖКА НЕСКОЛЬКИХ ФИЛИАЛОВ
 }

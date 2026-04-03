@@ -17,17 +17,20 @@ class WebSocketService {
     final tenantId = user?.tenantId;
     
     if (tenantId == null) {
-      print('WS Error: Cannot initialize without tenantId');
+      debugPrint('WS Error: Cannot initialize without tenantId');
       return;
     }
 
-    // --- ЛОГИКА ОПРЕДЕЛЕНИЯ URL (строго по app_config.dart) ---
+    // --- ОБНОВЛЕННАЯ ЛОГИКА ОПРЕДЕЛЕНИЯ URL ---
     String serverUrl;
     if (AppConfig.isProduction) {
       serverUrl = AppConfig.productionUrl;
     } else {
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-        serverUrl = AppConfig.developmentUrlAndroid;
+        // Учитываем флаг мобильного теста для WebSocket
+        serverUrl = AppConfig.isMobileTest 
+            ? AppConfig.developmentUrlAndroidDevice 
+            : AppConfig.developmentUrlAndroidEmulator;
       } else {
         serverUrl = AppConfig.developmentUrlDefault;
       }
@@ -40,8 +43,8 @@ class WebSocketService {
       config: StompConfig(
         url: wsUrl,
         onConnect: (frame) => _onConnect(frame, tenantId),
-        onWebSocketError: (dynamic error) => print('WS Connection Error: $error'),
-        onStompError: (frame) => print('STOMP Protocol Error: ${frame.body}'),
+        onWebSocketError: (dynamic error) => debugPrint('WS Connection Error: $error'),
+        onStompError: (frame) => debugPrint('STOMP Protocol Error: ${frame.body}'),
         reconnectDelay: const Duration(seconds: 5),
       ),
     );
@@ -50,14 +53,13 @@ class WebSocketService {
   }
 
   void _onConnect(StompFrame frame, String tenantId) {
-    print('WebSocket Connected for Tenant: $tenantId');
+    debugPrint('WebSocket Connected for Tenant: $tenantId');
 
-    // Подписываемся на обновления расписания именно этого салона
     _client?.subscribe(
       destination: '/topic/schedule/$tenantId',
       callback: (frame) {
         if (frame.body == 'refresh') {
-          print('WS: New update signal received from server');
+          debugPrint('WS: New update signal received from server');
           _scheduleUpdateController.add('refresh');
         }
       },

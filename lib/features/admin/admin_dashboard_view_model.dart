@@ -32,7 +32,6 @@ class AdminDashboardViewModel extends ChangeNotifier {
   List<Workload> _monthlyWorkload = [];
   List<Workload> get monthlyWorkload => _monthlyWorkload;
 
-  // Мы больше не храним список всех клиентов здесь для экономии памяти
   int _totalClientsCount = 0;
   int get totalClients => _totalClientsCount;
 
@@ -48,22 +47,23 @@ class AdminDashboardViewModel extends ChangeNotifier {
       final user = await _sessionService.getCurrentUser();
       final now = _timeService.now();
       
+      // Передаем текущую дату, так как метод теперь ожидает ее
       final Future<List<StaffMember>> staffFuture = (user?.role == UserRole.admin) 
           ? _staffService.getStaff() 
-          : _managerService.getStaffForSchedule();
+          : _managerService.getStaffForSchedule(now);
 
       final results = await Future.wait([
         staffFuture,
         _managerService.getAppointmentsForDay(now),
         _managerService.getWorkloadForMonth(now.year, now.month),
-        _contactService.getContactsCount(), // <<< ОПТИМИЗИРОВАНО: Запрашиваем только число
+        _contactService.getContactsCount(),
         _resourceService.getResources(),
       ]);
 
       _staff = results[0] as List<StaffMember>;
       _todayAppointments = results[1] as List<Appointment>;
       _monthlyWorkload = results[2] as List<Workload>;
-      _totalClientsCount = results[3] as int; // <<< ОПТИМИЗИРОВАНО
+      _totalClientsCount = results[3] as int;
       _resources = results[4] as List<Resource>;
 
     } catch (e) {

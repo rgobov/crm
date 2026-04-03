@@ -6,16 +6,34 @@ import 'package:try_neuro/service_locator.dart';
 class StaffService {
   final Dio _dio = sl<HttpClient>().dio;
 
-  // Теперь getStaff обращается к эндпоинту админа
+  // ОБНОВЛЕНО: Поддержка поиска и пагинации
+  Future<Map<String, dynamic>> getStaffPaged({String? query, int page = 0, int size = 100}) async {
+    final response = await _dio.get('/admin/staff', queryParameters: {
+      'query': query,
+      'page': page,
+      'size': size,
+    });
+
+    final List<dynamic> content = response.data['content'];
+    final List<StaffMember> members = content.map((json) => StaffMember.fromJson(json)).toList();
+
+    return {
+      'members': members,
+      'totalPages': response.data['totalPages'],
+      'totalElements': response.data['totalElements'],
+    };
+  }
+
+  // Оставляем для совместимости (берет первую страницу)
   Future<List<StaffMember>> getStaff() async {
-    final response = await _dio.get('/admin/staff');
-    final List<dynamic> data = response.data;
-    return data.map((json) => StaffMember.fromJson(json)).toList();
+    final result = await getStaffPaged();
+    return result['members'] as List<StaffMember>;
   }
 
   Future<void> addStaffMember({
     required String name,
     required String specialty,
+    String? phone,
     String? email,
     String? password,
     required String role,
@@ -28,6 +46,7 @@ class StaffService {
     await _dio.post('/admin/staff', data: {
       'name': name,
       'specialty': specialty,
+      'phone': phone,
       'email': email,
       'password': password,
       'role': role,
@@ -43,6 +62,7 @@ class StaffService {
     required String id,
     required String name,
     required String specialty,
+    String? phone,
     required String role,
     required bool available,
     String? workStartTime,
@@ -55,6 +75,7 @@ class StaffService {
     await _dio.put('/admin/staff/$id', data: {
       'name': name,
       'specialty': specialty,
+      'phone': phone,
       'role': role,
       'available': available,
       'workStartTime': workStartTime,

@@ -3,16 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
-import 'package:try_neuro/features/contacts/contact_edit_screen.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
-import 'package:try_neuro/features/manager/data/manager_service.dart';
+import 'package:try_neuro/features/admin/data/admin_service.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
-import 'package:try_neuro/features/staff/data/employee_service.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class ContactDetailScreen extends StatefulWidget {
   final Contact contact;
-
   const ContactDetailScreen({super.key, required this.contact});
 
   @override
@@ -20,18 +17,28 @@ class ContactDetailScreen extends StatefulWidget {
 }
 
 class _ContactDetailScreenState extends State<ContactDetailScreen> {
+  final _adminService = sl<AdminService>();
   final _sessionService = sl<SessionService>();
-  final _managerService = sl<ManagerService>();
-  final _employeeService = sl<EmployeeService>();
 
   late Contact _contact;
   late Future<List<Appointment>> _historyFuture;
   User? _currentUser;
 
+  // Состояния редактирования
+  bool _isEditingName = false;
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _notesController = TextEditingController();
+  int _editingPhoneIdx = -1;
+  final _phoneController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _contact = widget.contact;
+    _nameController.text = _contact.name;
+    _emailController.text = _contact.email ?? '';
+    _notesController.text = _contact.notes ?? '';
     _initialize();
   }
 
@@ -42,26 +49,32 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
 
   void _loadHistory() {
     setState(() {
-      if (_currentUser?.role == UserRole.manager) {
-        _historyFuture = _managerService.getContactAppointments(_contact.id);
-      } else {
-        _historyFuture = _employeeService.getContactAppointments(_contact.id);
-      }
+      _historyFuture = _adminService.getContactAppointments(_contact.id);
     });
   }
 
-  void _navigateToEditScreen() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ContactEditScreen(initialContact: _contact),
-      ),
+  Future<void> _saveAll() async {
+    final updated = Contact(
+      id: _contact.id,
+      name: _nameController.text.trim(),
+      phones: [..._contact.phones],
+      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
+      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
     );
 
-    if (result == true) {
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
+    if (_editingPhoneIdx != -1) {
+      updated.phones[_editingPhoneIdx] = PhoneUtils.clean(_phoneController.text);
+    }
+
+    try {
+      final saved = await _adminService.updateContact(updated);
+      setState(() {
+        _contact = saved;
+        _isEditingName = false;
+        _editingPhoneIdx = -1;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     }
   }
 
@@ -71,56 +84,87 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(_contact.name),
+          title: _isEditingName
+            ? TextField(
+                controller: _nameController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(hintText: 'Имя клиента'),
+                onSubmitted: (_) => _saveAll(),
+              )
+            : GestureDetector(
+                onTap: () => setState(() => _isEditingName = true),
+                child: Text(_contact.name),
+              ),
           actions: [
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: _navigateToEditScreen,
-              tooltip: 'Редактировать',
-            ),
+            if (_isEditingName) IconButton(icon: const Icon(Icons.check), onPressed: _saveAll)
           ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'ИНФО', icon: Icon(Icons.info_outline)),
-              Tab(text: 'ИСТОРИЯ', icon: Icon(Icons.history)),
-            ],
-          ),
+          bottom: const TabBar(tabs: [Tab(text: 'ИНФО'), Tab(text: 'ИСТОРИЯ')]),
         ),
-        body: TabBarView(
-          children: [
-            _buildInfoTab(),
-            _buildHistoryTab(),
-          ],
-        ),
+        body: TabBarView(children: [_buildInfoTab(), _buildHistoryTab()]),
       ),
     );
   }
 
   Widget _buildInfoTab() {
-    return SelectionArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Padding(
-              padding: EdgeInsets.only(left: 4, bottom: 8),
-              child: Text('КОНТАКТНЫЕ НОМЕРА', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        const Text('КОНТАКТНЫЕ НОМЕРА', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+        const SizedBox(height: 8),
+        ..._contact.phones.asMap().entries.map((entry) {
+          int idx = entry.key;
+          String phone = entry.value;
+          bool isEditing = _editingPhoneIdx == idx;
+
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.phone, color: Colors.blue),
+              title: isEditing
+                ? TextField(controller: _phoneController, autofocus: true, keyboardType: TextInputType.phone)
+                : Text(PhoneUtils.format(phone)),
+              trailing: isEditing
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() => _editingPhoneIdx = -1)),
+                    IconButton(icon: const Icon(Icons.check, color: Colors.green), onPressed: _saveAll),
+                  ])
+                : IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {
+                    setState(() {
+                      _editingPhoneIdx = idx;
+                      _phoneController.text = PhoneUtils.format(phone);
+                    });
+                  }),
             ),
-            ..._contact.phones.map((phone) => _buildDetailCard(PhoneUtils.format(phone), Icons.phone)),
-            
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.only(left: 4, bottom: 8),
-              child: Text('ПРОЧЕЕ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+          );
+        }),
+
+        const SizedBox(height: 24),
+        _buildEditableField('EMAIL', _emailController, Icons.email),
+
+        const SizedBox(height: 24),
+        _buildEditableField('ЗАМЕТКИ', _notesController, Icons.notes, maxLines: 3),
+      ],
+    );
+  }
+
+  Widget _buildEditableField(String label, TextEditingController ctrl, IconData icon, {int maxLines = 1}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+        Card(
+          child: ListTile(
+            leading: Icon(icon, color: Colors.blue),
+            title: TextField(
+              controller: ctrl,
+              maxLines: maxLines,
+              decoration: const InputDecoration(border: InputBorder.none),
+              onSubmitted: (_) => _saveAll(),
             ),
-            if (_contact.email != null && _contact.email!.isNotEmpty)
-              _buildDetailCard(_contact.email!, Icons.email, title: 'Email'),
-            if (_contact.notes != null && _contact.notes!.isNotEmpty)
-              _buildDetailCard(_contact.notes!, Icons.note, title: 'Заметки'),
-          ],
+            trailing: IconButton(icon: const Icon(Icons.save_outlined, size: 18), onPressed: _saveAll),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -128,107 +172,17 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     return FutureBuilder<List<Appointment>>(
       future: _historyFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Ошибка загрузки истории: ${snapshot.error}'));
-        }
-        final history = snapshot.data ?? [];
-        if (history.isEmpty) {
-          return const Center(child: Text('История посещений пуста'));
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16.0),
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final history = snapshot.data!;
+        if (history.isEmpty) return const Center(child: Text('История пуста'));
+        return ListView.builder(
           itemCount: history.length,
-          separatorBuilder: (context, index) => const Divider(),
-          itemBuilder: (context, index) {
-            final appointment = history[index];
-            return _buildHistoryItem(appointment);
-          },
+          itemBuilder: (context, i) => ListTile(
+            title: Text(history[i].service),
+            subtitle: Text(DateFormat('dd.MM.yyyy HH:mm').format(history[i].startTime.toLocal())),
+          ),
         );
       },
-    );
-  }
-
-  Widget _buildHistoryItem(Appointment appointment) {
-    final dateFormat = DateFormat('dd.MM.yyyy');
-    final timeFormat = DateFormat.Hm();
-    final timeStr = timeFormat.format(DateTime(0).add(Duration(hours: appointment.time.hour, minutes: appointment.time.minute)));
-
-    // --- ИСПРАВЛЕННЫЙ СВИТЧ С НОВОЙ ПАЛИТРОЙ ---
-    Color statusColor;
-    String statusText;
-    switch (appointment.status) {
-      case AppointmentStatus.scheduled:
-        statusColor = const Color(0xFF42A5F5); // Синий
-        statusText = 'Ожидает';
-        break;
-      case AppointmentStatus.confirmed:
-        statusColor = const Color(0xFF26A69A); // Бирюзовый
-        statusText = 'Подтверждено';
-        break;
-      case AppointmentStatus.needs_call:
-        statusColor = const Color(0xFFFFA726); // Янтарный
-        statusText = 'Перезвонить';
-        break;
-      case AppointmentStatus.completed:
-        statusColor = const Color(0xFF90A4AE); // Серо-синий
-        statusText = 'Выполнено';
-        break;
-      case AppointmentStatus.cancelled:
-        statusColor = const Color(0xFFEF5350); // Красный
-        statusText = 'Отменено';
-        break;
-    }
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        appointment.service,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-              const SizedBox(width: 4),
-              Text('${dateFormat.format(appointment.date)} в $timeStr'),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              statusText,
-              style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () {},
-    );
-  }
-
-  Widget _buildDetailCard(String value, IconData icon, {String? title}) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8.0),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.shade200)),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.blue),
-        title: title != null ? Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)) : null,
-        subtitle: Text(value, style: const TextStyle(fontSize: 16, color: Colors.black87)),
-      ),
     );
   }
 }

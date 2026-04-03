@@ -5,35 +5,26 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Try Neuro CRM">
 
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- Исправленные мета-теги для мобильных устройств -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="try_neuro">
+  
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>try_neuro</title>
+  <title>Try Neuro CRM</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- 1. Эта строка загружает движок Flutter -->
-  <script src="flutter.js" defer></script>
+  <!-- 1. Сначала загружаем Telegram SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+  <!-- 2. Это единственный скрипт, нужный для загрузки Flutter 3.22+ -->
+  <script src="flutter_bootstrap.js" async></script>
 </head>
 <body>
-  <!-- 2. Этот скрипт использует загруженный движок для запуска приложения -->
-  <script>
-    window.addEventListener('load', function(ev) {
-      // Инициализирует и запускает Flutter
-      _flutter.loader.loadEntrypoint({
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
-          });
-        }
-      });
-    });
-  </script>
+  <!-- Тело документа остается пустым, Flutter сам вставит сюда Canvas или HTML элементы -->
 </body>
 </html>

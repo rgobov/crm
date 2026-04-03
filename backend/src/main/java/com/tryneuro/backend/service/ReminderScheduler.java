@@ -1,61 +1,67 @@
 package com.tryneuro.backend.service;
 
 import com.tryneuro.backend.model.Appointment;
-import com.tryneuro.backend.model.Contact;
-import com.tryneuro.backend.model.WappiSettings;
+import com.tryneuro.backend.model.AppointmentStatus;
 import com.tryneuro.backend.repository.AppointmentRepository;
-import com.tryneuro.backend.repository.ContactRepository;
-import com.tryneuro.backend.repository.WappiSettingsRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReminderScheduler {
 
     private final AppointmentRepository appointmentRepository;
-    private final ContactRepository contactRepository;
-    private final WappiSettingsRepository settingsRepository;
-    private final WappiService wappiService;
+    private final NotificationManager notificationManager;
 
     @Scheduled(fixedRateString = "${reminder.check.interval:60000}")
+    @Transactional
     public void checkAndSendReminders() {
-        List<WappiSettings> allSettings = settingsRepository.findAll();
+        OffsetDateTime now = OffsetDateTime.now();
         
-        for (WappiSettings settings : allSettings) {
-            if (!settings.isEnabled() || settings.getApiKey() == null) continue;
+        // Получаем все будущие записи, где напоминание еще не отправлено
+        List<Appointment> pendingAppointments = appointmentRepository.findAllByReminderSentFalseAndAllowReminderTrueAndStartTimeAfter(
+            now
+        );
 
-            List<Appointment> appointments = appointmentRepository.findPendingReminders(
-                settings.getTenantId(), 
-                LocalDate.now()
-            );
+        if (pendingAppointments.isEmpty()) return;
+
+        for (Appointment app : pendingAppointments) {
+            // Только для активных статусов
+            if (app.getStatus() != AppointmentStatus.SCHEDULED && app.getStatus() != AppointmentStatus.CONFIRMED) {
+                continue;
+            }
+
+            OffsetDateTime startTime = app.getStartTime();
+            int leadTimeHours = app.getReminderLeadTimeHours() != null ? app.getReminderLeadTimeHours() : 24;
             
-            LocalDateTime now = LocalDateTime.now();
+            // Время, когда нужно отправить напоминание (время визита МИНУС часы упреждения)
+            OffsetDateTime triggerTime = startTime.minusHours(leadTimeHours);
 
-            for (Appointment app : appointments) {
-                LocalDateTime appointmentTime = app.getDate().atTime(app.getTime());
-                
-                // --- ИЗМЕНЕНИЕ: Не шлем напоминания, если до записи осталось меньше 10 минут ---
-                // Это защищает от спама по старым записям при перезагрузке сервера.
-                if (appointmentTime.isAfter(now.plusMinutes(10)) && 
-                    appointmentTime.isBefore(now.plusMinutes(settings.getLeadTimeMinutes()))) {
+            // Если время отправки уже наступило (или прошло), но до визита еще есть хотя бы 5 минут
+            if (now.isAfter(triggerTime) && startTime.isAfter(now.plusMinutes(5))) {
+                try {
+                    log.info("🚀 Triggering reminder for appointment {}. Client: {}", app.getId(), app.getClientName());
+                    notificationManager.sendNotification(app, "REMINDER");
                     
-                    contactRepository.findById(app.getContactId()).ifPresent(contact -> {
-                        try {
-                            wappiService.sendReminder(app, contact);
-                            app.setReminderSent(true);
-                            appointmentRepository.save(app);
-                            System.out.println("SUCCESS: TAPI reminder queued for: " + contact.getName());
-                        } catch (Exception e) {
-                            System.err.println("ERROR: Failed to send TAPI reminder: " + e.getMessage());
-                        }
-                    });
+                    app.setReminderSent(true);
+                    appointmentRepository.save(app);
+                } catch (Exception e) {
+                    log.error("❌ Failed to send reminder for {}: {}. Will retry later.", app.getId(), e.getMessage());
+                    // Оставляем reminderSent = false, чтобы система попробовала снова в следующем цикле
                 }
+            } else if (startTime.isBefore(now.plusMinutes(5))) {
+                // Если до визита осталось меньше 5 минут или он уже начался - 
+                // помечаем как "пропущенное", чтобы не пугать клиента за минуту до встречи.
+                log.warn("⏳ Appointment {} is too close or already started. Marking reminder as skipped.", app.getId());
+                app.setReminderSent(true);
+                appointmentRepository.save(app);
             }
         }
     }

@@ -1,0 +1,56 @@
+:root {
+    /* Палитра Solarized Light */
+    --base03: #002b36;
+    --base02: #073642;
+    --base01: #586e75; /* Основной текст */
+    --base00: #657b83;
+    --base0:  #839496;
+    --base1:  #93a1a1; /* Вспомогательный текст */
+    --base2:  #eee8d5; /* Фон выделения / нерабочие зоны */
+    --base3:  #fdf6e3; /* Основной фон (кремовый) */
+
+    --yellow:  #b58900;
+    --orange:  #cb4b16;
+    --red:     #dc322f;
+    --magenta: #d33682;
+    --violet:  #6c71c4;
+    --blue:    #268bd2; /* Основной акцентный синий */
+    --cyan:    #2aa198;
+    --green:   #859900;
+
+    /* Привязка к системным переменным */
+    --primary-color: var(--blue);
+    --primary-gradient: linear-gradient(135deg, #268bd2 0%, #2aa198 100%);
+    --bg-color: var(--base3);
+    --card-bg: var(--base2);
+    --text-color: var(--base01);
+    --hint-color: var(--base1);
+    --accent-color: var(--green);
+    --error-color: var(--red);
+
+    --border-radius: 20px;
+    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+/* Telegram overrides */
+:global(body.tg) {
+    --primary-color: var(--tg-theme-button-color, var(--blue));
+    --bg-color: var(--tg-theme-bg-color, var(--base3));
+}
+
+:global(body) {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+:global(.card) {
+    background: #ffffff; /* Белые карточки на кремовом фоне смотрятся хорошо */
+    border-radius: var(--border-radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--base2);
+}

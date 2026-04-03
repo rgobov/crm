@@ -11,9 +11,12 @@ services:
     depends_on:
       - postgres
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tryneuro_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: k918ddBi10e8_db_pass_secure
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/tryneuro_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      # Переменные будут подставлены из файла .env в этой же папке
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
 
   postgres:
     image: postgres:15-alpine
@@ -21,7 +24,7 @@ services:
     environment:
       POSTGRES_DB: tryneuro_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: k918ddBi10e8_db_pass_secure
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
 
@@ -34,7 +37,6 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
-    # Позволяет Nginx обращаться к хосту (туннелю)
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

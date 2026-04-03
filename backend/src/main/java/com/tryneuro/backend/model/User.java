@@ -16,7 +16,7 @@ import java.util.Collections;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class User implements UserDetails { // Реализуем UserDetails
+public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,10 +37,12 @@ public class User implements UserDetails { // Реализуем UserDetails
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    // --- Методы интерфейса UserDetails ---
+    // НОВОЕ: Идентификатор пользователя в Telegram для авто-входа
+    @Column(name = "telegram_id", unique = true)
+    private Long telegramId;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Убеждаемся, что роль не null, и добавляем префикс ROLE_ для Spring Security
         if (role == null) {
             return Collections.emptyList();
         }

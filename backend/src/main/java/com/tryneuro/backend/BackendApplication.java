@@ -2,10 +2,12 @@ package com.tryneuro.backend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@EnableScheduling // Включаем поддержку автоматических задач
+@EnableScheduling
+@EnableFeignClients // ВКЛЮЧАЕМ ПОДДЕРЖКУ FEIGN
 public class BackendApplication {
 
 	public static void main(String[] args) {

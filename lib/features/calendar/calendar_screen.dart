@@ -9,7 +9,9 @@ import 'package:try_neuro/features/staff/data/employee_service.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  final Function(DateTime)? onDateSelected; // Добавлен колбэк
+
+  const CalendarScreen({super.key, this.onDateSelected});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -43,8 +45,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     try {
       late final List<Workload> workload;
       if (_currentUser?.role == UserRole.employee) {
+        // Сотрудник видит только СВОЮ загрузку
         workload = await _employeeService.getMyWorkloadForMonth(month.year, month.month);
       } else {
+        // Менеджер видит загрузку ВСЕГО салона
         workload = await _managerService.getWorkloadForMonth(month.year, month.month);
       }
       if (mounted) {
@@ -68,11 +72,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
     if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute(
-        builder: (context) => ScheduleScreen(initialDate: selectedDay),
-      ),
-    );
+
+    if (widget.onDateSelected != null) {
+      // Если передан колбэк (режим Сотрудника), вызываем его
+      widget.onDateSelected!(selectedDay);
+    } else {
+      // Если колбэка нет (режим Менеджера), переходим на общий экран
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (context) => ScheduleScreen(initialDate: selectedDay),
+        ),
+      );
+    }
   }
 
   @override
@@ -80,6 +91,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Календарь загрузки'),
+        centerTitle: true,
       ),
       body: Column(
         children: [
@@ -135,6 +147,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
               },
             ),
           ),
+          const SizedBox(height: 20),
+          _buildLegend(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegend() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _legendItem(Colors.green.withOpacity(0.3), '1-2 зап.'),
+              _legendItem(Colors.yellow.withOpacity(0.4), '3-5 зап.'),
+              _legendItem(Colors.orange.withOpacity(0.5), '6-8 зап.'),
+              _legendItem(Colors.red.withOpacity(0.6), '9+ зап.'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legendItem(Color color, String label) {
+    return Expanded(
+      child: Row(
+        children: [
+          Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 10)),
         ],
       ),
     );

@@ -3,7 +3,8 @@ FROM dart:stable AS build
 
 RUN apt-get update && apt-get install -y git curl unzip
 
-ARG FLUTTER_VERSION=3.19.6
+# ОБНОВИЛИ ВЕРСИЮ: пакет telegram_web_app требует минимум 3.22.0
+ARG FLUTTER_VERSION=3.24.0
 RUN git clone https://github.com/flutter/flutter.git --depth 1 --branch ${FLUTTER_VERSION} /flutter
 ENV PATH="/flutter/bin:${PATH}"
 
@@ -12,7 +13,10 @@ RUN flutter config --enable-web
 
 WORKDIR /app
 
-COPY pubspec.* ./
+COPY pubspec.yaml ./
+# Если есть pubspec.lock, копируем и его
+# COPY pubspec.lock ./
+
 RUN flutter pub get
 
 COPY . .

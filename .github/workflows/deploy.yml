@@ -1,0 +1,42 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main # Теперь деплой запускается только при изменениях в основной ветке
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/crm
+            
+            echo "--- ОБНОВЛЕНИЕ КОДА (ветка main) ---"
+            git fetch origin main
+            git reset --hard origin/main
+            
+            echo "--- ПОДГОТОВКА СРЕДЫ (СЕКРЕТЫ) ---"
+            echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env
+            echo "TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}" >> .env
+            
+            echo "--- СБОРКА КОНТЕЙНЕРОВ ---"
+            export DOCKER_BUILDKIT=1
+            docker-compose build --pull
+            
+            echo "--- ПЕРЕЗАПУСК СЕРВИСОВ ---"
+            docker-compose up -d --force-recreate
+            
+            echo "--- ОЧИСТКА МУСОРА ---"
+            docker system prune -f
+            docker image prune -a -f --filter "until=24h"
+            
+            echo "--- СТАТУС КОНТЕЙНЕРОВ ---"
+            docker-compose ps

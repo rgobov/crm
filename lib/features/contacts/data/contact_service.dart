@@ -6,13 +6,39 @@ import 'package:try_neuro/service_locator.dart';
 class ContactService {
   final Dio _dio = sl<HttpClient>().dio;
 
-  Future<List<Contact>> getContacts({String? query}) async {
-    final response = await _dio.get('/contacts', queryParameters: query != null ? {'query': query} : null);
-    final List<dynamic> data = response.data;
-    return data.map((json) => Contact.fromJson(json)).toList();
+  /// Получение списка контактов с пагинацией.
+  /// Возвращает Map с 'contacts' (List) и 'isLast' (bool).
+  Future<Map<String, dynamic>> getContactsPaged({String? query, int page = 0, int size = 20}) async {
+    final response = await _dio.get('/contacts', queryParameters: {
+      if (query != null && query.isNotEmpty) 'query': query,
+      'page': page,
+      'size': size,
+    });
+
+    final List<dynamic> content = response.data['content'];
+    final bool isLast = response.data['last'] ?? true;
+
+    return {
+      'contacts': content.map((json) => Contact.fromJson(json)).toList(),
+      'isLast': isLast,
+    };
   }
 
-  // --- НОВОЕ: Экономный запрос количества клиентов ---
+  // Оставляем для совместимости (используется в других местах)
+  Future<List<Contact>> getContacts({String? query}) async {
+    final result = await getContactsPaged(query: query, size: 50);
+    return result['contacts'] as List<Contact>;
+  }
+
+  Future<Contact?> getContactById(String id) async {
+    try {
+      final response = await _dio.get('/contacts/$id');
+      return Contact.fromJson(response.data);
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<int> getContactsCount() async {
     final response = await _dio.get('/contacts/count');
     return response.data as int;

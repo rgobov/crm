@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:try_neuro/core/utils/phone_utils.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/features/contacts/domain/contact_model.dart';
@@ -18,7 +17,6 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contactService = sl<ContactService>();
 
-  // Разделенные контроллеры для ФИО
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _middleNameController = TextEditingController();
@@ -35,7 +33,6 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
     super.initState();
     
     if (_isEditing) {
-      // --- ЛОГИКА РАЗБИЕНИЯ ИМЕНИ ПРИ ЗАГРУЗКЕ ---
       final parts = widget.initialContact!.name.split(' ');
       if (parts.isNotEmpty) _lastNameController.text = parts[0];
       if (parts.length > 1) _firstNameController.text = parts[1];
@@ -98,7 +95,6 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
       return;
     }
 
-    // --- ЛОГИКА ОБЪЕДИНЕНИЯ ФИО ПЕРЕД СОХРАНЕНИЕМ ---
     final String fullName = [
       _lastNameController.text.trim(),
       _firstNameController.text.trim(),
@@ -158,7 +154,6 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
           child: ListView(
             padding: const EdgeInsets.all(24.0),
             children: [
-              // --- СЕКЦИЯ: ЛИЧНЫЕ ДАННЫЕ ---
               _buildFormSection(
                 title: 'Личные данные',
                 icon: Icons.person_outline,
@@ -185,10 +180,7 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 24),
-
-              // --- СЕКЦИЯ: КОНТАКТЫ ---
               _buildFormSection(
                 title: 'Контакты',
                 icon: Icons.contact_phone_outlined,
@@ -214,7 +206,8 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
                                 fillColor: Colors.white,
                               ),
                               keyboardType: TextInputType.phone,
-                              inputFormatters: [RussianPhoneInputFormatter()],
+                              // --- ИСПРАВЛЕНО: Используем актуальный форматтер ---
+                              inputFormatters: [InternationalPhoneInputFormatter()],
                               validator: (v) {
                                 final cleaned = PhoneUtils.clean(v ?? '');
                                 if (index == 0 && cleaned.isEmpty) return 'Обязательное поле';
@@ -231,7 +224,7 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                   TextButton.icon(
                     onPressed: _addPhoneField,
                     icon: const Icon(Icons.add),
@@ -246,10 +239,7 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 24),
-
-              // --- ПРОЧЕЕ ---
               _buildFormSection(
                 title: 'Дополнительно',
                 icon: Icons.note_alt_outlined,
@@ -263,10 +253,7 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 40),
-
-              // --- КНОПКА СОХРАНЕНИЯ ---
               FilledButton(
                 onPressed: _isSaving ? null : _saveForm,
                 style: FilledButton.styleFrom(
@@ -276,7 +263,7 @@ class _ContactEditScreenState extends State<ContactEditScreen> {
                 ),
                 child: _isSaving 
                   ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text(_isEditing ? 'ОБНОВИТЬ КЛИЕНТА' : 'СОХРАНИТЬ КЛИЕНТА', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  : Text(_isEditing ? 'ОБНОВИТЬ КЛИЕНТА' : 'СОЗДАТЬ ЗАПИСЬ', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 20),
             ],

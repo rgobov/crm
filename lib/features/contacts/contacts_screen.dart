@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:try_neuro/core/session/session_service.dart';
+import 'package:flutter/services.dart';
 import 'package:try_neuro/core/utils/phone_utils.dart';
-import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/contacts/add_contact_screen.dart';
 import 'package:try_neuro/features/contacts/contact_detail_screen.dart';
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
@@ -17,34 +17,125 @@ class ContactsScreen extends StatefulWidget {
 
 class _ContactsScreenState extends State<ContactsScreen> {
   final _contactService = sl<ContactService>();
-  final _sessionService = sl<SessionService>();
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  Timer? _debounce;
   
   List<Contact> _contacts = [];
-  bool _isLoading = true;
-  User? _currentUser;
+  bool _isLoading = false;
+  bool _isLoadMore = false;
+  int _currentPage = 0;
+  bool _isLastPage = false;
+  String _currentQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitialData();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+      if (!_isLoading && !_isLoadMore && !_isLastPage) {
+        _loadMoreData();
+      }
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 800), () {
+      final cleanDigits = PhoneUtils.clean(query);
+      
+      bool shouldSearch = false;
+      if (query.isEmpty) {
+        shouldSearch = true; 
+      } else if (cleanDigits.isNotEmpty) {
+        if (cleanDigits.length >= 6) shouldSearch = true;
+      } else {
+        if (query.trim().length >= 3) shouldSearch = true;
+      }
+
+      if (shouldSearch && _currentQuery != query) {
+        _loadInitialData();
+      }
+    });
+  }
+
+  Future<void> _loadInitialData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _currentPage = 0;
+      _isLastPage = false;
+      _currentQuery = _searchController.text;
+    });
+    
     try {
-      _currentUser = await _sessionService.getCurrentUser();
-      final contacts = await _contactService.getContacts(query: _searchController.text);
+      final cleanDigits = PhoneUtils.clean(_currentQuery);
+      final searchQuery = cleanDigits.isNotEmpty ? cleanDigits : _currentQuery;
+
+      final result = await _contactService.getContactsPaged(
+        query: searchQuery,
+        page: 0,
+        size: 25,
+      );
+      
       if (mounted) {
         setState(() {
-          _contacts = contacts;
+          _contacts = List<Contact>.from(result['contacts']);
+          _isLastPage = result['isLast'] as bool;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: $e')));
+      }
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    if (_isLoadMore || _isLastPage) return;
+    setState(() => _isLoadMore = true);
+    
+    try {
+      final nextPage = _currentPage + 1;
+      final cleanDigits = PhoneUtils.clean(_currentQuery);
+      final searchQuery = cleanDigits.isNotEmpty ? cleanDigits : _currentQuery;
+
+      final result = await _contactService.getContactsPaged(
+        query: searchQuery,
+        page: nextPage,
+        size: 25,
+      );
+      
+      if (mounted) {
+        final List<Contact> newContacts = result['contacts'];
+        setState(() {
+          for (var contact in newContacts) {
+            if (!_contacts.any((existing) => existing.id == contact.id)) {
+              _contacts.add(contact);
+            }
+          }
+          _isLastPage = result['isLast'] as bool;
+          _currentPage = nextPage;
+          _isLoadMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadMore = false);
       }
     }
   }
@@ -55,7 +146,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       MaterialPageRoute(builder: (context) => const AddContactScreen()),
     );
     if (result != null) {
-      _loadData();
+      _loadInitialData();
     }
   }
 
@@ -65,90 +156,152 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceVariant.withOpacity(0.2),
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: const Text('Клиенты'),
         centerTitle: true,
-        elevation: 0,
         backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
       body: Column(
         children: [
+          // --- ПОИСК: ПОДХОД КАК В НОВОЙ ЗАПИСИ ---
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: TextField(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextFormField(
               controller: _searchController,
+              // Фиксируем тип клавиатуры на text (она универсальна)
+              keyboardType: TextInputType.text,
+              // Всегда используем международный форматтер (он сам поймет, когда вводить цифры)
+              inputFormatters: [InternationalPhoneInputFormatter()],
               decoration: InputDecoration(
-                hintText: 'Поиск по имени или телефону...',
-                prefixIcon: const Icon(Icons.search),
+                labelText: 'Поиск клиента',
+                hintText: 'Имя или +7 (___) ...',
+                prefixIcon: const Icon(Icons.person_search_outlined),
                 suffixIcon: _searchController.text.isNotEmpty 
-                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () { _searchController.clear(); _loadData(); }) 
+                  ? IconButton(
+                      icon: const Icon(Icons.cancel_rounded), 
+                      onPressed: () { 
+                        _searchController.clear(); 
+                        _loadInitialData(); 
+                        setState(() {});
+                      }
+                    ) 
                   : null,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: colorScheme.surfaceVariant.withOpacity(0.3),
               ),
-              onChanged: (v) => _loadData(),
+              onChanged: (v) {
+                _onSearchChanged(v);
+                // Обновляем только если нужно показать/скрыть кнопку очистки
+                if (v.length <= 1) setState(() {});
+              },
             ),
           ),
+
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _contacts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.people_outline, size: 64, color: colorScheme.outline),
-                            const SizedBox(height: 16),
-                            const Text('Клиенты не найдены'),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _contacts.length,
-                        itemBuilder: (context, index) {
-                          final contact = _contacts[index];
-                          return Card(
-                            elevation: 0,
-                            margin: const EdgeInsets.only(bottom: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: colorScheme.outlineVariant),
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              leading: CircleAvatar(
-                                backgroundColor: colorScheme.primaryContainer,
-                                foregroundColor: colorScheme.onPrimaryContainer,
-                                child: Text(contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?'),
-                              ),
-                              title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              subtitle: Text(
-                                contact.phones.isNotEmpty ? PhoneUtils.format(contact.phones.first) : 'Нет телефона',
-                                style: TextStyle(color: colorScheme.onSurfaceVariant),
-                              ),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () async {
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => ContactDetailScreen(contact: contact)),
-                                );
-                                if (result == true) _loadData();
-                              },
-                            ),
-                          );
-                        },
-                      ),
+                : RefreshIndicator(
+                    onRefresh: _loadInitialData,
+                    child: _contacts.isEmpty
+                        ? _buildEmptyState(colorScheme)
+                        : ListView.separated(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                            itemCount: _contacts.length + 1,
+                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              if (index == _contacts.length) {
+                                return _buildFooter();
+                              }
+                              
+                              final contact = _contacts[index];
+                              return _buildContactTile(contact, colorScheme);
+                            },
+                          ),
+                  ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _navigateToAddContact,
-        icon: const Icon(Icons.person_add),
+        icon: const Icon(Icons.person_add_rounded),
         label: const Text('Новый клиент'),
+        elevation: 2,
       ),
+    );
+  }
+
+  Widget _buildContactTile(Contact contact, ColorScheme colorScheme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundColor: colorScheme.primaryContainer.withOpacity(0.7),
+          foregroundColor: colorScheme.onPrimaryContainer,
+          child: Text(
+            contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        title: Text(contact.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(
+          contact.phones.isNotEmpty ? PhoneUtils.format(contact.phones.first) : 'Нет телефона',
+          style: TextStyle(color: colorScheme.onSurfaceVariant),
+        ),
+        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: colorScheme.outline),
+        onTap: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ContactDetailScreen(contact: contact)),
+          );
+          if (result == true) _loadInitialData();
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ColorScheme colorScheme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_search_rounded, size: 80, color: colorScheme.outline.withOpacity(0.3)),
+          const SizedBox(height: 16),
+          Text(
+            _currentQuery.isEmpty ? 'На сегодня записей нет' : 'Клиенты не найдены',
+            style: TextStyle(fontSize: 16, color: colorScheme.outline, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooter() {
+    if (_isLastPage) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: Text(
+            _currentQuery.isEmpty 
+              ? 'Всего на сегодня: ${_contacts.length}' 
+              : 'Найдено клиентов: ${_contacts.length}',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 12, letterSpacing: 1.1),
+          ),
+        ),
+      );
+    }
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 32),
+      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
     );
   }
 }
