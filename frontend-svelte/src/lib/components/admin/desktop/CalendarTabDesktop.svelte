@@ -8,6 +8,7 @@
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
+    import { portal } from '$lib/actions/portal.js';
 
     export let forcedDate = null;
 
@@ -129,7 +130,7 @@
     {/if}
 
     {#if showModal}
-        <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
+        <div class="modal-backdrop" use:portal on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
                     <h3>
@@ -180,8 +181,8 @@
     .date-info .m { font-size: 15px; font-weight: 700; color: #93a1a1; text-transform: uppercase; }
     .btn-add { background: linear-gradient(135deg, #268bd2 0%, #2aa198 100%); color: white; border: none; padding: 10px 20px; border-radius: 14px; font-weight: 800; font-size: 13px; cursor: pointer; }
     .timeline-container { flex: 1; overflow: hidden; position: relative; }
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 43, 54, 0.6); backdrop-filter: blur(4px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .modal-content { background: #fdf6e3; width: 100%; max-width: 550px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); border: 1px solid #ddd6c1; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 43, 54, 0.6); backdrop-filter: blur(4px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
+    .modal-content { background: #fdf6e3; width: 100%; max-width: 550px; max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); border: 1px solid #ddd6c1; }
     .modal-header { background: #eee8d5; padding: 24px 32px; border-bottom: 1.5px solid #ddd6c1; display: flex; justify-content: space-between; align-items: center; }
     .modal-header h3 { color: #073642; margin: 0; font-size: 18px; font-weight: 800; }
     .close-btn { background: #fdf6e3; border: 1px solid #ddd6c1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #586e75; font-weight: bold; }

@@ -4,6 +4,7 @@
     import { branchService } from '$lib/services/branchService.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
     import { fade, scale, slide } from 'svelte/transition';
+    import { portal } from '$lib/actions/portal.js';
 
     export let staffId;
     const dispatch = createEventDispatcher();
@@ -98,7 +99,7 @@
     }
 </script>
 
-<div class="modal-backdrop" on:click|self={() => dispatch('close')} transition:fade={{duration: 200}}>
+<div class="modal-backdrop" use:portal on:click|self={() => dispatch('close')} transition:fade={{duration: 200}}>
     <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
         <div class="modal-header">
             <h2>Профиль сотрудника</h2>
@@ -255,8 +256,8 @@
 </div>
 
 <style>
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-    .modal-content { background: #f8fafc; width: 100%; max-width: 420px; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: 90vh; overflow-y: auto; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
+    .modal-content { background: #f8fafc; width: 100%; max-width: 420px; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); overflow-y: auto; }
 
     .modal-header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; z-index: 10; }
     .modal-header h2 { margin: 0; font-size: 15px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }

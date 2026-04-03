@@ -2,6 +2,7 @@
     import { createEventDispatcher } from 'svelte';
     import { branchService } from '$lib/services/branchService.js';
     import { fade, scale } from 'svelte/transition';
+    import { portal } from '$lib/actions/portal.js';
 
     export let branch = null;
     const dispatch = createEventDispatcher();
@@ -45,7 +46,7 @@
     }
 </script>
 
-<div class="modal-backdrop" on:click|self={() => dispatch('close')} in:fade={{duration: 200}}>
+<div class="modal-backdrop" use:portal on:click|self={() => dispatch('close')} in:fade={{duration: 200}}>
     <div class="modal-card" in:scale={{duration: 300, start: 0.95}}>
         <header class="modal-header">
             <h2>{branch ? 'Редактировать филиал' : 'Новый филиал'}</h2>
@@ -84,7 +85,7 @@
 </div>
 
 <style>
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
     .modal-card { background: white; width: 100%; max-width: 450px; border-radius: 32px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
     .modal-header { padding: 24px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
     .modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; color: #1e293b; }

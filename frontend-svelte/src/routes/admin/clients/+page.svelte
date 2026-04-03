@@ -5,6 +5,7 @@
     import { fade, scale } from 'svelte/transition';
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
+    import { portal } from '$lib/actions/portal.js';
 
     let clients = [];
     let searchQuery = '';
@@ -148,7 +149,7 @@
 
     <!-- МОДАЛЬНОЕ ОКНО (ВОССТАНОВЛЕННЫЕ ОРИГИНАЛЬНЫЕ КЛАССЫ) -->
     {#if selectedClientId}
-        <div class="modal-backdrop" on:click|self={closeDetails} transition:fade={{duration: 200}}>
+        <div class="modal-backdrop" use:portal on:click|self={closeDetails} transition:fade={{duration: 200}}>
             <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
                     <h2>Карточка клиента</h2>
@@ -197,13 +198,13 @@
     .add-header-btn { margin-left: auto; width: 44px; height: 44px; background: var(--primary-gradient); color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.35); transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0; }
     .add-header-btn:active { transform: scale(0.92); box-shadow: 0 2px 6px rgba(56, 151, 240, 0.2); }
 
-    /* МОДАЛЬНОЕ ОКНО (ВОССТАНОВЛЕННЫЕ ОРИГИНАЛЬНЫЕ СТИЛИ) */
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-    .modal-content { background: white; width: 100%; max-width: 500px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); }
-    .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
-    .modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; }
-    .close-x { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
-    .modal-scroll-body { flex: 1; overflow-y: auto; background: #f8fafc; }
+    /* МОДАЛЬНОЕ ОКНО */
+    :global(.modal-backdrop) { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
+    :global(.modal-content) { background: white; width: 100%; max-width: 500px; max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); }
+    :global(.modal-header) { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; }
+    :global(.modal-header h2) { margin: 0; font-size: 18px; font-weight: 800; }
+    :global(.close-x) { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; }
+    :global(.modal-scroll-body) { flex: 1; overflow-y: auto; background: #f8fafc; }
 
     .clients-initial-loader { display: flex; justify-content: center; padding: 100px 0; }
     .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }

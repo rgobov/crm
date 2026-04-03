@@ -5,6 +5,7 @@
     import TelegramSettingsModal from '../TelegramSettingsModal.svelte';
     import NotificationTemplatesModal from '../NotificationTemplatesModal.svelte';
     import { fade, scale } from 'svelte/transition';
+    import { portal } from '$lib/actions/portal.js';
 
     // Props от родителя (могут использоваться в будущем)
     export let forcedDate = null;
@@ -94,7 +95,7 @@
 </div>
 
 {#if showTelegramModal}
-    <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTelegramModal = false}>
+    <div class="modal-overlay" use:portal transition:fade={{duration: 200}} on:click|self={() => showTelegramModal = false}>
         <div class="modal-wrapper" in:scale={{start: 0.95, duration: 200}}>
             <TelegramSettingsModal on:close={() => showTelegramModal = false} />
         </div>
@@ -102,7 +103,7 @@
 {/if}
 
 {#if showTemplatesModal}
-    <div class="modal-overlay" transition:fade={{duration: 200}} on:click|self={() => showTemplatesModal = false}>
+    <div class="modal-overlay" use:portal transition:fade={{duration: 200}} on:click|self={() => showTemplatesModal = false}>
         <div class="modal-wrapper" in:scale={{start: 0.95, duration: 200}}>
             <NotificationTemplatesModal on:close={() => showTemplatesModal = false} />
         </div>
@@ -162,15 +163,20 @@
     .item-text p { margin: 2px 0 0 0; font-size: 12px; color: #586e75; font-weight: 500; }
     .arrow { font-size: 20px; color: #93a1a1; opacity: 0.5; margin-left: 8px; }
 
-    .modal-overlay {
+    :global(.modal-overlay) {
         position: fixed; inset: 0; background: rgba(7, 54, 66, 0.8);
-        backdrop-filter: blur(8px); z-index: 3000;
-        display: flex; align-items: center; justify-content: center; padding: 20px;
+        backdrop-filter: blur(8px); z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+        padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px));
+        padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px));
+        box-sizing: border-box;
     }
-    .modal-wrapper {
+    :global(.modal-wrapper) {
         width: 100%; max-width: 450px;
         background: #fdf6e3; border-radius: 34px; overflow: hidden;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         border: 1.5px solid #ddd6c1;
+        max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px);
     }
 </style>

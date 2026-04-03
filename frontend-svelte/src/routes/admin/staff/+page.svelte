@@ -159,23 +159,13 @@
     {/if}
 
     {#if selectedStaffId}
-        <div class="modal-backdrop" on:click|self={closeStaffModal} transition:fade={{duration: 200}}>
-            <div class="modal-content" transition:scale={{start: 0.95, duration: 200}}>
-                <header class="modal-header">
-                    <h2>Профиль мастера</h2>
-                    <button class="close-x-btn" on:click={closeStaffModal}>✕</button>
-                </header>
-                <div class="modal-body-scroll">
-                    {#key refreshKey}
-                        <StaffDetailModal
-                            staffId={selectedStaffId}
-                            on:updated={handleUpdateSuccess}
-                            on:close={closeStaffModal}
-                        />
-                    {/key}
-                </div>
-            </div>
-        </div>
+        {#key refreshKey}
+            <StaffDetailModal
+                staffId={selectedStaffId}
+                on:updated={handleUpdateSuccess}
+                on:close={closeStaffModal}
+            />
+        {/key}
     {/if}
 </div>
 

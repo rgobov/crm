@@ -2,6 +2,7 @@
     import { createEventDispatcher } from 'svelte';
     import { contactService } from '$lib/services/contactService.js';
     import { fade, scale } from 'svelte/transition';
+    import { portal } from '$lib/actions/portal.js';
 
     const dispatch = createEventDispatcher();
 
@@ -35,7 +36,7 @@
     }
 </script>
 
-<div class="modal-backdrop" on:click|self={() => dispatch('close')} transition:fade={{duration: 200}}>
+<div class="modal-backdrop" use:portal on:click|self={() => dispatch('close')} transition:fade={{duration: 200}}>
     <div class="modal-content" transition:scale={{start: 0.9, duration: 200}}>
         <div class="modal-header">
             <h2>Новый клиент</h2>
@@ -74,8 +75,8 @@
 </div>
 
 <style>
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-    .modal-content { background: white; width: 100%; max-width: 450px; border-radius: 28px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
+    .modal-content { background: white; width: 100%; max-width: 450px; border-radius: 28px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); display: flex; flex-direction: column; }
 
     .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
     .modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; }

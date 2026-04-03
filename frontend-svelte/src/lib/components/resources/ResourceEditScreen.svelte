@@ -5,6 +5,7 @@
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
+    import { portal } from '$lib/actions/portal.js';
 
     export let resource = null;
     const dispatch = createEventDispatcher();
@@ -54,7 +55,7 @@
     }
 </script>
 
-<div class="modal-backdrop" on:click|self={() => dispatch('cancel')} transition:fade={{duration: 200}}>
+<div class="modal-backdrop" use:portal on:click|self={() => dispatch('cancel')} transition:fade={{duration: 200}}>
     <div class="modal-content" in:scale={{duration: 400, start: 0.95, easing: quintOut}}>
 
         <header class="modal-header">
@@ -107,8 +108,12 @@
 <style>
     .modal-backdrop {
         position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(8px); z-index: 2000;
-        display: flex; align-items: center; justify-content: center; padding: 20px;
+        backdrop-filter: blur(8px); z-index: 99999;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+        padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px));
+        padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px));
+        box-sizing: border-box;
     }
 
     .modal-content {
@@ -116,6 +121,7 @@
         border-radius: 32px; overflow: hidden;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         display: flex; flex-direction: column;
+        max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px);
     }
 
     .modal-header {
