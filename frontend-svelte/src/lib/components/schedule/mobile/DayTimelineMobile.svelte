@@ -38,13 +38,22 @@
 
     function updateLayout() {
         const width = window.innerWidth;
-        if (staff.length <= 1) {
-            STAFF_WIDTH = width - TIME_COL_WIDTH;
+        const availableWidth = width - TIME_COL_WIDTH;
+        // Считаем общее кол-во колонок для расчета ширины
+        const totalCols = staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
+
+        if (totalCols <= 1) {
+            STAFF_WIDTH = availableWidth;
+            HOUR_HEIGHT = 80;
+        } else if (totalCols === 2) {
+            // Если всего 2 колонки, делим экран пополам
+            STAFF_WIDTH = Math.floor(availableWidth / 2);
+            HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.4); // Чуть выше для комфорта
         } else {
-            STAFF_WIDTH = Math.floor((width - TIME_COL_WIDTH) / 3);
+            // Если 3 и более, делим на 3 (стандартный режим)
+            STAFF_WIDTH = Math.floor(availableWidth / 3);
+            HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.618);
         }
-        HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.618);
-        if (staff.length <= 1) HOUR_HEIGHT = 80;
         SLOT_HEIGHT = HOUR_HEIGHT / 4;
     }
 
