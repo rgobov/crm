@@ -90,7 +90,8 @@ public class ScheduleService {
         // Проверяем изменились ли критические поля для валидации доступности
         boolean timeChanged = !appointment.getStartTime().equals(details.getStartTime());
         boolean durationChanged = !appointment.getDurationInMinutes().equals(details.getDurationInMinutes());
-        boolean staffChanged = !Objects.equals(appointment.getStaffMemberId(), details.getStaffMemberId());
+        boolean staffChanged = !
+                Objects.equals(appointment.getStaffMemberId(), details.getStaffMemberId());
         boolean branchChanged = !Objects.equals(appointment.getBranchId(), details.getBranchId());
         boolean resourceChanged = !Objects.equals(appointment.getResourceId(), details.getResourceId());
         
