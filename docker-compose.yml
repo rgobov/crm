@@ -1,0 +1,102 @@
+version: '3.8'
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "3"
+
+services:
+  tryneuro_database:
+    image: postgres:15-alpine
+    container_name: tryneuro_db
+    restart: always
+    logging: *default-logging
+    environment:
+      POSTGRES_DB: tryneuro_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tryneuro_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tryneuro_backend
+    restart: always
+    logging: *default-logging
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tryneuro_database:5432/tryneuro_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-postgres}
+      JWT_SECRET: ${JWT_SECRET:-9a4f98bed2f032b38cd98f9b5560ca2fd691225db05e61247b91285284cc56a0}
+      SERVICES_NOTIFICATIONS_URL: http://notifications:8081
+    depends_on:
+      - tryneuro_database
+    networks:
+      - tryneuro_network
+    ports:
+      - "8080:8080"
+
+  notifications:
+    build:
+      context: ./notifications
+      dockerfile: Dockerfile
+    container_name: tryneuro_notifications
+    restart: always
+    logging: *default-logging
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      BACKEND_SERVICE_URL: http://backend:8080
+    volumes:
+      - tg_sessions:/root/.try_neuro/tg-sessions
+    networks:
+      - tryneuro_network
+    ports:
+      - "8081:8081"
+
+  frontend-svelte:
+    build:
+      context: ./frontend-svelte
+      dockerfile: Dockerfile
+    container_name: tryneuro_svelte
+    restart: always
+    logging: *default-logging
+    environment:
+      ORIGIN: https://crm.999crm.ru
+      PROTOCOL_HEADER: x-forwarded-proto
+      HOST_HEADER: x-forwarded-host
+      PORT: 3000
+    depends_on:
+      - backend
+    networks:
+      - tryneuro_network
+    ports:
+      - "3001:3000"
+
+  nginx-proxy:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: tryneuro_proxy
+    restart: always
+    logging: *default-logging
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+    volumes:
+      - ./proxy/data:/data
+      - ./proxy/letsencrypt:/etc/letsencrypt
+    networks:
+      - tryneuro_network
+
+networks:
+  tryneuro_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  tg_sessions:
