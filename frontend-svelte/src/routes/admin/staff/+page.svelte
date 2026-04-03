@@ -75,6 +75,7 @@
                 {#if isLoading && !isFirstLoad}
                     <div class="mini-status-loader"></div>
                 {/if}
+                <button class="add-header-btn" on:click={() => showAddModal = true}>+</button>
             </div>
 
             <div class="search-container">
@@ -149,9 +150,6 @@
         </div>
     </div>
 
-    <!-- ✅ ИСПРАВЛЕННАЯ КНОПКА: ТЕПЕРЬ ОТКРЫВАЕТ МОДАЛКУ -->
-    <button class="fab-btn" on:click={() => showAddModal = true}>+</button>
-
     <!-- ✅ МОДАЛКА СОЗДАНИЯ -->
     {#if showAddModal}
         <AddStaffModal
@@ -223,8 +221,8 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .fab-btn { position: fixed; bottom: 40px; right: 40px; width: 64px; height: 64px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.4); cursor: pointer; z-index: 100; transition: transform 0.2s; }
-    .fab-btn:active { transform: scale(0.9); }
+    .add-header-btn { margin-left: auto; width: 44px; height: 44px; background: var(--primary-gradient); color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.35); transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0; }
+    .add-header-btn:active { transform: scale(0.92); box-shadow: 0 2px 6px rgba(56, 151, 240, 0.2); }
 
     .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
     .modal-content { background: white; width: 100%; max-width: 480px; height: 85vh; border-radius: 32px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); }

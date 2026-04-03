@@ -19,8 +19,13 @@
         showMoreMenu = false;
         showCalendarModal = false;
         activeTab.set(tab);
-        if ($page.url.pathname !== '/admin') {
-            await goto('/admin');
+        try {
+            if ($page?.url?.pathname !== '/admin') {
+                await goto('/admin');
+            }
+        } catch (e) {
+            // Fallback для WebView/Telegram где SvelteKit router может быть не готов
+            window.location.href = '/admin';
         }
     }
 

@@ -19,6 +19,13 @@ public interface StaffMemberRepository extends JpaRepository<StaffMember, String
     @Query("SELECT DISTINCT s FROM StaffMember s JOIN s.branches b WHERE s.tenantId = :tenantId AND b.id = :branchId AND s.active = true")
     List<StaffMember> findByTenantIdAndBranchId(@Param("tenantId") String tenantId, @Param("branchId") String branchId);
 
+    // JOIN FETCH версии — подтягивают branches за один SQL-запрос, устраняя N+1 и LazyInitializationException
+    @Query("SELECT DISTINCT s FROM StaffMember s LEFT JOIN FETCH s.branches WHERE s.tenantId = :tenantId")
+    List<StaffMember> findByTenantIdWithBranches(@Param("tenantId") String tenantId);
+
+    @Query("SELECT DISTINCT s FROM StaffMember s JOIN FETCH s.branches b WHERE s.tenantId = :tenantId AND b.id = :branchId AND s.active = true")
+    List<StaffMember> findByTenantIdAndBranchIdWithBranches(@Param("tenantId") String tenantId, @Param("branchId") String branchId);
+
     @Query("SELECT s FROM StaffMember s WHERE s.tenantId = :tenantId " +
            "AND (:active IS NULL OR s.active = :active) " +
            "AND (:query IS NULL OR :query = '' OR LOWER(s.name) LIKE LOWER(CONCAT('%', :query, '%')) " +

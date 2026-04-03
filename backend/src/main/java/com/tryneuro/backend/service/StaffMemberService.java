@@ -214,6 +214,28 @@ public class StaffMemberService {
     }
 
     @Transactional
+    public List<StaffMember> getStaffForDate(String tenantId, LocalDate date, String branchId) {
+        List<StaffMember> staffList;
+        if (branchId != null && !branchId.isEmpty() && !"null".equals(branchId)) {
+            staffList = staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tenantId, branchId);
+        } else {
+            staffList = staffMemberRepository.findByTenantIdWithBranches(tenantId);
+        }
+        return staffList.stream()
+                .filter(StaffMember::isActive)
+                .peek(staff -> {
+                    enrichWithUserData(staff);
+                    staffShiftRepository.findByStaffIdAndDateAndBranchId(staff.getId(), date, branchId).ifPresentOrElse(shift -> {
+                        staff.setDayOff(shift.isDayOff());
+                        staff.setWorkStartTime(shift.getWorkStartTime());
+                        staff.setWorkEndTime(shift.getWorkEndTime());
+                        staff.setBreakStartTime(shift.getBreakStartTime());
+                        staff.setBreakEndTime(shift.getBreakEndTime());
+                    }, () -> staff.setDayOff(true));
+                }).collect(Collectors.toList());
+    }
+
+    @Transactional
     public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
         return getStaffMemberById(id).map(staff -> {
             List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staff.getId(), date);
@@ -229,28 +251,6 @@ public class StaffMemberService {
         });
     }
 
-    @Transactional
-    public List<StaffMember> getStaffForDate(String tenantId, LocalDate date, String branchId) {
-        List<StaffMember> staffList;
-        if (branchId != null && !branchId.isEmpty() && !"null".equals(branchId)) {
-            staffList = staffMemberRepository.findByTenantIdAndBranchId(tenantId, branchId);
-        } else {
-            staffList = staffMemberRepository.findByTenantId(tenantId);
-        }
-        return staffList.stream()
-                .filter(StaffMember::isActive)
-                .peek(staff -> {
-                    if (staff.getBranches() != null) staff.getBranches().size();
-                    enrichWithUserData(staff);
-                    staffShiftRepository.findByStaffIdAndDateAndBranchId(staff.getId(), date, branchId).ifPresentOrElse(shift -> {
-                        staff.setDayOff(shift.isDayOff());
-                        staff.setWorkStartTime(shift.getWorkStartTime());
-                        staff.setWorkEndTime(shift.getWorkEndTime());
-                        staff.setBreakStartTime(shift.getBreakStartTime());
-                        staff.setBreakEndTime(shift.getBreakEndTime());
-                    }, () -> staff.setDayOff(true));
-                }).collect(Collectors.toList());
-    }
 
     @Transactional
     public StaffShift saveShift(StaffShift shift) {

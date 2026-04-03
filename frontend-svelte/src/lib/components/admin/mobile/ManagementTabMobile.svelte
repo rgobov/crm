@@ -4,6 +4,15 @@
     import { goto } from '$app/navigation';
     import { fade, scale } from 'svelte/transition';
 
+    // Безопасная навигация: fallback на window.location для WebView/Telegram
+    function safeGoto(path) {
+        try {
+            goto(path);
+        } catch (e) {
+            window.location.href = path;
+        }
+    }
+
     // Props от родителя (могут использоваться в будущем)
     export let forcedDate = null;
     export let branchId = null;
@@ -98,14 +107,14 @@
 
         <div class="phi-grid">
             {#each gridItems as item}
-                <button class="phi-card" on:click={() => goto(item.link)} in:scale={{duration: 200, start: 0.95}}>
+                <button class="phi-card" on:click={() => safeGoto(item.link)} in:scale={{duration: 200, start: 0.95}}>
                     <div class="card-icon">{item.icon}</div>
                     <h3>{item.title}</h3>
                 </button>
             {/each}
         </div>
 
-        <button class="phi-wide-card" on:click={() => goto('/admin/clients')} in:fade={{delay: 300}}>
+        <button class="phi-wide-card" on:click={() => safeGoto('/admin/clients')} in:fade={{delay: 300}}>
             <div class="wide-inner">
                 <div class="card-icon accent-bg">💎</div>
                 <div class="wide-text">
