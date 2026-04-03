@@ -87,8 +87,23 @@
 </div>
 
 <style>
-    .edit-screen { padding: 20px; max-width: 500px; margin: 0 auto; }
-    .form-container { padding: 24px; background: white; border-radius: 24px; box-shadow: var(--shadow); }
+    .edit-screen {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 18vh 20px 20px;
+        overflow-y: auto;
+        box-sizing: border-box;
+    }
+    .edit-screen .form-container { width: 100%; max-width: 480px; }
+    .form-container { padding: 32px; background: white; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+
+    @media (max-width: 640px) {
+        .edit-screen { padding-top: 10vh; }
+        .form-container { padding: 24px 20px; }
+    }
 
     .field { margin-bottom: 24px; }
     label { display: block; font-size: 12px; font-weight: 700; color: var(--primary-color); margin-bottom: 10px; text-transform: uppercase; }

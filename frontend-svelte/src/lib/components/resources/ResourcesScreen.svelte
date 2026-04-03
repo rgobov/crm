@@ -82,16 +82,20 @@
     }
 </script>
 
-<div class="screen-wrapper">
+    <div class="screen-wrapper">
+    <header class="sticky-header">
+        <div class="header-inner">
+            <div class="title-row">
+                <h1>Ресурсы</h1>
+                <span class="count-badge">{resources.length}</span>
+                <button class="add-header-btn" on:click={openCreate}>+</button>
+            </div>
+            <p class="subtitle">Управление кабинетами и оборудованием филиалов</p>
+        </div>
+    </header>
+
     <div class="screen-content">
         <div class="container-inner">
-            <header class="header">
-                <div class="title-wrap">
-                    <h1>Ресурсы</h1>
-                    <span class="count-badge">{resources.length}</span>
-                </div>
-                <p class="subtitle">Управление кабинетами и оборудованием филиалов</p>
-            </header>
 
             {#if isLoading && resources.length === 0}
                 <div class="center-loader"><span class="spinner"></span></div>
@@ -129,7 +133,6 @@
         </div>
     </div>
 
-    <button class="fab-btn" on:click={openCreate}>+</button>
 
     {#if showModal}
         <ResourceEditScreen
@@ -141,14 +144,15 @@
 </div>
 
 <style>
-    .screen-wrapper { height: 100vh; width: 100%; display: flex; flex-direction: column; background: #f8fafc; overflow: hidden; position: relative; }
-    .screen-content { flex: 1; overflow-y: auto; width: 100%; box-sizing: border-box; }
-    .container-inner { max-width: 800px; margin: 0 auto; padding: 32px 20px; }
-    .header { margin-bottom: 32px; }
-    .title-wrap { display: flex; align-items: center; gap: 12px; }
+    .screen-wrapper { height: 100vh; width: 100%; display: flex; flex-direction: column; background: #f8fafc; overflow: hidden; }
+    .sticky-header { background: white; border-bottom: 1px solid #f1f5f9; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+    .header-inner { max-width: 800px; margin: 0 auto; padding: 24px 32px 12px; }
+    .title-row { display: flex; align-items: center; gap: 12px; min-height: 36px; }
     h1 { font-size: 28px; font-weight: 850; margin: 0; color: #0f172a; }
     .count-badge { background: #eff6ff; color: var(--primary-color); padding: 4px 12px; border-radius: 10px; font-size: 14px; font-weight: 800; }
     .subtitle { color: #94a3b8; margin: 8px 0 0 0; font-weight: 600; }
+    .screen-content { flex: 1; overflow-y: auto; width: 100%; box-sizing: border-box; }
+    .container-inner { max-width: 800px; margin: 0 auto; padding: 32px 20px; }
 
     .tiles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
 
@@ -178,8 +182,8 @@
     .btn-del { background: #fef2f2; color: #ef4444; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; opacity: 0; transition: 0.2s; }
     .resource-tile:hover .btn-del { opacity: 1; }
 
-    .fab-btn { position: fixed; bottom: 40px; right: 40px; width: 64px; height: 64px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; font-weight: 300; cursor: pointer; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.3); transition: 0.2s; z-index: 100; }
-    .fab-btn:active { transform: scale(0.9); }
+    .add-header-btn { margin-left: auto; width: 44px; height: 44px; background: var(--primary-gradient); color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.35); transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0; }
+    .add-header-btn:active { transform: scale(0.92); box-shadow: 0 2px 6px rgba(56, 151, 240, 0.2); }
 
     .center-loader { display: flex; justify-content: center; padding: 100px; }
     .spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
@@ -188,6 +192,5 @@
     @media (max-width: 640px) {
         .container-inner { padding: 20px; }
         .tiles-grid { grid-template-columns: 1fr; }
-        .fab-btn { bottom: 100px; right: 20px; }
     }
 </style>

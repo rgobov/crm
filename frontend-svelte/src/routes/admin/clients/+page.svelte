@@ -75,6 +75,7 @@
                 {#if isLoading && clients.length > 0}
                     <div class="mini-top-loader"></div>
                 {/if}
+                <button class="add-header-btn" on:click={() => showAddModal = true}>+</button>
             </div>
 
             <div class="filter-tabs">
@@ -140,7 +141,6 @@
         </div>
     </div>
 
-    <button class="fab-circle" on:click={() => showAddModal = true}>+</button>
 
     {#if showAddModal}
         <AddContactModal on:close={() => showAddModal = false} on:success={handleAddSuccess} />
@@ -194,7 +194,8 @@
     .name-line { font-size: 15px; font-weight: 800; color: #1e293b; }
     .phone-line { font-size: 13px; color: #94a3b8; font-weight: 600; }
 
-    .fab-circle { position: fixed; bottom: 40px; right: 40px; width: 64px; height: 64px; background: var(--primary-gradient); color: white; border: none; border-radius: 20px; font-size: 32px; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.4); cursor: pointer; z-index: 1000; }
+    .add-header-btn { margin-left: auto; width: 44px; height: 44px; background: var(--primary-gradient); color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(56, 151, 240, 0.35); transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0; }
+    .add-header-btn:active { transform: scale(0.92); box-shadow: 0 2px 6px rgba(56, 151, 240, 0.2); }
 
     /* МОДАЛЬНОЕ ОКНО (ВОССТАНОВЛЕННЫЕ ОРИГИНАЛЬНЫЕ СТИЛИ) */
     .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
