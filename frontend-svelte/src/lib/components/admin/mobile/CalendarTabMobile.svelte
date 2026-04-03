@@ -357,6 +357,9 @@
         font-size: 18px;
         cursor: pointer;
         transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     :global(.modal-backdrop .close-btn:hover) {
