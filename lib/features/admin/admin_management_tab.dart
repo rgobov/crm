@@ -4,6 +4,7 @@ import 'package:try_neuro/features/manager/wappi_settings_screen.dart';
 import 'package:try_neuro/features/resources/resources_screen.dart';
 import 'package:try_neuro/features/services/services_screen.dart';
 import 'package:try_neuro/features/staff/staff_screen.dart';
+import 'package:try_neuro/features/contacts/contacts_screen.dart'; // Добавлен импорт
 
 class AdminManagementTab extends StatefulWidget {
   const AdminManagementTab({super.key});
@@ -50,6 +51,13 @@ class _AdminManagementTabState extends State<AdminManagementTab> {
                   icon: Icons.badge,
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StaffScreen())),
                 ),
+                // --- НОВОЕ: Кнопка Клиенты для Администратора ---
+                _buildManagementButton(
+                  context,
+                  title: 'Клиенты',
+                  icon: Icons.people_outline,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ContactsScreen())),
+                ),
                 _buildManagementButton(
                   context,
                   title: 'Ресурсы',
@@ -69,7 +77,7 @@ class _AdminManagementTabState extends State<AdminManagementTab> {
                 _buildManagementButton(
                   context,
                   title: 'Напоминания Wappi.pro',
-                  icon: Icons.notifications_active, // <<< ЗАМЕНЕНО С Icons.whatsapp
+                  icon: Icons.notifications_active,
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WappiSettingsScreen())),
                 ),
               ],

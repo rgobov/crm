@@ -1,17 +1,20 @@
 package com.tryneuro.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
+import java.util.Set;
 
 @Entity
 @Table(name = "staff_members")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class StaffMember {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -25,17 +28,37 @@ public class StaffMember {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
-    private LocalTime workStartTime;
-    private LocalTime workEndTime;
-    private LocalTime breakStartTime;
-    private LocalTime breakEndTime;
+    private String phone;
+
+    @Column(name = "photo_url")
+    private String photoUrl;
 
     @Column(nullable = false, columnDefinition = "boolean default true")
-    private boolean available = true;
+    private boolean active = true;
 
-    @Transient // Это поле не будет сохраняться в БД
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "staff_member_branches",
+        joinColumns = @JoinColumn(name = "staff_member_id"),
+        inverseJoinColumns = @JoinColumn(name = "branch_id")
+    )
+    private Set<Branch> branches;
+
+    @Transient
+    private LocalTime workStartTime;
+    @Transient
+    private LocalTime workEndTime;
+    @Transient
+    private LocalTime breakStartTime;
+    @Transient
+    private LocalTime breakEndTime;
+    @Transient
+    private boolean isDayOff;
+
+    @Transient
     private String role;
 
-    @Transient // И это поле тоже не будет сохраняться в БД
+    @Transient
     private String email;
 }

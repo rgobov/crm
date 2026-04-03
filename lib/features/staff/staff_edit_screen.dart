@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/session/session_service.dart';
+import 'package:try_neuro/core/utils/phone_utils.dart'; // <<< Добавлен импорт
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
@@ -8,7 +9,6 @@ import 'dart:async';
 
 class StaffEditScreen extends StatefulWidget {
   final StaffMember? staffMember;
-  // `initialEmail` больше не нужен, так как мы получаем его из staffMember
   const StaffEditScreen({super.key, this.staffMember});
 
   @override
@@ -22,19 +22,18 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
 
   bool get _isEditing => widget.staffMember != null;
 
-  // Контроллеры для полей
   final _nameController = TextEditingController();
   final _specialtyController = TextEditingController();
+  final _phoneController = TextEditingController(); // <<< Новый контроллер
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _newPasswordController = TextEditingController(); // Для нового пароля
+  final _newPasswordController = TextEditingController();
 
-  // Переменные состояния
   bool _hasAccount = false;
   bool _isAvailable = true;
   String _selectedRole = 'EMPLOYEE';
   TimeOfDay? _workStartTime, _workEndTime, _breakStartTime, _breakEndTime;
-  bool _isLoading = true; // Начинаем с загрузки
+  bool _isLoading = true;
   User? _currentUser;
 
   @override
@@ -53,6 +52,7 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
         if (member != null) {
           _nameController.text = member.name;
           _specialtyController.text = member.specialty;
+          _phoneController.text = member.phone != null ? PhoneUtils.format(member.phone) : ''; // <<< Заполнение телефона
           _isAvailable = member.available;
           _selectedRole = member.role ?? 'EMPLOYEE';
           _workStartTime = member.workStartTime;
@@ -73,6 +73,7 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
   void dispose() {
     _nameController.dispose();
     _specialtyController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _newPasswordController.dispose();
@@ -89,18 +90,20 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final String cleanPhone = PhoneUtils.clean(_phoneController.text); // <<< Очистка номера
+
       if (_isEditing) {
         await _staffService.updateStaffMember(
           id: widget.staffMember!.id,
           name: _nameController.text,
           specialty: _specialtyController.text,
+          phone: cleanPhone, // <<< Отправка телефона
           role: _selectedRole,
           available: _isAvailable,
           workStartTime: _formatTime(_workStartTime),
           workEndTime: _formatTime(_workEndTime),
           breakStartTime: _formatTime(_breakStartTime),
           breakEndTime: _formatTime(_breakEndTime),
-          // Передаем email и новый пароль
           email: _emailController.text,
           password: _newPasswordController.text,
         );
@@ -108,6 +111,7 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
         await _staffService.addStaffMember(
           name: _nameController.text,
           specialty: _specialtyController.text,
+          phone: cleanPhone, // <<< Отправка телефона
           email: _hasAccount ? _emailController.text : null,
           password: _hasAccount ? _passwordController.text : null,
           role: _selectedRole,
@@ -121,13 +125,6 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
       if (mounted) Navigator.of(context).pop(true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _selectTime(BuildContext context, TimeOfDay? initialTime, ValueChanged<TimeOfDay> onTimeSelected) async {
-    final TimeOfDay? picked = await showTimePicker(context: context, initialTime: initialTime ?? TimeOfDay.now());
-    if (picked != null && picked != initialTime) {
-      onTimeSelected(picked);
     }
   }
 
@@ -145,44 +142,69 @@ class _StaffEditScreenState extends State<StaffEditScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16.0),
                 children: [
-                  TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Имя'), validator: (v) => v!.isEmpty ? 'Введите имя' : null),
+                  TextFormField(
+                    controller: _nameController, 
+                    decoration: const InputDecoration(labelText: 'Имя', border: OutlineInputBorder()), 
+                    validator: (v) => v!.isEmpty ? 'Введите имя' : null
+                  ),
                   const SizedBox(height: 16),
-                  TextFormField(controller: _specialtyController, decoration: const InputDecoration(labelText: 'Специальность'), validator: (v) => v!.isEmpty ? 'Введите специальность' : null),
+                  TextFormField(
+                    controller: _specialtyController, 
+                    decoration: const InputDecoration(labelText: 'Специальность', border: OutlineInputBorder()), 
+                    validator: (v) => v!.isEmpty ? 'Введите специальность' : null
+                  ),
                   const SizedBox(height: 16),
-                  // --- ЛОГИКА ОТОБРАЖЕНИЯ ПОЛЕЙ АККАУНТА ---
-                  if (!_isEditing) // Показываем свитчер только при создании
+                  
+                  // --- НОВОЕ ПОЛЕ: Телефон ---
+                  TextFormField(
+                    controller: _phoneController,
+                    decoration: const InputDecoration(
+                      labelText: 'Телефон', 
+                      border: OutlineInputBorder(),
+                      hintText: '+7 (___) ___-__-__'
+                    ),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [InternationalPhoneInputFormatter()],
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (!_isEditing)
                     SwitchListTile(
                       title: const Text('Создать учетную запись'),
                       value: _hasAccount,
                       onChanged: (value) => setState(() => _hasAccount = value),
                     ),
-                  // Показываем поля, если создаем аккаунт, ИЛИ если редактируем и аккаунт уже есть
                   if (_hasAccount) ...[
                     TextFormField(
                       controller: _emailController, 
-                      decoration: const InputDecoration(labelText: 'Email'), 
+                      decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()), 
                       validator: (v) => v!.isEmpty ? 'Введите email' : null, 
                       enabled: isEmailFieldEnabled,
                     ),
                     const SizedBox(height: 16),
-                    // Поле "Пароль" только при создании
                     if (!_isEditing)
-                      TextFormField(controller: _passwordController, decoration: const InputDecoration(labelText: 'Пароль'), obscureText: true, validator: (v) => (v!.isEmpty) ? 'Введите пароль' : null),
-                    // Поле "Новый пароль" только у админа при редактировании
+                      TextFormField(controller: _passwordController, decoration: const InputDecoration(labelText: 'Пароль', border: OutlineInputBorder()), obscureText: true, validator: (v) => (v!.isEmpty) ? 'Введите пароль' : null),
                     if (_isEditing && isAdmin)
-                      TextFormField(controller: _newPasswordController, decoration: const InputDecoration(labelText: 'Новый пароль (оставьте пустым, чтобы не менять)'), obscureText: true),
+                      TextFormField(controller: _newPasswordController, decoration: const InputDecoration(labelText: 'Новый пароль (оставьте пустым)', border: OutlineInputBorder()), obscureText: true),
                     const SizedBox(height: 16),
                   ],
                   DropdownButtonFormField<String>(
                     value: _selectedRole,
-                    items: const [DropdownMenuItem(value: 'EMPLOYEE', child: Text('Сотрудник')), DropdownMenuItem(value: 'MANAGER', child: Text('Менеджер'))],
+                    items: const [
+                      DropdownMenuItem(value: 'EMPLOYEE', child: Text('Сотрудник')), 
+                      DropdownMenuItem(value: 'MANAGER', child: Text('Менеджер'))
+                    ],
                     onChanged: (v) => setState(() => _selectedRole = v!),
-                    decoration: const InputDecoration(labelText: 'Роль'),
+                    decoration: const InputDecoration(labelText: 'Роль', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 16),
                   SwitchListTile(title: const Text('Доступен'), value: _isAvailable, onChanged: (v) => setState(() => _isAvailable = v)),
                   const SizedBox(height: 24),
-                  ElevatedButton(onPressed: _isLoading ? null : _saveForm, child: const Text('Сохранить')),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _saveForm, 
+                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                    child: const Text('Сохранить')
+                  ),
                 ],
               ),
             ),

@@ -22,10 +22,16 @@ dependencies:
   async: ^2.11.0
   
   dio: ^5.4.0
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^10.0.0
   shared_preferences: ^2.2.3
   jwt_decoder: ^2.0.1
-  stomp_dart_client: ^3.0.1 # <<< ОБНОВИЛИ ВЕРСИЮ
+  stomp_dart_client: ^3.0.1
+  
+  # ТЕЛЕГРАМ MINI APP SDK
+  telegram_web_app: ^0.3.3
+
+  # СИНХРОНИЗИРОВАННЫЙ СКРОЛЛ
+  linked_scroll_controller: ^0.2.0
 
 dev_dependencies:
   flutter_test:

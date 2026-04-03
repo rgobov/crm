@@ -9,4 +9,7 @@ import java.util.List;
 @Repository
 public interface ResourceRepository extends JpaRepository<Resource, String> {
     List<Resource> findByTenantId(String tenantId);
+    
+    // НОВОЕ: Поиск ресурсов конкретного филиала
+    List<Resource> findByTenantIdAndBranchId(String tenantId, String branchId);
 }

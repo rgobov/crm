@@ -15,7 +15,6 @@ import 'package:try_neuro/features/resources/data/resource_service.dart';
 import 'package:try_neuro/features/resources/domain/resource_model.dart';
 import 'package:try_neuro/features/schedule/domain/appointment_model.dart';
 import 'package:try_neuro/features/services/data/app_service.dart';
-import 'package:try_neuro/features/services/domain/service_model.dart';
 import 'package:try_neuro/features/staff/data/employee_service.dart';
 import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
@@ -57,10 +56,9 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
   Timer? _phoneDebounce;
   bool _isAutoUpdating = false;
 
-  List<Contact> _contacts = [];
+  List<Contact> _contacts = []; 
   List<Resource> _resources = [];
   List<StaffMember> _staff = [];
-  List<Service> _services = [];
 
   Contact? _selectedContact;
   StaffMember? _selectedStaffMember;
@@ -80,7 +78,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     _serviceController.text = widget.initialAppointment?.service ?? '';
     _durationController = TextEditingController(text: widget.initialAppointment?.durationInMinutes.toString() ?? '60');
     _selectedTime = widget.initialAppointment?.time ?? widget.preselectedTime;
-    _selectedDate = widget.initialAppointment?.date ?? widget.selectedDate;
+    _selectedDate = widget.initialAppointment?.startTime ?? widget.selectedDate;
     _phoneSearchController.addListener(_onPhoneChanged);
     _loadInitialData();
   }
@@ -116,34 +114,23 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     if (_phoneDebounce?.isActive ?? false) _phoneDebounce!.cancel();
     _phoneDebounce = Timer(const Duration(milliseconds: 800), () async {
       final latestDigits = PhoneUtils.clean(_phoneSearchController.text);
-      if (latestDigits.length < 5) return;
+      if (latestDigits.length < 6) return;
 
       final contact = await _contactService.findContactByPhone(latestDigits);
       
       if (contact != null && mounted) {
-        if (_selectedContact?.id == contact.id) return;
-
         setState(() {
           _isAutoUpdating = true;
-          final index = _contacts.indexWhere((c) => c.id == contact.id);
-          if (index != -1) {
-            _selectedContact = _contacts[index];
-          } else {
-            _contacts.insert(0, contact);
-            _selectedContact = contact;
+          if (!_contacts.any((c) => c.id == contact.id)) {
+            _contacts.add(contact);
           }
-          
+          _selectedContact = contact;
           _phoneSearchController.text = PhoneUtils.format(contact.phones.first);
           _isAutoUpdating = false;
         });
 
-        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Клиент найден: ${contact.name}'), 
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
+          SnackBar(content: Text('Клиент найден: ${contact.name}'), duration: const Duration(seconds: 1)),
         );
       }
     });
@@ -157,38 +144,41 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
 
       late final List<StaffMember> staffList;
       if (_currentUser?.role == UserRole.manager || _currentUser?.role == UserRole.admin) {
-        staffList = await _managerService.getStaffForSchedule();
+        staffList = await _managerService.getStaffForSchedule(_selectedDate);
       } else if (_currentUser?.role == UserRole.employee) {
-        final self = await _employeeService.getMyProfile();
+        final self = await _employeeService.getMyProfile(date: _selectedDate);
         staffList = [self];
       } else {
         staffList = await _staffService.getStaff();
       }
 
       final otherData = await Future.wait([
-        _contactService.getContacts(),
         _resourceService.getResources(),
         _appService.getServices(),
       ]);
 
       if (!mounted) return;
 
-      _contacts = otherData[0] as List<Contact>;
-      _resources = otherData[1] as List<Resource>;
+      _resources = otherData[0] as List<Resource>;
       _staff = staffList;
-      _services = otherData[2] as List<Service>;
+
+      if (widget.initialAppointment != null && widget.initialAppointment!.contactId != null) {
+        final contact = await _contactService.getContactById(widget.initialAppointment!.contactId!);
+        if (contact != null) {
+          setState(() {
+            _contacts = [contact];
+            _selectedContact = contact;
+            _isAutoUpdating = true;
+            _phoneSearchController.text = contact.displayPhone;
+            _isAutoUpdating = false;
+          });
+        }
+      }
 
       if (widget.initialAppointment != null) {
         try {
-          _selectedContact = _contacts.firstWhere((c) => c.id == widget.initialAppointment!.contactId);
           if (widget.initialAppointment!.resourceId != null) _selectedResource = _resources.firstWhere((r) => r.id == widget.initialAppointment!.resourceId);
           if (widget.initialAppointment!.staffMemberId != null) _selectedStaffMember = _staff.firstWhere((s) => s.id == widget.initialAppointment!.staffMemberId);
-          
-          if (_selectedContact != null) {
-            _isAutoUpdating = true;
-            _phoneSearchController.text = _selectedContact!.displayPhone;
-            _isAutoUpdating = false;
-          }
         } catch (e) { /* ignore */ }
       } else if (widget.preselectedStaffId != null) {
         final matchingStaff = _staff.where((s) => s.id == widget.preselectedStaffId).toList();
@@ -199,7 +189,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: ${e.toString()}'), backgroundColor: Colors.red));
-        Navigator.of(context).pop();
       }
     } finally {
       if (mounted) {
@@ -239,10 +228,17 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     setState(() => _isSaving = true);
 
     try {
+      final combinedStartTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime!.hour,
+        _selectedTime!.minute,
+      );
+
       final newAppointment = Appointment(
         id: widget.initialAppointment?.id ?? 'new',
-        date: _selectedDate,
-        time: _selectedTime!,
+        startTime: combinedStartTime,
         durationInMinutes: int.tryParse(_durationController.text) ?? 60,
         clientName: _selectedContact!.name,
         contactId: _selectedContact!.id, 
@@ -361,12 +357,13 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
     if (result is Contact) {
       setState(() {
         _isAutoUpdating = true;
-        _contacts.insert(0, result);
+        if (!_contacts.any((c) => c.id == result.id)) {
+          _contacts.insert(0, result);
+        }
         _selectedContact = result;
         _phoneSearchController.text = result.displayPhone;
         _isAutoUpdating = false;
       });
-      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Клиент добавлен: ${result.name}')),
       );
@@ -396,7 +393,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // --- СЕКЦИЯ: КЛИЕНТ ---
                     _buildSectionCard(
                       title: 'Информация о клиенте',
                       icon: Icons.person_search_outlined,
@@ -408,7 +404,7 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                             labelText: 'Поиск по телефону',
                             hintText: '+7 (___) ___-__-__',
                             prefixIcon: const Icon(Icons.phone),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                             filled: true,
                             fillColor: Colors.white,
                             suffixIcon: IconButton(
@@ -418,7 +414,8 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                             ),
                           ),
                           keyboardType: TextInputType.phone,
-                          inputFormatters: [RussianPhoneInputFormatter()],
+                          // --- ПРАВКА: Используем международный форматтер ---
+                          inputFormatters: [InternationalPhoneInputFormatter()],
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<Contact>(
@@ -448,7 +445,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- СЕКЦИЯ: ДЕТАЛИ ---
                     _buildSectionCard(
                       title: 'Детали визита',
                       icon: Icons.event_note_outlined,
@@ -517,7 +513,6 @@ class _AppointmentEditScreenState extends State<AppointmentEditScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- СЕКЦИЯ: ИСПОЛНЕНИЕ ---
                     _buildSectionCard(
                       title: 'Исполнение',
                       icon: Icons.badge_outlined,

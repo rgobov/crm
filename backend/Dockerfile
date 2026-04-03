@@ -1,12 +1,23 @@
-# Используем легкий образ с Java 17
-FROM eclipse-temurin:17-jdk-alpine
-
-# Рабочая директория
+# ЭТАП 1: Сборка
+FROM maven:3.8.4-openjdk-17-slim AS build
 WORKDIR /app
 
-# Копируем собранный JAR файл в контейнер
-# Убедитесь, что mvn clean package был выполнен перед сборкой образа
-COPY target/backend-0.0.1-SNAPSHOT.jar app.jar
+# Кешируем зависимости
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-# Указываем команду для запуска
+# Копируем исходный код
+COPY src ./src
+
+# ВКЛЮЧАЕМ ТЕСТЫ ПЕРЕД СБОРКОЙ:
+# Если тесты не пройдут, образ не соберется и деплой не состоится.
+RUN mvn package
+
+# ЭТАП 2: Запуск
+FROM eclipse-temurin:17-jdk-alpine
+WORKDIR /app
+
+COPY --from=build /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
+
+EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

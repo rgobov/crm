@@ -1,17 +1,15 @@
 /// Центральный конфигурационный файл приложения.
 class AppConfig {
-  // --- ГЛАВНЫЙ ПЕРЕКЛЮЧАТЕЛЬ ОКРУЖЕНИЯ ---
-  //
-  // true: приложение будет подключаться к удаленному серверу (продакшен).
-  // false: приложение будет подключаться к локальному бэкенду (разработка).
-  //
-  static const bool isProduction = false;
+  static const bool isProduction = true; 
 
-  // --- АДРЕСА СЕРВЕРОВ ---
-  // Убрали порт :8080, так как Nginx сам перенаправляет запросы
-  static const String productionUrl = 'https://738629.cloud4box.ru/api';
-  // Адрес для локальной разработки на Android эмуляторе
-  static const String developmentUrlAndroid = 'http://10.0.2.2:8080/api';
-  // Адрес для локальной разработки в браузере (Chrome) или iOS симуляторе
+  // --- ТЕСТИРОВАНИЕ НА РЕАЛЬНОМ ТЕЛЕФОНЕ!!! ---
+  static const bool isMobileTest = true;
+
+  // Исправленный адрес (точки вместо дефисов, чтобы совпадало с Nginx Proxy Manager)
+  static const String productionUrl = 'https://crm.999crm.ru/api';
+  
+  static const String computerIp = '192.168.100.5';
+  static const String developmentUrlAndroidEmulator = 'http://10.0.2.2:8080/api';
+  static const String developmentUrlAndroidDevice = 'http://$computerIp:8080/api';
   static const String developmentUrlDefault = 'http://localhost:8080/api';
 }

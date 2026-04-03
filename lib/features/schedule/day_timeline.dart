@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:linked_scroll_controller/linked_scroll_controller.dart'; // <<< НОВЫЙ ИМПОРТ
 import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/features/auth/domain/user_model.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
@@ -46,9 +47,19 @@ class _DayTimelineState extends State<DayTimeline> {
   final double timeColumnWidth = 60.0;
   final double staffColumnWidth = 150.0;
 
+  // --- КОНТРОЛЛЕРЫ ДЛЯ СИНХРОНИЗАЦИИ СКРОЛЛА ---
+  late LinkedScrollControllerGroup _horizontalScrollGroup;
+  late ScrollController _headerScrollController;
+  late ScrollController _bodyScrollController;
+
   @override
   void initState() {
     super.initState();
+    // Инициализируем группу скролла
+    _horizontalScrollGroup = LinkedScrollControllerGroup();
+    _headerScrollController = _horizontalScrollGroup.addAndGet();
+    _bodyScrollController = _horizontalScrollGroup.addAndGet();
+
     _sessionService.getCurrentUser().then((user) {
       if (mounted) setState(() => _currentUser = user);
     });
@@ -62,6 +73,8 @@ class _DayTimelineState extends State<DayTimeline> {
   @override
   void dispose() {
     _timer?.cancel();
+    _headerScrollController.dispose();
+    _bodyScrollController.dispose();
     super.dispose();
   }
 
@@ -154,6 +167,7 @@ class _DayTimelineState extends State<DayTimeline> {
       onTap: () => setState(() => _selectedAppointmentId = null),
       child: Column(
         children: [
+          // --- ШАПКА МАСТЕРОВ ---
           Container(
             height: 60,
             decoration: BoxDecoration(
@@ -165,6 +179,7 @@ class _DayTimelineState extends State<DayTimeline> {
                 SizedBox(width: timeColumnWidth, child: Icon(Icons.access_time, size: 18, color: colorScheme.outline)),
                 Expanded(
                   child: ListView(
+                    controller: _headerScrollController, // <<< ПРИВЯЗАЛИ КОНТРОЛЛЕР
                     scrollDirection: Axis.horizontal,
                     physics: const ClampingScrollPhysics(),
                     children: [
@@ -174,8 +189,16 @@ class _DayTimelineState extends State<DayTimeline> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(s.name, style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface, fontSize: 13)),
-                                  Text(s.specialty, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+                                  Text(s.name, 
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface, fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(s.specialty, 
+                                    style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ],
                               ),
                             ))),
@@ -191,19 +214,25 @@ class _DayTimelineState extends State<DayTimeline> {
             ),
           ),
           
+          // --- ТЕЛО РАСПИСАНИЯ ---
           Expanded(
-            child: SingleChildScrollView(
+            child: SingleChildScrollView( // Вертикальный скролл
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Колонка времени (зафиксирована слева)
                   SizedBox(
                     width: timeColumnWidth,
                     height: totalHeight,
                     child: _buildTimeColumn(startHour, endHour, colorScheme),
                   ),
+                  
+                  // Колонки мастеров (синхронно крутятся по горизонтали)
                   Expanded(
                     child: SingleChildScrollView(
+                      controller: _bodyScrollController, // <<< ПРИВЯЗАЛИ КОНТРОЛЛЕР
                       scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
                       child: Row(
                         children: [
                           ...widget.staff.map((s) => _buildStaffColumn(context, s, totalHeight, startHour, endHour, colorScheme)),
@@ -311,9 +340,8 @@ class _DayTimelineState extends State<DayTimeline> {
     final double actualHeight = appointment.durationInMinutes * (hourHeight / 60);
     final isSelected = _selectedAppointmentId == appointment.id;
     
-    // ПАРАМЕТРЫ АНИМАЦИИ
-    const duration = Duration(milliseconds: 400); // Сделали дольше
-    const curve = Curves.fastOutSlowIn; // Более премиальная кривая
+    const duration = Duration(milliseconds: 400);
+    const curve = Curves.fastOutSlowIn;
 
     final double displayHeight = isSelected ? max(actualHeight, 95.0) : actualHeight;
     final bool showContent = isSelected || actualHeight >= 35;
@@ -331,7 +359,7 @@ class _DayTimelineState extends State<DayTimeline> {
             _selectedAppointmentId = isSelected ? null : appointment.id;
           });
         },
-        child: AnimatedContainer( // Добавили плавную анимацию тени и углов
+        child: AnimatedContainer(
           duration: duration,
           curve: curve,
           decoration: BoxDecoration(
@@ -344,10 +372,7 @@ class _DayTimelineState extends State<DayTimeline> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // 1. ФОН
                 Container(color: _getStatusColor(appointment.status, colorScheme)),
-                
-                // 2. КОНТЕНТ (с защитой от Overflow во время роста)
                 if (showContent)
                   IgnorePointer(
                     child: Padding(
@@ -388,7 +413,6 @@ class _DayTimelineState extends State<DayTimeline> {
                     ),
                   ),
 
-                // 3. ПАНЕЛЬ КНОПОК
                 if (isSelected)
                   Positioned(
                     bottom: 0,

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:try_neuro/core/network/time_service.dart';
 import 'package:try_neuro/core/network/websocket_service.dart';
+import 'package:try_neuro/features/auth/data/auth_service.dart';
+import 'package:try_neuro/features/auth/login_screen.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/schedule/appointment_detail_screen.dart';
 import 'package:try_neuro/features/schedule/appointment_edit_screen.dart';
@@ -23,6 +25,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   final ManagerService _managerService = sl<ManagerService>();
   final TimeService _timeService = sl<TimeService>();
   final WebSocketService _wsService = sl<WebSocketService>();
+  final AuthService _authService = sl<AuthService>();
 
   late DateTime _selectedDay;
   List<Appointment> _appointmentsForDay = [];
@@ -55,13 +58,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     try {
       final results = await Future.wait([
         _managerService.getAppointmentsForDay(_selectedDay),
-        _managerService.getStaffForSchedule(), 
+        // ПЕРЕДАЕМ ДАТУ: Чтобы получить смены на конкретный день
+        _managerService.getStaffForSchedule(_selectedDay), 
       ]);
 
       if (mounted) {
         setState(() {
           _appointmentsForDay = results[0] as List<Appointment>;
           final allStaff = results[1] as List<StaffMember>;
+          // Фильтруем только сотрудников (EMPLOYEE)
           _staff = allStaff.where((s) => s.role == 'EMPLOYEE').toList(); 
           _isLoading = false;
         });
@@ -72,6 +77,36 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         if (!silent) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: ${e.toString()}')));
         }
+      }
+    }
+  }
+
+  void _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Выход из системы'),
+        content: const Text('Вы действительно хотите выйти из своей учетной записи?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ОТМЕНА'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ВЫЙТИ', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _authService.logout();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
       }
     }
   }
@@ -135,6 +170,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.logout, color: Colors.redAccent),
+          onPressed: _handleLogout,
+          tooltip: 'Выйти',
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -145,7 +185,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       body: Column(
         children: [
-          // 1. Таймлайн занимает всё основное пространство
           Expanded(
             child: _isLoading && _appointmentsForDay.isEmpty
                 ? const Center(child: CircularProgressIndicator())
@@ -158,8 +197,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     onAppointmentUpdated: _onAppointmentUpdated,
                   ),
           ),
-          
-          // 2. Разделитель и Календарь ПЕРЕМЕЩЕНЫ ВНИЗ
           const Divider(height: 1),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12),

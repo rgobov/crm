@@ -1,30 +1,33 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:try_neuro/core/config/app_config.dart'; // Импортируем наш конфиг
+import 'package:try_neuro/core/config/app_config.dart';
 import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/service_locator.dart';
 
 class HttpClient {
   final Dio dio;
 
-  // Функция для получения URL на основе конфига
   static String getBaseUrl() {
     if (AppConfig.isProduction) {
       return AppConfig.productionUrl;
     }
 
-    // Локальная разработка
     if (kIsWeb) {
       return AppConfig.developmentUrlDefault;
     }
+
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return AppConfig.developmentUrlAndroid;
+      // Выбираем URL в зависимости от того, тестируем на реальном устройстве или эмуляторе
+      return AppConfig.isMobileTest 
+          ? AppConfig.developmentUrlAndroidDevice 
+          : AppConfig.developmentUrlAndroidEmulator;
     }
+
     return AppConfig.developmentUrlDefault;
   }
 
   HttpClient() : dio = Dio(BaseOptions(
-    baseUrl: getBaseUrl(), // Используем результат нашей функции
+    baseUrl: getBaseUrl(),
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 30),
   )) {

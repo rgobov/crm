@@ -98,7 +98,6 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
   }
 
   Future<void> _sendTest() async {
-    // --- ИЗМЕНЕНИЕ: Захардкодили номер в контроллер по умолчанию ---
     final TextEditingController phoneCtrl = TextEditingController(text: PhoneUtils.format('79122488565'));
     
     final phone = await showDialog<String>(
@@ -114,11 +113,11 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
               controller: phoneCtrl,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(), 
-                hintText: '+7 (___) ___-__-__',
+                hintText: 'Номер телефона',
                 helperText: 'Номер можно изменить или стереть',
               ),
               keyboardType: TextInputType.phone,
-              inputFormatters: [RussianPhoneInputFormatter()],
+              inputFormatters: [InternationalPhoneInputFormatter()],
             ),
           ],
         ),
@@ -270,21 +269,6 @@ class _WappiSettingsScreenState extends State<WappiSettingsScreen> {
                 ),
               ),
             ),
-    );
-  }
-}
-
-class _TagChip extends StatelessWidget {
-  final String tag;
-  final String label;
-  const _TagChip({required this.tag, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      label: Text(tag, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue)),
-      onPressed: () {},
-      tooltip: label,
     );
   }
 }

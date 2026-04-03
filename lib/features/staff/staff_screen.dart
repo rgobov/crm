@@ -3,6 +3,7 @@ import 'package:try_neuro/features/staff/data/staff_service.dart';
 import 'package:try_neuro/features/staff/domain/staff_member_model.dart';
 import 'package:try_neuro/features/staff/staff_edit_screen.dart';
 import 'package:try_neuro/service_locator.dart';
+import 'dart:async';
 
 class StaffScreen extends StatefulWidget {
   const StaffScreen({super.key});
@@ -13,7 +14,12 @@ class StaffScreen extends StatefulWidget {
 
 class _StaffScreenState extends State<StaffScreen> {
   final StaffService _staffService = sl<StaffService>();
-  late Future<List<StaffMember>> _staffFuture;
+  final TextEditingController _searchController = TextEditingController();
+
+  List<StaffMember> _staff = [];
+  bool _isLoading = true;
+  int _totalElements = 0;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -21,24 +27,47 @@ class _StaffScreenState extends State<StaffScreen> {
     _loadStaff();
   }
 
-  void _loadStaff() {
-    setState(() {
-      _staffFuture = _staffService.getStaff();
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  // Логика "умного" поиска как в Svelte
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      final isPhone = RegExp(r'^\d+$').hasMatch(query);
+      if (query.isEmpty || (isPhone && query.length >= 6) || (!isPhone && query.length >= 2)) {
+        _loadStaff(query: query);
+      }
     });
   }
 
-  // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+  Future<void> _loadStaff({String? query}) async {
+    setState(() => _isLoading = true);
+    try {
+      final result = await _staffService.getStaffPaged(query: query);
+      setState(() {
+        _staff = result['members'];
+        _totalElements = result['totalElements'];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка загрузки: $e')));
+      }
+    }
+  }
+
   void _navigateToEditScreen({StaffMember? staffMember}) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        // Убираем устаревший параметр `initialEmail`
-        builder: (context) => StaffEditScreen(staffMember: staffMember),
-      ),
+      MaterialPageRoute(builder: (context) => StaffEditScreen(staffMember: staffMember)),
     );
-    if (result == true) {
-      _loadStaff();
-    }
+    if (result == true) _loadStaff();
   }
 
   void _deleteStaffMember(String staffMemberId) async {
@@ -48,11 +77,8 @@ class _StaffScreenState extends State<StaffScreen> {
         title: const Text('Подтверждение'),
         content: const Text('Вы уверены, что хотите удалить этого сотрудника?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -67,46 +93,72 @@ class _StaffScreenState extends State<StaffScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Персонал'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Персонал'),
+            Text('Всего: $_totalElements', style: const TextStyle(fontSize: 12)),
+          ],
+        ),
       ),
-      body: FutureBuilder<List<StaffMember>>(
-        future: _staffFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Ошибка загрузки: ${snapshot.error}'));
-          }
-          final staff = snapshot.data;
-          if (staff == null || staff.isEmpty) {
-            return const Center(child: Text('У вас пока нет сотрудников'));
-          }
-          return RefreshIndicator(
-            onRefresh: () async => _loadStaff(),
-            child: ListView.builder(
-              itemCount: staff.length,
-              itemBuilder: (context, index) {
-                final staffMember = staff[index];
-                return ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.badge)),
-                  title: Text(staffMember.name),
-                  subtitle: Text(staffMember.specialty),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                    onPressed: () => _deleteStaffMember(staffMember.id),
-                  ),
-                  onTap: () => _navigateToEditScreen(staffMember: staffMember),
-                );
-              },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Поиск (от 2 букв или 6 цифр)...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(icon: const Icon(Icons.clear), onPressed: () {
+                      _searchController.clear();
+                      _loadStaff();
+                    })
+                  : null,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: _isLoading && _staff.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : _staff.isEmpty
+                    ? const Center(child: Text('Ничего не найдено'))
+                    : RefreshIndicator(
+                        onRefresh: () => _loadStaff(query: _searchController.text),
+                        child: ListView.builder(
+                          itemCount: _staff.length,
+                          itemBuilder: (context, index) {
+                            final member = _staff[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                                  child: Text(member.name[0].toUpperCase(), style: TextStyle(color: Theme.of(context).primaryColor)),
+                                ),
+                                title: Text(member.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text(member.specialty),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                  onPressed: () => _deleteStaffMember(member.id),
+                                ),
+                                onTap: () => _navigateToEditScreen(staffMember: member),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
-        heroTag: 'staff_fab', 
         onPressed: () => _navigateToEditScreen(),
-        tooltip: 'Добавить сотрудника',
         child: const Icon(Icons.add),
       ),
     );

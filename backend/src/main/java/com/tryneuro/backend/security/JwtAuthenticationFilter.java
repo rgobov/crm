@@ -43,27 +43,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         final String jwt = authHeader.substring(7);
-        final String userEmail = jwtUtil.extractUsername(jwt);
 
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Основная логика аутентификации ---
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+        try {
+            final String userEmail = jwtUtil.extractUsername(jwt);
 
-            if (jwtUtil.isTokenValid(jwt, userDetails)) {
-                final Claims claims = jwtUtil.extractAllClaims(jwt);
-                final String tenantId = claims.get("tenantId", String.class);
-                request.setAttribute("tenantId", tenantId);
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, 
-                        null, 
-                        userDetails.getAuthorities()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                // ЭТО КЛЮЧЕВОЙ МОМЕНТ: Мы явно устанавливаем аутентификацию для ТЕКУЩЕГО запроса
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtUtil.isTokenValid(jwt, userDetails)) {
+                    final Claims claims = jwtUtil.extractAllClaims(jwt);
+                    final String tenantId = claims.get("tenantId", String.class);
+                    request.setAttribute("tenantId", tenantId);
+
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // ЛОВИМ ВСЕ ОШИБКИ: SignatureException, ExpiredJwtException, MalformedJwtException и др.
+            // Если токен плохой - просто не авторизуем пользователя.
+            logger.warn("JWT Token validation failed: " + e.getMessage());
         }
+
         filterChain.doFilter(request, response);
     }
 }

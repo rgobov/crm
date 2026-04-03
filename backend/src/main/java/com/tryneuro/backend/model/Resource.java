@@ -1,5 +1,6 @@
 package com.tryneuro.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -22,4 +23,13 @@ public class Resource {
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
+
+    // СДЕЛАНО ОБЯЗАТЕЛЬНЫМ
+    @Column(name = "branch_id", nullable = false)
+    private String branchId;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branch_id", insertable = false, updatable = false)
+    private Branch branch;
 }

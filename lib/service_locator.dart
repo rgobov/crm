@@ -1,12 +1,13 @@
 import 'package:get_it/get_it.dart';
 import 'package:try_neuro/core/network/http_client.dart';
 import 'package:try_neuro/core/network/time_service.dart';
-import 'package:try_neuro/core/network/websocket_service.dart'; // <<< ИМПОРТ
+import 'package:try_neuro/core/network/websocket_service.dart';
 import 'package:try_neuro/core/session/session_service.dart';
 import 'package:try_neuro/core/session/token_storage.dart';
 import 'package:try_neuro/core/offline/offline_queue_service.dart';
 import 'package:try_neuro/core/offline/sync_service.dart';
 import 'package:try_neuro/features/auth/data/auth_service.dart';
+import 'package:try_neuro/features/auth/data/telegram_auth_service.dart'; // <<< ИМПОРТ
 import 'package:try_neuro/features/contacts/data/contact_service.dart';
 import 'package:try_neuro/features/manager/data/manager_service.dart';
 import 'package:try_neuro/features/resources/data/resource_service.dart';
@@ -23,10 +24,11 @@ void setupServiceLocator() {
   sl.registerLazySingleton(() => SessionService());
   sl.registerLazySingleton(() => HttpClient());
   sl.registerLazySingleton(() => TimeService());
-  sl.registerLazySingleton(() => WebSocketService()); // <<< РЕГИСТРАЦИЯ
+  sl.registerLazySingleton(() => WebSocketService());
 
   // Feature сервисы
   sl.registerLazySingleton(() => AuthService());
+  sl.registerLazySingleton(() => TelegramAuthService()); // <<< РЕГИСТРАЦИЯ
   sl.registerLazySingleton(() => ContactService());
   sl.registerLazySingleton(() => ResourceService());
   sl.registerLazySingleton(() => StaffService());
