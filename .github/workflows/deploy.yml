@@ -1,9 +1,13 @@
-name: Deploy to VPS
+name: Deploy to VPS (DEV MODE)
 
 on:
   push:
     branches:
+<<<<<<< Updated upstream
       - feature/employee-permissions # ОБНОВЛЕНО: Деплоим из новой ветки
+=======
+      - fix/ios-modal-behavior # Деплоим сразу при пуше в эту ветку
+>>>>>>> Stashed changes
 
 jobs:
   deploy:
@@ -19,24 +23,32 @@ jobs:
             set -e
             cd ~/crm
             
+<<<<<<< Updated upstream
             echo "--- ОБНОВЛЕНИЕ КОДА (ветка feature/employee-permissions) ---"
             git fetch origin feature/employee-permissions
             git reset --hard origin/feature/employee-permissions
+=======
+            echo "--- ПЕРЕКЛЮЧЕНИЕ НА ВЕТКУ FIX ---"
+            git fetch origin fix/ios-modal-behavior
+            git checkout fix/ios-modal-behavior || git checkout -b fix/ios-modal-behavior origin/fix/ios-modal-behavior
+            git reset --hard origin/fix/ios-modal-behavior
+>>>>>>> Stashed changes
             
-            echo "--- ПОДГОТОВКА СРЕДЫ (СЕКРЕТЫ) ---"
+            echo "--- ПОДГОТОВКА СРЕДЫ ---"
             echo "TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}" > .env
             echo "TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}" >> .env
             
-            echo "--- СБОРКА КОНТЕЙНЕРОВ ---"
+            echo "--- ПРИНУДИТЕЛЬНАЯ ПЕРЕСБОРКА (БЕЗ КЭША ДЛЯ ФРОНТЕНДА) ---"
             export DOCKER_BUILDKIT=1
-            docker-compose build --pull
+            # Мы добавим --no-cache, чтобы Docker точно пересобрал фронтенд с новым кодом
+            docker-compose build --no-cache frontend
+            docker-compose build backend
             
-            echo "--- ПЕРЕЗАПУСК СЕРВИСОВ ---"
+            echo "--- ПЕРЕЗАПУСК ---"
             docker-compose up -d --force-recreate
             
-            echo "--- ОЧИСТКА МУСОРА ---"
+            echo "--- ОЧИСТКА ---"
             docker system prune -f
-            docker image prune -a -f --filter "until=24h"
             
-            echo "--- СТАТУС КОНТЕЙНЕРОВ ---"
+            echo "--- СТАТУС ---"
             docker-compose ps
