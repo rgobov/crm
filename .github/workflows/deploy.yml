@@ -26,7 +26,8 @@ jobs:
             
             echo "--- СБОРКА ФРОНТЕНДА (БЕЗ КЭША) ---"
             export DOCKER_BUILDKIT=1
-            docker-compose build --no-cache frontend
+            # Исправлено имя сервиса на frontend-svelte
+            docker-compose build --no-cache frontend-svelte
             docker-compose build backend
             
             echo "--- ПЕРЕЗАПУСК ---"
