@@ -85,21 +85,33 @@
 </div>
 
 <style>
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
-    .modal-card { background: white; width: 100%; max-width: 450px; border-radius: 32px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
-    .modal-header { padding: 24px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-    .modal-header h2 { margin: 0; font-size: 18px; font-weight: 800; color: #1e293b; }
-    .btn-close { background: #f1f5f9; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #64748b; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 43, 54, 0.4); backdrop-filter: blur(8px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+    .modal-card { background: #fdf6e3; width: 100%; max-width: 480px; border-radius: 32px; overflow: hidden; box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.3); border: 1.5px solid #ddd6c1; }
 
-    .modal-body { padding: 32px; display: flex; flex-direction: column; gap: 24px; }
+    .modal-header { padding: 20px 24px; border-bottom: 1.5px solid #ddd6c1; display: flex; justify-content: space-between; align-items: center; background: #eee8d5; }
+    .modal-header h2 { margin: 0; font-size: 16px; font-weight: 850; color: #073642; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-close { background: #fdf6e3; border: 1.5px solid #ddd6c1; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: #586e75; font-weight: 800; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .btn-close:hover { background: white; border-color: #268bd2; color: #268bd2; }
+
+    .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 20px; background: #fdf6e3; }
     .form-group { display: flex; flex-direction: column; gap: 8px; }
-    label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
-    input, select { background: #f8fafc; border: 1.5px solid #f1f5f9; padding: 12px 16px; border-radius: 12px; font-size: 15px; font-weight: 600; outline: none; transition: 0.2s; color: #1e293b; }
-    input:focus, select:focus { border-color: #0ea5e9; background: white; }
-    .hint { font-size: 12px; color: #94a3b8; margin: 0; font-weight: 500; }
+    label { font-size: 10px; font-weight: 850; color: #93a1a1; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px; }
 
-    .modal-footer { padding: 20px 32px; background: #f8fafc; display: flex; justify-content: flex-end; gap: 12px; }
-    .btn-secondary { background: white; border: 1.5px solid #e2e8f0; padding: 10px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; color: #64748b; }
-    .btn-save { background: #0ea5e9; color: white; border: none; padding: 10px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; }
-    .btn-save:disabled { opacity: 0.5; }
+    input, select {
+        background: white; border: 2px solid #ddd6c1; padding: 14px 18px; border-radius: 16px;
+        font-size: 16px; font-weight: 600; outline: none; transition: all 0.2s; color: #073642;
+    }
+    input:focus, select:focus { border-color: #268bd2; box-shadow: 0 0 0 4px rgba(38, 139, 210, 0.1); }
+    input::placeholder { color: #93a1a1; font-weight: 500; }
+
+    .hint { font-size: 12px; color: #586e75; margin: 0; font-weight: 600; line-height: 1.4; }
+
+    .modal-footer { padding: 20px 24px; background: #eee8d5; border-top: 1.5px solid #ddd6c1; display: flex; justify-content: flex-end; gap: 12px; }
+    .btn-secondary { background: #fdf6e3; border: 1.5px solid #ddd6c1; padding: 14px 24px; border-radius: 14px; font-weight: 850; cursor: pointer; color: #586e75; font-size: 13px; text-transform: uppercase; }
+    .btn-save {
+        background: #268bd2; color: white; border: none; padding: 14px 28px; border-radius: 14px;
+        font-weight: 900; cursor: pointer; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s;
+    }
+    .btn-save:active { transform: scale(0.98); }
+    .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

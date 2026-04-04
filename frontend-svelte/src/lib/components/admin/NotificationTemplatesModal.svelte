@@ -101,34 +101,36 @@
 </div>
 
 <style>
-    .modal-inner { display: flex; flex-direction: column; background: #f8fafc; height: 100%; }
-    .modal-header { padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; background: white; border-bottom: 1px solid #f1f5f9; }
-    .header-title { font-weight: 900; color: #1e293b; font-size: 14px; text-transform: uppercase; }
-    .btn-close-round { background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; color: #64748b; }
+    .modal-inner { display: flex; flex-direction: column; background: #fdf6e3; width: 100%; border-radius: 28px; overflow: hidden; border: 1.5px solid #ddd6c1; }
+    .modal-header { padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; }
+    .header-title { font-weight: 850; color: #073642; font-size: 16px; text-transform: uppercase; margin: 0; letter-spacing: 0.5px; }
+    .btn-close-round { background: #fdf6e3; border: 1px solid #ddd6c1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #586e75; display: flex; align-items: center; justify-content: center; font-weight: 800; }
 
     .modal-body { padding: 24px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
-    label { display: block; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; }
+    label { display: block; font-size: 10px; font-weight: 850; color: #93a1a1; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
 
     textarea {
-        width: 100%; padding: 16px; border-radius: 20px; border: 1px solid #e2e8f0;
-        background: white; font-size: 15px; color: #1e293b; resize: none; line-height: 1.6;
-        outline: none; transition: border-color 0.2s;
+        width: 100%; padding: 18px; border-radius: 22px; border: 2px solid #ddd6c1;
+        background: white; font-size: 16px; color: #073642; resize: none; line-height: 1.6;
+        outline: none; transition: border-color 0.2s; font-weight: 600;
     }
-    textarea:focus { border-color: #0ea5e9; }
+    textarea:focus { border-color: #268bd2; }
 
-    .ph-label { font-size: 11px; color: #94a3b8; display: block; margin-bottom: 8px; font-weight: 700; }
-    .ph-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .placeholders-box { background: #eee8d5; padding: 20px; border-radius: 22px; border: 1.5px solid #ddd6c1; }
+    .ph-label { font-size: 11px; color: #586e75; display: block; margin-bottom: 12px; font-weight: 800; text-transform: uppercase; }
+    .ph-grid { display: flex; flex-wrap: wrap; gap: 10px; }
     .ph-tag {
-        background: #f1f5f9; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 12px;
-        font-size: 12px; font-weight: 700; color: #475569; cursor: pointer;
+        background: #fdf6e3; border: 1.5px solid #ddd6c1; padding: 10px 14px; border-radius: 14px;
+        font-size: 13px; font-weight: 800; color: #586e75; cursor: pointer; transition: all 0.2s;
     }
-    .ph-tag:hover { background: #e0f2fe; border-color: #0ea5e9; color: #0ea5e9; }
+    .ph-tag:hover { background: #268bd2; border-color: #268bd2; color: white; transform: translateY(-2px); }
 
-    .modal-footer { padding: 16px 24px; display: flex; justify-content: flex-end; gap: 12px; background: white; border-top: 1px solid #f1f5f9; }
-    .btn-primary { background: #0ea5e9; color: white; border: none; padding: 14px 24px; border-radius: 16px; font-weight: 800; cursor: pointer; }
-    .btn-secondary { background: #f1f5f9; color: #64748b; border: none; padding: 14px 24px; border-radius: 16px; font-weight: 700; cursor: pointer; }
+    .modal-footer { padding: 18px 24px; display: flex; justify-content: flex-end; gap: 12px; background: #eee8d5; border-top: 1.5px solid #ddd6c1; }
+    .btn-primary { background: #268bd2; color: white; border: none; padding: 16px 28px; border-radius: 18px; font-weight: 900; cursor: pointer; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-secondary { background: #fdf6e3; color: #586e75; border: 1.5px solid #ddd6c1; padding: 16px 28px; border-radius: 18px; font-weight: 850; cursor: pointer; font-size: 13px; text-transform: uppercase; }
 
     .loading-state { display: flex; justify-content: center; padding: 40px; }
-    .spinner { width: 24px; height: 24px; border: 3px solid #f1f5f9; border-top-color: #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 </style>
