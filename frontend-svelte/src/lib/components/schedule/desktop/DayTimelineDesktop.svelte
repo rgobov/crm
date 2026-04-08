@@ -153,7 +153,11 @@ const dispatch = createEventDispatcher();
                 {#each staff as s (s.id + refreshKey)}
                     <button class="staff-cell btn-reset" style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
                         <div class="avatar-box">
-                            <div class="avatar" class:is-off={s.dayOff}>{s.name.charAt(0)}</div>
+                            {#if s.photoData}
+                                <img class="avatar" class:is-off={s.dayOff} src="data:image/jpeg;base64,{s.photoData}" alt={s.name} />
+                            {:else}
+                                <div class="avatar" class:is-off={s.dayOff}>{s.name.charAt(0)}</div>
+                            {/if}
                         </div>
                         <div class="meta">
                             <span class="n">{s.name}</span>
@@ -224,7 +228,8 @@ const dispatch = createEventDispatcher();
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 12px; border-right: 1px solid #ddd6c1; overflow: hidden; }
 
     .avatar-box { flex-shrink: 0; }
-    .avatar { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; }
+    .avatar { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; object-fit: cover; }
+    img.avatar { background: #ddd; }
     .avatar.is-off { background: #93a1a1; }
 
     .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; }

@@ -13,4 +13,5 @@ public class CreateStaffRequest {
     private String role;
     private boolean available;
     private List<String> branchIds; // ПОДДЕРЖКА НЕСКОЛЬКИХ ФИЛИАЛОВ
+    private String photoData; // Base64 encoded photo
 }

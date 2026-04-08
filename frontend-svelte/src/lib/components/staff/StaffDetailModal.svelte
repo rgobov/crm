@@ -22,9 +22,12 @@
 
     let tempValues = {
         name: '', specialty: '', phone: '', role: '',
-        active: true, photoUrl: '', branchIds: [],
+        active: true, photoUrl: '', photoData: '', branchIds: [],
         email: '', password: ''
     };
+
+    let photoFileInput = null;
+    let isUploadingPhoto = false;
 
     onMount(async () => {
         await Promise.all([loadStaff(), loadBranches()]);
@@ -60,10 +63,44 @@
             role: staff.role || 'EMPLOYEE',
             active: staff.active,
             photoUrl: staff.photoUrl || '',
+            photoData: staff.photoData || '',
             branchIds: (staff.branchIds && Array.isArray(staff.branchIds)) ? [...staff.branchIds] : [],
             email: staff.email || '',
             password: ''
         };
+    }
+
+    async function handlePhotoUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, выберите изображение');
+            return;
+        }
+        isUploadingPhoto = true;
+        try {
+            const result = await staffService.uploadStaffPhoto(staffId, file);
+            staff = result;
+            syncTemp();
+            dispatch('updated', staff);
+        } catch (e) {
+            alert('Ошибка при загрузке фото: ' + (e.response?.data?.message || e.message));
+        } finally {
+            isUploadingPhoto = false;
+            if (photoFileInput) photoFileInput.value = '';
+        }
+    }
+
+    async function deletePhoto() {
+        if (!confirm('Удалить фото профиля?')) return;
+        try {
+            const result = await staffService.deleteStaffPhoto(staffId);
+            staff = result;
+            syncTemp();
+            dispatch('updated', staff);
+        } catch (e) {
+            alert('Ошибка при удалении фото');
+        }
     }
 
     async function saveField(field) {
@@ -112,13 +149,33 @@
             {:else if staff}
                 <!-- ГЕРОЙ-СЕКЦИЯ (УМЕНЬШЕНА) -->
                 <div class="hero-section">
-                    <div class="avatar-box">
-                        {#if staff.photoUrl}
+                    <label for="photo-upload" class="avatar-box">
+                        {#if tempValues.photoData}
+                            <img src={"data:image/jpeg;base64," + tempValues.photoData} alt={staff.name} class="avatar-image" />
+                        {:else if staff.photoUrl}
                             <img src={staff.photoUrl} alt={staff.name} class="avatar-image" />
                         {:else}
                             {staff.name ? staff.name.charAt(0) : '?'}
                         {/if}
-                    </div>
+                        <span class="avatar-overlay">
+                            {isUploadingPhoto ? '⏳' : '📷'}
+                        </span>
+                    </label>
+
+                    <input
+                        type="file"
+                        accept="image/*"
+                        bind:this={photoFileInput}
+                        on:change={handlePhotoUpload}
+                        style="display: none"
+                        id="photo-upload"
+                    />
+
+                    {#if tempValues.photoData || staff.photoUrl}
+                        <div class="photo-actions-row">
+                            <button class="btn-photo-delete" on:click|preventDefault={deletePhoto}>🗑️ Удалить фото</button>
+                        </div>
+                    {/if}
 
                     <div class="inline-edit-wrap">
                         {#if editMode.name}
@@ -257,7 +314,19 @@
 
 <style>
     .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
-    .modal-content { background: #f8fafc; width: 100%; max-width: 420px; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); overflow-y: auto; }
+    .modal-content { background: #f8fafc; width: 100%; max-width: 420px; min-width: 320px; border-radius: 28px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); overflow-y: auto; box-sizing: border-box; }
+
+    @media (max-width: 480px) {
+        .modal-backdrop { padding: 10px; }
+        .modal-content { max-width: 100%; min-width: 280px; border-radius: 20px; }
+        .modal-header { padding: 12px 16px; }
+        .modal-header h2 { font-size: 13px; }
+        .modal-body { padding: 16px; }
+        .avatar-box { width: 56px; height: 56px; font-size: 24px; }
+        h3 { font-size: 16px; }
+        .photo-actions-row { gap: 6px; }
+        .btn-photo-upload { padding: 5px 12px; font-size: 11px; }
+    }
 
     .modal-header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; background: white; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; z-index: 10; }
     .modal-header h2 { margin: 0; font-size: 15px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -266,8 +335,10 @@
     .modal-body { padding: 20px; }
 
     .hero-section { text-align: center; margin-bottom: 16px; }
-    .avatar-box { width: 64px; height: 64px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; margin: 0 auto 12px; box-shadow: 0 8px 16px rgba(56, 151, 240, 0.2); overflow: hidden; }
+    .avatar-box { width: 64px; height: 64px; background: var(--primary-gradient); color: white; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 900; margin: 0 auto 12px; box-shadow: 0 8px 16px rgba(56, 151, 240, 0.2); overflow: hidden; cursor: pointer; position: relative; }
+    .avatar-box:hover .avatar-overlay { opacity: 1; }
     .avatar-image { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 20px; opacity: 0; transition: 0.2s; border-radius: 20px; }
 
     h3 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; cursor: pointer; }
     h3 span { color: var(--primary-color); opacity: 0.4; font-size: 14px; margin-left: 4px; }
@@ -303,6 +374,9 @@
     .btn-cancel-mini { background: #f1f5f9; color: #64748b; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 10px; cursor: pointer; }
 
     .badge-role { background: #eff6ff; color: var(--primary-color); padding: 2px 8px; border-radius: 5px; font-size: 11px; font-weight: 800; }
+
+    .photo-actions-row { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+    .btn-photo-delete { background: #fee2e2; color: #dc2626; border: none; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
 
     .edit-input-group { display: flex; gap: 6px; width: 100%; }
     input, select { flex: 1; padding: 8px 12px; border: 2px solid var(--primary-color); border-radius: 10px; font-size: 14px; outline: none; background: white; color: #0f172a; font-weight: 600; }

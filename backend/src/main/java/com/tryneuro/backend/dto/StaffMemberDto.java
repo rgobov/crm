@@ -18,6 +18,7 @@ public class StaffMemberDto {
     private String specialty;
     private String phone;
     private String photoUrl;
+    private String photoData; // Base64 encoded image
     private boolean active;
     private String role;
     private String email;

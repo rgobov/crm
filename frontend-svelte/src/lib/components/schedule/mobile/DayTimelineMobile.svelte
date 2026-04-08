@@ -150,7 +150,11 @@
                 {#each staff as s (s.id)}
                     <button class="staff-cell btn-reset" class:is-off={s.dayOff} style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
                         <div class="avatar-wrap">
-                            <div class="avatar" class:is-off={s.dayOff}>{s.name ? s.name.charAt(0) : '?'}</div>
+                            {#if s.photoData}
+                                <img class="avatar" class:is-off={s.dayOff} src="data:image/jpeg;base64,{s.photoData}" alt={s.name} />
+                            {:else}
+                                <div class="avatar" class:is-off={s.dayOff}>{s.name ? s.name.charAt(0) : '?'}</div>
+                            {/if}
                         </div>
                         <div class="meta">
                             <span class="n">{s.name}</span>
@@ -223,7 +227,8 @@
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }
     .staff-cell.is-off { opacity: 0.5; background: #eee8d5; }
     .staff-cell.is-off .n, .staff-cell.is-off .s { color: #93a1a1; }
-    .avatar { width: 32px; height: 32px; background: var(--primary-gradient); color: white; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 13px; }
+    .avatar { width: 32px; height: 32px; background: var(--primary-gradient); color: white; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 13px; object-fit: cover; }
+    img.avatar { background: #ddd; }
     .avatar.is-off { background: #93a1a1; }
     .meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }
     .n { display: block; font-size: 11px; font-weight: 850; color: #073642; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

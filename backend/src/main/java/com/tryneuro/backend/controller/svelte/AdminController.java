@@ -12,8 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -113,6 +115,18 @@ public class AdminController {
     @DeleteMapping("/staff/{id}")
     public void deleteStaffMember(@PathVariable String id) {
         staffMemberService.deleteStaffMember(id);
+    }
+
+    @PostMapping(value = "/staff/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public StaffMemberDto uploadStaffPhoto(@RequestAttribute("tenantId") String tenantId, 
+                                           @PathVariable String id, 
+                                           @RequestParam("file") MultipartFile file) {
+        return DtoMapper.toDto(staffMemberService.updateStaffPhoto(id, file, getRequiredTenantId(tenantId)));
+    }
+
+    @DeleteMapping("/staff/{id}/photo")
+    public StaffMemberDto deleteStaffPhoto(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        return DtoMapper.toDto(staffMemberService.deleteStaffPhoto(id, getRequiredTenantId(tenantId)));
     }
 
     // --- CLIENTS ---

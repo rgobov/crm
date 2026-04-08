@@ -47,5 +47,25 @@ export const staffService = {
         await api.post(`/admin/staff/${staffId}/shift/copy`, sourceShift, {
             params: { days }
         });
+    },
+
+    /**
+     * Загрузить фото профиля сотрудника
+     */
+    async uploadStaffPhoto(staffId, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await api.post(`/admin/staff/${staffId}/photo`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+    },
+
+    /**
+     * Удалить фото профиля сотрудника
+     */
+    async deleteStaffPhoto(staffId) {
+        const response = await api.delete(`/admin/staff/${staffId}/photo`);
+        return response.data;
     }
 };

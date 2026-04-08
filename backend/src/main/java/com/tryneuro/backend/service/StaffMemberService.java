@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -45,6 +46,7 @@ public class StaffMemberService {
     private final BranchRepository branchRepository;
     private final PasswordEncoder passwordEncoder;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ImageCompressionService imageCompressionService;
 
     @Autowired
     public StaffMemberService(StaffMemberRepository staffMemberRepository,
@@ -53,7 +55,8 @@ public class StaffMemberService {
                               AppointmentRepository appointmentRepository,
                               BranchRepository branchRepository,
                               PasswordEncoder passwordEncoder,
-                              SimpMessagingTemplate messagingTemplate) {
+                              SimpMessagingTemplate messagingTemplate,
+                              ImageCompressionService imageCompressionService) {
         this.staffMemberRepository = staffMemberRepository;
         this.staffShiftRepository = staffShiftRepository;
         this.userRepository = userRepository;
@@ -61,6 +64,7 @@ public class StaffMemberService {
         this.branchRepository = branchRepository;
         this.passwordEncoder = passwordEncoder;
         this.messagingTemplate = messagingTemplate;
+        this.imageCompressionService = imageCompressionService;
     }
 
     @Transactional
@@ -96,6 +100,40 @@ public class StaffMemberService {
     }
 
     @Transactional
+    public StaffMember updateStaffPhoto(String id, MultipartFile file, String tenantId) {
+        StaffMember staffMember = staffMemberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
+        if (!staffMember.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
+        }
+        try {
+            byte[] photoBytes = imageCompressionService.compress(file);
+            staffMember.setPhotoData(photoBytes);
+            StaffMember saved = staffMemberRepository.save(staffMember);
+            notifyChange(tenantId);
+            enrichWithUserData(saved);
+            return saved;
+        } catch (Exception e) {
+            log.warn("Ошибка при обработке фото: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ошибка при обработке фото: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public StaffMember deleteStaffPhoto(String id, String tenantId) {
+        StaffMember staffMember = staffMemberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Сотрудник не найден"));
+        if (!staffMember.getTenantId().equals(tenantId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
+        }
+        staffMember.setPhotoData(null);
+        StaffMember saved = staffMemberRepository.save(staffMember);
+        notifyChange(tenantId);
+        enrichWithUserData(saved);
+        return saved;
+    }
+
+    @Transactional
     public StaffMember addStaffMember(CreateStaffRequest request, String tenantId) {
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
@@ -112,7 +150,19 @@ public class StaffMemberService {
             Set<Branch> branches = new HashSet<>(branchRepository.findAllById(request.getBranchIds()));
             staffMember.setBranches(branches);
         }
+        
+        // Обработка фото
+        if (request.getPhotoData() != null && !request.getPhotoData().isEmpty()) {
+            try {
+                byte[] photoBytes = imageCompressionService.compressFromBase64(request.getPhotoData());
+                staffMember.setPhotoData(photoBytes);
+            } catch (Exception e) {
+                log.warn("Ошибка при обработке фото: {}", e.getMessage());
+            }
+        }
+        
         StaffMember saved = staffMemberRepository.save(staffMember);
+        
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             User newUser = new User();
             newUser.setId(UUID.randomUUID().toString());

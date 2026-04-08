@@ -1,6 +1,7 @@
 package com.tryneuro.backend.dto;
 
 import com.tryneuro.backend.model.*;
+import java.util.Base64;
 import java.util.stream.Collectors;
 import java.util.Collections;
 
@@ -146,12 +147,18 @@ public class DtoMapper {
                     .collect(Collectors.toList());
         }
 
+        String photoDataBase64 = null;
+        if (entity.getPhotoData() != null && entity.getPhotoData().length > 0) {
+            photoDataBase64 = Base64.getEncoder().encodeToString(entity.getPhotoData());
+        }
+
         return StaffMemberDto.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .specialty(entity.getSpecialty())
                 .phone(entity.getPhone())
                 .photoUrl(entity.getPhotoUrl())
+                .photoData(photoDataBase64)
                 .active(entity.isActive())
                 .role(entity.getRole())
                 .email(entity.getEmail())

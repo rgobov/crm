@@ -33,6 +33,10 @@ public class StaffMember {
     @Column(name = "photo_url")
     private String photoUrl;
 
+    @Lob
+    @Column(name = "photo_data")
+    private byte[] photoData;
+
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;
 

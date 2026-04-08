@@ -15,8 +15,37 @@
         available: true,
         email: '',
         password: '',
-        branchIds: []
+        branchIds: [],
+        photoData: ''
     };
+
+    let photoFileInput = null;
+    let photoPreview = null;
+    let isUploadingPhoto = false;
+
+    function handlePhotoSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, выберите изображение');
+            return;
+        }
+        isUploadingPhoto = true;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            photoPreview = e.target.result;
+            // Извлекаем base64 из data URL
+            formData.photoData = photoPreview.split(',')[1];
+            isUploadingPhoto = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearPhoto() {
+        photoPreview = null;
+        formData.photoData = '';
+        if (photoFileInput) photoFileInput.value = '';
+    }
 
     let allBranches = [];
     let isLoading = true;
@@ -72,6 +101,29 @@
                 <div class="center"><span class="spinner"></span></div>
             {:else}
                 <div class="form-container">
+                    <div class="form-group">
+                        <label>Фото профиля</label>
+                        <div class="photo-upload-area">
+                            {#if photoPreview}
+                                <img src={photoPreview} alt="Превью" class="photo-preview" />
+                                <button type="button" class="btn-clear-photo" on:click={clearPhoto}>✕</button>
+                            {:else}
+                                <label for="new-photo-upload" class="photo-placeholder">
+                                    <span>📷</span>
+                                    <span class="placeholder-text">Нажмите для загрузки фото</span>
+                                </label>
+                            {/if}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                bind:this={photoFileInput}
+                                on:change={handlePhotoSelect}
+                                style="display: none"
+                                id="new-photo-upload"
+                            />
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="name">Имя мастера *</label>
                         <input type="text" id="name" bind:value={formData.name} placeholder="Напр. Иван Иванов" />
@@ -169,6 +221,14 @@
     .branch-selector-grid { display: flex; flex-wrap: wrap; gap: 8px; }
     .branch-chip { padding: 8px 14px; border-radius: 12px; border: 1.5px solid #ddd6c1; background: white; color: #586e75; font-weight: 700; font-size: 12px; cursor: pointer; transition: 0.2s; }
     .branch-chip.selected { border-color: #268bd2; background: #268bd2; color: white; }
+
+    .photo-upload-area { position: relative; width: 100px; height: 100px; margin: 0 auto; }
+    .photo-preview { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; border: 2px solid #ddd6c1; }
+    .photo-placeholder { width: 100%; height: 100%; border: 2px dashed #ddd6c1; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; background: white; transition: 0.2s; }
+    .photo-placeholder:hover { border-color: #268bd2; background: #f0f8ff; }
+    .photo-placeholder span:first-child { font-size: 28px; }
+    .placeholder-text { font-size: 9px; color: #93a1a1; text-align: center; margin-top: 4px; }
+    .btn-clear-photo { position: absolute; top: -6px; right: -6px; background: #dc2626; color: white; border: none; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; cursor: pointer; }
 
     .modal-footer { padding: 18px 24px; display: flex; justify-content: flex-end; gap: 12px; background: #eee8d5; border-top: 1.5px solid #ddd6c1; }
     .btn-primary { background: #268bd2; color: white; border: none; padding: 14px 24px; border-radius: 16px; font-weight: 900; cursor: pointer; font-size: 14px; text-transform: uppercase; transition: 0.2s; }
