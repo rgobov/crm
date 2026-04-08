@@ -44,7 +44,6 @@
         { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
         { id: 'CONFIRMED', label: 'Подтвержден', color: '#0891b2' },
         { id: 'ARRIVED', label: 'Пришёл', color: '#7c3aed' },
-        { id: 'NEEDS_CALL', label: 'Позвонить', color: '#a855f7' },
         { id: 'COMPLETED', label: 'Завершен', color: '#16a34a' },
         { id: 'CANCELLED', label: 'Отменен', color: '#dc2626' }
     ];
