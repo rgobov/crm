@@ -113,6 +113,7 @@
         width: 100%; padding: 18px; border-radius: 22px; border: 2px solid #ddd6c1;
         background: white; font-size: 16px; color: #073642; resize: none; line-height: 1.6;
         outline: none; transition: border-color 0.2s; font-weight: 600;
+        box-sizing: border-box;
     }
     textarea:focus { border-color: #268bd2; }
 

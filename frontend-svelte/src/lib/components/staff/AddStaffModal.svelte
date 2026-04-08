@@ -2,7 +2,7 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import { staffService } from '$lib/services/staffService.js';
     import { branchService } from '$lib/services/branchService.js';
-    import { fade, scale, slide } from 'svelte/transition';
+    import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
     const dispatch = createEventDispatcher();
@@ -13,8 +13,8 @@
         phone: '',
         role: 'EMPLOYEE',
         available: true,
-        email: '', // Добавлено
-        password: '', // Добавлено
+        email: '',
+        password: '',
         branchIds: []
     };
 
@@ -44,7 +44,7 @@
         if (!formData.name) return alert('Введите имя мастера');
         if (formData.branchIds.length === 0) return alert('Выберите хотя бы один филиал');
         if (formData.email && !formData.password) {
-            formData.password = 'qwerty'; // Пароль по умолчанию, если указан email
+            formData.password = 'qwerty';
         }
 
         isSaving = true;
@@ -83,10 +83,11 @@
                     </div>
 
                     <div class="form-group">
-                        <label>Привязка к филиалам * <small>(обязательно)</small></label>
+                        <label>Привязка к филиалам *</label>
                         <div class="branch-selector-grid">
                             {#each allBranches as b}
                                 <button
+                                    type="button"
                                     class="branch-chip"
                                     class:selected={formData.branchIds.includes(b.id)}
                                     on:click={() => toggleBranch(b.id)}
@@ -100,65 +101,81 @@
                     <div class="divider">Данные для входа</div>
 
                     <div class="form-group">
-                        <label for="email">Email (для входа в систему)</label>
+                        <label for="email">Email (для входа)</label>
                         <input type="email" id="email" bind:value={formData.email} placeholder="master@example.com" />
                     </div>
 
                     <div class="form-group">
-                        <label for="password">Пароль (мин. 6 символов)</label>
+                        <label for="password">Пароль</label>
                         <input type="password" id="password" bind:value={formData.password} placeholder="Оставьте пустым для 'qwerty'" />
                     </div>
 
                     <div class="form-group">
                         <label for="role">Уровень доступа</label>
                         <select bind:value={formData.role}>
-                            <option value="EMPLOYEE">Сотрудник (свой график)</option>
-                            <option value="MANAGER">Менеджер (весь филиал)</option>
+                            <option value="EMPLOYEE">Сотрудник</option>
+                            <option value="MANAGER">Менеджер</option>
                         </select>
-                    </div>
-
-                    <div class="actions">
-                        <button
-                            class="save-btn"
-                            on:click={handleSave}
-                            disabled={isSaving || !formData.name || formData.branchIds.length === 0}
-                        >
-                            {isSaving ? 'Создание...' : 'Создать сотрудника'}
-                        </button>
                     </div>
                 </div>
             {/if}
         </div>
+
+        <footer class="modal-footer">
+            <button class="btn-secondary" on:click={() => dispatch('close')}>Отмена</button>
+            <button
+                class="btn-primary"
+                on:click={handleSave}
+                disabled={isSaving || !formData.name || formData.branchIds.length === 0}
+            >
+                {isSaving ? 'Создание...' : 'Создать'}
+            </button>
+        </footer>
     </div>
 </div>
 
 <style>
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px)); padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px)); box-sizing: border-box; }
-    .modal-content { background: white; width: 100%; max-width: 460px; border-radius: 32px; overflow: hidden; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4); max-height: calc(100dvh - max(40px, env(safe-area-inset-top, 20px) + env(safe-area-inset-bottom, 20px)) - 40px); display: flex; flex-direction: column; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px; box-sizing: border-box; }
+    .modal-content { background: #fdf6e3; width: 100%; max-width: 480px; border-radius: 28px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border: 1.5px solid #ddd6c1; display: flex; flex-direction: column; max-height: 90dvh; }
 
-    .modal-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; }
-    .modal-header h2 { margin: 0; font-size: 18px; font-weight: 850; color: #0f172a; }
-    .btn-close { background: #f1f5f9; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: #94a3b8; font-weight: bold; }
+    .modal-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; }
+    .modal-header h2 { margin: 0; font-size: 16px; font-weight: 850; color: #073642; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-close { background: #fdf6e3; border: 1.5px solid #ddd6c1; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; color: #586e75; font-weight: bold; transition: 0.2s; }
 
-    .modal-body { padding: 24px; overflow-y: auto; }
+    .modal-body { padding: 24px; overflow-y: auto; flex: 1; box-sizing: border-box; }
+    .form-container { display: flex; flex-direction: column; gap: 18px; }
 
-    .form-group { margin-bottom: 20px; }
-    label { display: block; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
-    input, select { width: 100%; padding: 14px; border: 2px solid #f1f5f9; border-radius: 14px; font-size: 15px; background: #f8fafc; font-weight: 600; color: #1e293b; outline: none; transition: 0.2s; }
-    input:focus { border-color: var(--primary-color); background: white; }
+    .form-group { display: flex; flex-direction: column; }
+    label { display: block; font-size: 10px; font-weight: 850; color: #93a1a1; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
 
-    .divider { margin: 32px 0 20px; font-size: 10px; font-weight: 900; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; gap: 10px; }
-    .divider::after { content: ""; flex: 1; height: 1px; background: #f1f5f9; }
+    input, select {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid #ddd6c1;
+        border-radius: 16px;
+        font-size: 15px;
+        background: white;
+        font-weight: 600;
+        color: #073642;
+        outline: none;
+        transition: 0.2s;
+        box-sizing: border-box; /* ФИКС ОТСТУПА СПРАВА */
+    }
+    input:focus, select:focus { border-color: #268bd2; }
+
+    .divider { margin: 10px 0; font-size: 10px; font-weight: 900; color: #93a1a1; text-transform: uppercase; letter-spacing: 1.5px; display: flex; align-items: center; gap: 10px; }
+    .divider::after { content: ""; flex: 1; height: 1px; background: #ddd6c1; }
 
     .branch-selector-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-    .branch-chip { padding: 8px 14px; border-radius: 12px; border: 2px solid #f1f5f9; background: #f8fafc; color: #64748b; font-weight: 700; font-size: 12px; cursor: pointer; transition: 0.2s; }
-    .branch-chip.selected { border-color: var(--primary-color); background: #eff6ff; color: var(--primary-color); }
+    .branch-chip { padding: 8px 14px; border-radius: 12px; border: 1.5px solid #ddd6c1; background: white; color: #586e75; font-weight: 700; font-size: 12px; cursor: pointer; transition: 0.2s; }
+    .branch-chip.selected { border-color: #268bd2; background: #268bd2; color: white; }
 
-    .actions { margin-top: 32px; }
-    .save-btn { width: 100%; padding: 16px; background: var(--primary-gradient); color: white; border: none; border-radius: 16px; font-size: 16px; font-weight: 800; box-shadow: 0 10px 20px rgba(56, 151, 240, 0.2); cursor: pointer; }
-    .save-btn:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
+    .modal-footer { padding: 18px 24px; display: flex; justify-content: flex-end; gap: 12px; background: #eee8d5; border-top: 1.5px solid #ddd6c1; }
+    .btn-primary { background: #268bd2; color: white; border: none; padding: 14px 24px; border-radius: 16px; font-weight: 900; cursor: pointer; font-size: 14px; text-transform: uppercase; transition: 0.2s; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: #fdf6e3; color: #586e75; border: 1.5px solid #ddd6c1; padding: 14px 24px; border-radius: 16px; font-weight: 850; cursor: pointer; font-size: 13px; text-transform: uppercase; }
 
     .center { display: flex; justify-content: center; padding: 40px; }
-    .spinner { width: 24px; height: 24px; border: 3px solid #f1f5f9; border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    .spinner { width: 28px; height: 28px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 </style>
