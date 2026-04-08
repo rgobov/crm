@@ -66,7 +66,7 @@
 
             {#if appt.comment && !isShort}
                 <div class="cmt-preview" transition:fade>
-                    <span class="cmt-icon">💬</span> {appt.comment}
+                    {appt.comment}
                 </div>
             {/if}
         </div>
@@ -119,22 +119,22 @@
     .appt-content.compact { padding: 4px 8px; gap: 0; }
 
     .t-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px; }
-    .tm { font-size: 10px; font-weight: 900; color: #93a1a1; letter-spacing: 0.1px; white-space: nowrap; }
+    .tm { font-size: 10.5px; font-weight: 800; color: #586e75; letter-spacing: 0.1px; white-space: nowrap; }
 
     .st-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
     .main-info { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 1px; overflow: hidden; }
-    .cl { font-size: 12px; font-weight: 850; color: #073642; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cl { font-size: 13px; font-weight: 850; color: #073642; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .sub-details-stack { display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
-    .ref-tag { font-size: 9px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sv { font-size: 9px; color: #657b83; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ref-tag { font-size: 10px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sv { font-size: 10px; color: #073642; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .cmt-preview {
         margin-top: 4px;
-        font-size: 10px;
-        line-height: 1.2;
-        color: #586e75;
+        font-size: 11px;
+        line-height: 1.3;
+        color: #073642;
         font-weight: 500;
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -142,7 +142,7 @@
         overflow: hidden;
         word-break: break-word;
         padding-top: 4px;
-        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
     }
 
     /* Увеличиваем шрифт комментариев только для десктопной версии */
@@ -151,6 +151,6 @@
             font-size: 11px;
         }
     }
-    .cmt-icon { font-size: 8px; opacity: 0.6; margin-right: 2px; }
+
     .compact .cmt-preview { display: none; }
 </style>

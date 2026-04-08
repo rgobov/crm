@@ -26,7 +26,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 2000; /* Выше всего */
+        z-index: 450; /* Выше карточек (320), но ниже меню (1000+) */
         transform: translateY(-50%) translateX(50%);
         pointer-events: none;
     }
@@ -60,7 +60,7 @@
         right: 0;
         height: 2px;
         background: #dc322f;
-        z-index: 1500; /* Выше сетки и карточек */
+        z-index: 400; /* Выше сетки и карточек, но ниже навигации */
         transform: translateY(-50%);
         pointer-events: none;
         box-shadow: 0 0 8px rgba(220, 50, 47, 0.4);
