@@ -105,40 +105,52 @@
 
     .appt-content {
         height: 100%;
-        border-left: 3.5px solid var(--status-color);
-        padding: 5px 8px;
+        border-left: 2.5px solid var(--status-color);
+        padding: 5px 8px; /* Фибоначчи: 5 вертикаль, 8 горизонталь */
         display: flex;
         flex-direction: column;
-        gap: 1px;
+        gap: 0;
         box-sizing: border-box;
     }
-    .appt-content.compact { padding: 3px 6px; gap: 0; }
+    .appt-content.compact { padding: 3px 6px; }
 
-    .t-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; opacity: 0.8; }
-    .tm { font-size: 10px; font-weight: 800; color: #586e75; letter-spacing: 0.2px; white-space: nowrap; }
+    .t-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 3px;
+        opacity: 0.6;
+    }
+    .tm { font-size: 8.5px; font-weight: 900; color: #586e75; letter-spacing: 0.4px; white-space: nowrap; text-transform: uppercase; }
 
-    .st-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .st-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
 
-    .main-info { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.5px; overflow: hidden; }
-    .cl { font-size: 13.5px; font-weight: 850; color: #002b36; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .main-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        min-height: 0;
+    }
+    .cl { font-size: 14px; font-weight: 850; color: #002b36; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
 
-    .sub-details-stack { display: flex; flex-direction: column; gap: 0.5px; overflow: hidden; margin-top: 1px; }
-    .ref-tag { font-size: 9.5px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sv { font-size: 10px; color: #586e75; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub-details-stack { display: flex; flex-direction: column; gap: 0; overflow: hidden; }
+    .ref-tag { font-size: 9px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sv { font-size: 9px; color: #657b83; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .cmt-preview {
-        margin-top: 3px;
+        margin-top: 5px; /* Фибоначчи */
         font-size: 10.5px;
-        line-height: 1.25;
+        line-height: 1.3;
         color: #073642;
         font-weight: 500;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
         word-break: break-word;
-        padding-top: 3px;
-        border-top: 1px solid rgba(7, 54, 66, 0.06);
+        padding-top: 5px;
+        border-top: 1px solid rgba(7, 54, 66, 0.05);
     }
 
     /* Увеличиваем шрифт комментариев только для десктопной версии */
