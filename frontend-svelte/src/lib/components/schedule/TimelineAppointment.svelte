@@ -37,7 +37,7 @@
 
     $: color = statusColors[appt.status] || statusColors['SCHEDULED'];
     $: bgColor = backgroundColors[appt.status] || '#fdf6e3';
-    $: isShort = appt.durationInMinutes < 40;
+    $: isShort = appt.durationInMinutes < 30;
 </script>
 
 <button class="appt-box btn-reset"
@@ -82,58 +82,54 @@
 
     .appt-box {
         position: absolute;
-        left: 4px !important;
-        right: 4px !important;
+        left: 2px !important;
+        right: 2px !important;
         width: auto !important;
 
-        /* ИСПОЛЬЗУЕМ ЦВЕТ СТАТУСА ДЛЯ ФОНА */
         background: var(--bg-color);
-
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        border: 1px solid var(--status-color); /* Граница в цвет статуса, но прозрачная */
-        border-color: rgba(0,0,0,0.05);
-
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        border: 1px solid rgba(7, 54, 66, 0.08);
         overflow: hidden;
-        z-index: 150; /* НИЖЕ time axis (z-index: 200) */
-        transition: all 0.2s;
+        z-index: 150;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         box-sizing: border-box;
     }
 
     .appt-box:hover {
-        z-index: 320 !important; /* ВЫШЕ staff header (z-index: 300) */
-        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-        transform: translateY(-1px);
+        z-index: 400 !important;
+        box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+        transform: translateY(-2px) scale(1.01);
         border-color: var(--status-color);
     }
 
     .appt-content {
         height: 100%;
-        border-left: 4px solid var(--status-color);
-        padding: 6px 10px;
+        border-left: 3.5px solid var(--status-color);
+        padding: 5px 8px;
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 1px;
         box-sizing: border-box;
     }
-    .appt-content.compact { padding: 4px 8px; gap: 0; }
+    .appt-content.compact { padding: 3px 6px; gap: 0; }
 
-    .t-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1px; }
-    .tm { font-size: 10.5px; font-weight: 800; color: #586e75; letter-spacing: 0.1px; white-space: nowrap; }
+    .t-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; opacity: 0.8; }
+    .tm { font-size: 10px; font-weight: 800; color: #586e75; letter-spacing: 0.2px; white-space: nowrap; }
 
-    .st-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .st-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-    .main-info { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 1px; overflow: hidden; }
-    .cl { font-size: 13px; font-weight: 850; color: #073642; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .main-info { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: 0.5px; overflow: hidden; }
+    .cl { font-size: 13.5px; font-weight: 850; color: #002b36; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    .sub-details-stack { display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
-    .ref-tag { font-size: 10px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sv { font-size: 10px; color: #073642; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sub-details-stack { display: flex; flex-direction: column; gap: 0.5px; overflow: hidden; margin-top: 1px; }
+    .ref-tag { font-size: 9.5px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sv { font-size: 10px; color: #586e75; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .cmt-preview {
-        margin-top: 4px;
-        font-size: 11px;
-        line-height: 1.3;
+        margin-top: 3px;
+        font-size: 10.5px;
+        line-height: 1.25;
         color: #073642;
         font-weight: 500;
         display: -webkit-box;
@@ -141,8 +137,8 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
         word-break: break-word;
-        padding-top: 4px;
-        border-top: 1px solid rgba(0, 0, 0, 0.1);
+        padding-top: 3px;
+        border-top: 1px solid rgba(7, 54, 66, 0.06);
     }
 
     /* Увеличиваем шрифт комментариев только для десктопной версии */

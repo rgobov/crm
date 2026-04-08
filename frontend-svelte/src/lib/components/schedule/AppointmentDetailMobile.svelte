@@ -168,12 +168,14 @@
         {/if}
 
         <div class="info-tile comment-tile" class:editing={isEditingComment}>
-            <div class="tile-icon note">📝</div>
+            {#if !isEditingComment}
+                <div class="tile-icon note">📝</div>
+            {/if}
             <div class="tile-body">
                 <label>Внутренняя заметка</label>
                 {#if isEditingComment}
                     <div class="inline-editor" in:fade>
-                        <textarea bind:value={tempComment} placeholder="Добавьте детали..." autofocus></textarea>
+                        <textarea bind:value={tempComment} placeholder="Детали визита..." autofocus></textarea>
                         <div class="editor-actions">
                             <button class="btn-save-mini" on:click={saveInlineComment} disabled={isSaving}>
                                 {isSaving ? '...' : 'СОХРАНИТЬ ✓'}
@@ -186,7 +188,7 @@
                         {#if appointment.comment}
                             <span class="comment-text">"{appointment.comment}"</span>
                         {:else}
-                            <span class="placeholder">Нажмите, чтобы добавить заметку...</span>
+                            <span class="placeholder">Нажмите, чтобы добавить...</span>
                         {/if}
                         <span class="edit-icon">✎</span>
                     </p>
@@ -303,26 +305,26 @@
 
     .comment-tile { background: #fffbeb; border-color: #fef3c7; cursor: pointer; }
     .comment-tile:hover { background: #fef3c7; }
-    .comment-tile.editing { background: white; border-color: #0ea5e9; cursor: default; }
+    .comment-tile.editing { background: white; border-color: #0ea5e9; cursor: default; align-items: flex-start; }
     .tile-icon.note { background: #fef3c7; color: #d97706; }
 
-    .clickable-text { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .clickable-text { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 24px; }
     .comment-text { font-style: italic; color: #92400e; font-weight: 600; }
     .placeholder { color: #94a3b8; font-weight: 500; font-size: 13px; }
     .edit-icon { opacity: 0.3; font-size: 12px; }
 
-    .inline-editor { width: 100%; margin-top: 6px; }
-    textarea { width: 100%; min-height: 70px; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 8px; font-size: 14px; font-family: inherit; color: #1e293b; outline: none; resize: none; margin-bottom: 6px; }
-    textarea:focus { border-color: #0ea5e9; }
+    .inline-editor { width: 100%; margin-top: 8px; padding: 0 10px; box-sizing: border-box; }
+    textarea { width: 100%; min-height: 120px; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 12px; font-size: 15px; font-family: inherit; color: #1e293b; outline: none; resize: none; margin-bottom: 12px; background: #f8fafc; box-sizing: border-box; display: block; }
+    textarea:focus { border-color: #0ea5e9; background: white; }
 
-    .editor-actions { display: flex; gap: 6px; }
-    .btn-save-mini { flex: 1; background: #0ea5e9; color: white; border: none; padding: 6px; border-radius: 8px; font-weight: 800; font-size: 10px; cursor: pointer; }
-    .btn-cancel-mini { background: #f1f5f9; color: #64748b; border: none; padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 10px; cursor: pointer; }
+    .editor-actions { display: flex; gap: 10px; margin-top: 4px; }
+    .btn-save-mini { flex: 1.6; background: #0ea5e9; color: white; border: none; padding: 15px 10px; border-radius: 12px; font-weight: 900; font-size: 12px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2); }
+    .btn-cancel-mini { flex: 1; background: #f1f5f9; color: #64748b; border: none; padding: 15px 10px; border-radius: 12px; font-weight: 800; font-size: 11px; cursor: pointer; text-transform: uppercase; }
 
     .tile-icon { width: 36px; height: 36px; background: #f1f5f9; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
     .tile-icon.tg { background: #e0f2fe; color: #0ea5e9; }
 
-    .tile-body { flex: 1; }
+    .tile-body { flex: 1; min-width: 0; }
     .tile-body label { display: block; font-size: 8px; font-weight: 800; color: #cbd5e1; text-transform: uppercase; }
     .tile-body .val { margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; }
     .tile-body small { font-size: 10px; color: #94a3b8; font-weight: 600; }
