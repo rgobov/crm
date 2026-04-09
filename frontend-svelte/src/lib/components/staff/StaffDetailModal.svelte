@@ -164,7 +164,7 @@
 
                     <input
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png"
                         bind:this={photoFileInput}
                         on:change={handlePhotoUpload}
                         style="display: none"
