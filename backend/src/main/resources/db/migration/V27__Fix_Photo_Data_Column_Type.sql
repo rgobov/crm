@@ -1,0 +1,1 @@
+ALTER TABLE staff_members ALTER COLUMN photo_data TYPE BYTEA USING photo_data::bytea;
