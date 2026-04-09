@@ -8,6 +8,7 @@
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
+    import { portal } from '$lib/actions/portal.js';
 
     export let forcedDate = null;
 
@@ -185,9 +186,12 @@
         </div>
     {/if}
 
-    <!-- МОДАЛКИ -->
+    <!-- МОДАЛКИ — вынесены в <body> через portal для корректной работы z-index на iOS.
+         Проблема: .mobile-bottom-ui имеет backdrop-filter, что создаёт новый Stacking Context
+         на WebKit/iOS. Любой z-index внутри дочернего контекста не может превысить родительский.
+         Portal переносит модалку напрямую в <body>, минуя всю иерархию контекстов. -->
     {#if showModal}
-        <div class="modal-backdrop" on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
+        <div class="modal-backdrop" use:portal on:mousedown|self={closeModal} transition:fade={{duration: 200}}>
             <div class="modal-content-mobile" transition:scale={{start: 0.95, duration: 200}}>
                 <header class="modal-header">
                     <h3>
@@ -216,7 +220,9 @@
     {/if}
 
     {#if showNestedAddContact}
-        <AddContactModal on:close={() => showNestedAddContact = false} on:success={handleContactAdded} />
+        <div use:portal>
+            <AddContactModal on:close={() => showNestedAddContact = false} on:success={handleContactAdded} />
+        </div>
     {/if}
 </div>
 
@@ -287,72 +293,67 @@
 
     .mobile-timeline-wrapper { flex: 1; overflow: hidden; position: relative; }
 
-    /* МОДАЛКИ ДЛЯ МОБИЛОК (УМНАЯ АДАПТАЦИЯ ANDROID/IOS) */
-    .modal-backdrop { 
-        position: fixed; 
-        inset: 0; 
-        background: rgba(7, 54, 66, 0.85);
-        backdrop-filter: blur(8px);
+    /*
+     * МОДАЛКИ: стили объявлены через :global() потому что use:portal
+     * физически переносит элементы в <body>, они выходят из скоупа
+     * компонента и Svelte не может применить к ним scoped-стили.
+     *
+     * z-index: 99999 теперь работает корректно на iOS, т.к. элемент
+     * находится напрямую в <body> — вне любых вложенных Stacking Context'ов.
+     */
+
+    :global(.modal-backdrop) {
+        position: fixed;
+        inset: 0;
+        background: rgba(7, 54, 66, 0.8);
+        /* z-index максимальный — теперь безопасно, т.к. нет родительского контекста */
         z-index: 99999;
-        display: flex; 
-        align-items: center; /* По умолчанию ЦЕНТРИРОВАНИЕ (как было на Android) */
-        justify-content: center; 
-        padding: 16px;
-        box-sizing: border-box; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        /* safe-area-inset-top: учитываем notch/Dynamic Island на iPhone */
+        padding-top: max(40px, calc(env(safe-area-inset-top, 20px) + 20px));
+        box-sizing: border-box;
     }
 
-    /* Специфические правки только для iOS (iPhone/iPad) */
-    @supports (-webkit-touch-callout: none) {
-        .modal-backdrop {
-            align-items: flex-end; /* На iOS прижимаем к низу для удобства и обхода багов Viewport */
-            padding-bottom: calc(12px + env(safe-area-inset-bottom, 20px));
-        }
-    }
-    
-    .modal-content-mobile { 
-        width: 100%; 
-        max-width: 500px;
-        max-height: 90dvh;
-        background: #fdf6e3; 
-        border-radius: 30px;
-        display: flex; 
-        flex-direction: column; 
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    :global(.modal-content-mobile) {
+        width: 100%;
+        max-width: 480px;
+        height: calc(100dvh - max(40px, calc(env(safe-area-inset-top, 20px) + 20px)) - 20px);
+        background: #fdf6e3;
+        border-radius: 24px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
         overflow: hidden;
-        position: relative;
     }
 
-    @supports (-webkit-touch-callout: none) {
-        .modal-content-mobile {
-            margin-bottom: 8px; /* Парящий эффект снизу только для iOS */
-        }
+    :global(.modal-backdrop .modal-header) {
+        padding: 16px 20px;
+        background: #eee8d5;
+        border-bottom: 1.5px solid #ddd6c1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
     }
-    
-    .modal-header { 
-        padding: 18px 20px;
-        background: #eee8d5; 
-        border-bottom: 1.5px solid #ddd6c1; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        flex-shrink: 0; 
+
+    :global(.modal-backdrop .modal-header h3) {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: #073642;
+        line-height: 1.2;
     }
-    
-    .modal-header h3 { 
-        margin: 0; 
-        font-size: 19px;
-        font-weight: 850;
-        color: #073642; 
-        line-height: 1.2; 
-    }
-    
-    .close-btn { 
-        background: #fdf6e3; 
-        border: 1px solid #ddd6c1; 
-        width: 36px; 
-        height: 36px; 
-        border-radius: 50%; 
-        flex-shrink: 0; 
+
+    :global(.modal-backdrop .close-btn) {
+        background: #fdf6e3;
+        border: 1px solid #ddd6c1;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        flex-shrink: 0;
         font-size: 18px;
         cursor: pointer;
         transition: all 0.2s;
@@ -360,20 +361,22 @@
         align-items: center;
         justify-content: center;
     }
-    
-    .close-btn:hover {
+
+    :global(.modal-backdrop .close-btn:hover) {
         background: #eee8d5;
         transform: scale(1.1);
     }
-    
-    .modal-body { 
-        flex: 1; 
-        overflow-y: auto; 
+
+    :global(.modal-backdrop .modal-body) {
+        flex: 1;
+        overflow-y: auto;
         overflow-x: hidden;
-        -webkit-overflow-scrolling: touch; 
-        padding: 0; 
-        padding-bottom: 20px;
+        -webkit-overflow-scrolling: touch;
+        padding: 0;
+        /* safe-area-inset-bottom: учитываем home indicator на iPhone */
+        padding-bottom: env(safe-area-inset-bottom, 20px);
         min-height: 0;
+        /* предотвращаем "резиновый" скролл, уходящий на фон */
         overscroll-behavior: contain;
     }
 </style>

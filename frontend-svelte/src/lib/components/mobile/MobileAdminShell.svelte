@@ -169,6 +169,17 @@
         -webkit-overflow-scrolling: touch;
     }
 
+    /*
+     * ВАЖНО: backdrop-filter убран намеренно!
+     *
+     * backdrop-filter (и -webkit-backdrop-filter) создаёт новый CSS Stacking Context
+     * на iOS WebKit. Это означает, что z-index дочерних элементов сравнивается только
+     * внутри этого контекста. Модалка с z-index: 99999 внутри .mobile-content
+     * (сестринского к .mobile-bottom-ui) никогда не перекрывала бы BottomNav на iOS,
+     * даже при любых значениях z-index.
+     *
+     * Замена: непрозрачный фон #eee8d5 — визуально идентично, без побочных эффектов.
+     */
     .mobile-bottom-ui { position: fixed; bottom: 0; left: 0; right: 0; background: #eee8d5; border-top: 1.5px solid #ddd6c1; z-index: 1000; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -5px 25px rgba(0,0,0,0.05); }
 
     .bottom-date-picker { background: white; border-bottom: 1px solid #ddd6c1; }
