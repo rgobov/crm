@@ -35,10 +35,19 @@
         selectedDate.set(new Date(event.detail.date));
     }
 
-    function handleFullCalendarSelect(event) {
+    async function handleFullCalendarSelect(event) {
         selectedDate.set(new Date(event.detail.date));
         activeTab.set('timeline');
         showCalendarModal = false;
+
+        // Если мы не на /admin, нужно туда вернуться, чтобы увидеть таймлайн
+        if ($page?.url?.pathname !== '/admin') {
+            try {
+                await goto('/admin');
+            } catch (e) {
+                window.location.href = '/admin';
+            }
+        }
     }
 
     function toggleMoreMenu() {

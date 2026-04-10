@@ -50,6 +50,11 @@
         viewMode = 'day';
     } else if ($activeTab === 'calendar') {
         viewMode = 'month';
+    } else if ($activeTab === 'management') {
+        // Если мы на вкладке "Главная", но компонент CalendarTab (который переиспользуется для timeline)
+        // активен, нам нужно убедиться, что он в режиме дня, если пришел forcedDate,
+        // иначе пусть остается в последнем состоянии.
+        if (forcedDate) viewMode = 'day';
     }
 
     function handleDateSelected(event) {
