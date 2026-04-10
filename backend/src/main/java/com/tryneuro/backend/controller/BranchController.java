@@ -55,7 +55,11 @@ public class BranchController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBranch(@PathVariable String id) {
-        branchService.deleteBranch(id);
-        return ResponseEntity.ok().build();
+        try {
+            branchService.deleteBranch(id);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

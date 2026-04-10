@@ -14,7 +14,7 @@ public class BranchService {
     private final BranchRepository branchRepository;
 
     public List<Branch> getBranches(String tenantId) {
-        return branchRepository.findByTenantId(tenantId);
+        return branchRepository.findByTenantIdAndActive(tenantId, true);
     }
 
     public Branch createBranch(Branch branch, String tenantId) {
@@ -29,6 +29,10 @@ public class BranchService {
     }
 
     public void deleteBranch(String id) {
-        branchRepository.deleteById(id);
+        // Instead of deleting, just deactivate the branch
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Branch not found: " + id));
+        branch.setActive(false);
+        branchRepository.save(branch);
     }
 }

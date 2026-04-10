@@ -58,5 +58,10 @@ public class Branch {
 
 
 
-    }
+    @Column(nullable = false, columnDefinition = "boolean default true")
 
+    private boolean active = true;
+
+
+
+}
