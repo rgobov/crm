@@ -1,5 +1,5 @@
 <script>
-    import { isMobile } from '$lib/stores/ui.js';
+    import { isMobile } from '$lib/stores/dashboardStore.js';
     import DayTimelineDesktop from './desktop/DayTimelineDesktop.svelte';
     import DayTimelineMobile from './mobile/DayTimelineMobile.svelte';
     import { createEventDispatcher } from 'svelte';
@@ -26,6 +26,7 @@
         on:appointmentTap={forward}
         on:emptySlotTap={forward}
         on:staffTap={forward}
+        on:refresh={forward}
     />
 {:else}
     <!-- ДЕСКТОПНАЯ ВЕРСИЯ: Изолированная структура -->
@@ -36,5 +37,6 @@
         on:appointmentTap={forward}
         on:emptySlotTap={forward}
         on:staffTap={forward}
+        on:refresh={forward}
     />
 {/if}
