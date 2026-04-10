@@ -1,13 +1,15 @@
 <script>
     import { onMount } from 'svelte';
     import { branchService } from '$lib/services/branchService.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import BranchEditModal from '$lib/components/branches/BranchEditModal.svelte';
     import { fade, scale } from 'svelte/transition';
 
-    let branches = [];
     let isLoading = true;
     let showModal = false;
     let selectedBranch = null;
+
+    $: branches = $branchStore;
 
     onMount(async () => {
         await loadBranches();
@@ -16,7 +18,7 @@
     async function loadBranches() {
         isLoading = true;
         try {
-            branches = await branchService.getBranches();
+            await branchStore.refresh();
         } catch (e) {
             console.error('Failed to load branches', e);
         } finally {
@@ -51,46 +53,54 @@
     }
 </script>
 
-<div class="page-wrapper">
-    <header class="page-header">
-        <div class="title-row">
-            <a href="/admin" class="back-link">‹</a>
-            <h1>Филиалы</h1>
-        </div>
-    </header>
+<div class="page-scroll-container">
+    <div class="page-wrapper">
+        <header class="page-header">
+            <div class="title-row">
+                <a href="/admin" class="back-link">‹</a>
+                <h1>Филиалы</h1>
+            </div>
+        </header>
 
-    {#if isLoading}
-        <div class="loader-box"><span class="spinner"></span></div>
-    {:else}
-        <div class="branches-grid">
-            <!-- КНОПКА ДОБАВЛЕНИЯ В ВИДЕ КАРТОЧКИ -->
-            <button class="add-card" on:click={openCreate} in:scale>
-                <span class="plus-icon">+</span>
-                <span class="add-text">Добавить новый филиал</span>
-            </button>
+        {#if isLoading}
+            <div class="loader-box"><span class="spinner"></span></div>
+        {:else}
+            <div class="branches-grid">
+                <!-- КНОПКА ДОБАВЛЕНИЯ В ВИДЕ КАРТОЧКИ -->
+                <button class="add-card" on:click={openCreate} in:scale>
+                    <span class="plus-icon">+</span>
+                    <span class="add-text">Добавить новый филиал</span>
+                </button>
 
-            {#each branches as branch}
-                <div class="branch-card" on:click={() => openEdit(branch)} in:fade>
-                    <div class="card-content">
-                        <h3>{branch.name}</h3>
-                        <p>{branch.address || 'Адрес не указан'}</p>
+                {#each branches as branch}
+                    <div class="branch-card" on:click={() => openEdit(branch)} in:fade>
+                        <div class="card-content">
+                            <h3>{branch.name}</h3>
+                            <p>{branch.address || 'Адрес не указан'}</p>
+                        </div>
+                        <div class="card-footer">
+                            <span>{branch.timezone}</span>
+                            <button class="btn-delete-mini" on:click|stopPropagation={() => handleDelete(branch.id, branch.name)}>🗑️</button>
+                        </div>
                     </div>
-                    <div class="card-footer">
-                        <span>{branch.timezone}</span>
-                        <button class="btn-delete-mini" on:click|stopPropagation={() => handleDelete(branch.id, branch.name)}>🗑️</button>
-                    </div>
-                </div>
-            {/each}
-        </div>
-    {/if}
+                {/each}
+            </div>
+        {/if}
 
-    {#if showModal}
-        <BranchEditModal branch={selectedBranch} on:close={() => showModal = false} on:success={handleSuccess} />
-    {/if}
+        {#if showModal}
+            <BranchEditModal branch={selectedBranch} on:close={() => showModal = false} on:success={handleSuccess} />
+        {/if}
+    </div>
 </div>
 
 <style>
-    .page-wrapper { padding: 32px; max-width: 1000px; margin: 0 auto; min-height: 100vh; background: #fdf6e3; }
+    .page-scroll-container {
+        flex: 1;
+        overflow-y: auto;
+        height: 100%;
+        background: #fdf6e3;
+    }
+    .page-wrapper { padding: 32px; max-width: 1000px; margin: 0 auto; min-height: 100%; }
     .page-header { margin-bottom: 32px; }
     .title-row { display: flex; align-items: center; gap: 16px; }
     .back-link { font-size: 32px; text-decoration: none; color: #93a1a1; line-height: 1; transition: color 0.2s; }

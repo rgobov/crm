@@ -1,8 +1,8 @@
 <script>
     import { onMount } from 'svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { websocketService } from '$lib/services/websocketService.js';
-    import { branchService } from '$lib/services/branchService.js';
     import AdminSidebar from '$lib/components/admin/AdminSidebar.svelte';
     import MobileAdminShell from '$lib/components/mobile/MobileAdminShell.svelte';
     import { isMobile, isTablet } from '$lib/stores/ui.js';
@@ -15,7 +15,6 @@
 
     let sidebarWidth = 300;
     let isResizing = false;
-    let branches = [];
 
     onMount(async () => {
         initAuth();
@@ -24,7 +23,7 @@
         document.body.style.height = '100vh';
 
         try {
-            branches = await branchService.getBranches();
+            await branchStore.refresh();
         } catch (e) { /* ignore */ }
     });
 
@@ -44,7 +43,7 @@
 </script>
 
 {#if $isMobile || $isTablet}
-    <MobileAdminShell {branches}>
+    <MobileAdminShell>
         <slot />
     </MobileAdminShell>
 {:else}

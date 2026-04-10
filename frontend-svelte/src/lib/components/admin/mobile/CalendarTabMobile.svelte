@@ -7,6 +7,7 @@
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -151,36 +152,22 @@
             <div class="branch-selector">
                 <h3>Выбор филиала</h3>
                 <div class="branch-list">
-                    <button 
-                        class="branch-item" 
-                        class:active={$activeBranchId === 1}
-                        on:click={() => selectBranch(1)}
-                    >
-                        <span class="branch-name">Основной филиал</span>
-                        {#if $activeBranchId === 1}
-                            <span class="branch-check">✓</span>
-                        {/if}
-                    </button>
-                    <button 
-                        class="branch-item" 
-                        class:active={$activeBranchId === 2}
-                        on:click={() => selectBranch(2)}
-                    >
-                        <span class="branch-name">Филиал 2</span>
-                        {#if $activeBranchId === 2}
-                            <span class="branch-check">✓</span>
-                        {/if}
-                    </button>
-                    <button 
-                        class="branch-item" 
-                        class:active={$activeBranchId === 3}
-                        on:click={() => selectBranch(3)}
-                    >
-                        <span class="branch-name">Филиал 3</span>
-                        {#if $activeBranchId === 3}
-                            <span class="branch-check">✓</span>
-                        {/if}
-                    </button>
+                    {#each $branchStore as branch}
+                        <button
+                            class="branch-item"
+                            class:active={$activeBranchId === branch.id}
+                            on:click={() => selectBranch(branch.id)}
+                        >
+                            <span class="branch-name">{branch.name}</span>
+                            {#if $activeBranchId === branch.id}
+                                <span class="branch-check">✓</span>
+                            {/if}
+                        </button>
+                    {:else}
+                        <div class="empty-state-msg">
+                            <p>Филиалы не найдены</p>
+                        </div>
+                    {/each}
                 </div>
             </div>
         </div>

@@ -16,7 +16,6 @@
     <svelte:component
         this={tabs[$activeTab]}
         {forcedDate}
-        branchId={$activeBranchId}
     />
 </div>
 

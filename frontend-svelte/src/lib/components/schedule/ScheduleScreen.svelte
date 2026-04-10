@@ -3,21 +3,27 @@
     import { adminService } from '$lib/services/adminService.js';
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import DayTimeline from './DayTimeline.svelte';
     import api from '$lib/api.js';
 
     export let onlyBusyStaff = false;
     export let onlyWorkingStaff = false;
+    export let branchId = null; // Добавляем проп
 
     const dispatch = createEventDispatcher();
 
     let appointments = [];
     let staff = [];
     let isLoading = false;
-    let lastLoadTime = 0; // Track last load time to prevent duplicates
+    let lastLoadTime = 0;
+
+    // ПРИОРИТЕТ: Проп, если он есть, иначе Стор.
+    $: currentBranchId = branchId || $activeBranchId;
 
     // Lazy loading function for staff photos
     async function loadStaffPhoto(staffId) {
+        if (!staffId) return null;
         const cacheKey = `staff_photo_${staffId}`;
         
         // Check cache first
@@ -53,27 +59,34 @@
     })();
 
     // РЕАКТИВНАЯ ЗАГРУЗКА
-    $: if ($selectedDate && $activeBranchId) {
+    $: if ($selectedDate && currentBranchId) {
         const now = Date.now();
-        if (now - lastLoadTime > 1000) { // Prevent duplicate loads within 1 second
-            console.log('🔄 Schedule: Reactive load for branch:', $activeBranchId);
-            loadDayData($selectedDate, $activeBranchId);
+        if (now - lastLoadTime > 1000) {
+            console.log('🔄 Schedule: Reactive load for branch:', currentBranchId);
+            loadDayData($selectedDate, currentBranchId);
             lastLoadTime = now;
         }
     }
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
-        if (signal && signal.ts > 0 && $activeBranchId) {
+        if (signal && signal.ts > 0 && currentBranchId) {
             console.log('📥 WS: Refresh signal received, loading data');
-            loadDayData($selectedDate, $activeBranchId, true);
+            loadDayData($selectedDate, currentBranchId, true);
             lastLoadTime = Date.now();
         }
     });
 
     onMount(async () => {
-        console.log('🏁 ScheduleScreen mounted. BranchId:', $activeBranchId);
-        if ($selectedDate && $activeBranchId) {
-            await loadDayData($selectedDate, $activeBranchId);
+        console.log('🏁 ScheduleScreen mounted. BranchId:', currentBranchId);
+        // Загружаем список филиалов, если он пуст
+        if (branchStore && typeof $branchStore !== 'undefined' && $branchStore.length === 0) {
+            branchStore.refresh();
+        }
+
+        console.log('Current state before load:', { date: $selectedDate, branch: currentBranchId, activeBranch: $activeBranchId });
+
+        if ($selectedDate && currentBranchId) {
+            await loadDayData($selectedDate, currentBranchId);
         }
     });
 
@@ -111,22 +124,24 @@
                 staffArray = [];
             }
             
-            staff = staffArray.filter(s => s.role === 'ROLE_EMPLOYEE' || s.role === 'EMPLOYEE');
-            console.log('Staff count after filtering:', staff.length);
+            // Убираем жесткий фильтр по ролям, так как админы тоже могут работать.
+            // Если бэкенд вернул сотрудника в списке для расписания — он должен там быть.
+            staff = staffArray;
+            console.log('Staff count:', staff.length);
             
-            // Start lazy loading photos for all staff members
+    // Start lazy loading photos for all staff members
             if (staff.length > 0) {
                 console.log('Starting lazy loading of photos for', staff.length, 'staff members');
-                staff.forEach(async (staffMember, index) => {
-                    const photoData = await loadStaffPhoto(staffMember.id);
-                    if (photoData) {
-                        // Update staff member with photo data
-                        staff = staff.map(s => 
-                            s.id === staffMember.id ? {...s, photoData} : s
-                        );
-                        console.log(`Loaded photo for staff ${index + 1}/${staff.length}:`, staffMember.name);
-                    }
-                });
+                // Use a smaller batch size or sequential loading to avoid "Network Error"
+                for (const staffMember of staff) {
+                    loadStaffPhoto(staffMember.id).then(photoData => {
+                        if (photoData) {
+                            staff = staff.map(s =>
+                                s.id === staffMember.id ? {...s, photoData} : s
+                            );
+                        }
+                    });
+                }
             }
             
             console.log('Day data loaded. Staff count:', staff.length);
@@ -149,10 +164,12 @@
                 <span class="spinner"></span>
                 <p style="margin-top: 12px; font-size: 12px; color: #94a3b8;">Загрузка расписания...</p>
             </div>
-        {:else if !$activeBranchId}
+        {:else if !currentBranchId}
              <div class="empty-state-msg">
                 <span class="icon">🏢</span>
                 <p>Выберите филиал в меню сверху</p>
+                <p style="font-size: 10px; opacity: 0.5; margin-top: 4px;">ID: {currentBranchId || 'none'}</p>
+                <button on:click={() => branchStore.refresh()} style="margin-top: 10px; font-size: 10px;">Обновить список филиалов</button>
             </div>
         {:else if staff.length === 0 && !isLoading}
             <div class="empty-state-msg">

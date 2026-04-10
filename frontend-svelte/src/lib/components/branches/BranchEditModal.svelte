@@ -1,6 +1,7 @@
 <script>
     import { createEventDispatcher } from 'svelte';
     import { branchService } from '$lib/services/branchService.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -37,6 +38,8 @@
             } else {
                 await branchService.createBranch(payload);
             }
+            // Обновляем глобальный стор, чтобы изменения увидели все компоненты
+            await branchStore.refresh();
             dispatch('success');
         } catch (e) {
             alert('Ошибка при сохранении');

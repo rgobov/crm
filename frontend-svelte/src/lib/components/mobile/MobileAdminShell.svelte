@@ -1,5 +1,6 @@
 <script>
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { openModal } from '$lib/stores/modalStore.js';
     import { logout } from '$lib/stores/auth.js';
     import { goto } from '$app/navigation';
@@ -10,7 +11,8 @@
     import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte';
 
     const dispatch = createEventDispatcher();
-    export let branches = [];
+
+    $: branches = $branchStore;
 
     let showMoreMenu = false;
     let showCalendarModal = false;

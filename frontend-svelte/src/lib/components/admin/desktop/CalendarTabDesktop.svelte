@@ -7,6 +7,7 @@
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 

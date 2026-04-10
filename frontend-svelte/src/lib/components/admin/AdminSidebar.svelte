@@ -2,15 +2,16 @@
     import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { logout } from '$lib/stores/auth.js';
-    import { branchService } from '$lib/services/branchService.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
     import { createEventDispatcher, onMount } from 'svelte';
 
     const dispatch = createEventDispatcher();
 
-    let branches = [];
     let isLoadingBranches = true;
+
+    $: branches = $branchStore;
 
     const menuItems = [
         { id: 'management', label: 'Главная', icon: '📊' },
@@ -20,9 +21,9 @@
     async function loadBranches() {
         try {
             isLoadingBranches = true;
-            branches = await branchService.getBranches();
-            if (branches.length > 0 && !$activeBranchId) {
-                activeBranchId.set(branches[0].id);
+            await branchStore.refresh();
+            if ($branchStore.length > 0 && !$activeBranchId) {
+                activeBranchId.set($branchStore[0].id);
             }
         } catch (e) {
             console.error('Sidebar: Failed to load branches', e);
