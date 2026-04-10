@@ -4,6 +4,7 @@
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import DayTimeline from './DayTimeline.svelte';
+    import api from '$lib/api.js';
 
     export let onlyBusyStaff = false;
     export let onlyWorkingStaff = false;
@@ -12,7 +13,34 @@
 
     let appointments = [];
     let staff = [];
-    let isLoading = false; // По умолчанию false, чтобы не висел спиннер зря
+    let isLoading = false;
+    let lastLoadTime = 0; // Track last load time to prevent duplicates
+
+    // Lazy loading function for staff photos
+    async function loadStaffPhoto(staffId) {
+        const cacheKey = `staff_photo_${staffId}`;
+        
+        // Check cache first
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            return cached;
+        }
+        
+        try {
+            const response = await api.get(`/admin/schedule/staff/${staffId}/photo`);
+            const photoData = response.data.photoData;
+            
+            // Cache the photo data
+            if (photoData) {
+                localStorage.setItem(cacheKey, photoData);
+            }
+            
+            return photoData;
+        } catch (e) {
+            console.warn('Failed to load photo for staff:', staffId, e);
+            return null;
+        }
+    }
 
     $: displayedStaff = (() => {
         let result = staff;
@@ -26,13 +54,19 @@
 
     // РЕАКТИВНАЯ ЗАГРУЗКА
     $: if ($selectedDate && $activeBranchId) {
-        console.log('🔄 Schedule: Reactive load for branch:', $activeBranchId);
-        loadDayData($selectedDate, $activeBranchId);
+        const now = Date.now();
+        if (now - lastLoadTime > 1000) { // Prevent duplicate loads within 1 second
+            console.log('🔄 Schedule: Reactive load for branch:', $activeBranchId);
+            loadDayData($selectedDate, $activeBranchId);
+            lastLoadTime = now;
+        }
     }
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
         if (signal && signal.ts > 0 && $activeBranchId) {
+            console.log('📥 WS: Refresh signal received, loading data');
             loadDayData($selectedDate, $activeBranchId, true);
+            lastLoadTime = Date.now();
         }
     });
 
@@ -54,9 +88,48 @@
                 adminService.getAppointmentsForDay(date, bId),
                 adminService.getStaffForSchedule(date, bId)
             ]);
+            
+            console.log('🔍 [DEBUG] staffData type:', typeof staffData);
+            console.log('🔍 [DEBUG] staffData isArray:', Array.isArray(staffData));
+            console.log('🔍 [DEBUG] staffData length:', staffData?.length);
+            console.log('🔍 [DEBUG] staffData sample:', staffData?.slice(0, 2));
+            
             appointments = apptsData || [];
-            staff = (staffData || []).filter(s => s.role === 'ROLE_EMPLOYEE' || s.role === 'EMPLOYEE');
-            console.log('✅ Day data loaded. Staff count:', staff.length);
+            
+            // Fix: Handle case where backend returns JSON string instead of array
+            let staffArray = staffData;
+            if (typeof staffData === 'string') {
+                try {
+                    staffArray = JSON.parse(staffData);
+                    console.log('🔧 [FIX] Parsed staffData from JSON string, count:', staffArray.length);
+                } catch (e) {
+                    console.error('❌ [ERROR] Failed to parse staffData JSON:', e);
+                    staffArray = [];
+                }
+            } else if (!Array.isArray(staffData)) {
+                console.warn('⚠️ [WARN] staffData is not array, using empty array');
+                staffArray = [];
+            }
+            
+            staff = staffArray.filter(s => s.role === 'ROLE_EMPLOYEE' || s.role === 'EMPLOYEE');
+            console.log('Staff count after filtering:', staff.length);
+            
+            // Start lazy loading photos for all staff members
+            if (staff.length > 0) {
+                console.log('Starting lazy loading of photos for', staff.length, 'staff members');
+                staff.forEach(async (staffMember, index) => {
+                    const photoData = await loadStaffPhoto(staffMember.id);
+                    if (photoData) {
+                        // Update staff member with photo data
+                        staff = staff.map(s => 
+                            s.id === staffMember.id ? {...s, photoData} : s
+                        );
+                        console.log(`Loaded photo for staff ${index + 1}/${staff.length}:`, staffMember.name);
+                    }
+                });
+            }
+            
+            console.log('Day data loaded. Staff count:', staff.length);
         } catch (e) {
             console.error('❌ Schedule Screen API Error:', e);
         } finally {

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -217,7 +219,26 @@ public class AdminController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(value = "branchId", required = false) String branchId) {
         return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId)
-                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
+                .stream().map(staff -> {
+                    StaffMemberDto dto = DtoMapper.toDto(staff);
+                    dto.setPhotoData(null); // Exclude photo data for schedule API
+                    return dto;
+                }).collect(Collectors.toList());
+    }
+    
+    @GetMapping("/schedule/staff/{id}/photo")
+    public ResponseEntity<Map<String, String>> getStaffPhoto(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        return staffMemberService.getStaffMemberById(id)
+                .filter(s -> s.getTenantId().equals(getRequiredTenantId(tenantId)))
+                .map(staff -> {
+                    String photoDataBase64 = null;
+                    if (staff.getPhotoData() != null && staff.getPhotoData().length > 0) {
+                        photoDataBase64 = Base64.getEncoder().encodeToString(staff.getPhotoData());
+                    }
+                    // Fix: Map.of() doesn't accept null values
+                    return ResponseEntity.ok(Map.of("photoData", photoDataBase64 != null ? photoDataBase64 : ""));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/appointments")
