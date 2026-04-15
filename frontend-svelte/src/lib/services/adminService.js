@@ -22,17 +22,19 @@ export const adminService = {
         })).data;
     },
 
-    async getAppointmentsForDay(date, branchId) {
+    async getAppointmentsForDay(date, branchId, options = {}) {
         const dateStr = toLocalDbDate(date);
         return (await api.get('/admin/appointments/day', {
-            params: { date: dateStr, branchId: branchId }
+            params: { date: dateStr, branchId: branchId },
+            ...options
         })).data;
     },
 
-    async getStaffForSchedule(date, branchId) {
+    async getStaffForSchedule(date, branchId, options = {}) {
         const dateStr = toLocalDbDate(date);
         return (await api.get('/admin/schedule/staff', {
-            params: { date: dateStr, branchId: branchId }
+            params: { date: dateStr, branchId: branchId },
+            ...options
         })).data;
     },
 

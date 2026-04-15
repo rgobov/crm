@@ -28,7 +28,9 @@
         if (!silent) isLoading = true;
         try {
             console.log(`📡 Fetching appointments for date: ${date}, branch: ${bId}`);
-            const apptsData = await adminService.getAppointmentsForDay(date, bId);
+            // Используем bypassCache для обновлений по сигналу или смене даты,
+            // чтобы точно получить актуальные данные из БД
+            const apptsData = await adminService.getAppointmentsForDay(date, bId, { bypassCache: true });
             appointments = apptsData || [];
         } catch (e) {
             console.error('❌ Error loading appointments:', e);
@@ -42,7 +44,7 @@
         if (!silent) isLoading = true;
         try {
             console.log(`📡 Fetching staff for date: ${date}, branch: ${bId}`);
-            const staffData = await adminService.getStaffForSchedule(date, bId);
+            const staffData = await adminService.getStaffForSchedule(date, bId, { bypassCache: true });
 
             let staffArray = [];
             if (typeof staffData === 'string') {

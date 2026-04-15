@@ -37,18 +37,26 @@ const originalGet = api.get;
 
 // Безопасная дедупликация только через метод .get()
 api.get = function(url, config = {}) {
+    // Если в конфиге есть bypassCache: true, не используем дедупликацию
+    if (config.bypassCache) {
+        return originalGet.call(this, url, config);
+    }
+
     // Формируем уникальный ключ запроса
     const requestKey = `GET:${url}:${JSON.stringify(config.params || {})}`;
 
     if (pendingRequests.has(requestKey)) {
-        console.log(`[Deduplicator] Joining existing request: ${url}`);
+        console.debug(`[Deduplicator] Joining existing request: ${url}`);
         return pendingRequests.get(requestKey);
     }
 
     // Помечаем конфиг ключом, чтобы перехватчик ответа знал, что удалять
     config._requestKey = requestKey;
 
-    const promise = originalGet.call(this, url, config);
+    const promise = originalGet.call(this, url, config).finally(() => {
+        pendingRequests.delete(requestKey);
+    });
+
     pendingRequests.set(requestKey, promise);
 
     return promise;
