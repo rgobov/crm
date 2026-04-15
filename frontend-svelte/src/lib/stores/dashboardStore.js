@@ -49,4 +49,18 @@ if (typeof window !== 'undefined') {
 }
 
 export const refreshTrigger = writable(0);
-export const isMobile = writable(false);
+
+// ✅ Умное определение мобильного устройства с поддержкой SSR и ресайза
+function createMobileStore() {
+    const { subscribe, set } = writable(false);
+
+    if (typeof window !== 'undefined') {
+        const check = () => set(window.innerWidth < 768);
+        check();
+        window.addEventListener('resize', check);
+    }
+
+    return { subscribe };
+}
+
+export const isMobile = createMobileStore();
