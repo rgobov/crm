@@ -78,7 +78,7 @@ public class ScheduleService {
         if (saved.getContactId() != null && saved.getReferenceTag() != null && !saved.getReferenceTag().isEmpty()) {
             contactService.addTagIfMissing(saved.getContactId(), saved.getReferenceTag());
         }
-        notifyChange(saved.getTenantId());
+        notifyAppointmentChange(saved, "CREATED");
         return saved;
     }
 
@@ -124,7 +124,7 @@ public class ScheduleService {
         if (updated.getContactId() != null && updated.getReferenceTag() != null && !updated.getReferenceTag().isEmpty()) {
             contactService.addTagIfMissing(updated.getContactId(), updated.getReferenceTag());
         }
-        notifyChange(updated.getTenantId());
+        notifyAppointmentChange(updated, "UPDATED");
         return updated;
     }
 
@@ -233,9 +233,33 @@ public class ScheduleService {
     public void deleteAppointment(String id) {
         appointmentRepository.findById(id).ifPresent(app -> {
             String tenantId = app.getTenantId();
+            Appointment deletedCopy = new Appointment();
+            deletedCopy.setId(id);
+            deletedCopy.setTenantId(tenantId);
+            deletedCopy.setBranchId(app.getBranchId());
+            deletedCopy.setDate(app.getDate());
+            
             appointmentRepository.deleteById(id);
-            notifyChange(tenantId);
+            notifyAppointmentChange(deletedCopy, "DELETED");
         });
+    }
+
+    private void notifyAppointmentChange(Appointment app, String changeType) {
+        if (app != null && app.getTenantId() != null) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("type", "APPOINTMENT_" + changeType);
+            payload.put("appointmentId", app.getId());
+            payload.put("branchId", app.getBranchId());
+            payload.put("date", app.getDate().toString());
+            payload.put("timestamp", System.currentTimeMillis());
+            
+            if (!"DELETED".equals(changeType)) {
+                payload.put("staffId", app.getStaffMemberId());
+                payload.put("status", app.getStatus());
+            }
+
+            messagingTemplate.convertAndSend("/topic/schedule/" + app.getTenantId(), payload);
+        }
     }
 
     private void notifyChange(String tenantId) {

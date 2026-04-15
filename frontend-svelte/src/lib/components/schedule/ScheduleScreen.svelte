@@ -149,9 +149,31 @@
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
         if (signal && signal.ts > 0 && currentBranchId) {
-            debouncedRefresh();
+            // Если пришло детальное уведомление об изменении конкретной записи
+            if (signal.type && signal.type.startsWith('APPOINTMENT_')) {
+                const { appointmentId, date, branchId, type } = signal;
+
+                // Обновляем только если это наш филиал и наша дата
+                if (branchId === currentBranchId && date === toLocalDbDate($selectedDate)) {
+                    console.log(`🎯 WS: Selective update for ${type}: ${appointmentId}`);
+                    // Для простоты пока перекачиваем только записи, не трогая сотрудников
+                    fetchAppointments($selectedDate, currentBranchId, true);
+                }
+            } else {
+                // Обычный общий сигнал (или старый формат) - обновляем записи
+                debouncedRefresh();
+            }
         }
     });
+
+    function toLocalDbDate(date) {
+        if (!date) return '';
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
 
     onMount(async () => {
         if (branchStore && typeof $branchStore !== 'undefined' && $branchStore.length === 0) {

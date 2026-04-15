@@ -57,7 +57,14 @@ export const websocketService = {
                 console.log('✅ WS: Connected');
 
                 stompClient.subscribe(`/topic/schedule/${tenantId}`, (message) => {
-                    scheduleRefreshSignal.set({ ts: Date.now() });
+                    const data = JSON.parse(message.body);
+                    scheduleRefreshSignal.set({
+                        ts: Date.now(),
+                        type: data.type,
+                        appointmentId: data.appointmentId,
+                        branchId: data.branchId,
+                        date: data.date
+                    });
                 });
 
                 stompClient.subscribe(`/topic/telegram/${tenantId}`, (message) => {
