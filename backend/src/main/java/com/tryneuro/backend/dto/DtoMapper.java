@@ -1,6 +1,7 @@
 package com.tryneuro.backend.dto;
 
 import com.tryneuro.backend.model.*;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.stream.Collectors;
 import java.util.Collections;
