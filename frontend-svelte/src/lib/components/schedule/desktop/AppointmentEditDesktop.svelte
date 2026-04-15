@@ -12,8 +12,6 @@
 
     import { branchService } from '$lib/services/branchService.js';
 
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
-
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
 
     import { timeUtils } from '$lib/utils/timeUtils.js';
@@ -427,8 +425,6 @@
                 await adminService.createAppointment(payload);
 
             }
-
-            scheduleRefreshSignal.set({ ts: Date.now() });
 
             dispatch('saved');
 

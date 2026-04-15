@@ -1,7 +1,6 @@
 <script>
     import { createEventDispatcher } from 'svelte';
     import { staffService } from '$lib/services/staffService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js'; // <<< ИМПОРТ ФИЛИАЛА
     import { fade, slide, scale } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
@@ -37,7 +36,6 @@
                 await staffService.copyShift(staff.id, shiftData, copyDays);
             }
 
-            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
             dispatch('success');
         } catch (e) {
             console.error(e);

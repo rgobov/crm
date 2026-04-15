@@ -1,16 +1,12 @@
 <script>
-    import { createEventDispatcher } from 'svelte';
+    // Импорты и пропсы
+    import { createEventDispatcher, onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { fade, scale, slide } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
     export let appointment;
     const dispatch = createEventDispatcher();
-
-    let isEditingComment = false;
-    let tempComment = "";
-    let isSaving = false;
 
     let staffMember = appointment.staffMember;
     let staffName = appointment.staffName;
@@ -37,8 +33,11 @@
         }
     }
 
-    import { onMount } from 'svelte';
     onMount(loadStaffMember);
+
+    let isEditingComment = false;
+    let tempComment = "";
+    let isSaving = false;
 
     const STATUSES = [
         { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
@@ -53,7 +52,6 @@
             const updated = { ...appointment, status: newStatus };
             await adminService.updateAppointment(appointment.id, updated);
             appointment = updated;
-            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
             dispatch('updated', updated);
         } catch (e) {
             alert('Ошибка обновления статуса');
@@ -67,7 +65,6 @@
             await adminService.updateAppointment(appointment.id, updated);
             appointment.comment = tempComment;
             isEditingComment = false;
-            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
         } catch (e) {
             alert('Ошибка сохранения заметки');
         } finally {
@@ -98,7 +95,6 @@
     async function handleDelete() {
         if (confirm('Удалить эту запись?')) {
             await adminService.deleteAppointment(appointment.id);
-            scheduleRefreshSignal.set({ ts: Date.now() });
             dispatch('deleted', appointment.id);
         }
     }

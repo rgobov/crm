@@ -6,7 +6,6 @@
     import { serviceService } from '$lib/services/serviceService.js';
     import { resourceService } from '$lib/services/resourceService.js';
     import { branchService } from '$lib/services/branchService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
     import SearchDropdownItem from './SearchDropdownItem.svelte';
@@ -256,7 +255,6 @@
             } else {
                 await adminService.createAppointment(payload);
             }
-            scheduleRefreshSignal.set({ ts: Date.now() });
             dispatch('saved');
         } catch (e) {
             console.error('Save failed', e);

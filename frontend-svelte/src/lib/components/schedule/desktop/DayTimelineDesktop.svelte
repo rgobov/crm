@@ -238,7 +238,7 @@ const dispatch = createEventDispatcher();
 
     .timeline-body-scroll { flex: 1; overflow: auto; position: relative; }
     .body-layout-wrapper { display: flex; min-height: 100%; position: relative; }
-    .time-axis-col { flex-shrink: 0; background: #eee8d5; border-right: 1.5px solid #ddd6c1; position: sticky; left: 0; z-index: 200; }
+    .time-axis-col { flex-shrink: 0; background: #eee8d5; border-right: 1.5px solid #ddd6c1; position: sticky; left: 0; z-index: 410; }
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 9px; font-weight: 900; color: #586e75; background: #fdf6e3; padding: 1px 4px; border-radius: 4px; border: 1px solid #ddd6c1; }
 

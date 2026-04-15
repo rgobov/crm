@@ -1,7 +1,6 @@
 <script>
     import { createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { fade } from 'svelte/transition';
 
     export let appointment;
@@ -20,7 +19,6 @@
             const updated = { ...appointment, status: newStatus };
             await adminService.updateAppointment(appointment.id, updated);
             appointment = updated;
-            scheduleRefreshSignal.set({ ts: Date.now() });
             dispatch('updated', updated);
         } catch (e) {
             alert('Ошибка обновления статуса');
@@ -30,7 +28,6 @@
     async function handleDelete() {
         if (confirm('Удалить эту запись?')) {
             await adminService.deleteAppointment(appointment.id);
-            scheduleRefreshSignal.set({ ts: Date.now() });
             dispatch('deleted', appointment.id);
         }
     }

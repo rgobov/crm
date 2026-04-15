@@ -2,7 +2,6 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import api from '$lib/api.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { fade, slide, scale } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -88,8 +87,6 @@
             contact = res.data;
             cancelAllEdits();
 
-            // Обновляем таймлайн
-            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
             dispatch('updated', contact);
         } catch (e) {
             alert('Ошибка при сохранении');

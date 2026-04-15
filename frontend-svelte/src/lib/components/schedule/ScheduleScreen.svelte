@@ -2,6 +2,7 @@
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
+    import { dbService } from '$lib/services/dbService.js';
     import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchStore } from '$lib/stores/branchStore.js';
     import DayTimeline from './DayTimeline.svelte';
@@ -9,7 +10,7 @@
 
     export let onlyBusyStaff = false;
     export let onlyWorkingStaff = false;
-    export let branchId = null; // Добавляем проп
+    export let branchId = null;
 
     const dispatch = createEventDispatcher();
 
@@ -17,34 +18,111 @@
     let staff = [];
     let isLoading = false;
     let lastLoadTime = 0;
+    let refreshTimeout;
 
     // ПРИОРИТЕТ: Проп, если он есть, иначе Стор.
     $: currentBranchId = branchId || $activeBranchId;
 
-    // Lazy loading function for staff photos
-    async function loadStaffPhoto(staffId) {
+    async function fetchAppointments(date, bId, silent = false) {
+        if (!date || !bId) return;
+        if (!silent) isLoading = true;
+        try {
+            console.log(`📡 Fetching appointments for date: ${date}, branch: ${bId}`);
+            const apptsData = await adminService.getAppointmentsForDay(date, bId);
+            appointments = apptsData || [];
+        } catch (e) {
+            console.error('❌ Error loading appointments:', e);
+        } finally {
+            if (!silent) isLoading = false;
+        }
+    }
+
+    async function fetchStaff(date, bId, silent = false) {
+        if (!date || !bId) return;
+        if (!silent) isLoading = true;
+        try {
+            console.log(`📡 Fetching staff for date: ${date}, branch: ${bId}`);
+            const staffData = await adminService.getStaffForSchedule(date, bId);
+
+            let staffArray = [];
+            if (typeof staffData === 'string') {
+                try { staffArray = JSON.parse(staffData); } catch (e) { staffArray = []; }
+            } else {
+                staffArray = Array.isArray(staffData) ? staffData : [];
+            }
+
+            // Soft update: сохраняем фото, если они уже есть в памяти
+            staff = staffArray.map(ns => {
+                const existing = staff.find(os => os.id === ns.id);
+                if (existing && existing.photoData) {
+                    return { ...ns, photoData: existing.photoData };
+                }
+                return ns;
+            });
+
+            // Ленивая загрузка недостающих фото
+            staff.forEach(member => {
+                // Если фото нет или оно могло устареть
+                loadStaffPhoto(member.id, member.photoUpdatedAt).then(photo => {
+                    if (photo && member.photoData !== photo) {
+                        staff = staff.map(s => s.id === member.id ? {...s, photoData: photo} : s);
+                    }
+                });
+            });
+        } catch (e) {
+            console.error('❌ Error loading staff:', e);
+        } finally {
+            if (!silent) isLoading = false;
+        }
+    }
+
+    async function loadDayData(date, bId, silent = false) {
+        if (!date || !bId) return;
+        if (!silent) isLoading = true;
+        await Promise.all([
+            fetchAppointments(date, bId, true),
+            fetchStaff(date, bId, true)
+        ]);
+        isLoading = false;
+    }
+
+    function debouncedRefresh() {
+        clearTimeout(refreshTimeout);
+        refreshTimeout = setTimeout(() => {
+            if ($selectedDate && currentBranchId) {
+                console.log('🔄 WS: Debounced refresh (appointments only)');
+                fetchAppointments($selectedDate, currentBranchId, true);
+            }
+        }, 300);
+    }
+
+    async function loadStaffPhoto(staffId, updatedAtOnServer) {
         if (!staffId) return null;
-        const cacheKey = `staff_photo_${staffId}`;
-        
-        // Check cache first
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-            return cached;
+
+        // 1. Проверяем кэш в IndexedDB
+        const cachedRecord = await dbService.getPhoto(staffId);
+
+        // 2. Если фото есть и оно актуальное
+        if (cachedRecord && cachedRecord.photoData && updatedAtOnServer) {
+            if (cachedRecord.updatedAt >= updatedAtOnServer) {
+                return cachedRecord.photoData;
+            }
         }
         
         try {
+            // 3. Если нет в кэше или устарело, идем на сервер
             const response = await api.get(`/admin/schedule/staff/${staffId}/photo`);
             const photoData = response.data.photoData;
-            
-            // Cache the photo data
+
             if (photoData) {
-                localStorage.setItem(cacheKey, photoData);
+                // Сохраняем в кэш с новой датой
+                await dbService.savePhoto(staffId, photoData, updatedAtOnServer || Date.now());
+                return photoData;
             }
-            
-            return photoData;
+            return cachedRecord ? cachedRecord.photoData : null;
         } catch (e) {
-            console.warn('Failed to load photo for staff:', staffId, e);
-            return null;
+            console.error(`Error loading photo for ${staffId}:`, e);
+            return cachedRecord ? cachedRecord.photoData : null;
         }
     }
 
@@ -58,99 +136,34 @@
         return result;
     })();
 
-    // РЕАКТИВНАЯ ЗАГРУЗКА
+    // РЕАКТИВНАЯ ЗАГРУЗКА ПРИ СМЕНЕ ДАТЫ ИЛИ ФИЛИАЛА
     $: if ($selectedDate && currentBranchId) {
         const now = Date.now();
-        if (now - lastLoadTime > 1000) {
-            console.log('🔄 Schedule: Reactive load for branch:', currentBranchId);
-            loadDayData($selectedDate, currentBranchId);
+        if (now - lastLoadTime > 800) {
             lastLoadTime = now;
+            loadDayData($selectedDate, currentBranchId);
         }
     }
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
         if (signal && signal.ts > 0 && currentBranchId) {
-            console.log('📥 WS: Refresh signal received, loading data');
-            loadDayData($selectedDate, currentBranchId, true);
-            lastLoadTime = Date.now();
+            debouncedRefresh();
         }
     });
 
     onMount(async () => {
-        console.log('🏁 ScheduleScreen mounted. BranchId:', currentBranchId);
-        // Загружаем список филиалов, если он пуст
         if (branchStore && typeof $branchStore !== 'undefined' && $branchStore.length === 0) {
             branchStore.refresh();
         }
-
-        console.log('Current state before load:', { date: $selectedDate, branch: currentBranchId, activeBranch: $activeBranchId });
-
         if ($selectedDate && currentBranchId) {
             await loadDayData($selectedDate, currentBranchId);
         }
     });
 
-    onDestroy(() => unsubscribe());
-
-    async function loadDayData(date, bId, silent = false) {
-        if (!date || !bId) return;
-        if (!silent) isLoading = true;
-
-        try {
-            const [apptsData, staffData] = await Promise.all([
-                adminService.getAppointmentsForDay(date, bId),
-                adminService.getStaffForSchedule(date, bId)
-            ]);
-            
-            console.log('🔍 [DEBUG] staffData type:', typeof staffData);
-            console.log('🔍 [DEBUG] staffData isArray:', Array.isArray(staffData));
-            console.log('🔍 [DEBUG] staffData length:', staffData?.length);
-            console.log('🔍 [DEBUG] staffData sample:', staffData?.slice(0, 2));
-            
-            appointments = apptsData || [];
-            
-            // Fix: Handle case where backend returns JSON string instead of array
-            let staffArray = staffData;
-            if (typeof staffData === 'string') {
-                try {
-                    staffArray = JSON.parse(staffData);
-                    console.log('🔧 [FIX] Parsed staffData from JSON string, count:', staffArray.length);
-                } catch (e) {
-                    console.error('❌ [ERROR] Failed to parse staffData JSON:', e);
-                    staffArray = [];
-                }
-            } else if (!Array.isArray(staffData)) {
-                console.warn('⚠️ [WARN] staffData is not array, using empty array');
-                staffArray = [];
-            }
-            
-            // Убираем жесткий фильтр по ролям, так как админы тоже могут работать.
-            // Если бэкенд вернул сотрудника в списке для расписания — он должен там быть.
-            staff = staffArray;
-            console.log('Staff count:', staff.length);
-            
-    // Start lazy loading photos for all staff members
-            if (staff.length > 0) {
-                console.log('Starting lazy loading of photos for', staff.length, 'staff members');
-                // Use a smaller batch size or sequential loading to avoid "Network Error"
-                for (const staffMember of staff) {
-                    loadStaffPhoto(staffMember.id).then(photoData => {
-                        if (photoData) {
-                            staff = staff.map(s =>
-                                s.id === staffMember.id ? {...s, photoData} : s
-                            );
-                        }
-                    });
-                }
-            }
-            
-            console.log('Day data loaded. Staff count:', staff.length);
-        } catch (e) {
-            console.error('❌ Schedule Screen API Error:', e);
-        } finally {
-            isLoading = false;
-        }
-    }
+    onDestroy(() => {
+        unsubscribe();
+        clearTimeout(refreshTimeout);
+    });
 
     function handleEmptySlot(event) { dispatch('emptySlotTap', event.detail); }
     function handleAppointment(event) { dispatch('appointmentTap', event.detail); }
@@ -168,7 +181,6 @@
              <div class="empty-state-msg">
                 <span class="icon">🏢</span>
                 <p>Выберите филиал в меню сверху</p>
-                <p style="font-size: 10px; opacity: 0.5; margin-top: 4px;">ID: {currentBranchId || 'none'}</p>
                 <button on:click={() => branchStore.refresh()} style="margin-top: 10px; font-size: 10px;">Обновить список филиалов</button>
             </div>
         {:else if staff.length === 0 && !isLoading}

@@ -1,7 +1,7 @@
 <script>
-    import { createEventDispatcher } from 'svelte';
+    // Импорты и пропсы
+    import { createEventDispatcher, onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { fade, scale, slide } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -16,14 +16,12 @@
     async function loadStaffMember() {
         if (appointment.staffMemberId && !staffMember) {
             try {
-                // Используем тот же метод что и в AppointmentEditScreen
                 const staffData = await adminService.getStaffForSchedule(
                     new Date(appointment.startTime), 
                     appointment.branchId || 'br-virtual'
                 );
                 staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
                 
-                // Находим сотрудника по ID
                 const foundStaff = staffList.find(s => s.id === appointment.staffMemberId);
                 if (foundStaff) {
                     staffMember = foundStaff;
@@ -35,9 +33,8 @@
         }
     }
 
-    // Загружаем при монтировании компонента
-    import { onMount } from 'svelte';
     onMount(loadStaffMember);
+
 
     let isEditingComment = false;
     let tempComment = "";
@@ -56,7 +53,6 @@
             const updated = { ...appointment, status: newStatus };
             await adminService.updateAppointment(appointment.id, updated);
             appointment = updated;
-            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
             dispatch('updated', updated);
         } catch (e) {
             alert('Ошибка обновления статуса');
@@ -70,7 +66,6 @@
             await adminService.updateAppointment(appointment.id, updated);
             appointment.comment = tempComment;
             isEditingComment = false;
-            scheduleRefreshSignal.set({ ts: Date.now(), source: 'local' });
         } catch (e) {
             alert('Ошибка сохранения заметки');
         } finally {
@@ -101,7 +96,6 @@
     async function handleDelete() {
         if (confirm('Удалить эту запись?')) {
             await adminService.deleteAppointment(appointment.id);
-            scheduleRefreshSignal.set({ ts: Date.now() });
             dispatch('deleted', appointment.id);
         }
     }

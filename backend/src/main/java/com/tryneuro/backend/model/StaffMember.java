@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Set;
 
@@ -36,8 +37,17 @@ public class StaffMember {
     @Column(name = "photo_data")
     private byte[] photoData;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;
+
+    @PreUpdate
+    @PrePersist
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @ManyToMany(fetch = FetchType.LAZY)

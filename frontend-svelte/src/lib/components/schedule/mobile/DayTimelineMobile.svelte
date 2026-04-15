@@ -221,7 +221,7 @@
     .scroll-canvas { display: grid; grid-template-areas: "corner header" "axis grid"; position: relative; }
     .sticky-top-left { grid-area: corner; position: sticky; top: 0; left: 0; z-index: 500; background: #eee8d5; border-right: 1.5px solid #ddd6c1; border-bottom: 1.5px solid #ddd6c1; height: 60px; display: flex; align-items: center; justify-content: center; color: #93a1a1; font-size: 14px; }
     .staff-header-sticky { grid-area: header; position: sticky; top: 0; z-index: 400; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; height: 60px; }
-    .time-axis-sticky { grid-area: axis; position: sticky; left: 0; z-index: 300; background: #eee8d5; border-right: 1.5px solid #ddd6c1; }
+    .time-axis-sticky { grid-area: axis; position: sticky; left: 0; z-index: 410; background: #eee8d5; border-right: 1.5px solid #ddd6c1; }
     .grid-body { grid-area: grid; position: relative; background: #fdf6e3; }
     .staff-row { display: flex; height: 100%; }
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }

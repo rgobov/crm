@@ -19,6 +19,7 @@ public class StaffMemberDto {
     private String phone;
     private String photoUrl;
     private String photoData; // Base64 encoded image
+    private Long photoUpdatedAt; // Timestamp
     private boolean active;
     private String role;
     private String email;

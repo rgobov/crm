@@ -159,6 +159,7 @@ public class DtoMapper {
                 .phone(entity.getPhone())
                 .photoUrl(entity.getPhotoUrl())
                 .photoData(photoDataBase64)
+                .photoUpdatedAt(entity.getUpdatedAt() != null ? entity.getUpdatedAt().toInstant(ZoneOffset.UTC).toEpochMilli() : null)
                 .active(entity.isActive())
                 .role(entity.getRole())
                 .email(entity.getEmail())
