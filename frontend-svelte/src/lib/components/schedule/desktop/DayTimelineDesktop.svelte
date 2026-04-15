@@ -67,15 +67,27 @@ const dispatch = createEventDispatcher();
 
     function updateNowPosition() {
         if (!currentBranch) {
-            nowLinePos = -1; // ✅ Явно скрываем линию если нет филиала
+            nowLinePos = -1;
             branchTime = "";
             return;
         }
         const tz = currentBranch.timezone;
         const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
-        if (formatter.format(currentTime) === formatter.format(day)) {
-            nowLinePos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, tz);
-            branchTime = timeUtils.formatTime(currentTime.toISOString(), tz);
+
+        // 1. Проверяем, что сегодня - это выбранный день
+        const isToday = formatter.format(currentTime) === formatter.format(day);
+
+        if (isToday) {
+            // 2. Проверяем, входит ли текущий час в видимый диапазон (рабочее время)
+            const currentHourInTz = parseInt(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', timeZone: tz }).format(currentTime));
+
+            if (currentHourInTz >= startHour && currentHourInTz < endHour) {
+                nowLinePos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, tz);
+                branchTime = timeUtils.formatTime(currentTime.toISOString(), tz);
+            } else {
+                nowLinePos = -1;
+                branchTime = "";
+            }
         } else {
             nowLinePos = -1;
             branchTime = "";
