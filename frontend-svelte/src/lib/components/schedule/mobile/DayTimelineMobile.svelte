@@ -35,21 +35,20 @@
         return map;
     })();
 
-    function updateLayout() {
-        const width = window.innerWidth;
+    // РЕАКТИВНЫЙ РАСЧЕТ ВЕРСТКИ (Золотое сечение 1.618)
+    $: {
+        const width = typeof window !== 'undefined' ? window.innerWidth : 375;
         const availableWidth = width - TIME_COL_WIDTH;
-        // Считаем общее кол-во колонок для расчета ширины
         const totalCols = staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
 
         if (totalCols <= 1) {
             STAFF_WIDTH = availableWidth;
-            HOUR_HEIGHT = 80;
+            HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.618);
+            if (HOUR_HEIGHT > 120) HOUR_HEIGHT = 120;
         } else if (totalCols === 2) {
-            // Если всего 2 колонки, делим экран пополам
             STAFF_WIDTH = Math.floor(availableWidth / 2);
-            HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.4); // Чуть выше для комфорта
+            HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.3);
         } else {
-            // Если 3 и более, делим на 3 (стандартный режим)
             STAFF_WIDTH = Math.floor(availableWidth / 3);
             HOUR_HEIGHT = Math.floor(STAFF_WIDTH / 1.618);
         }
@@ -57,8 +56,6 @@
     }
 
     onMount(async () => {
-        updateLayout();
-        window.addEventListener('resize', updateLayout);
         await timeSyncService.sync();
         await fetchBranchData();
         const timer = setInterval(() => {
