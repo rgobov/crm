@@ -54,6 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     final Claims claims = jwtUtil.extractAllClaims(jwt);
                     final String tenantId = claims.get("tenantId", String.class);
                     request.setAttribute("tenantId", tenantId);
+                    TenantContext.setCurrentTenantId(tenantId);
 
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
@@ -70,6 +71,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             logger.warn("JWT Token validation failed: " + e.getMessage());
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 }

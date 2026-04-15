@@ -8,11 +8,11 @@ export const employeeService = {
     },
 
     // 2. Личный профиль и график на дату
-    async getMyProfile(date = new Date()) {
+    async getMyProfile(date = new Date(), branchId = null) {
         const dateStr = date.toISOString().split('T')[0];
-        const response = await api.get('/employee/profile', {
-            params: { date: dateStr }
-        });
+        const params = { date: dateStr };
+        if (branchId) params.branchId = branchId;
+        const response = await api.get('/employee/profile', { params });
         return response.data;
     },
 
@@ -41,8 +41,8 @@ export const employeeService = {
 
     // --- НОВОЕ: Управление сменами (Синхронно с Flutter) ---
     async updateMyShift(data) {
-        // Ожидает: date, isDayOff, workStart, workEnd, breakStart, breakEnd
-        await api.put('/employee/shift', data);
+        // Ожидает: date, isDayOff, workStartTime, workEndTime, breakStartTime, breakEndTime, branchId
+        await api.put('/employee/profile/shift', data);
     },
 
     async repeatSchedule(data) {

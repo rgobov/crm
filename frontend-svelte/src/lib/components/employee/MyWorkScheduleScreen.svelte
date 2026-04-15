@@ -1,9 +1,33 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import { employeeService } from '$lib/services/employeeService.js';
+    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
+    import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { goto } from '$app/navigation';
 
+    $: currentBranchId = branchId || $activeBranchId;
+    export let branchId = null;
+
     let selectedDate = new Date().toISOString().split('T')[0];
+
+    // Подписка на обновления
+    const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
+        if (signal && signal.ts > 0) {
+            const { type, staffId, date, branchId: sigBranchId } = signal;
+
+            // Если обновился график именно этого сотрудника на эту дату
+            if (type === 'STAFF_SHIFT_UPDATED' && date === selectedDate) {
+                 console.log('🎯 WS: My shift updated from elsewhere, refreshing...');
+                 loadShift();
+            }
+        }
+    });
+
+    onMount(() => {
+        return () => unsubscribe();
+    });
+
+    onDestroy(() => unsubscribe());
     let shiftData = {
         isDayOff: false,
         workStartTime: '09:00',
@@ -19,9 +43,10 @@
     $: if (selectedDate) loadShift();
 
     async function loadShift() {
+        if (!currentBranchId) return;
         isLoading = true;
         try {
-            const profile = await employeeService.getMyProfile(new Date(selectedDate));
+            const profile = await employeeService.getMyProfile(new Date(selectedDate), currentBranchId);
             if (profile) {
                 shiftData = {
                     isDayOff: profile.isDayOff || false,
@@ -37,14 +62,23 @@
     }
 
     async function handleSave() {
+        if (!currentBranchId) {
+            alert('Ошибка: филиал не выбран');
+            return;
+        }
         isSaving = true;
         try {
-            await employeeService.updateMyShift({
+            const payload = {
                 date: selectedDate,
+                branchId: currentBranchId,
                 ...shiftData
-            });
+            };
+            console.log('💾 Saving shift:', payload);
+            await employeeService.updateMyShift(payload);
+            console.log('✅ Shift saved successfully');
             alert('График сохранен');
         } catch (e) {
+            console.error('❌ Error saving shift:', e);
             alert('Ошибка при сохранении');
         } finally {
             isSaving = false;
@@ -52,11 +86,13 @@
     }
 
     async function repeatSchedule(days) {
+        if (!currentBranchId) return;
         isSaving = true;
         try {
             await employeeService.repeatSchedule({
                 sourceDate: selectedDate,
                 days: days,
+                branchId: currentBranchId,
                 ...shiftData
             });
             alert(`График скопирован на ${days} дней вперед`);

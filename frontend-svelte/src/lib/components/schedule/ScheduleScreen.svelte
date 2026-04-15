@@ -19,6 +19,7 @@
     let isLoading = false;
     let lastLoadTime = 0;
     let refreshTimeout;
+    let staffRefreshTimeout = null; // Дебаунсинг для обновления сотрудников
 
     // ПРИОРИТЕТ: Проп, если он есть, иначе Стор.
     $: currentBranchId = branchId || $activeBranchId;
@@ -42,40 +43,65 @@
     async function fetchStaff(date, bId, silent = false) {
         if (!date || !bId) return;
         if (!silent) isLoading = true;
-        try {
-            console.log(`📡 Fetching staff for date: ${date}, branch: ${bId}`);
-            const staffData = await adminService.getStaffForSchedule(date, bId, { bypassCache: true });
 
-            let staffArray = [];
-            if (typeof staffData === 'string') {
-                try { staffArray = JSON.parse(staffData); } catch (e) { staffArray = []; }
-            } else {
-                staffArray = Array.isArray(staffData) ? staffData : [];
-            }
+        let attempts = 0;
+        const maxAttempts = 2;
 
-            // Soft update: сохраняем фото, если они уже есть в памяти
-            staff = staffArray.map(ns => {
-                const existing = staff.find(os => os.id === ns.id);
-                if (existing && existing.photoData) {
-                    return { ...ns, photoData: existing.photoData };
+        while (attempts < maxAttempts) {
+            try {
+                console.log(`📡 Fetching staff for date: ${date}, branch: ${bId} (Attempt ${attempts + 1})`);
+                const staffData = await adminService.getStaffForSchedule(date, bId, { bypassCache: true });
+
+                let staffArray = [];
+                if (typeof staffData === 'string') {
+                    try { staffArray = JSON.parse(staffData); } catch (e) { staffArray = []; }
+                } else {
+                    staffArray = Array.isArray(staffData) ? staffData : [];
                 }
-                return ns;
-            });
 
-            // Ленивая загрузка недостающих фото
-            staff.forEach(member => {
-                // Если фото нет или оно могло устареть
-                loadStaffPhoto(member.id, member.photoUpdatedAt).then(photo => {
-                    if (photo && member.photoData !== photo) {
-                        staff = staff.map(s => s.id === member.id ? {...s, photoData: photo} : s);
+                // Soft update: сохраняем фото, если они уже есть в памяти
+                staff = staffArray.map(ns => {
+                    const existing = staff.find(os => os.id === ns.id);
+                    if (existing && existing.photoData) {
+                        return { ...ns, photoData: existing.photoData };
                     }
+                    return ns;
                 });
-            });
-        } catch (e) {
-            console.error('❌ Error loading staff:', e);
-        } finally {
-            if (!silent) isLoading = false;
+
+                console.log('📊 Staff loaded:', staff.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    workStartTime: s.workStartTime,
+                    workEndTime: s.workEndTime,
+                    dayOff: s.dayOff
+                })));
+
+                // Ленивая загрузка недостающих фото
+                staff.forEach(member => {
+                    loadStaffPhoto(member.id, member.photoUpdatedAt).then(photo => {
+                        if (photo && member.photoData !== photo) {
+                            staff = staff.map(s => s.id === member.id ? {...s, photoData: photo} : s);
+                        }
+                    });
+                });
+
+                // Если успешно - выходим из цикла
+                break;
+            } catch (e) {
+                attempts++;
+                console.error(`❌ Error loading staff (Attempt ${attempts}):`, e);
+                if (attempts < maxAttempts) {
+                    console.log('⏳ Retrying in 1s...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } finally {
+                if (!silent && attempts === maxAttempts) isLoading = false;
+                if (attempts === maxAttempts) {
+                   // Optional: show user-friendly error if all attempts failed
+                }
+            }
         }
+        if (!silent) isLoading = false;
     }
 
     async function loadDayData(date, bId, silent = false) {
@@ -148,20 +174,49 @@
     }
 
     const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
+        console.log('📥 WS: Signal received:', signal);
         if (signal && signal.ts > 0 && currentBranchId) {
-            // Если пришло детальное уведомление об изменении конкретной записи
-            if (signal.type && signal.type.startsWith('APPOINTMENT_')) {
-                const { appointmentId, date, branchId, type } = signal;
+            const { type, staffId, appointmentId, date, branchId } = signal;
+            const currentLocalDate = toLocalDbDate($selectedDate);
 
-                // Обновляем только если это наш филиал и наша дата
-                if (branchId === currentBranchId && date === toLocalDbDate($selectedDate)) {
-                    console.log(`🎯 WS: Selective update for ${type}: ${appointmentId}`);
-                    // Для простоты пока перекачиваем только записи, не трогая сотрудников
-                    fetchAppointments($selectedDate, currentBranchId, true);
-                }
+            console.log('🔍 WS: Current state:', {
+                currentBranchId,
+                currentLocalDate,
+                signalType: type,
+                signalBranchId: branchId,
+                signalDate: date
+            });
+
+            // Проверка релевантности: только если наш филиал и наш день
+            // Если в сигнале нет branchId или date — считаем его глобальным
+            const isRelevantBranch = !branchId || branchId === currentBranchId;
+            const isRelevantDate = !date || date === currentLocalDate;
+
+            console.log('🔍 WS: Relevance check:', {
+                isRelevantBranch,
+                isRelevantDate
+            });
+
+            if (!isRelevantBranch || !isRelevantDate) {
+                console.log('⏭️ WS: Signal ignored - not relevant');
+                return;
+            }
+
+            if (type === 'STAFF_SHIFT_UPDATED') {
+                console.log(`🎯 WS: Staff shift updated - debounced refresh`);
+                clearTimeout(staffRefreshTimeout);
+                staffRefreshTimeout = setTimeout(() => {
+                    fetchStaff($selectedDate, currentBranchId, true);
+                }, 500);
+            } else if (type === 'STAFF_UPDATED' || type === 'STAFF_DELETED') {
+                console.log(`🎯 WS: Staff profile updated (${type}) - refreshing staff`);
+                fetchStaff($selectedDate, currentBranchId, true);
+            } else if (type && type.startsWith('APPOINTMENT_')) {
+                console.log(`🎯 WS: Appointment updated (${type}) - refreshing appointments only`);
+                fetchAppointments($selectedDate, currentBranchId, true);
             } else {
-                // Обычный общий сигнал (или старый формат) - обновляем записи
-                debouncedRefresh();
+                console.log(`📢 WS: General signal (${type || 'unknown'}) - full refresh`);
+                loadDayData($selectedDate, currentBranchId, true);
             }
         }
     });
@@ -187,11 +242,18 @@
     onDestroy(() => {
         unsubscribe();
         clearTimeout(refreshTimeout);
+        clearTimeout(staffRefreshTimeout);
     });
 
     function handleEmptySlot(event) { dispatch('emptySlotTap', event.detail); }
     function handleAppointment(event) { dispatch('appointmentTap', event.detail); }
     function handleStaffTap(event) { dispatch('staffTap', event.detail); }
+    function handleRefresh() {
+        console.log('🔄 Refresh triggered from timeline component');
+        if ($selectedDate && currentBranchId) {
+            loadDayData($selectedDate, currentBranchId, true);
+        }
+    }
 </script>
 
 <div class="schedule-screen">
@@ -220,6 +282,7 @@
                 on:appointmentTap={handleAppointment}
                 on:emptySlotTap={handleEmptySlot}
                 on:staffTap={handleStaffTap}
+                on:refresh={handleRefresh}
             />
         {/if}
     </div>

@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -232,15 +234,11 @@ public class ScheduleService {
     @Transactional
     public void deleteAppointment(String id) {
         appointmentRepository.findById(id).ifPresent(app -> {
-            String tenantId = app.getTenantId();
-            Appointment deletedCopy = new Appointment();
-            deletedCopy.setId(id);
-            deletedCopy.setTenantId(tenantId);
-            deletedCopy.setBranchId(app.getBranchId());
-            deletedCopy.setDate(app.getDate());
+            // Сначала уведомляем клиентов об удалении (пока данные есть в объекте)
+            notifyAppointmentChange(app, "DELETED");
             
+            // Затем удаляем из БД
             appointmentRepository.deleteById(id);
-            notifyAppointmentChange(deletedCopy, "DELETED");
         });
     }
 
@@ -258,17 +256,44 @@ public class ScheduleService {
                 payload.put("status", app.getStatus());
             }
 
-            messagingTemplate.convertAndSend("/topic/schedule/" + app.getTenantId(), payload);
+            // ✅ Отправляем ТОЛЬКО после коммита транзакции
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        messagingTemplate.convertAndSend("/topic/schedule/" + app.getTenantId(), payload);
+                    }
+                });
+            } else {
+                messagingTemplate.convertAndSend("/topic/schedule/" + app.getTenantId(), payload);
+            }
+        }
+    }
+
+    private void notifyChange(String tenantId, String type, String branchId, LocalDate date) {
+        if (tenantId == null) return;
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", type != null ? type : "SCHEDULE_UPDATED");
+        payload.put("timestamp", System.currentTimeMillis());
+        if (branchId != null) payload.put("branchId", branchId);
+        if (date != null) payload.put("date", date.toString());
+
+        // ✅ Отправляем ТОЛЬКО после коммита транзакции
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
+                }
+            });
+        } else {
+            messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
         }
     }
 
     private void notifyChange(String tenantId) {
-        if (tenantId != null) {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("type", "SCHEDULE_UPDATED");
-            payload.put("timestamp", System.currentTimeMillis());
-            messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
-        }
+        notifyChange(tenantId, "SCHEDULE_UPDATED", null, null);
     }
 
     public List<WorkloadDto> getWorkloadForMonth(String tenantId, int year, int month, String branchId) {

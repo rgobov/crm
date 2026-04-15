@@ -29,8 +29,10 @@
 
         isSaving = true;
         try {
+            console.log('💾 Admin saving shift:', { staffId: staff.id, ...shiftData });
             // Сохраняем смену (теперь бэкенд ждет и branchId)
             await staffService.updateShift(staff.id, shiftData);
+            console.log('✅ Admin shift saved successfully');
 
             if (copyDays > 0) {
                 await staffService.copyShift(staff.id, shiftData, copyDays);
@@ -38,7 +40,7 @@
 
             dispatch('success');
         } catch (e) {
-            console.error(e);
+            console.error('❌ Admin error saving shift:', e);
             alert(e.response?.data?.message || 'Ошибка при сохранении графика');
         } finally {
             isSaving = false;

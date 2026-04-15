@@ -172,4 +172,20 @@ public class DtoMapper {
                 .isDayOff(entity.isDayOff())
                 .build();
     }
+
+    public static StaffScheduleDto toScheduleDto(StaffMember entity) {
+        if (entity == null) return null;
+
+        return StaffScheduleDto.builder()
+                .id(entity.getId())
+                .name(entity.getName())
+                .specialty(entity.getSpecialty())
+                .photoUpdatedAt(entity.getUpdatedAt() != null ? entity.getUpdatedAt().toInstant(ZoneOffset.UTC).toEpochMilli() : null)
+                .workStartTime(entity.getWorkStartTime())
+                .workEndTime(entity.getWorkEndTime())
+                .breakStartTime(entity.getBreakStartTime())
+                .breakEndTime(entity.getBreakEndTime())
+                .isDayOff(entity.isDayOff())
+                .build();
+    }
 }

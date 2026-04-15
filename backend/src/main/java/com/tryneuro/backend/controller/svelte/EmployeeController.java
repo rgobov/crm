@@ -65,9 +65,12 @@ public class EmployeeController {
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<StaffMember> getMyProfile(@AuthenticationPrincipal User user, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+    public ResponseEntity<StaffMember> getMyProfile(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) String branchId) {
         LocalDate targetDate = (date != null) ? date : LocalDate.now();
-        return staffMemberService.getStaffByIdAndDate(getRequiredStaffId(user), targetDate)
+        return staffMemberService.getStaffByIdAndDate(getRequiredStaffId(user), targetDate, branchId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

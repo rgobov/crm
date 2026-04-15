@@ -23,6 +23,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -109,8 +111,10 @@ public class StaffMemberService {
         try {
             byte[] photoBytes = imageCompressionService.compress(file);
             staffMember.setPhotoData(photoBytes);
+            // Обновляем дату, чтобы другие устройства поняли, что фото изменилось
+            staffMember.setUpdatedAt(java.time.LocalDateTime.now());
             StaffMember saved = staffMemberRepository.save(staffMember);
-            notifyChange(tenantId);
+            notifyChange(tenantId, "STAFF_UPDATED", id, null, null);
             enrichWithUserData(saved);
             return saved;
         } catch (Exception e) {
@@ -127,8 +131,9 @@ public class StaffMemberService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Доступ запрещен");
         }
         staffMember.setPhotoData(null);
+        staffMember.setUpdatedAt(java.time.LocalDateTime.now());
         StaffMember saved = staffMemberRepository.save(staffMember);
-        notifyChange(tenantId);
+        notifyChange(tenantId, "STAFF_UPDATED", id, null, null);
         enrichWithUserData(saved);
         return saved;
     }
@@ -286,17 +291,28 @@ public class StaffMemberService {
     }
 
     @Transactional
-    public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date) {
+    public Optional<StaffMember> getStaffByIdAndDate(String id, LocalDate date, String branchId) {
         return getStaffMemberById(id).map(staff -> {
-            List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staff.getId(), date);
-            if (!shifts.isEmpty()) {
-                StaffShift shift = shifts.get(0);
+            Optional<StaffShift> shiftOpt;
+            if (branchId != null && !branchId.isEmpty() && !"null".equals(branchId)) {
+                shiftOpt = staffShiftRepository.findByStaffIdAndDateAndBranchId(staff.getId(), date, branchId);
+            } else {
+                List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staff.getId(), date);
+                shiftOpt = shifts.isEmpty() ? Optional.empty() : Optional.of(shifts.get(0));
+            }
+
+            shiftOpt.ifPresent(shift -> {
                 staff.setDayOff(shift.isDayOff());
                 staff.setWorkStartTime(shift.getWorkStartTime());
                 staff.setWorkEndTime(shift.getWorkEndTime());
                 staff.setBreakStartTime(shift.getBreakStartTime());
                 staff.setBreakEndTime(shift.getBreakEndTime());
+            });
+
+            if (shiftOpt.isEmpty()) {
+                staff.setDayOff(true);
             }
+
             return staff;
         });
     }
@@ -304,6 +320,12 @@ public class StaffMemberService {
 
     @Transactional
     public StaffShift saveShift(StaffShift shift) {
+        // Гарантируем tenantId перед сохранением
+        if (shift.getTenantId() == null) {
+            String currentTenantId = com.tryneuro.backend.security.TenantContext.getCurrentTenantId();
+            shift.setTenantId(currentTenantId);
+        }
+
         StaffShift saved = staffShiftRepository.findByStaffIdAndDateAndBranchId(shift.getStaffId(), shift.getDate(), shift.getBranchId())
                 .map(existing -> {
                     existing.setWorkStartTime(shift.getWorkStartTime());
@@ -311,20 +333,41 @@ public class StaffMemberService {
                     existing.setBreakStartTime(shift.getBreakStartTime());
                     existing.setBreakEndTime(shift.getBreakEndTime());
                     existing.setDayOff(shift.isDayOff());
+                    existing.setTenantId(shift.getTenantId()); // На всякий случай
                     return staffShiftRepository.save(existing);
                 })
                 .orElseGet(() -> staffShiftRepository.save(shift));
 
-        notifyChange(saved.getTenantId());
+        notifyChange(saved.getTenantId(), "STAFF_SHIFT_UPDATED", saved.getStaffId(), saved.getBranchId(), saved.getDate());
         return saved;
     }
 
-    private void notifyChange(String tenantId) {
-        if (tenantId != null) {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("type", "SCHEDULE_UPDATED");
-            payload.put("timestamp", System.currentTimeMillis());
+    private void notifyChange(String tenantId, String type, String staffId, String branchId, LocalDate date) {
+        if (tenantId == null) return;
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("type", type != null ? type : "SCHEDULE_UPDATED");
+        payload.put("timestamp", System.currentTimeMillis());
+        if (staffId != null) payload.put("staffId", staffId);
+        if (branchId != null) payload.put("branchId", branchId);
+        if (date != null) payload.put("date", date.toString());
+
+        // ✅ ГАРАНТИЯ: Отправляем сигнал ТОЛЬКО после успешного коммита транзакции
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    log.info("📢 Sending WS signal after transaction commit: {}", payload.get("type"));
+                    messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
+                }
+            });
+        } else {
+            // Если транзакции нет (например, простой GET), отправляем сразу
             messagingTemplate.convertAndSend("/topic/schedule/" + tenantId, payload);
         }
+    }
+
+    private void notifyChange(String tenantId) {
+        notifyChange(tenantId, "SCHEDULE_UPDATED", null, null, null);
     }
 }

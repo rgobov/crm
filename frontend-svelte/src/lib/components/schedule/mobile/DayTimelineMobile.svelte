@@ -1,10 +1,9 @@
 <script>
-    import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+    import { onMount, createEventDispatcher } from 'svelte';
     import { timeUtils } from '$lib/utils/timeUtils.js';
     import { timeSyncService } from '$lib/services/timeSyncService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchService } from '$lib/services/branchService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import TimelineAppointment from '../TimelineAppointment.svelte';
     import TimelineNowIndicator from '../TimelineNowIndicator.svelte';
     import { fade } from 'svelte/transition';
@@ -57,13 +56,6 @@
         SLOT_HEIGHT = HOUR_HEIGHT / 4;
     }
 
-    const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
-        if (signal && signal.ts > 0 && $activeBranchId) {
-            fetchBranchData();
-            dispatch('refresh'); // 🔄 ✅ Синхронизация по сигналу WebSocket
-        }
-    });
-
     onMount(async () => {
         updateLayout();
         window.addEventListener('resize', updateLayout);
@@ -82,12 +74,7 @@
         return () => {
             window.removeEventListener('resize', updateLayout);
             clearInterval(timer);
-            unsubscribe();
         };
-    });
-
-    onDestroy(() => {
-        unsubscribe();
     });
 
     async function fetchBranchData() {

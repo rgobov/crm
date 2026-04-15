@@ -214,16 +214,12 @@ public class AdminController {
     }
 
     @GetMapping("/schedule/staff")
-    public List<StaffMemberDto> getStaffForSchedule(
+    public List<StaffScheduleDto> getStaffForSchedule(
             @RequestAttribute("tenantId") String tenantId, 
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(value = "branchId", required = false) String branchId) {
         return staffMemberService.getStaffForDate(getRequiredTenantId(tenantId), date, branchId)
-                .stream().map(staff -> {
-                    StaffMemberDto dto = DtoMapper.toDto(staff);
-                    dto.setPhotoData(null); // Exclude photo data for schedule API
-                    return dto;
-                }).collect(Collectors.toList());
+                .stream().map(DtoMapper::toScheduleDto).collect(Collectors.toList());
     }
     
     @GetMapping("/schedule/staff/{id}/photo")

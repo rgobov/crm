@@ -4,7 +4,6 @@
     import { timeSyncService } from '$lib/services/timeSyncService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchService } from '$lib/services/branchService.js';
-    import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import TimelineAppointment from '../TimelineAppointment.svelte';
     import TimelineNowIndicator from '../TimelineNowIndicator.svelte';
     import TimelineCursorGuide from '../TimelineCursorGuide.svelte';
@@ -47,14 +46,6 @@ const dispatch = createEventDispatcher();
         return map;
     })();
 
-    // ПОДПИСКА НА ВЕБСОКЕТЫ
-    const unsubscribe = scheduleRefreshSignal.subscribe(signal => {
-        if (signal && signal.ts > 0 && $activeBranchId) {
-            fetchBranchData();
-            dispatch('refresh'); // 🔄 ✅ Сигнал родителю перезагрузить пропсы
-        }
-    });
-
     onMount(async () => {
         await timeSyncService.sync();
         await fetchBranchData();
@@ -64,13 +55,7 @@ const dispatch = createEventDispatcher();
         }, 30000);
         updateNowPosition();
         setTimeout(scrollToCurrentTime, 600);
-        return () => {
-            clearInterval(timer);
-            unsubscribe();
-        };
     });
-
-    onDestroy(() => unsubscribe());
 
     async function fetchBranchData() {
         if (!$activeBranchId) return;
