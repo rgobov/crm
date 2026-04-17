@@ -14,7 +14,7 @@
     export let appointments = [];
     export let staff = [];
 
-    let TIME_COL_WIDTH = 36;
+    let TIME_COL_WIDTH = 0;
     let HOUR_HEIGHT = 72;
     let SLOT_HEIGHT = HOUR_HEIGHT / 4;
     let STAFF_WIDTH = 0;
@@ -22,7 +22,7 @@
     let startHour = 8, endHour = 22, hours = [];
     let currentTime = new Date(), nowLinePos = -1, branchTime = "";
     let currentBranch = null;
-    let mainScroll;
+    let scrollHeader, scrollBody;
 
     $: apptsByStaff = (() => {
         const map = { 'unassigned': [] };
@@ -68,8 +68,8 @@
         }, 30000);
         updateNowPosition();
         setTimeout(() => {
-            if (mainScroll && nowLinePos > 0) {
-                mainScroll.scrollTo({ top: nowLinePos - (mainScroll.clientHeight / 3), behavior: 'smooth' });
+            if (scrollBody && nowLinePos > 0) {
+                scrollBody.scrollTo({ top: nowLinePos - (scrollBody.clientHeight / 3), behavior: 'smooth' });
             }
         }, 600);
         return () => {
@@ -126,15 +126,25 @@
         if (status === 'OFF' || status === 'BREAK') return;
         dispatch('emptySlotTap', { hour, min: minute, staffId });
     }
+
+    function syncScroll() {
+        if (scrollHeader && scrollBody) {
+            scrollHeader.scrollLeft = scrollBody.scrollLeft;
+        }
+    }
+
+    function syncHeaderScroll() {
+        if (scrollBody && scrollHeader) {
+            scrollBody.scrollLeft = scrollHeader.scrollLeft;
+        }
+    }
 </script>
 
-<div class="mobile-timeline-unified" bind:this={mainScroll}>
-    <div class="scroll-canvas" style="width: {(staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
-
-        <div class="sticky-top-left" style="width: {TIME_COL_WIDTH}px">🕒</div>
-
-        <header class="staff-header-sticky">
-            <div class="staff-row">
+<div class="mobile-timeline-wrapper">
+    <header class="staff-header-fixed">
+        <div class="time-corner-fixed" style="width: {TIME_COL_WIDTH}px">🕒</div>
+        <div class="staff-scroll-area" bind:this={scrollHeader} on:scroll={syncHeaderScroll}>
+            <div class="staff-row" style="width: {(staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 {#each staff as s (s.id)}
                     <button class="staff-cell btn-reset" class:is-off={s.dayOff} style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
                         <div class="avatar-wrap">
@@ -157,60 +167,67 @@
                     </div>
                 {/if}
             </div>
-        </header>
+        </div>
+    </header>
 
-        <aside class="time-axis-sticky" style="width: {TIME_COL_WIDTH}px">
-            {#each hours as h (h)}
-                <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
-                    <span class="h-label">{h}:00</span>
-                </div>
-            {/each}
-            <TimelineNowIndicator {nowLinePos} label={branchTime} mode="dot" />
-        </aside>
-
-        <main class="grid-body">
-            <div class="cols-container">
-                {#each [...staff, ...(apptsByStaff['unassigned']?.length > 0 ? [{id: null}] : [])] as s ( (s.id || 'unassigned') )}
-                    <div class="staff-col" style="width: {STAFF_WIDTH}px">
-                        {#each Array(hours.length * 4) as _, i}
-                            {@const h = hours[Math.floor(i/4)]}
-                            {@const m = (i%4)*15}
-                            {@const status = timeUtils.getSlotStatus(s.id ? s : null, h, m)}
-                            <button class="slot-btn"
-                                    class:is-break={status === 'BREAK'}
-                                    class:is-off={status === 'OFF'}
-                                    class:zebra={h % 2 === 0}
-                                    style="height: {SLOT_HEIGHT}px"
-                                    on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}>
-                            </button>
-                        {/each}
-                        {#each apptsByStaff[s.id || 'unassigned'] || [] as appt (appt.id)}
-                            <TimelineAppointment {appt} {startHour} hourHeight={HOUR_HEIGHT} timezone={currentBranch?.timezone} on:click={(e) => dispatch('appointmentTap', e.detail)} />
-                        {/each}
+    <div class="timeline-body-scroll" bind:this={scrollBody} on:scroll={syncScroll}>
+        <div class="body-layout-wrapper" style="width: {(staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
+            <aside class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
+                {#each hours as h (h)}
+                    <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
+                        <span class="h-label">{h}:00</span>
                     </div>
                 {/each}
-            </div>
-            <div class="grid-lines">
-                {#each Array(hours.length * 4) as _, i}
-                    {@const isHour = i % 4 === 0}
-                    <div class="l" class:bold={isHour} class:dashed={!isHour} style="top: {i * SLOT_HEIGHT}px"></div>
-                {/each}
-            </div>
-            <TimelineNowIndicator {nowLinePos} mode="line" />
-        </main>
+                <TimelineNowIndicator {nowLinePos} label={branchTime} mode="dot" />
+            </aside>
+
+            <main class="grid-canvas">
+                <div class="cols-container">
+                    {#each [...staff, ...(apptsByStaff['unassigned']?.length > 0 ? [{id: null}] : [])] as s ( (s.id || 'unassigned') )}
+                        <div class="staff-col" style="width: {STAFF_WIDTH}px">
+                            {#each Array(hours.length * 4) as _, i}
+                                {@const h = hours[Math.floor(i/4)]}
+                                {@const m = (i%4)*15}
+                                {@const status = timeUtils.getSlotStatus(s.id ? s : null, h, m)}
+                                <button class="slot-btn"
+                                        class:is-break={status === 'BREAK'}
+                                        class:is-off={status === 'OFF'}
+                                        class:zebra={h % 2 === 0}
+                                        style="height: {SLOT_HEIGHT}px"
+                                        on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}>
+                                </button>
+                            {/each}
+                            {#each apptsByStaff[s.id || 'unassigned'] || [] as appt (appt.id)}
+                                <TimelineAppointment {appt} {startHour} hourHeight={HOUR_HEIGHT} timezone={currentBranch?.timezone} on:click={(e) => dispatch('appointmentTap', e.detail)} />
+                            {/each}
+                        </div>
+                    {/each}
+                </div>
+                <div class="grid-lines">
+                    {#each Array(hours.length * 4) as _, i}
+                        {@const isHour = i % 4 === 0}
+                        <div class="l" class:bold={isHour} class:dashed={!isHour} style="top: {i * SLOT_HEIGHT}px"></div>
+                    {/each}
+                </div>
+                <TimelineNowIndicator {nowLinePos} mode="line" />
+            </main>
+        </div>
     </div>
 </div>
 
 <style>
     * { box-sizing: border-box; }
     .btn-reset { background: none; border: none; padding: 0; margin: 0; text-align: left; cursor: pointer; font-family: inherit; }
-    .mobile-timeline-unified { height: 100%; width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; background: #fdf6e3; }
-    .mobile-timeline-unified::-webkit-scrollbar { display: none; }
-    .scroll-canvas { display: grid; grid-template-areas: "corner header" "axis grid"; position: relative; min-height: 100%; }
-    .sticky-top-left { grid-area: corner; position: sticky; top: 0; left: 0; z-index: 500; background: #eee8d5; border-right: 1.5px solid #ddd6c1; border-bottom: 1.5px solid #ddd6c1; height: 60px; display: flex; align-items: center; justify-content: center; color: #93a1a1; font-size: 14px; }
-    .staff-header-sticky { grid-area: header; position: sticky; top: 0; z-index: 400; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; height: 60px; }
-    .time-axis-sticky { grid-area: axis; position: sticky; top: 0; left: 0; z-index: 410; background: #eee8d5; border-right: 1.5px solid #ddd6c1; }
-    .grid-body { grid-area: grid; position: relative; background: #fdf6e3; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .mobile-timeline-wrapper { height: 100%; display: flex; flex-direction: column; background: #fdf6e3; }
+    .staff-header-fixed { display: flex; height: 60px; background: #eee8d5; z-index: 900; border-bottom: 1.5px solid #ddd6c1; flex-shrink: 0; position: fixed; top: 60px; left: 0; right: 0; }
+    .time-corner-fixed { display: flex; align-items: center; justify-content: center; color: #93a1a1; font-size: 14px; border-right: 1.5px solid #ddd6c1; background: #eee8d5; z-index: 910; flex-shrink: 0; }
+    .staff-scroll-area { flex: 1; overflow-x: auto; scrollbar-width: none; }
+    .staff-scroll-area::-webkit-scrollbar { display: none; }
+    .timeline-body-scroll { flex: 1; overflow: auto; position: relative; -webkit-overflow-scrolling: touch; padding-top: 60px; }
+    .timeline-body-scroll::-webkit-scrollbar { display: none; }
+    .body-layout-wrapper { display: flex; min-height: 100%; position: relative; }
+    .time-axis-col { flex-shrink: 0; background: #eee8d5; border-right: 1.5px solid #ddd6c1; position: sticky; left: 0; z-index: 410; }
+    .grid-canvas { position: relative; flex: 1; background: #fdf6e3; }
     .staff-row { display: flex; height: 100%; }
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }
     .staff-cell.is-off { opacity: 0.5; background: #eee8d5; }
