@@ -117,7 +117,7 @@
             if (s.workStartTime) minH = Math.min(minH, parseInt(s.workStartTime.split(':')[0]));
             if (s.workEndTime) maxH = Math.max(maxH, parseInt(s.workEndTime.split(':')[0]));
         });
-        startHour = Math.max(0, minH - 1);
+        startHour = Math.max(0, minH);
         endHour = Math.min(24, maxH + 1);
         hours = Array.from({length: endHour - startHour + 1}, (_, i) => startHour + i);
     }
