@@ -1,3 +1,17 @@
+<script context="module">
+    // Глобальный кэш форматировщиков для исключения нагрузки на GC
+    const dayFormatterMap = new Map();
+    const hourFormatterMap = new Map();
+
+    function getFormatters(tz) {
+        if (!dayFormatterMap.has(tz)) {
+            dayFormatterMap.set(tz, new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }));
+            hourFormatterMap.set(tz, new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: tz }));
+        }
+        return { dayF: dayFormatterMap.get(tz), hourF: hourFormatterMap.get(tz) };
+    }
+</script>
+
 <script>
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { timeUtils } from '$lib/utils/timeUtils.js';
@@ -23,6 +37,8 @@ const dispatch = createEventDispatcher();
     let startHour = 8, endHour = 22, hours = [];
     let currentTime = new Date(), nowLinePos = -1, branchTime = "";
     let currentBranch = null;
+    let isBranchLoading = false;
+    let isDestroyed = false;
 
     let scrollHeader, scrollBody, gridCanvas;
     let isDown = false, startX, scrollLeft;
@@ -31,7 +47,6 @@ const dispatch = createEventDispatcher();
     let refreshKey = 0;
     $: if (staff) {
         refreshKey++;
-        // Адаптация ширины: если мастер один, делаем колонку шире
         STAFF_WIDTH = staff.length <= 1 ? Math.max(400, window.innerWidth - TIME_COL_WIDTH - 40) : 200;
     }
 
@@ -46,44 +61,78 @@ const dispatch = createEventDispatcher();
         return map;
     })();
 
+    let timer;
+    let scrollTimeout;
     onMount(async () => {
         await timeSyncService.sync();
+        if (isDestroyed) return;
+
         await fetchBranchData();
-        const timer = setInterval(() => {
+        if (isDestroyed) return;
+
+        updateNowPosition();
+
+        timer = setInterval(() => {
+            if (isDestroyed) {
+                clearInterval(timer);
+                return;
+            }
             currentTime = timeSyncService.getNow();
             updateNowPosition();
-        }, 30000);
+        }, 500);
+
         updateNowPosition();
-        setTimeout(scrollToCurrentTime, 600);
+        scrollTimeout = setTimeout(() => {
+            if (!isDestroyed && scrollBody) scrollToCurrentTime();
+        }, 600);
+    });
+
+    onDestroy(() => {
+        isDestroyed = true;
+        if (timer) clearInterval(timer);
+        if (scrollTimeout) clearTimeout(scrollTimeout);
     });
 
     async function fetchBranchData() {
         if (!$activeBranchId) return;
+        isBranchLoading = true;
         try {
             const branches = await branchService.getBranches();
+            if (isDestroyed) return;
             currentBranch = branches.find(b => b.id === $activeBranchId);
-        } catch (e) { }
+        } catch (e) {
+        } finally {
+            isBranchLoading = false;
+            if (!isDestroyed) updateNowPosition();
+        }
     }
 
     function updateNowPosition() {
-        if (!currentBranch) {
+        if (!currentBranch || isBranchLoading || isDestroyed) {
             nowLinePos = -1;
             branchTime = "";
             return;
         }
-        const tz = currentBranch.timezone;
-        const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
 
-        // 1. Проверяем, что сегодня - это выбранный день
-        const isToday = formatter.format(currentTime) === formatter.format(day);
+        const tz = currentBranch.timezone;
+        const { dayF, hourF } = getFormatters(tz);
+
+        const isToday = dayF.format(currentTime) === dayF.format(day);
 
         if (isToday) {
-            // 2. Проверяем, входит ли текущий час в видимый диапазон (рабочее время)
-            const currentHourInTz = parseInt(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', timeZone: tz }).format(currentTime));
+            const currentHourInTz = parseInt(hourF.format(currentTime));
 
             if (currentHourInTz >= startHour && currentHourInTz < endHour) {
-                nowLinePos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, tz);
-                branchTime = timeUtils.formatTime(currentTime.toISOString(), tz);
+                const pos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, tz);
+                const maxPos = (endHour - startHour) * HOUR_HEIGHT;
+
+                if (pos < 0 || pos > maxPos) {
+                    nowLinePos = -1;
+                    branchTime = "";
+                } else {
+                    nowLinePos = pos;
+                    branchTime = timeUtils.formatTime(currentTime.toISOString(), tz);
+                }
             } else {
                 nowLinePos = -1;
                 branchTime = "";
@@ -94,7 +143,12 @@ const dispatch = createEventDispatcher();
         }
     }
 
-    $: if ($activeBranchId) fetchBranchData();
+    $: if ($activeBranchId) {
+        nowLinePos = -1;
+        currentBranch = null;
+        isBranchLoading = true;
+        fetchBranchData();
+    }
     $: if (day || startHour || currentBranch) updateNowPosition();
 
     function handleStart(e) { isDown = true; startX = e.pageX - scrollBody.offsetLeft; scrollLeft = scrollBody.scrollLeft; }
@@ -234,7 +288,7 @@ const dispatch = createEventDispatcher();
     .s { display: block; font-size: 10px; color: #93a1a1; font-weight: 700; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .timeline-body-scroll { flex: 1; overflow: auto; position: relative; }
-    .body-layout-wrapper { display: flex; min-height: 100%; position: relative; }
+    .body-layout-wrapper { display: flex; min-height: 100%; position: relative; overflow: hidden; }
     .time-axis-col { flex-shrink: 0; background: #eee8d5; border-right: 1.5px solid #ddd6c1; position: sticky; left: 0; z-index: 410; }
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 9px; font-weight: 900; color: #586e75; background: #fdf6e3; padding: 1px 4px; border-radius: 4px; border: 1px solid #ddd6c1; }
