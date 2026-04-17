@@ -118,10 +118,10 @@
         {#if viewMode === 'day'}
         <header class="mobile-filter-bar">
             <!-- ДАТА ТЕПЕРЬ СЛЕВА -->
-            <div class="date-chip">
+            <button class="date-chip btn-reset" on:click={() => selectedDate.set(new Date())}>
                 <span class="d">{$selectedDate.getDate()}</span>
                 <span class="m">{$selectedDate.toLocaleDateString('ru-RU', { month: 'short' }).toUpperCase()}</span>
-            </div>
+            </button>
 
             <!-- ФИЛЬТРЫ В ВИДЕ ПОНЯТНЫХ КНОПОК-ПЕРЕКЛЮЧАТЕЛЕЙ -->
             <div class="filter-pills">
@@ -274,6 +274,12 @@
     .date-chip {
         display: flex; align-items: baseline; gap: 4px;
         background: #fdf6e3; padding: 6px 12px; border-radius: 14px; border: 1px solid #ddd6c1;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .date-chip:hover {
+        background: #eee8d5;
+        border-color: #268bd2;
     }
     .date-chip .d { font-size: 18px; font-weight: 900; color: #073642; }
     .date-chip .m { font-size: 11px; font-weight: 850; color: #93a1a1; }
