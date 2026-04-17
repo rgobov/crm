@@ -14,7 +14,7 @@
     export let appointments = [];
     export let staff = [];
 
-    let TIME_COL_WIDTH = 48;
+    let TIME_COL_WIDTH = 36;
     let HOUR_HEIGHT = 72;
     let SLOT_HEIGHT = HOUR_HEIGHT / 4;
     let STAFF_WIDTH = 0;
@@ -38,6 +38,10 @@
     // РЕАКТИВНЫЙ РАСЧЕТ ВЕРСТКИ (Золотое сечение 1.618)
     $: {
         const width = typeof window !== 'undefined' ? window.innerWidth : 375;
+
+        // TIME_COL_WIDTH пропорциональна ширине экрана (9%)
+        TIME_COL_WIDTH = Math.floor(width * 0.09);
+
         const availableWidth = width - TIME_COL_WIDTH;
         const totalCols = staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
 
