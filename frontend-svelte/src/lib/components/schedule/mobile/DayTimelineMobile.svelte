@@ -95,8 +95,14 @@
         const tz = currentBranch.timezone;
         const formatter = new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
         if (formatter.format(currentTime) === formatter.format(day)) {
-            nowLinePos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, tz);
-            branchTime = timeUtils.formatTime(currentTime.toISOString(), tz);
+            const currentHourInTz = parseInt(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: tz }).format(currentTime));
+            if (currentHourInTz >= startHour && currentHourInTz < endHour) {
+                nowLinePos = timeUtils.getTimeOffset(currentTime.toISOString(), startHour, HOUR_HEIGHT, tz);
+                branchTime = timeUtils.formatTime(currentTime.toISOString(), tz);
+            } else {
+                nowLinePos = -1;
+                branchTime = "";
+            }
         } else {
             nowLinePos = -1;
             branchTime = "";
