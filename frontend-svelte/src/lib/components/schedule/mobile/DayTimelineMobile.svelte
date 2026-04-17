@@ -200,13 +200,13 @@
 <style>
     * { box-sizing: border-box; }
     .btn-reset { background: none; border: none; padding: 0; margin: 0; text-align: left; cursor: pointer; font-family: inherit; }
-    .mobile-timeline-unified { height: 100%; width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x mandatory; scroll-padding-left: 48px; background: #fdf6e3; }
+    .mobile-timeline-unified { height: 100%; width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; background: #fdf6e3; }
     .mobile-timeline-unified::-webkit-scrollbar { display: none; }
-    .scroll-canvas { display: grid; grid-template-areas: "corner header" "axis grid"; position: relative; }
+    .scroll-canvas { display: grid; grid-template-areas: "corner header" "axis grid"; position: relative; min-height: 100%; }
     .sticky-top-left { grid-area: corner; position: sticky; top: 0; left: 0; z-index: 500; background: #eee8d5; border-right: 1.5px solid #ddd6c1; border-bottom: 1.5px solid #ddd6c1; height: 60px; display: flex; align-items: center; justify-content: center; color: #93a1a1; font-size: 14px; }
     .staff-header-sticky { grid-area: header; position: sticky; top: 0; z-index: 400; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1; height: 60px; }
-    .time-axis-sticky { grid-area: axis; position: sticky; left: 0; z-index: 410; background: #eee8d5; border-right: 1.5px solid #ddd6c1; }
-    .grid-body { grid-area: grid; position: relative; background: #fdf6e3; }
+    .time-axis-sticky { grid-area: axis; position: sticky; top: 0; left: 0; z-index: 410; background: #eee8d5; border-right: 1.5px solid #ddd6c1; }
+    .grid-body { grid-area: grid; position: relative; background: #fdf6e3; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .staff-row { display: flex; height: 100%; }
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }
     .staff-cell.is-off { opacity: 0.5; background: #eee8d5; }
@@ -220,7 +220,7 @@
     .hour-cell { position: relative; }
     .h-label { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); font-size: 9px; font-weight: 900; color: #586e75; background: #fdf6e3; padding: 1px 4px; border-radius: 4px; border: 1px solid #ddd6c1; }
     .cols-container { display: flex; height: 100%; }
-    .staff-col { position: relative; height: 100%; border-right: 1.5px solid #ddd6c1; flex-shrink: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+    .staff-col { position: relative; height: 100%; border-right: 1.5px solid #ddd6c1; flex-shrink: 0; }
     .slot-btn { width: 100%; border: none; display: block; background: #fdf6e3; }
     .slot-btn.zebra { background: #f5efdc; }
     .slot-btn.is-off { background-color: #eee8d5 !important; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important; opacity: 0.6; }

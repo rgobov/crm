@@ -115,28 +115,28 @@
             <CalendarScreen on:dateSelected={handleDateSelected} />
         </div>
     {:else if viewMode === 'day'}
+        {#if viewMode === 'day'}
+        <header class="mobile-filter-bar">
+            <!-- ДАТА ТЕПЕРЬ СЛЕВА -->
+            <div class="date-chip">
+                <span class="d">{$selectedDate.getDate()}</span>
+                <span class="m">{$selectedDate.toLocaleDateString('ru-RU', { month: 'short' }).toUpperCase()}</span>
+            </div>
+
+            <!-- ФИЛЬТРЫ В ВИДЕ ПОНЯТНЫХ КНОПОК-ПЕРЕКЛЮЧАТЕЛЕЙ -->
+            <div class="filter-pills">
+                <button class="pill" class:active={onlyWorkingStaff} on:click={() => onlyWorkingStaff = !onlyWorkingStaff}>
+                    <span class="p-icon">⚡</span>
+                    <span class="p-label">В СМЕНЕ</span>
+                </button>
+                <button class="pill" class:active={onlyBusyStaff} on:click={() => onlyBusyStaff = !onlyBusyStaff}>
+                    <span class="p-icon">🎯</span>
+                    <span class="p-label">ЗАНЯТЫЕ</span>
+                </button>
+            </div>
+        </header>
+
         <div class="day-view-mobile" in:fade>
-
-            <header class="mobile-filter-bar">
-                <!-- ДАТА ТЕПЕРЬ СЛЕВА -->
-                <div class="date-chip">
-                    <span class="d">{$selectedDate.getDate()}</span>
-                    <span class="m">{$selectedDate.toLocaleDateString('ru-RU', { month: 'short' }).toUpperCase()}</span>
-                </div>
-
-                <!-- ФИЛЬТРЫ В ВИДЕ ПОНЯТНЫХ КНОПОК-ПЕРЕКЛЮЧАТЕЛЕЙ -->
-                <div class="filter-pills">
-                    <button class="pill" class:active={onlyWorkingStaff} on:click={() => onlyWorkingStaff = !onlyWorkingStaff}>
-                        <span class="p-icon">⚡</span>
-                        <span class="p-label">В СМЕНЕ</span>
-                    </button>
-                    <button class="pill" class:active={onlyBusyStaff} on:click={() => onlyBusyStaff = !onlyBusyStaff}>
-                        <span class="p-icon">🎯</span>
-                        <span class="p-label">ЗАНЯТЫЕ</span>
-                    </button>
-                </div>
-            </header>
-
             <div class="mobile-timeline-wrapper">
                 <ScheduleScreen
                     branchId={$activeBranchId}
@@ -148,6 +148,7 @@
                 />
             </div>
         </div>
+        {/if}
     {:else if viewMode === 'more'}
         <div class="more-view-mobile" in:fade>
             <div class="header-row">
@@ -256,14 +257,19 @@
     .branch-name { font-size: 16px; font-weight: 600; }
     .branch-check { font-size: 18px; font-weight: bold; }
 
-    .day-view-mobile { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-    /* НОВАЯ МОБИЛЬНАЯ ПАНЕЛЬ ФИЛЬТРОВ */
+    /* НОВАЯ МОБИЛЬНАЯ ПАНЕЛЬ ФИЛЬТРОВ - sibling к day-view-mobile */
     .mobile-filter-bar {
         display: flex; align-items: center; justify-content: space-between;
         padding: 12px 16px; background: #eee8d5; border-bottom: 1.5px solid #ddd6c1;
-        gap: 12px;
+        gap: 12px; flex-shrink: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
     }
+
+    .day-view-mobile { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-top: 60px; }
 
     .date-chip {
         display: flex; align-items: baseline; gap: 4px;
