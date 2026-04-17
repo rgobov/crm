@@ -81,12 +81,15 @@
 
             services = servicesData;
             resources = resourcesData;
-            staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
+                staffList = (staffData || []).map(s => ({
+                ...s,
+                id: s.id ? String(s.id) : null // Гарантируем строковый ID для биндинга в select
+            }));
 
             if (isEditing) {
                 formData = {
                     ...appointment,
-                    staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : null),
+                    staffMemberId: appointment.staffMemberId ? String(appointment.staffMemberId) : (appointment.staffMember?.id ? String(appointment.staffMember.id) : null),
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
@@ -108,7 +111,7 @@
                     if (c) selectContact(c, true);
                 }
             } else {
-                formData.staffMemberId = preselected.staffId || null;
+                formData.staffMemberId = preselected.staffId ? String(preselected.staffId) : null;
                 formData.branchId = $activeBranchId;
                 const d = new Date(preselected.date);
                 d.setHours(preselected.hour, preselected.min, 0, 0);
