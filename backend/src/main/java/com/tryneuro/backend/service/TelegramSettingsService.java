@@ -56,6 +56,15 @@ public class TelegramSettingsService {
         }
     }
 
+    public void cancelQrGeneration(String tenantId) {
+        try {
+            notificationClient.cancelQrGeneration(internalSecret, tenantId);
+            updateDatabaseStatus(tenantId, false);
+        } catch (Exception e) {
+            log.error("Failed to cancel QR generation: {}", e.getMessage());
+        }
+    }
+
     @Transactional
     public void disconnect(String tenantId) {
         try {

@@ -171,6 +171,28 @@ public class TelegramClientManager {
 
     private final Set<String> tenantsToCleanup = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    public void cancelQrGeneration(String tenantId) {
+        ReentrantLock lock = getSessionLock(tenantId);
+        lock.lock();
+        try {
+            pendingQrLinks.remove(tenantId);
+            lastSyncedQrLink.remove(tenantId);
+            syncStatusWithBackend(tenantId, "DISCONNECTED", null);
+            // Удаляем клиента из активных, чтобы он перестал генерировать QR
+            SimpleTelegramClient client = activeClients.remove(tenantId);
+            if (client != null) {
+                try {
+                    client.close();
+                } catch (Exception e) {
+                    log.warn("Failed to close client during QR cancellation: {}", e.getMessage());
+                }
+            }
+            log.info("🚫 QR generation cancelled for tenant {}", tenantId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
     public void forceDisconnect(String tenantId) {
         ReentrantLock lock = getSessionLock(tenantId);
         lock.lock();
@@ -184,7 +206,7 @@ public class TelegramClientManager {
                 pendingCloses.put(tenantId, closeFut);
                 try {
                     client.close();
-                    closeFut.get(5, TimeUnit.SECONDS); 
+                    closeFut.get(5, TimeUnit.SECONDS);
                 } catch (Exception e) {
                     pendingCloses.remove(tenantId);
                 }

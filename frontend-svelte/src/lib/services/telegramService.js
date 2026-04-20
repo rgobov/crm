@@ -13,5 +13,8 @@ export const telegramService = {
     },
     async sendPassword(password) {
         await api.post('/admin/telegram/password', { password });
+    },
+    async cancelQrGeneration() {
+        await api.post('/admin/telegram/cancel-qr');
     }
 };

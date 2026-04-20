@@ -135,6 +135,18 @@
             isProcessing = false;
         }
     }
+
+    async function handleClose() {
+        // Отменяем генерацию QR если модальное окно закрывается в статусе WAITING_QR
+        if (status === 'WAITING_QR') {
+            try {
+                await telegramService.cancelQrGeneration();
+            } catch (e) {
+                console.error('Failed to cancel QR generation:', e);
+            }
+        }
+        dispatch('close');
+    }
 </script>
 
 <div class="modal-inner">
@@ -145,7 +157,7 @@
                 {#if isAuthorized}ПОДКЛЮЧЕНО{:else if isWaitPassword}НУЖЕН ПАРОЛЬ{:else if status === 'WAITING_QR'}ОЖИДАНИЕ QR{:else}ОТКЛЮЧЕНО{/if}
             </div>
         </div>
-        <button class="btn-close-round" on:click={() => dispatch('close')}>✕</button>
+        <button class="btn-close-round" on:click={handleClose}>✕</button>
     </header>
 
     <div class="modal-body">
@@ -240,11 +252,10 @@
 
     <footer class="modal-footer">
         <div class="footer-layout">
+            <button class="btn-secondary" on:click={handleClose}>ЗАКРЫТЬ</button>
             {#if isAuthorized}
-                <button class="btn-danger-link" on:click={handleDisconnect}>ОТКЛЮЧИТЬ</button>
+                <button class="btn-danger" on:click={handleDisconnect}>ОТКЛЮЧИТЬ</button>
             {/if}
-            <div class="spacer"></div>
-            <button class="btn-secondary" on:click={() => dispatch('close')}>ЗАКРЫТЬ</button>
         </div>
     </footer>
 </div>
@@ -289,9 +300,10 @@
     .btn-primary:active { transform: scale(0.98); }
 
     .modal-footer { padding: 18px 24px; background: #eee8d5; border-top: 1.5px solid #ddd6c1; display: flex; align-items: center; }
-    .spacer { flex: 1; }
-    .btn-secondary { background: #fdf6e3; color: #586e75; border: 1.5px solid #ddd6c1; padding: 12px 28px; border-radius: 14px; font-weight: 850; cursor: pointer; font-size: 13px; text-transform: uppercase; }
-    .btn-danger-link { background: transparent; color: #dc322f; border: none; font-weight: 900; cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .footer-layout { display: flex; justify-content: space-between; width: 100%; }
+    .btn-secondary { background: #fdf6e3; color: #586e75; border: 1.5px solid #ddd6c1; padding: 12px 24px; border-radius: 14px; font-weight: 850; cursor: pointer; font-size: 13px; text-transform: uppercase; }
+    .btn-danger { background: #dc322f; color: white; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 850; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-danger:hover { background: #cb4b16; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }

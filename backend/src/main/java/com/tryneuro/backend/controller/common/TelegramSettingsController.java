@@ -58,6 +58,14 @@ public class TelegramSettingsController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/cancel-qr")
+    public ResponseEntity<?> cancelQrGeneration() {
+        String tenantId = (String) request.getAttribute("tenantId");
+        log.info("🚫 Received cancel QR request for tenant: {}", tenantId);
+        telegramSettingsService.cancelQrGeneration(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/disconnect")
     public ResponseEntity<?> disconnect() {
         String tenantId = (String) request.getAttribute("tenantId");

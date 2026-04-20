@@ -37,4 +37,10 @@ public interface NotificationClient {
         @RequestHeader("X-Internal-Secret") String secret,
         @RequestBody Map<String, String> request
     );
+
+    @PostMapping("/api/telegram/cancel-qr")
+    void cancelQrGeneration(
+        @RequestHeader("X-Internal-Secret") String secret,
+        @RequestParam("tenantId") String tenantId
+    );
 }

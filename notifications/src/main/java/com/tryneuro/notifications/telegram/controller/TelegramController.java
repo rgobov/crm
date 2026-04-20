@@ -87,11 +87,23 @@ public class TelegramController {
     public ResponseEntity<?> deleteSession(
             @RequestHeader(value = "X-Internal-Secret", required = false) String secret,
             @RequestParam String tenantId) {
-        
+
         if (!isAuthorized(secret)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         log.info("🗑 Request to delete session for tenant: {}", tenantId);
         clientManager.forceDisconnect(tenantId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/cancel-qr")
+    public ResponseEntity<?> cancelQrGeneration(
+            @RequestHeader(value = "X-Internal-Secret", required = false) String secret,
+            @RequestParam String tenantId) {
+
+        if (!isAuthorized(secret)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        log.info("🚫 Request to cancel QR generation for tenant: {}", tenantId);
+        clientManager.cancelQrGeneration(tenantId);
         return ResponseEntity.ok().build();
     }
 
