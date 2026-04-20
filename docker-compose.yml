@@ -36,6 +36,7 @@ services:
       SERVICES_NOTIFICATIONS_URL: http://notifications:8081
     depends_on:
       - tryneuro_database
+      - notifications
     networks:
       - tryneuro_network
     ports:
