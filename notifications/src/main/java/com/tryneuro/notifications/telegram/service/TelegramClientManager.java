@@ -234,6 +234,10 @@ public class TelegramClientManager {
         APIToken apiToken = new APIToken(properties.getApiId(), properties.getApiHash());
         TDLibSettings settings = TDLibSettings.create(apiToken);
         settings.setDatabaseDirectoryPath(sessionPath.resolve("db"));
+        
+        // Disable IPv6 to prevent connection errors on servers without IPv6 support
+        settings.setOption("disable_ipv6", new TdApi.OptionValueBoolean(true));
+        settings.setOption("ignore_file_names", new TdApi.OptionValueBoolean(true));
 
         SimpleTelegramClientBuilder builder = clientFactory.builder(settings);
 
