@@ -24,11 +24,11 @@ jobs:
             git checkout fix/ios-final-attempt || git checkout -b fix/ios-final-attempt origin/fix/ios-final-attempt
             git reset --hard origin/fix/ios-final-attempt
             
-            echo "--- СБОРКА ФРОНТЕНДА (БЕЗ КЭША) ---"
+            echo "--- СБОРКА ВСЕХ СЕРВИСОВ (БЕЗ КЭША) ---"
             export DOCKER_BUILDKIT=1
-            # Исправлено имя сервиса на frontend-svelte
             docker-compose build --no-cache frontend-svelte
-            docker-compose build backend
+            docker-compose build --no-cache backend
+            docker-compose build --no-cache notifications
             
             echo "--- ПЕРЕЗАПУСК ---"
             docker-compose up -d --force-recreate

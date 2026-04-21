@@ -4,10 +4,10 @@ WORKDIR /app
 
 # Кешируем зависимости
 COPY pom.xml .
-RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline
+RUN mvn dependency:go-offline
 
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn package -DskipTests
+RUN mvn package -DskipTests
 
 # ЭТАП 2: Запуск (Используем Debian-based образ вместо Alpine для совместимости с TDLib)
 FROM eclipse-temurin:21-jre
