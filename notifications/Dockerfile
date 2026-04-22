@@ -1,5 +1,5 @@
 # ЭТАП 1: Сборка
-FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 
 # Кешируем зависимости
@@ -10,7 +10,7 @@ COPY src ./src
 RUN mvn package -DskipTests
 
 # ЭТАП 2: Запуск (Используем Debian-based образ вместо Alpine для совместимости с TDLib)
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # Устанавливаем необходимые библиотеки согласно документации TDLib:
@@ -25,4 +25,4 @@ RUN apt-get update && apt-get install -y \
 COPY --from=build /app/target/notifications-0.0.1-SNAPSHOT.jar app.jar
 
 EXPOSE 8081
-ENTRYPOINT ["java", "-Djava.net.preferIPv4Stack=true", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

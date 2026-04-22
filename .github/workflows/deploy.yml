@@ -24,11 +24,12 @@ jobs:
             git checkout fix/ios-final-attempt || git checkout -b fix/ios-final-attempt origin/fix/ios-final-attempt
             git reset --hard origin/fix/ios-final-attempt
             
-            echo "--- СБОРКА ВСЕХ СЕРВИСОВ (БЕЗ КЭША) ---"
+            echo "--- СБОРКА СЕРВИСОВ (БЕЗ КЭША) ---"
             export DOCKER_BUILDKIT=1
             docker-compose build --no-cache frontend-svelte
-            docker-compose build --no-cache backend
-            docker-compose build --no-cache notifications
+            docker-compose build backend
+            docker-compose build notifications-java
+            docker-compose build notifications-python
             
             echo "--- ПЕРЕЗАПУСК ---"
             docker-compose up -d --force-recreate

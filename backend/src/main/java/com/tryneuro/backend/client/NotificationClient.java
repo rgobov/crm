@@ -1,11 +1,13 @@
 package com.tryneuro.backend.client;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-@FeignClient(name = "notification-service", url = "${services.notifications.url}")
+@FeignClient(name = "notification-service", url = "#{@notificationsUrl}")
 public interface NotificationClient {
 
     @PostMapping("/api/telegram/send-by-phone")
@@ -16,6 +18,12 @@ public interface NotificationClient {
 
     @GetMapping("/api/telegram/qr")
     Map<String, String> getQrStatus(
+        @RequestHeader("X-Internal-Secret") String secret,
+        @RequestParam("tenantId") String tenantId
+    );
+
+    @GetMapping("/api/telegram/status")
+    Map<String, String> getStatus(
         @RequestHeader("X-Internal-Secret") String secret,
         @RequestParam("tenantId") String tenantId
     );
@@ -34,6 +42,18 @@ public interface NotificationClient {
 
     @PostMapping("/api/telegram/password")
     void checkPassword(
+        @RequestHeader("X-Internal-Secret") String secret,
+        @RequestBody Map<String, String> request
+    );
+
+    @PostMapping("/api/telegram/send-code")
+    Map<String, String> sendCode(
+        @RequestHeader("X-Internal-Secret") String secret,
+        @RequestBody Map<String, String> request
+    );
+
+    @PostMapping("/api/telegram/sign-in")
+    Map<String, String> signIn(
         @RequestHeader("X-Internal-Secret") String secret,
         @RequestBody Map<String, String> request
     );

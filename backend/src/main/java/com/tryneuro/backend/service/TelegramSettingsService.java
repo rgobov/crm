@@ -30,7 +30,7 @@ public class TelegramSettingsService {
 
     public Map<String, String> getRealTimeStatus(String tenantId) {
         try {
-            return notificationClient.getQrStatus(internalSecret, tenantId);
+            return notificationClient.getStatus(internalSecret, tenantId);
         } catch (Exception e) {
             log.error("Failed to get TG status: {}", e.getMessage());
             return Map.of("status", "ERROR", "qrCode", "");
@@ -53,6 +53,30 @@ public class TelegramSettingsService {
             ));
         } catch (Exception e) {
             log.error("Failed to proxy TG password: {}", e.getMessage());
+        }
+    }
+
+    public Map<String, String> sendCode(String tenantId, String phoneNumber) {
+        try {
+            return notificationClient.sendCode(internalSecret, Map.of(
+                "tenantId", tenantId,
+                "phoneNumber", phoneNumber
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send code: {}", e.getMessage());
+            return Map.of("status", "error", "message", e.getMessage());
+        }
+    }
+
+    public Map<String, String> signIn(String tenantId, String code) {
+        try {
+            return notificationClient.signIn(internalSecret, Map.of(
+                "tenantId", tenantId,
+                "code", code
+            ));
+        } catch (Exception e) {
+            log.error("Failed to sign in: {}", e.getMessage());
+            return Map.of("status", "error", "message", e.getMessage());
         }
     }
 

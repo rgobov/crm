@@ -10,5 +10,5 @@ import org.springframework.stereotype.Component;
 public class TelegramProperties {
     private int apiId;
     private String apiHash;
-    private String sessionsPath = "./tg-sessions";
+    private String sessionsPath = "/root/.try_neuro/tg-sessions";
 }

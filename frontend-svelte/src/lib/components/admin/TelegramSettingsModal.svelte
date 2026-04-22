@@ -20,10 +20,13 @@
     let qrVersion = 0; // ИСПОЛЬЗУЕМ ДЛЯ ПРИНУДИТЕЛЬНОЙ ПЕРЕРИСОВКИ
 
     let cloudPassword = '';
+    let phoneNumber = '';
+    let verificationCode = '';
 
     $: isAuthorized = status === 'CONNECTED';
-    $: isFloodWait = status.startsWith('FLOOD_WAIT');
+    $: isFloodWait = status && status.startsWith('FLOOD_WAIT');
     $: isWaitPassword = status === 'WAITING_PASSWORD' || status === 'PASSWORD_ERROR';
+    $: isWaitCode = status === 'WAITING_CODE' || status === 'CODE_ERROR';
 
     onMount(async () => {
         unsubscribeWS = telegramStatusSignal.subscribe(signal => {
@@ -91,19 +94,59 @@
     }
 
     async function handleConnect() {
-        if (isProcessing) return;
+        console.log('🔘 handleConnect called');
+        if (isProcessing) {
+            console.log('⚠️ Already processing');
+            return;
+        }
         isProcessing = true;
         userInitiated = true;
         errorMessage = '';
         qrCode = '';
         connectStep = 'ЗАПУСК...';
+        console.log('✅ userInitiated set to true');
 
         try {
             await telegramService.connect();
+            console.log('✅ connect API call succeeded');
+            isProcessing = false;
         } catch (e) {
+            console.error('❌ connect failed:', e);
             errorMessage = 'Ошибка запуска';
             isProcessing = false;
             userInitiated = false;
+        }
+    }
+
+    async function handleSendCode() {
+        if (!phoneNumber || isProcessing) return;
+        isProcessing = true;
+        errorMessage = '';
+        connectStep = 'ОТПРАВКА КОДА...';
+
+        try {
+            await telegramService.sendCode(phoneNumber);
+            status = 'WAITING_CODE';
+            isProcessing = false;
+        } catch (e) {
+            errorMessage = 'Ошибка отправки кода';
+            isProcessing = false;
+        }
+    }
+
+    async function handleSignIn() {
+        if (!verificationCode || isProcessing) return;
+        isProcessing = true;
+        errorMessage = '';
+        connectStep = 'ПРОВЕРКА КОДА...';
+
+        try {
+            await telegramService.signIn(verificationCode);
+            verificationCode = '';
+            isProcessing = false;
+        } catch (e) {
+            errorMessage = 'Неверный код';
+            isProcessing = false;
         }
     }
 
@@ -153,8 +196,8 @@
     <header class="modal-header">
         <div class="header-main">
             <h2 class="header-title">Telegram Уведомления</h2>
-            <div class="header-status-badge" class:online={isAuthorized} class:warning={isWaitPassword}>
-                {#if isAuthorized}ПОДКЛЮЧЕНО{:else if isWaitPassword}НУЖЕН ПАРОЛЬ{:else if status === 'WAITING_QR'}ОЖИДАНИЕ QR{:else}ОТКЛЮЧЕНО{/if}
+            <div class="header-status-badge" class:online={isAuthorized} class:warning={isWaitPassword || isWaitCode}>
+                {#if isAuthorized}ПОДКЛЮЧЕНО{:else if isWaitPassword}НУЖЕН ПАРОЛЬ{:else if isWaitCode}ОЖИДАНИЕ КОДА{:else if status === 'WAITING_QR'}ОЖИДАНИЕ QR{:else}ОТКЛЮЧЕНО{/if}
             </div>
         </div>
         <button class="btn-close-round" on:click={handleClose}>✕</button>
@@ -168,15 +211,15 @@
             </div>
         {:else}
             <div class="content-wrapper" in:fade={{duration: 200}}>
-                <section class="hero-card" class:active={isAuthorized} class:warning={isWaitPassword}>
+                <section class="hero-card" class:active={isAuthorized} class:warning={isWaitPassword || isWaitCode}>
                     <div class="icon-box">
-                        {#if isAuthorized}✓{:else if isWaitPassword}🔐{:else}📱{/if}
+                        {#if isAuthorized}✓{:else if isWaitPassword}🔐{:else if isWaitCode}📱{:else}📱{/if}
                     </div>
                     <div class="hero-info">
                         <label for="st-info">КАНАЛ СВЯЗИ</label>
                         <div id="st-info" class="status-row">
-                            <span class="status-name">Telegram Bot API</span>
-                            <div class="dot" class:online={isAuthorized} class:waiting={isWaitPassword}></div>
+                            <span class="status-name">Telegram User API</span>
+                            <div class="dot" class:online={isAuthorized} class:waiting={isWaitPassword || isWaitCode}></div>
                         </div>
                     </div>
                 </section>
@@ -213,28 +256,44 @@
                                 <p class="error-text">❌ Неверный пароль. Попробуйте еще раз.</p>
                             {/if}
                         </div>
-                    {:else if userInitiated || status === 'WAITING_QR'}
-                        <div class="card qr-card" in:slide>
-                            <div class="qr-header">
-                                <label>{qrCode ? 'ОТСКАНИРУЙТЕ КОД' : 'ГЕНЕРАЦИЯ...'}</label>
-                                {#if qrJustUpdated}
-                                    <span class="qr-flash" in:fade>ОБНОВЛЕНО ✅</span>
-                                {/if}
+                    {:else if isWaitCode}
+                        <div class="card setup-card" in:slide>
+                            <label>ПОДТВЕРЖДЕНИЕ КОДА</label>
+                            <b>Введите код из Telegram</b>
+                            <p>Код был отправлен на ваш номер телефона.</p>
+                            <div class="password-input-group">
+                                <input
+                                    type="text"
+                                    bind:value={verificationCode}
+                                    placeholder="Код из Telegram"
+                                    class="input-primary"
+                                    on:keydown={(e) => e.key === 'Enter' && handleSignIn()}
+                                />
+                                <button class="btn-primary" on:click={handleSignIn} disabled={isProcessing}>
+                                    {#if isProcessing}{connectStep}{:else}ПОДТВЕРДИТЬ{/if}
+                                </button>
                             </div>
-                            <div class="qr-container">
-                                {#if qrCode}
-                                    <!-- ПРИНУДИТЕЛЬНАЯ ПЕРЕРИСОВКА ЧЕРЕЗ KEY -->
-                                    {#key qrVersion}
-                                        <img src="data:image/png;base64,{qrCode}" alt="QR" in:fade={{duration: 300}} />
-                                    {/key}
-                                {:else}
-                                    <div class="qr-loading-box">
-                                        <div class="spinner-small"></div>
-                                        <p>{connectStep || 'Связь с сервером...'}</p>
-                                    </div>
-                                {/if}
+                            {#if status === 'CODE_ERROR'}
+                                <p class="error-text">❌ Неверный код. Попробуйте еще раз.</p>
+                            {/if}
+                        </div>
+                    {:else if userInitiated}
+                        <div class="card setup-card" in:slide>
+                            <label>НОМЕР ТЕЛЕФОНА</label>
+                            <b>Введите номер телефона</b>
+                            <p>На этот номер будет отправлен код подтверждения.</p>
+                            <div class="password-input-group">
+                                <input
+                                    type="tel"
+                                    bind:value={phoneNumber}
+                                    placeholder="79991234567"
+                                    class="input-primary"
+                                    on:keydown={(e) => e.key === 'Enter' && handleSendCode()}
+                                />
+                                <button class="btn-primary" on:click={handleSendCode} disabled={isProcessing}>
+                                    {#if isProcessing}{connectStep}{:else}ОТПРАВИТЬ КОД{/if}
+                                </button>
                             </div>
-                            <p class="hint">Настройки → Устройства → Подключить</p>
                         </div>
                     {:else}
                         <div class="card connect-card">

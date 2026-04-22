@@ -44,17 +44,18 @@ services:
 
   notifications:
     build:
-      context: ./notifications
+      context: ./notifications-python
       dockerfile: Dockerfile
-    container_name: tryneuro_notifications
+    container_name: tryneuro_notifications_python
     restart: always
     logging: *default-logging
     environment:
       TELEGRAM_API_ID: ${TELEGRAM_API_ID}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
-      BACKEND_SERVICE_URL: http://backend:8080
+      BACKEND_URL: http://backend:8080
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
     volumes:
-      - tg_sessions:/root/.try_neuro/tg-sessions
+      - tg_sessions_python:/app/sessions
     networks:
       - tryneuro_network
     ports:
@@ -100,4 +101,4 @@ networks:
 
 volumes:
   postgres_data:
-  tg_sessions:
+  tg_sessions_python:

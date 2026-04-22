@@ -58,6 +58,24 @@ public class TelegramSettingsController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/send-code")
+    public ResponseEntity<?> sendCode(@RequestBody Map<String, String> body) {
+        String tenantId = (String) request.getAttribute("tenantId");
+        String phoneNumber = body.get("phoneNumber");
+        log.info("📱 Received send code request for tenant: {}, phone: {}", tenantId, phoneNumber);
+        Map<String, String> result = telegramSettingsService.sendCode(tenantId, phoneNumber);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/sign-in")
+    public ResponseEntity<?> signIn(@RequestBody Map<String, String> body) {
+        String tenantId = (String) request.getAttribute("tenantId");
+        String code = body.get("code");
+        log.info("✅ Received sign in request for tenant: {}", tenantId);
+        Map<String, String> result = telegramSettingsService.signIn(tenantId, code);
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/cancel-qr")
     public ResponseEntity<?> cancelQrGeneration() {
         String tenantId = (String) request.getAttribute("tenantId");
