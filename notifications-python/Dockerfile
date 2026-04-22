@@ -4,8 +4,9 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    libssl3 \
-    zlib1g \
+    gcc \
+    libssl-dev \
+    zlib1g-dev \
     libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
