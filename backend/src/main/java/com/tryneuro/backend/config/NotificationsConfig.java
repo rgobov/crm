@@ -7,20 +7,11 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class NotificationsConfig {
 
-    @Value("${services.notifications.implementation:java}")
-    private String implementation;
-
-    @Value("${services.notifications.java.url:http://notifications-java:8081}")
-    private String javaUrl;
-
-    @Value("${services.notifications.python.url:http://notifications-python:8081}")
-    private String pythonUrl;
+    @Value("${services.notifications.url:http://notifications:8081}")
+    private String notificationsUrl;
 
     @Bean(name = "notificationsUrl")
     public String notificationsUrl() {
-        if ("python".equalsIgnoreCase(implementation)) {
-            return pythonUrl;
-        }
-        return javaUrl;
+        return notificationsUrl;
     }
 }
