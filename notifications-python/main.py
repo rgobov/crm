@@ -56,7 +56,7 @@ app.add_middleware(
 class Settings(BaseSettings):
     telegram_api_id: int
     telegram_api_hash: str
-    backend_url: str = "http://localhost:8080"
+    backend_url: str = "http://backend:8080"
     internal_secret: str = "try-neuro-internal-secret-2026"
     sessions_path: str = "./sessions"
     telegram_proxy: Optional[str] = None
@@ -96,29 +96,53 @@ class TelegramClientWrapper:
         
     async def start(self):
         os.makedirs(self.session_path, exist_ok=True)
+        # Session name should not be the same as the directory path to avoid SQLite errors
+        session_name = os.path.join(self.session_path, "tg_session")
 
         # Parse proxy if provided
         proxy = None
         if settings.telegram_proxy:
             try:
-                # Support both SOCKS5 and HTTP proxy formats
-                proxy = settings.telegram_proxy
-                logger.info(f"Using proxy: {proxy}")
+                # Support for proxy string parsing
+                from urllib.parse import urlparse
+                url = urlparse(settings.telegram_proxy)
+
+                # Tinyproxy is usually HTTP
+                scheme = url.scheme or "http"
+                hostname = url.hostname or (url.path.split(':')[0] if ':' in url.path else url.path)
+                try:
+                    port = url.port or (int(url.path.split(':')[1]) if ':' in url.path else 8888)
+                except:
+                    port = 8888
+
+                proxy = {
+                    "scheme": scheme,
+                    "hostname": hostname,
+                    "port": port
+                }
+
+                if url.username:
+                    proxy["username"] = url.username
+                if url.password:
+                    proxy["password"] = url.password
+
+                logger.info(f"Using parsed proxy: {scheme}://{hostname}:{port}")
             except Exception as e:
-                logger.warning(f"Failed to parse proxy: {e}")
+                logger.warning(f"Failed to parse proxy string '{settings.telegram_proxy}': {e}. Using as is.")
+                proxy = settings.telegram_proxy
 
         self.client = Client(
-            name=self.session_path,
+            name=session_name,
             api_id=settings.telegram_api_id,
             api_hash=settings.telegram_api_hash,
             in_memory=False,
-            no_updates=True,  # Disable updates to prevent blocking
+            no_updates=True,
             proxy=proxy
         )
 
         # Check if session exists and is authorized
-        session_file = os.path.join(self.session_path, f"{self.session_path}.session")
-        session_exists = os.path.exists(session_file) or os.path.exists(f"{self.session_path}.session-journal")
+        session_file = f"{session_name}.session"
+        session_exists = os.path.exists(session_file)
 
         if session_exists:
             try:
