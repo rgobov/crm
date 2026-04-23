@@ -38,7 +38,7 @@ jobs:
 
             echo "--- СБОРКА ОБРАЗОВ ---"
             export DOCKER_BUILDKIT=1
-            docker-compose -f docker-compose.prod.yml build
+            docker-compose -f docker-compose.prod.yml build --no-cache
 
             echo "--- ОСТАНОВКА И УДАЛЕНИЕ СТАРЫХ КОНТЕЙНЕРОВ ---"
             docker-compose -f docker-compose.prod.yml down --remove-orphans
