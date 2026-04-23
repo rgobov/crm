@@ -16,8 +16,9 @@ import base64
 from typing import Optional, Dict, Set
 from datetime import datetime, timedelta
 from pyrogram import Client
-from pyrogram.types import User
+from pyrogram.types import User, InputPhoneContact
 import httpx
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -259,23 +260,27 @@ class TelegramClientWrapper:
             raise HTTPException(status_code=400, detail="Client not connected")
             
         try:
-            # Import contact
-            contacts = await self.client.import_contacts(
-                [{"phone_number": phone, "first_name": name or "Клиент CRM"}]
-            )
+            # Import contact using the proper type
+            logger.info(f"Importing contact: {phone} ({name})")
+            contacts = await self.client.import_contacts([
+                InputPhoneContact(phone_number=phone, first_name=name or "Клиент CRM")
+            ])
             
-            if not contacts or not contacts.users:
+            if not contacts or not hasattr(contacts, "users") or not contacts.users:
+                logger.warning(f"Contact not found for phone {phone}")
                 raise HTTPException(status_code=404, detail="Contact not found")
                 
             user = contacts.users[0]
-            
+            logger.info(f"Sending message to user_id {user.id}")
+
             # Send message
             await self.client.send_message(user.id, text)
             
             return {"status": "sent"}
             
         except Exception as e:
-            logger.error(f"Failed to send message: {e}")
+            error_trace = traceback.format_exc()
+            logger.error(f"Failed to send message to {phone}: {e}\n{error_trace}")
             raise HTTPException(status_code=500, detail=str(e))
 
 # Request/Response models
