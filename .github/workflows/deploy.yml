@@ -42,7 +42,8 @@ jobs:
 
             echo "--- ОСТАНОВКА И УДАЛЕНИЕ СТАРЫХ КОНТЕЙНЕРОВ ---"
             docker-compose -f docker-compose.prod.yml down --remove-orphans
-            docker rm -f tryneuro_notifications_python || true
+            # Принудительно удаляем все контейнеры проекта по их именам, чтобы избежать конфликтов
+            docker rm -f tryneuro_backend tryneuro_notifications_python tryneuro_frontend tryneuro_db_prod tryneuro_proxy || true
 
             echo "--- ПЕРЕЗАПУСК ---"
             docker-compose -f docker-compose.prod.yml up -d
