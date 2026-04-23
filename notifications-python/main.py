@@ -263,7 +263,7 @@ class TelegramClientWrapper:
             # Import contact using the proper type
             logger.info(f"Importing contact: {phone} ({name})")
             contacts = await self.client.import_contacts([
-                InputPhoneContact(phone_number=phone, first_name=name or "Клиент CRM")
+                InputPhoneContact(phone=phone, first_name=name or "Клиент CRM")
             ])
             
             if not contacts or not hasattr(contacts, "users") or not contacts.users:
