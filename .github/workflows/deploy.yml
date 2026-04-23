@@ -40,6 +40,9 @@ jobs:
             export DOCKER_BUILDKIT=1
             docker-compose -f docker-compose.prod.yml build
 
+            echo "--- УДАЛЕНИЕ СТАРЫХ КОНТЕЙНЕРОВ ---"
+            docker-compose -f docker-compose.prod.yml rm -f
+
             echo "--- ПЕРЕЗАПУСК ---"
             docker-compose -f docker-compose.prod.yml up -d --force-recreate
 
