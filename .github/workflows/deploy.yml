@@ -41,7 +41,8 @@ jobs:
             docker-compose -f docker-compose.prod.yml build
 
             echo "--- ОСТАНОВКА И УДАЛЕНИЕ СТАРЫХ КОНТЕЙНЕРОВ ---"
-            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml down --remove-orphans
+            docker rm -f tryneuro_notifications_python || true
 
             echo "--- ПЕРЕЗАПУСК ---"
             docker-compose -f docker-compose.prod.yml up -d
