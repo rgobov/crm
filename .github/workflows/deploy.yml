@@ -36,8 +36,15 @@ jobs:
             TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
             EOF
 
+            echo "--- СБОРКА ОБРАЗОВ ---"
+            export DOCKER_BUILDKIT=1
+            docker-compose -f docker-compose.prod.yml build
+
             echo "--- ПЕРЕЗАПУСК ---"
             docker-compose -f docker-compose.prod.yml up -d --force-recreate
+
+            echo "--- ОЧИСТКА СТАРЫХ КОНТЕЙНЕРОВ И ОБРАЗОВ ---"
+            docker system prune -af
 
             echo "--- СТАТУС ---"
             docker-compose -f docker-compose.prod.yml ps

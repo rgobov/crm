@@ -2,11 +2,15 @@ version: '3.8'
 
 services:
   frontend:
-    image: roma1975/try_neuro_frontend:1.0.11
+    build:
+      context: ../frontend-svelte
+      dockerfile: Dockerfile
     container_name: tryneuro_frontend
 
   backend:
-    image: roma1975/try_neuro_backend:1.0.0
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: tryneuro_backend
     depends_on:
       - postgres
@@ -31,7 +35,9 @@ services:
       - postgres_prod_data:/var/lib/postgresql/data
 
   notifications:
-    image: roma1975/try_neuro_notifications_python:1.0.0
+    build:
+      context: ../notifications-python
+      dockerfile: Dockerfile
     container_name: tryneuro_notifications_python
     environment:
       - TELEGRAM_API_ID=${TELEGRAM_API_ID}
