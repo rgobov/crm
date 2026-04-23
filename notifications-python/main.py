@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, Request
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 import os
@@ -264,14 +264,13 @@ class TelegramClientWrapper:
                 [{"phone_number": phone, "first_name": name or "Клиент CRM"}]
             )
             
-            if not contacts or not contacts.user_ids or contacts.user_ids[0] == 0:
+            if not contacts or not contacts.users:
                 raise HTTPException(status_code=404, detail="Contact not found")
                 
-            # Create private chat
-            chat = await self.client.create_private_chat(contacts.user_ids[0])
+            user = contacts.users[0]
             
             # Send message
-            await self.client.send_message(chat.id, text)
+            await self.client.send_message(user.id, text)
             
             return {"status": "sent"}
             
@@ -282,11 +281,9 @@ class TelegramClientWrapper:
 # Request/Response models
 class SendMessageRequest(BaseModel):
     tenantId: str
-    phoneNumber: str = Field(..., alias="phone")
+    phone: str
     name: Optional[str] = None
     text: str
-
-    model_config = ConfigDict(populate_by_name=True)
 
 class PasswordRequest(BaseModel):
     tenantId: str
@@ -362,7 +359,7 @@ async def health():
     return {"status": "ok"}
 
 @app.post("/api/telegram/send-by-phone")
-async def send_message(
+async def send_message_endpoint(
     request: SendMessageRequest,
     x_internal_secret: str = Header(...)
 ):
@@ -375,7 +372,7 @@ async def send_message(
     if not client_wrapper:
         raise HTTPException(status_code=400, detail="OFFLINE")
         
-    result = await client_wrapper.send_message(request.phoneNumber, request.name, request.text)
+    result = await client_wrapper.send_message(request.phone, request.name, request.text)
     return result
 
 @app.get("/api/telegram/qr")
@@ -554,9 +551,7 @@ async def create_new_client_instance(tenant_id: str) -> TelegramClientWrapper:
         if client_wrapper.is_ready:
             await sync_status_with_backend(tenant_id, "CONNECTED", None)
         else:
-            # Need to authorize - generate QR code
-            # Pyrogram doesn't have built-in QR like TDLib, so we'll use a different approach
-            # For now, mark as disconnected and let user know
+            # Need to authorize
             await sync_status_with_backend(tenant_id, "DISCONNECTED", None)
     except Exception as e:
         logger.error(f"Failed to create client for {tenant_id}: {e}")
