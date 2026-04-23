@@ -282,9 +282,11 @@ class TelegramClientWrapper:
 # Request/Response models
 class SendMessageRequest(BaseModel):
     tenantId: str
-    phoneNumber: str
+    phoneNumber: str = Field(..., alias="phone")
     name: Optional[str] = None
     text: str
+
+    model_config = ConfigDict(populate_by_name=True)
 
 class PasswordRequest(BaseModel):
     tenantId: str
