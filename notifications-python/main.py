@@ -220,7 +220,7 @@ class TelegramClientWrapper:
             return {"status": "connected"}
         except Exception as e:
             logger.error(f"Failed to sign in: {e}")
-            if "SessionPasswordNeeded" in str(e):
+            if "SESSION_PASSWORD_NEEDED" in str(e) or "SessionPasswordNeeded" in str(e):
                 self.auth_state = "WAITING_PASSWORD"
                 raise HTTPException(status_code=400, detail="PASSWORD_NEEDED")
             raise HTTPException(status_code=400, detail="Invalid code")
