@@ -17,8 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 
-# Create sessions directory
-RUN mkdir -p /app/sessions
+# Create sessions directory and set permissions
+RUN mkdir -p /app/sessions && chmod 777 /app/sessions
 
 EXPOSE 8081
 

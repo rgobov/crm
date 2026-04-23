@@ -56,7 +56,7 @@ services:
       INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
       TELEGRAM_PROXY: ${TELEGRAM_PROXY:-}
     volumes:
-      - tg_sessions_python:/app/sessions
+      - ./sessions:/app/sessions
     networks:
       - tryneuro_network
     ports:
