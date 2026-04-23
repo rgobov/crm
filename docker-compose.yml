@@ -54,6 +54,7 @@ services:
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
       BACKEND_URL: http://backend:8080
       INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
+      TELEGRAM_PROXY: ${TELEGRAM_PROXY:-}
     volumes:
       - tg_sessions_python:/app/sessions
     networks:

@@ -23,15 +23,21 @@ jobs:
             git fetch origin ${{ github.ref_name }}
             git checkout ${{ github.ref_name }} || git checkout -b ${{ github.ref_name }} origin/${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
-            
-            echo "--- СБОРКА СЕРВИСОВ (БЕЗ КЭША) ---"
-            export DOCKER_BUILDKIT=1
-            docker-compose build --no-cache frontend-svelte
-            docker-compose build backend
-            docker-compose build notifications
-            
+
+            echo "--- СОЗДАНИЕ .env ФАЙЛА ---"
+            cd backend
+            cat > .env << EOF
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}
+            TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}
+            INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
+            TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
+            EOF
+
             echo "--- ПЕРЕЗАПУСК ---"
-            docker-compose up -d --force-recreate
-            
+            docker-compose -f docker-compose.prod.yml up -d --force-recreate
+
             echo "--- СТАТУС ---"
-            docker-compose ps
+            docker-compose -f docker-compose.prod.yml ps

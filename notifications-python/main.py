@@ -58,8 +58,9 @@ class Settings(BaseSettings):
     telegram_api_hash: str
     backend_url: str = "http://localhost:8080"
     internal_secret: str = "try-neuro-internal-secret-2026"
-    sessions_path: str = "/app/sessions"
-    
+    sessions_path: str = "./sessions"
+    telegram_proxy: Optional[str] = None
+
     model_config = ConfigDict(
         env_file='.env',
         env_file_encoding='utf-8',
@@ -96,12 +97,23 @@ class TelegramClientWrapper:
     async def start(self):
         os.makedirs(self.session_path, exist_ok=True)
 
+        # Parse proxy if provided
+        proxy = None
+        if settings.telegram_proxy:
+            try:
+                # Support both SOCKS5 and HTTP proxy formats
+                proxy = settings.telegram_proxy
+                logger.info(f"Using proxy: {proxy}")
+            except Exception as e:
+                logger.warning(f"Failed to parse proxy: {e}")
+
         self.client = Client(
             name=self.session_path,
             api_id=settings.telegram_api_id,
             api_hash=settings.telegram_api_hash,
             in_memory=False,
-            no_updates=True  # Disable updates to prevent blocking
+            no_updates=True,  # Disable updates to prevent blocking
+            proxy=proxy
         )
 
         # Check if session exists and is authorized
