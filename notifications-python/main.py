@@ -87,7 +87,8 @@ class TelegramClientWrapper:
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
         self.client: Optional[Client] = None
-        self.session_path = os.path.join(settings.sessions_path, tenant_id)
+        # Use absolute path to avoid SQLite "unable to open database file" errors
+        self.session_path = os.path.abspath(os.path.join(settings.sessions_path, tenant_id))
         self.is_ready = False
         self.is_authorized = False
         self.phone_code_hash = None
