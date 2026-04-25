@@ -55,7 +55,6 @@
     let isSaving = false;
     let debounceTimer;
 
-    let staffList = [];
     let services = [];
     let resources = [];
     let currentBranchData = null;
@@ -72,16 +71,14 @@
             const allBranches = await branchService.getBranches();
             currentBranchData = allBranches.find(b => b.id === $activeBranchId);
 
-            const [servicesData, resourcesData, staffData] = await Promise.all([
+            const [servicesData, resourcesData] = await Promise.all([
                 serviceService.getServices().catch(e => { console.error('Services load failed:', e); return []; }),
-                resourceService.getResources($activeBranchId).catch(e => { console.error('Resources load failed:', e); return []; }),
-                adminService.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId).catch(e => { console.error('Staff load failed:', e); return []; })
+                resourceService.getResources($activeBranchId).catch(e => { console.error('Resources load failed:', e); return []; })
             ]);
 
             services = servicesData || [];
             resources = resourcesData || [];
-            staffList = (staffData || []).filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
-            
+
             // Отладочная информация
             console.log('Resources loaded:', resources);
             console.log('Active branch ID:', $activeBranchId);
@@ -437,14 +434,6 @@
                             </div>
                         {/if}
                     </div>
-                </div>
-
-                <div class="tile-card">
-                    <label for="staff-select-id">ИСПОЛНИТЕЛЬ</label>
-                    <select id="staff-select-id" bind:value={formData.staffMemberId}>
-                        <option value="">Не назначен</option>
-                        {#each staffList as s}<option value={s.id}>{s.name}</option>{/each}
-                    </select>
                 </div>
 
                 <div class="tile-card">

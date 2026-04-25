@@ -8,33 +8,6 @@
     export let appointment;
     const dispatch = createEventDispatcher();
 
-    let staffMember = appointment.staffMember;
-    let staffName = appointment.staffName;
-    let staffList = [];
-
-    // Загружаем данные сотрудника используя тот же подход что в AppointmentEditScreen
-    async function loadStaffMember() {
-        if (appointment.staffMemberId && !staffMember) {
-            try {
-                const staffData = await adminService.getStaffForSchedule(
-                    new Date(appointment.startTime), 
-                    appointment.branchId || 'br-virtual'
-                );
-                staffList = staffData.filter(s => s.role === 'EMPLOYEE' || s.role === 'ROLE_EMPLOYEE');
-                
-                const foundStaff = staffList.find(s => s.id === appointment.staffMemberId);
-                if (foundStaff) {
-                    staffMember = foundStaff;
-                    staffName = foundStaff.name;
-                }
-            } catch (e) {
-                console.error('Failed to load staff list:', e);
-            }
-        }
-    }
-
-    onMount(loadStaffMember);
-
     let isEditingComment = false;
     let tempComment = "";
     let isSaving = false;
@@ -209,14 +182,6 @@
                     в {new Date(appointment.startTime).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}
                 </p>
                 <small>{appointment.durationInMinutes} мин. длительность</small>
-            </div>
-        </div>
-
-        <div class="info-tile">
-            <div class="tile-icon">👤</div>
-            <div class="tile-body">
-                <label>Специалист</label>
-                <p class="val">{staffName || staffMember?.name || appointment.staffName || appointment.staffMember?.name || 'Не назначен'}</p>
             </div>
         </div>
 
