@@ -37,32 +37,52 @@
 
     $: color = statusColors[appt.status] || statusColors['SCHEDULED'];
     $: bgColor = backgroundColors[appt.status] || '#fdf6e3';
-    $: isShort = appt.durationInMinutes < 30;
+
+    $: actualHeight = appt.durationInMinutes * (hourHeight / 60);
+    $: isShort = appt.durationInMinutes < 30 || actualHeight < 55;
+    $: isUltraShort = actualHeight < 40;
+    $: isTiny = actualHeight < 28;
 </script>
 
 <button class="appt-box btn-reset"
      style="{apptStyle} --status-color: {color}; --bg-color: {bgColor}"
      on:click|stopPropagation={() => dispatch('click', appt)}
      in:scale={{duration: 200, start: 0.95}}>
-    <div class="appt-content" class:compact={isShort}>
-        <div class="t-row">
-            <span class="tm">
-                {timeUtils.formatTime(appt.startTime, timezone)} — {timeUtils.getEndTime(appt.startTime, appt.durationInMinutes, timezone)}
-            </span>
-            <div class="indicators">
-                <span class="st-dot" style="background: {color}"></span>
+    <div class="appt-content"
+         class:compact={isShort}
+         class:ultra-compact={isUltraShort}
+         class:tiny={isTiny}>
+
+        {#if !isTiny}
+            <div class="t-row">
+                <span class="tm">
+                    {timeUtils.formatTime(appt.startTime, timezone)}
+                    {#if !isUltraShort}
+                        — {timeUtils.getEndTime(appt.startTime, appt.durationInMinutes, timezone)}
+                    {/if}
+                </span>
+                <div class="indicators">
+                    <span class="st-dot" style="background: {color}"></span>
+                </div>
             </div>
-        </div>
+        {/if}
 
         <div class="main-info">
-            <div class="cl">{appt.clientName}</div>
-
-            <div class="sub-details-stack">
-                {#if appt.referenceTag}
-                    <span class="ref-tag">🚗 {appt.referenceTag}</span>
+            <div class="cl">
+                {#if isTiny}
+                    <span class="st-dot-mini" style="background: {color}"></span>
                 {/if}
-                <span class="sv">{appt.service}</span>
+                {appt.clientName}
             </div>
+
+            {#if !isUltraShort}
+                <div class="sub-details-stack">
+                    {#if appt.referenceTag}
+                        <span class="ref-tag">🚗 {appt.referenceTag}</span>
+                    {/if}
+                    <span class="sv">{appt.service}</span>
+                </div>
+            {/if}
 
             {#if appt.comment && !isShort}
                 <div class="cmt-preview" transition:fade>
@@ -113,6 +133,8 @@
         box-sizing: border-box;
     }
     .appt-content.compact { padding: 3px 6px; }
+    .appt-content.ultra-compact { padding: 2px 5px; }
+    .appt-content.tiny { padding: 0 4px; justify-content: center; }
 
     .t-row {
         display: flex;
@@ -121,9 +143,20 @@
         margin-bottom: 3px;
         opacity: 0.6;
     }
+    .compact .t-row { margin-bottom: 1px; }
+
     .tm { font-size: 8.5px; font-weight: 900; color: #586e75; letter-spacing: 0.4px; white-space: nowrap; text-transform: uppercase; }
 
     .st-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .st-dot-mini {
+        display: inline-block;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        margin-right: 3px;
+        vertical-align: middle;
+        flex-shrink: 0;
+    }
 
     .main-info {
         flex: 1;
@@ -132,7 +165,21 @@
         justify-content: flex-start;
         min-height: 0;
     }
-    .cl { font-size: 14px; font-weight: 850; color: #002b36; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+    .tiny .main-info { justify-content: center; }
+
+    .cl {
+        font-size: 14px;
+        font-weight: 850;
+        color: #002b36;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 2px;
+    }
+    .compact .cl { font-size: 13px; margin-bottom: 0; }
+    .ultra-compact .cl { font-size: 12px; }
+    .tiny .cl { font-size: 11px; line-height: 1; }
 
     .sub-details-stack { display: flex; flex-direction: column; gap: 0; overflow: hidden; }
     .ref-tag { font-size: 9px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
