@@ -270,7 +270,7 @@
     .tile-icon.note { background: #fef3c7; color: #d97706; }
 
     .clickable-text { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 24px; }
-    .comment-text { font-style: italic; color: #92400e; font-weight: 600; }
+    .comment-text { font-style: italic; color: #92400e; font-weight: 600; word-break: break-word; overflow-wrap: anywhere; }
     .placeholder { color: #94a3b8; font-weight: 500; font-size: 13px; }
     .edit-icon { opacity: 0.3; font-size: 12px; }
 
@@ -287,7 +287,7 @@
 
     .tile-body { flex: 1; min-width: 0; }
     .tile-body label { display: block; font-size: 8px; font-weight: 800; color: #cbd5e1; text-transform: uppercase; }
-    .tile-body .val { margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; }
+    .tile-body .val { margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; word-break: break-word; overflow-wrap: anywhere; }
     .tile-body small { font-size: 10px; color: #94a3b8; font-weight: 600; }
 
     .hours-edit { display: flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 850; color: #1e293b; }

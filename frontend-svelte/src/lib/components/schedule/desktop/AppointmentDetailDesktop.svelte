@@ -135,6 +135,7 @@
     .phone-link:hover { text-decoration: underline; }
 
     .comment-preview { margin-top: 24px; background: #eee8d5; padding: 16px; border-radius: 16px; border: 1px solid #ddd6c1; }
+    .comment-preview p { margin: 0; font-size: 13px; line-height: 1.5; color: #073642; word-break: break-word; overflow-wrap: anywhere; }
 
     .status-list { display: flex; flex-direction: column; gap: 8px; }
     .st-btn {
