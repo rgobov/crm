@@ -42,6 +42,7 @@
     $: isShort = appt.durationInMinutes < 30 || actualHeight < 55;
     $: isUltraShort = actualHeight < 40;
     $: isTiny = actualHeight < 28;
+    $: showComment = appt.comment && !isShort && actualHeight > 80;
 </script>
 
 <button class="appt-box btn-reset"
@@ -84,7 +85,7 @@
                 </div>
             {/if}
 
-            {#if appt.comment && !isShort}
+            {#if showComment}
                 <div class="cmt-preview" transition:fade>
                     {appt.comment}
                 </div>
