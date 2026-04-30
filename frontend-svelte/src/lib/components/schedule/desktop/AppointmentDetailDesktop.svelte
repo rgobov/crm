@@ -80,7 +80,7 @@
             </div>
             {#if appointment.referenceTag}
                 <div class="data-item highlight">
-                    <span class="icon">🚗</span>
+                    <span class="icon">�</span>
                     <span>{appointment.referenceTag}</span>
                 </div>
             {/if}

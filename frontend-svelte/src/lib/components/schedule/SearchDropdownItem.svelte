@@ -13,7 +13,7 @@
 <button class="dropdown-item" on:click={() => dispatch('select')} in:fade={{duration: 150}}>
     <div class="item-visual" class:is-service={type === 'service'}>
         {#if type === 'service'}
-            <span class="icon">✂️</span>
+            <span class="icon">⭐</span>
         {:else}
             <span class="avatar">{icon || title.charAt(0).toUpperCase()}</span>
         {/if}

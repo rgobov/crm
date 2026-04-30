@@ -59,7 +59,7 @@
                 <div class="center-loader"><span class="spinner"></span></div>
             {:else if services.length === 0}
                 <div class="empty-state" in:fade>
-                    <div class="empty-icon">✂️</div>
+                    <div class="empty-icon">⭐</div>
                     <h3>Нет активных услуг</h3>
                     <p>Добавьте первую услугу для записи клиентов</p>
                     <button class="btn-prime" on:click={() => goto('/admin/services/new')}>Создать услугу</button>

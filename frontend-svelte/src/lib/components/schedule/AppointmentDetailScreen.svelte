@@ -157,7 +157,7 @@
 
         {#if appointment.referenceTag}
             <div class="info-tile reference-tile" in:slide>
-                <div class="tile-icon car">🚗</div>
+                <div class="tile-icon car">�</div>
                 <div class="tile-body">
                     <label>Объект визита</label>
                     <p class="val">{appointment.referenceTag}</p>
@@ -196,7 +196,7 @@
         </div>
 
         <div class="info-tile">
-            <div class="tile-icon">✂️</div>
+            <div class="tile-icon">⭐</div>
             <div class="tile-body">
                 <label>Выбранная услуга</label>
                 <p class="val">{appointment.service}</p>
