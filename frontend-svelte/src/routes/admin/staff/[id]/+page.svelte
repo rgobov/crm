@@ -28,8 +28,10 @@
     onMount(async () => {
         if (window.Telegram && window.Telegram.WebApp) {
             tg = window.Telegram.WebApp;
-            tg.BackButton.show();
-            tg.BackButton.onClick(() => goto('/admin/staff'));
+            if (tg.BackButton) {
+                tg.BackButton.show();
+                tg.BackButton.onClick(() => goto('/admin/staff'));
+            }
         }
 
         try {

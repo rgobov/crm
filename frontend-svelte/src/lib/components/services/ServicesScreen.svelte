@@ -9,12 +9,19 @@
     let tg = null;
 
     onMount(async () => {
-        if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
-            tg.BackButton.show();
-            tg.BackButton.onClick(() => goto('/admin'));
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                tg = window.Telegram.WebApp;
+                if (tg.BackButton) {
+                    tg.BackButton.show();
+                    tg.BackButton.onClick(() => goto('/admin'));
+                }
+            }
+            await loadServices();
+        } catch (e) {
+            console.error('onMount error:', e);
+            isLoading = false;
         }
-        await loadServices();
     });
 
     async function loadServices() {

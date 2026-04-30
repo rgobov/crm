@@ -16,8 +16,10 @@
     onMount(() => {
         if (window.Telegram && window.Telegram.WebApp) {
             tg = window.Telegram.WebApp;
-            tg.BackButton.show();
-            tg.BackButton.onClick(() => goto('/'));
+            if (tg.BackButton) {
+                tg.BackButton.show();
+                tg.BackButton.onClick(() => goto('/'));
+            }
         }
     });
 
