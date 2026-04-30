@@ -40,8 +40,8 @@
 
     $: actualHeight = appt.durationInMinutes * (hourHeight / 60);
     $: isShort = appt.durationInMinutes < 30 || actualHeight < 55;
-    $: isUltraShort = actualHeight < 40;
-    $: isTiny = actualHeight < 28;
+    $: isUltraShort = actualHeight < 50;
+    $: isTiny = actualHeight < 32;
     $: showComment = appt.comment && !isShort && actualHeight > 80;
 </script>
 
@@ -177,10 +177,11 @@
         overflow: hidden;
         text-overflow: ellipsis;
         margin-bottom: 2px;
+        flex-shrink: 0;
     }
     .compact .cl { font-size: 13px; margin-bottom: 0; }
-    .ultra-compact .cl { font-size: 12px; }
-    .tiny .cl { font-size: 11px; line-height: 1; }
+    .ultra-compact .cl { font-size: 12px; margin-bottom: 0; }
+    .tiny .cl { font-size: 11px; line-height: 1; margin-bottom: 0; }
 
     .sub-details-stack { display: flex; flex-direction: column; gap: 0; overflow: hidden; }
     .ref-tag { font-size: 9px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
