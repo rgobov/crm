@@ -48,8 +48,20 @@ jobs:
             
             docker-compose up -d
 
-            echo "--- ОТКЛЮЧЕНИЕ IPv6 В NGINX (ФИКС ДЛЯ МОБИЛЬНЫХ) ---"
-            docker exec tryneuro_proxy sh -c "sed -i 's/listen \[::\]/#listen [::]/g' /data/nginx/proxy_host/*.conf /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/production.conf" || true
+            echo "--- ОТКЛЮЧЕНИЕ IPv6 И ОПТИМИЗАЦИЯ NGINX (GZIP + HTTP/2 FIX) ---"
+            docker exec tryneuro_proxy sh -c "
+              # Отключаем IPv6
+              sed -i 's/listen \[::\]/#listen [::]/g' /data/nginx/proxy_host/*.conf /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/production.conf
+              
+              # Включаем Gzip глобально
+              echo 'gzip on;
+              gzip_proxied any;
+              gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+              gzip_vary on;
+              gzip_comp_level 6;' > /etc/nginx/conf.d/gzip.conf
+              
+              # Опционально: Если HTTP/2 все еще тормозит, можно будет его отключить здесь в будущем
+            " || true
             docker exec tryneuro_proxy nginx -s reload || true
 
             echo "--- ОЧИСТКА ---"
