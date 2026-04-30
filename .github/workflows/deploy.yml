@@ -48,6 +48,10 @@ jobs:
             
             docker-compose up -d
 
+            echo "--- ОТКЛЮЧЕНИЕ IPv6 В NGINX (ФИКС ДЛЯ МОБИЛЬНЫХ) ---"
+            docker exec tryneuro_proxy sh -c "sed -i 's/listen \[::\]/#listen [::]/g' /data/nginx/proxy_host/*.conf /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/production.conf" || true
+            docker exec tryneuro_proxy nginx -s reload || true
+
             echo "--- ОЧИСТКА ---"
             docker system prune -f
 
