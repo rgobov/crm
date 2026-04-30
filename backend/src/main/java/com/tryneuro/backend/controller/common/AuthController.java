@@ -73,8 +73,12 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public User getCurrentUser(@RequestAttribute("tenantId") String tenantId) {
+    public User getCurrentUser(@RequestAttribute(value = "tenantId", required = false) String tenantId) {
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Сессия истекла");
+        }
         String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByEmail(email).orElseThrow();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Пользователь не найден"));
     }
 }
