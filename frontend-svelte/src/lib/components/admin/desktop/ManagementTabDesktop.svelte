@@ -30,7 +30,7 @@
         { id: 'branches', title: 'Филиалы', desc: 'Ваши точки и часовые пояса', icon: '🏢', link: '/admin/branches' },
         { id: 'staff', title: 'Персонал', desc: 'Сотрудники и роли', icon: '👤', link: '/admin/staff' },
         { id: 'resources', title: 'Ресурсы', desc: 'Оборудование и залы', icon: '⚒️', link: '/admin/resources' },
-        { id: 'services', title: 'Услуги', desc: 'Ваш прайс-лист', icon: '✂️', link: '/admin/services' },
+        { id: 'services', title: 'Услуги', desc: 'Ваш прайс-лист', icon: '⭐', link: '/admin/services' },
         { id: 'clients', title: 'Клиенты', desc: 'База клиентов', icon: '💎', link: '/admin/clients' }
     ];
 </script>

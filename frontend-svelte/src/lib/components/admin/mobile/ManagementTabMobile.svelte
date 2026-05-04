@@ -38,7 +38,7 @@
         { id: 'branches', title: 'Филиалы', icon: '🏢', link: '/admin/branches' },
         { id: 'staff', title: 'Персонал', icon: '👤', link: '/admin/staff' },
         { id: 'resources', title: 'Ресурсы', icon: '⚒️', link: '/admin/resources' },
-        { id: 'services', title: 'Услуги', icon: '✂️', link: '/admin/services' }
+        { id: 'services', title: 'Услуги', icon: '⭐', link: '/admin/services' }
     ];
 
     function formatStat(num) {
