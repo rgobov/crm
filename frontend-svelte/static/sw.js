@@ -1,5 +1,5 @@
 // Service Worker для 999 CRM PWA
-const CACHE = "pwabuilder-offline-page";
+const CACHE = "pwabuilder-offline-v1";
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/5.1.2/workbox-sw.js');
 
@@ -22,10 +22,31 @@ if (workbox.navigationPreload.isSupported()) {
   workbox.navigationPreload.enable();
 }
 
+// Кэшируем только статические файлы
+workbox.routing.registerRoute(
+  new RegExp('/\\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2)$'),
+  new workbox.strategies.CacheFirst({
+    cacheName: CACHE
+  })
+);
+
+// API запросы всегда из сети
+workbox.routing.registerRoute(
+  new RegExp('/api/'),
+  new workbox.strategies.NetworkOnly()
+);
+
+// Остальные запросы - NetworkFirst с fallback
 workbox.routing.registerRoute(
   new RegExp('/*'),
-  new workbox.strategies.StaleWhileRevalidate({
-    cacheName: CACHE
+  new workbox.strategies.NetworkFirst({
+    cacheName: CACHE,
+    plugins: [
+      new workbox.expiration.ExpirationPlugin({
+        maxEntries: 50,
+        maxAgeSeconds: 24 * 60 * 60 // 24 часа
+      })
+    ]
   })
 );
 
