@@ -28,6 +28,11 @@ public class CompanyService {
 
     @Transactional
     public Company registerCompany(RegisterCompanyRequest request) {
+        // Проверяем, существует ли пользователь с таким email
+        if (userRepository.existsByEmail(request.getAdminEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Пользователь с таким email уже существует");
+        }
+
         // 1. Создаем компанию
         Company company = new Company();
         company.setName(request.getCompanyName());

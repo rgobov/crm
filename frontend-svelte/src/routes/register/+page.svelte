@@ -57,7 +57,9 @@
                 const userResponse = await api.get('/auth/me');
                 user.set(userResponse.data);
 
-                if (tg) tg.HapticFeedback.notificationOccurred('success');
+                if (tg && tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
 
                 // Сразу в админку!
                 goto('/admin');
@@ -65,7 +67,9 @@
         } catch (e) {
             console.error('Registration failed:', e);
             error = e.response?.data?.message || 'Ошибка регистрации. Проверьте данные.';
-            if (tg) tg.HapticFeedback.notificationOccurred('error');
+            if (tg && tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('error');
+            }
         } finally {
             isLoading = false;
         }
