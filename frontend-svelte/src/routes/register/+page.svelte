@@ -3,6 +3,7 @@
     import api from '$lib/api.js';
     import { user, token } from '$lib/stores/auth.js';
     import { goto } from '$app/navigation';
+    import { FeedbackUtils } from '$lib/utils/feedback.js';
 
     let companyName = '';
     let adminName = '';
@@ -26,6 +27,7 @@
     async function handleRegister() {
         if (!companyName || !adminName || !email || !password) {
             error = 'Заполните все поля';
+            FeedbackUtils.error(); // Вспышка + вибрация при ошибке валидации
             return;
         }
 
@@ -57,9 +59,7 @@
                 const userResponse = await api.get('/auth/me');
                 user.set(userResponse.data);
 
-                if (tg && tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
+                FeedbackUtils.success(); // Вспышка + вибрация при успехе
 
                 // Сразу в админку!
                 goto('/admin');
@@ -67,9 +67,7 @@
         } catch (e) {
             console.error('Registration failed:', e);
             error = e.response?.data?.message || 'Ошибка регистрации. Проверьте данные.';
-            if (tg && tg.HapticFeedback) {
-                tg.HapticFeedback.notificationOccurred('error');
-            }
+            FeedbackUtils.error(); // Вспышка + вибрация при ошибке
         } finally {
             isLoading = false;
         }
