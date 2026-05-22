@@ -25,9 +25,38 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, ex.getStatusCode());
     }
 
+    // Обработка ошибок валидации параметров и неверных типов (400 Bad Request)
+    @ExceptionHandler({
+        org.springframework.web.bind.MethodArgumentNotValidException.class,
+        org.springframework.web.bind.MissingServletRequestParameterException.class,
+        org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+        org.springframework.http.converter.HttpMessageNotReadableException.class
+    })
+    public ResponseEntity<Object> handleBadRequestExceptions(Exception ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Bad Request");
+        body.put("message", ex.getMessage());
+
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    }
+
     // Обработка RuntimeException и прочих непредвиденных ошибок
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGeneralException(Exception ex) {
+        if (ex instanceof ResponseStatusException rse) {
+            return handleResponseStatusException(rse);
+        }
+        if (ex instanceof org.springframework.web.ErrorResponse er) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("timestamp", LocalDateTime.now());
+            body.put("status", er.getStatusCode().value());
+            body.put("error", er.getStatusCode().toString());
+            body.put("message", er.getBody().getDetail());
+            return new ResponseEntity<>(body, er.getStatusCode());
+        }
+
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());

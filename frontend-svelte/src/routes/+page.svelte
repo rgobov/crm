@@ -13,6 +13,14 @@
 	let emailInput;
 
 	onMount(async () => {
+		if (typeof window !== 'undefined') {
+			const urlParams = new URLSearchParams(window.location.search);
+			const tenantIdParam = urlParams.get('tenantId');
+			if (tenantIdParam) {
+				localStorage.setItem('bookingTenantId', tenantIdParam);
+			}
+		}
+
 		if (window.Telegram && window.Telegram.WebApp) {
 			tg = window.Telegram.WebApp;
 			tg.ready();
@@ -59,6 +67,7 @@
 			user.set(response.data);
 			if (response.data.role === 'ADMIN') goto('/admin');
 			else if (response.data.role === 'MANAGER') goto('/manager');
+			else if (response.data.role === 'CLIENT') goto('/client');
 			else goto('/employee');
 			if (tg && isMiniApp) tg.MainButton.hide();
 			return true;

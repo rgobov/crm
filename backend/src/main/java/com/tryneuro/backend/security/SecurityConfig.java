@@ -77,10 +77,18 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**", "/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/error").permitAll()
                 .requestMatchers("/api/admin/telegram/internal/**").permitAll()
                 .requestMatchers("/api/admin/telegram/**").hasAnyRole("ADMIN", "MANAGER")
-                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")
                 .requestMatchers("/api/employee/**").hasAnyRole("EMPLOYEE", "ADMIN")
+                .requestMatchers("/api/client/**").hasAnyRole("CLIENT", "ADMIN", "MANAGER")
                 .anyRequest().authenticated()
+            )
+            .exceptionHandling(exception -> exception
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"" + authException.getMessage() + "\"}");
+                })
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider())

@@ -3,6 +3,24 @@
     import { adminService } from '$lib/services/adminService.js';
     import { goto } from '$app/navigation';
     import { fade, scale } from 'svelte/transition';
+    import { user } from '$lib/stores/auth.js';
+
+    let copied = false;
+    let activeBookingTab = 'link'; // 'link' | 'api'
+
+    $: bookingUrl = typeof window !== 'undefined' && $user?.tenantId
+        ? `${window.location.origin}/register-client?tenantId=${$user.tenantId}`
+        : '';
+
+    async function copyBookingUrl() {
+        try {
+            await navigator.clipboard.writeText(bookingUrl);
+            copied = true;
+            setTimeout(() => copied = false, 2000);
+        } catch (e) {
+            console.error('Copy failed', e);
+        }
+    }
 
     // Безопасная навигация: fallback на window.location для WebView/Telegram
     function safeGoto(path) {
@@ -124,6 +142,45 @@
             </div>
             <span class="phi-arrow">→</span>
         </button>
+
+        <label class="section-caption" style="margin-top: 30px;">ОНЛАЙН-ЗАПИСЬ КЛИЕНТОВ</label>
+        <div class="booking-settings-card">
+            <div class="card-tabs">
+                <button class="tab-btn" class:active={activeBookingTab === 'link'} on:click={() => activeBookingTab = 'link'}>
+                    Ссылка
+                </button>
+                <button class="tab-btn" class:active={activeBookingTab === 'api'} on:click={() => activeBookingTab = 'api'}>
+                    API
+                </button>
+            </div>
+
+            <div class="tab-content">
+                {#if activeBookingTab === 'link'}
+                    <p class="section-desc">Ссылка для размещения на сайте или в соцсетях:</p>
+                    <div class="copy-link-wrapper">
+                        <input type="text" readonly value={bookingUrl} class="copy-input" />
+                        <button class="copy-button" on:click={copyBookingUrl}>
+                            {copied ? 'Copied' : 'Copy'}
+                        </button>
+                    </div>
+                {:else}
+                    <p class="section-desc">Спецификация для внешних разработчиков:</p>
+                    <div class="api-docs-box">
+                        <div class="api-endpoint">
+                            <span class="method post">POST</span>
+                            <span class="url">/api/auth/register-client</span>
+                        </div>
+                        <pre class="json-schema">{`{
+  "name": "Имя",
+  "phone": "+79991112233",
+  "email": "client@example.com",
+  "password": "пароль123",
+  "tenantId": "${$user?.tenantId || 'ваш_tenant_id'}"
+}`}</pre>
+                    </div>
+                {/if}
+            </div>
+        </div>
     </section>
 
     <div class="bottom-phi-spacer"></div>
@@ -225,4 +282,119 @@
     .phi-arrow { font-size: 22px; color: #268bd2; font-weight: 300; }
 
     .bottom-phi-spacer { height: 120px; }
+
+    /* СТИЛИ КАРТОЧКИ НАСТРОЕК ОНЛАЙН-ЗАПИСИ ДЛЯ МОБИЛЬНОЙ ВЕРСИИ */
+    .booking-settings-card {
+        background: #eee8d5;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-tabs {
+        display: flex;
+        background: #ddd6c1;
+        border-bottom: 1.5px solid #ddd6c1;
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 12px;
+        background: transparent;
+        border: none;
+        font-size: 12px;
+        font-weight: 800;
+        color: #586e75;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+        background: #eee8d5;
+        color: #073642;
+    }
+
+    .tab-content {
+        padding: 16px;
+        text-align: left;
+    }
+
+    .section-desc {
+        font-size: 11px;
+        color: #586e75;
+        margin: 0 0 10px 0;
+        font-weight: 650;
+    }
+
+    .copy-link-wrapper {
+        display: flex;
+        gap: 6px;
+    }
+
+    .copy-input {
+        flex: 1;
+        padding: 10px;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 10px;
+        background: #fdf6e3;
+        color: #586e75;
+        font-size: 12px;
+        outline: none;
+        min-width: 0; /* предотвращает переполнение */
+    }
+
+    .copy-button {
+        padding: 0 14px;
+        background: #268bd2;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .api-docs-box {
+        background: #fdf6e3;
+        border: 1px solid #ddd6c1;
+        border-radius: 12px;
+        padding: 12px;
+    }
+
+    .api-endpoint {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .method.post {
+        background: #859900;
+        color: white;
+        font-size: 8px;
+        font-weight: 900;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .url {
+        font-family: monospace;
+        font-size: 11px;
+        font-weight: 800;
+        color: #073642;
+    }
+
+    .json-schema {
+        background: #eee8d5;
+        padding: 8px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 10px;
+        color: #586e75;
+        margin: 0;
+        overflow-x: auto;
+    }
 </style>

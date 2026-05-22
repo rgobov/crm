@@ -1,6 +1,7 @@
 <script>
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
+    import { clientService } from '$lib/services/clientService.js';
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { dbService } from '$lib/services/dbService.js';
     import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
@@ -11,6 +12,9 @@
     export let onlyBusyStaff = false;
     export let onlyWorkingStaff = false;
     export let branchId = null;
+    export let isClient = false;
+
+    $: service = isClient ? clientService : adminService;
 
     const dispatch = createEventDispatcher();
 
@@ -31,7 +35,7 @@
             console.log(`📡 Fetching appointments for date: ${date}, branch: ${bId}`);
             // Используем bypassCache для обновлений по сигналу или смене даты,
             // чтобы точно получить актуальные данные из БД
-            const apptsData = await adminService.getAppointmentsForDay(date, bId, { bypassCache: true });
+            const apptsData = await service.getAppointmentsForDay(date, bId, { bypassCache: true });
             appointments = apptsData || [];
         } catch (e) {
             console.error('❌ Error loading appointments:', e);
@@ -50,7 +54,7 @@
         while (attempts < maxAttempts) {
             try {
                 console.log(`📡 Fetching staff for date: ${date}, branch: ${bId} (Attempt ${attempts + 1})`);
-                const staffData = await adminService.getStaffForSchedule(date, bId, { bypassCache: true });
+                const staffData = await service.getStaffForSchedule(date, bId, { bypassCache: true });
 
                 let staffArray = [];
                 if (typeof staffData === 'string') {
@@ -138,8 +142,8 @@
         }
         
         try {
-            // 3. Если нет в кэше или устарело, идем на сервер
-            const response = await api.get(`/admin/schedule/staff/${staffId}/photo`);
+            const photoUrl = isClient ? `/client/schedule/staff/${staffId}/photo` : `/admin/schedule/staff/${staffId}/photo`;
+            const response = await api.get(photoUrl);
             const photoData = response.data.photoData;
 
             if (photoData) {

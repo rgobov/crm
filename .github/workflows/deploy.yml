@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/ios-final-attempt
+      - feature/roles
 
 jobs:
   deploy:

@@ -6,6 +6,24 @@
     import NotificationTemplatesModal from '../NotificationTemplatesModal.svelte';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
+    import { user } from '$lib/stores/auth.js';
+
+    let copied = false;
+    let activeBookingTab = 'link'; // 'link' | 'api'
+
+    $: bookingUrl = typeof window !== 'undefined' && $user?.tenantId
+        ? `${window.location.origin}/register-client?tenantId=${$user.tenantId}`
+        : '';
+
+    async function copyBookingUrl() {
+        try {
+            await navigator.clipboard.writeText(bookingUrl);
+            copied = true;
+            setTimeout(() => copied = false, 2000);
+        } catch (e) {
+            console.error('Copy failed', e);
+        }
+    }
 
     // Props от родителя (могут использоваться в будущем)
     export let forcedDate = null;
@@ -91,6 +109,46 @@
                 <span class="arrow">›</span>
             </button>
         </nav>
+
+        <h2 class="section-label" style="margin-top: 34px;">ОНЛАЙН-ЗАПИСЬ КЛИЕНТОВ</h2>
+        <div class="booking-settings-card">
+            <div class="card-tabs">
+                <button class="tab-btn" class:active={activeBookingTab === 'link'} on:click={() => activeBookingTab = 'link'}>
+                    Готовая ссылка
+                </button>
+                <button class="tab-btn" class:active={activeBookingTab === 'api'} on:click={() => activeBookingTab = 'api'}>
+                    Интеграция по API
+                </button>
+            </div>
+
+            <div class="tab-content">
+                {#if activeBookingTab === 'link'}
+                    <p class="section-desc">Скопируйте ссылку и разместите её на вашем сайте или в соцсетях:</p>
+                    <div class="copy-link-wrapper">
+                        <input type="text" readonly value={bookingUrl} class="copy-input" />
+                        <button class="copy-button" on:click={copyBookingUrl}>
+                            {copied ? 'Скопировано!' : 'Копировать'}
+                        </button>
+                    </div>
+                {:else}
+                    <p class="section-desc">Документация для интеграции формы записи вашими разработчиками:</p>
+                    <div class="api-docs-box">
+                        <div class="api-endpoint">
+                            <span class="method post">POST</span>
+                            <span class="url">/api/auth/register-client</span>
+                        </div>
+                        <p class="endpoint-desc">Регистрация и создание контакта в вашей системе</p>
+                        <pre class="json-schema">{`{
+  "name": "Имя клиента",
+  "phone": "+79991112233",
+  "email": "client@example.com",
+  "password": "пароль123",
+  "tenantId": "${$user?.tenantId || 'ваш_tenant_id'}"
+}`}</pre>
+                    </div>
+                {/if}
+            </div>
+        </div>
     </div>
 </div>
 
@@ -171,6 +229,132 @@
         padding-top: max(20px, calc(env(safe-area-inset-top, 20px) + 12px));
         padding-bottom: max(20px, calc(env(safe-area-inset-bottom, 20px) + 12px));
         box-sizing: border-box;
+    }
+
+    /* СТИЛИ ДЛЯ КАРТОЧКИ НАСТРОЕК ОНЛАЙН-ЗАПИСИ */
+    .booking-settings-card {
+        background: #eee8d5;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 24px;
+        overflow: hidden;
+        margin-top: 12px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-tabs {
+        display: flex;
+        background: #ddd6c1;
+        border-bottom: 1.5px solid #ddd6c1;
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 14px;
+        background: transparent;
+        border: none;
+        font-size: 13px;
+        font-weight: 800;
+        color: #586e75;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+        background: #eee8d5;
+        color: #073642;
+    }
+
+    .tab-content {
+        padding: 20px;
+        text-align: left;
+    }
+
+    .section-desc {
+        font-size: 12px;
+        color: #586e75;
+        margin: 0 0 12px 0;
+        font-weight: 650;
+    }
+
+    .copy-link-wrapper {
+        display: flex;
+        gap: 8px;
+    }
+
+    .copy-input {
+        flex: 1;
+        padding: 12px;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 12px;
+        background: #fdf6e3;
+        color: #586e75;
+        font-size: 13px;
+        outline: none;
+    }
+
+    .copy-button {
+        padding: 0 18px;
+        background: #268bd2;
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+
+    .copy-button:hover {
+        opacity: 0.9;
+    }
+
+    .api-docs-box {
+        background: #fdf6e3;
+        border: 1px solid #ddd6c1;
+        border-radius: 16px;
+        padding: 16px;
+    }
+
+    .api-endpoint {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .method.post {
+        background: #859900;
+        color: white;
+        font-size: 9px;
+        font-weight: 900;
+        padding: 3px 8px;
+        border-radius: 6px;
+    }
+
+    .url {
+        font-family: monospace;
+        font-size: 12px;
+        font-weight: 800;
+        color: #073642;
+    }
+
+    .endpoint-desc {
+        font-size: 11px;
+        color: #93a1a1;
+        margin: 0 0 10px 0;
+        font-weight: 650;
+    }
+
+    .json-schema {
+        background: #eee8d5;
+        padding: 10px;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 11px;
+        color: #586e75;
+        margin: 0;
+        overflow-x: auto;
     }
     :global(.modal-wrapper) {
         width: 100%; max-width: 450px;

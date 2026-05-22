@@ -3,6 +3,8 @@ package com.tryneuro.backend.controller.common;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tryneuro.backend.dto.AuthRequest;
 import com.tryneuro.backend.dto.AuthResponse;
+import com.tryneuro.backend.dto.RegisterClientRequest;
+import com.tryneuro.backend.service.CompanyService;
 import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.repository.StaffMemberRepository;
@@ -35,6 +37,7 @@ public class AuthController {
     private final TelegramAuthService telegramAuthService;
     private final UserRepository userRepository;
     private final StaffMemberRepository staffMemberRepository;
+    private final CompanyService companyService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostMapping("/login")
@@ -80,5 +83,11 @@ public class AuthController {
         String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Пользователь не найден"));
+    }
+
+    @PostMapping("/register-client")
+    public User registerClient(@RequestBody RegisterClientRequest request) {
+        log.info("AUTH: Register client attempt for email: {}", request.getEmail());
+        return companyService.registerClient(request);
     }
 }

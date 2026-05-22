@@ -50,7 +50,7 @@ public class Contact {
 
     @JdbcTypeCode(SqlTypes.ARRAY)
 
-    @Column(name = "phones", nullable = false, columnDefinition = "text[]")
+    @Column(name = "phones", nullable = false)
 
     private List<String> phones = new ArrayList<>();
 
@@ -76,7 +76,7 @@ public class Contact {
 
     @JdbcTypeCode(SqlTypes.ARRAY)
 
-    @Column(name = "tags", columnDefinition = "text[]")
+    @Column(name = "tags")
 
     private List<String> tags = new ArrayList<>();
 

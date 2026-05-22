@@ -231,6 +231,10 @@ public class ScheduleService {
         return apps;
     }
 
+    public Optional<Appointment> getAppointmentById(String id) {
+        return appointmentRepository.findById(id);
+    }
+
     @Transactional
     public void deleteAppointment(String id) {
         appointmentRepository.findById(id).ifPresent(app -> {
