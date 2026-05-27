@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -42,7 +43,19 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
     boolean existsByStaffMemberId(String staffId);
 
-    List<Appointment> findAllByReminderSentFalseAndAllowReminderTrueAndStartTimeAfter(OffsetDateTime time);
+    @Query("SELECT MAX(COALESCE(a.reminderLeadTimeHours, 24)) FROM Appointment a WHERE a.reminderSent = false AND a.allowReminder = true")
+    Integer findMaxReminderLeadTimeHours();
+
+    @Query("SELECT a FROM Appointment a LEFT JOIN FETCH a.contact " +
+           "WHERE a.reminderSent = false AND a.allowReminder = true " +
+           "AND a.startTime > :now AND a.startTime <= :maxStartTime")
+    List<Appointment> findAppointmentsForReminders(@Param("now") OffsetDateTime now, 
+                                                   @Param("maxStartTime") OffsetDateTime maxStartTime);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Appointment a SET a.reminderSent = :sent WHERE a.id = :id")
+    void updateReminderSentStatus(@Param("id") String id, @Param("sent") boolean sent);
 
     @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId AND a.staffMemberId = :staffId AND CAST(a.startTime AS date) = :date")
     List<Appointment> findByTenantIdAndStaffMemberIdAndDate(@Param("tenantId") String tenantId, @Param("staffId") String staffId, @Param("date") LocalDate date);
