@@ -98,74 +98,113 @@
 </script>
 
 {#if showModal}
-  <div class="pwa-install-overlay" on:click={handleClose}>
-    <div class="pwa-install-card" on:click|stopPropagation>
-      <button class="pwa-close-btn" on:click={handleClose} aria-label="Закрыть">
-        &times;
-      </button>
-      
-      <div class="pwa-card-header">
-        <img src="/icon-192x192.png" alt="999 CRM Logo" class="pwa-app-logo" />
-        <div class="pwa-app-meta">
-          <h3>999 CRM</h3>
-          <p class="pwa-developer">Try Neuro Corp.</p>
-          <span class="pwa-verified">
-            <svg class="pwa-shield-icon" viewBox="0 0 24 24" width="12" height="12">
-              <path fill="#01875f" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
-            Проверено Play Защитой
-          </span>
-        </div>
-      </div>
-      
-      <div class="pwa-stats-grid">
-        <div class="pwa-stat-box">
-          <span class="pwa-stat-value">4.9 ★</span>
-          <span class="pwa-stat-label">120+ отзывов</span>
-        </div>
-        <div class="pwa-stat-divider"></div>
-        <div class="pwa-stat-box">
-          <span class="pwa-stat-value">120 КБ</span>
-          <span class="pwa-stat-label">Размер</span>
-        </div>
-        <div class="pwa-stat-divider"></div>
-        <div class="pwa-stat-box">
-          <span class="pwa-stat-value">3+</span>
-          <span class="pwa-stat-label">Для всех</span>
-        </div>
-      </div>
-
-      <button class="pwa-primary-btn" on:click={handleInstall}>
-        Установить
-      </button>
-
-      <div class="pwa-screenshots-section">
-        <h4 class="pwa-section-title">О приложении</h4>
-        <div class="pwa-screenshots-container">
-          <div class="pwa-screenshot">
-            <div class="pwa-screenshot-mock">
-              <span class="pwa-mock-tag">Панель записи</span>
-              <div class="pwa-mock-content">
-                <div class="pwa-mock-line"></div>
-                <div class="pwa-mock-line short"></div>
-              </div>
-            </div>
-          </div>
-          <div class="pwa-screenshot">
-            <div class="pwa-screenshot-mock">
-              <span class="pwa-mock-tag">Календарь</span>
-              <div class="pwa-mock-content">
-                <div class="pwa-mock-line"></div>
-                <div class="pwa-mock-line short"></div>
-              </div>
-            </div>
+  {#if isIOS}
+    <div class="ios-install-overlay" on:click={handleClose}>
+      <div class="ios-install-sheet" on:click|stopPropagation>
+        <button class="ios-close-btn" on:click={handleClose} aria-label="Закрыть">
+          &times;
+        </button>
+        
+        <div class="ios-header">
+          <img src="/icon-192x192.png" alt="999 CRM Logo" class="ios-app-logo" />
+          <div class="ios-app-meta">
+            <h3>999 CRM</h3>
+            <p>Система записи клиентов</p>
           </div>
         </div>
+        
+        <div class="ios-divider"></div>
+        
+        <h4 class="ios-instruction-title">Установка на iPhone / iPad</h4>
+        
+        <div class="ios-steps">
+          <div class="ios-step">
+            <span class="ios-step-num">1</span>
+            <p>Нажмите кнопку <strong>«Поделиться»</strong> <span class="ios-icon-wrapper"><svg viewBox="0 0 24 24" class="ios-share-svg"><path d="M12 3a1 1 0 0 1 1 1v12a1 1 0 0 1-2 0V4a1 1 0 0 1 1-1zm6 8a1 1 0 0 1 1 1v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7a1 1 0 0 1 2 0v7h10v-7a1 1 0 0 1 1-1zM9.29 6.71a1 1 0 0 1 0-1.42l2-2a1 1 0 0 1 1.42 0l2 2a1 1 0 0 1-1.42 1.42L12 5.41l-1.29 1.3a1 1 0 0 1-1.42 0z"/></svg></span> в панели Safari.</p>
+          </div>
+          <div class="ios-step">
+            <span class="ios-step-num">2</span>
+            <p>Прокрутите меню вниз и выберите <strong>«На экран "Домой"»</strong> <span class="ios-icon-wrapper"><svg viewBox="0 0 24 24" class="ios-plus-svg"><path d="M19 11h-6V5a1 1 0 0 0-2 0v6H5a1 1 0 0 0 0 2h6v6a1 1 0 0 0 2 0v-6h6a1 1 0 0 0 0-2z"/></svg></span>.</p>
+          </div>
+          <div class="ios-step">
+            <span class="ios-step-num">3</span>
+            <p>Нажмите <strong>«Добавить»</strong> в правом верхнем углу.</p>
+          </div>
+        </div>
+        
+        <div class="ios-pointer"></div>
       </div>
-
-      <p class="pwa-disclaimer">Установка приложения займет всего несколько секунд и не расходует память телефона.</p>
     </div>
-  </div>
+  {:else}
+    <div class="pwa-install-overlay" on:click={handleClose}>
+      <div class="pwa-install-card" on:click|stopPropagation>
+        <button class="pwa-close-btn" on:click={handleClose} aria-label="Закрыть">
+          &times;
+        </button>
+        
+        <div class="pwa-card-header">
+          <img src="/icon-192x192.png" alt="999 CRM Logo" class="pwa-app-logo" />
+          <div class="pwa-app-meta">
+            <h3>999 CRM</h3>
+            <p class="pwa-developer">Try Neuro Corp.</p>
+            <span class="pwa-verified">
+              <svg class="pwa-shield-icon" viewBox="0 0 24 24" width="12" height="12">
+                <path fill="#01875f" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              Проверено Play Защитой
+            </span>
+          </div>
+        </div>
+        
+        <div class="pwa-stats-grid">
+          <div class="pwa-stat-box">
+            <span class="pwa-stat-value">4.9 ★</span>
+            <span class="pwa-stat-label">120+ отзывов</span>
+          </div>
+          <div class="pwa-stat-divider"></div>
+          <div class="pwa-stat-box">
+            <span class="pwa-stat-value">120 КБ</span>
+            <span class="pwa-stat-label">Размер</span>
+          </div>
+          <div class="pwa-stat-divider"></div>
+          <div class="pwa-stat-box">
+            <span class="pwa-stat-value">3+</span>
+            <span class="pwa-stat-label">Для всех</span>
+          </div>
+        </div>
+
+        <button class="pwa-primary-btn" on:click={handleInstall}>
+          Установить
+        </button>
+
+        <div class="pwa-screenshots-section">
+          <h4 class="pwa-section-title">О приложении</h4>
+          <div class="pwa-screenshots-container">
+            <div class="pwa-screenshot">
+              <div class="pwa-screenshot-mock">
+                <span class="pwa-mock-tag">Панель записи</span>
+                <div class="pwa-mock-content">
+                  <div class="pwa-mock-line"></div>
+                  <div class="pwa-mock-line short"></div>
+                </div>
+              </div>
+            </div>
+            <div class="pwa-screenshot">
+              <div class="pwa-screenshot-mock">
+                <span class="pwa-mock-tag">Календарь</span>
+                <div class="pwa-mock-content">
+                  <div class="pwa-mock-line"></div>
+                  <div class="pwa-mock-line short"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="pwa-disclaimer">Установка приложения займет всего несколько секунд и не расходует память телефона.</p>
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <style>
@@ -398,5 +437,174 @@
     margin: 0;
     line-height: 1.4;
     text-align: center;
+  }
+
+  /* iOS specific styles */
+  .ios-install-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 99999;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .ios-install-sheet {
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 380px;
+    padding: 24px 20px;
+    box-sizing: border-box;
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #000000;
+    text-align: left;
+    margin-bottom: 24px;
+    animation: iosSlideUp 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  @keyframes iosSlideUp {
+    from {
+      transform: translateY(100px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .ios-close-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: #e5e5ea;
+    border: none;
+    font-size: 18px;
+    font-weight: bold;
+    color: #8e8e93;
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .ios-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .ios-app-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    margin-right: 14px;
+    object-fit: cover;
+  }
+
+  .ios-app-meta h3 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+
+  .ios-app-meta p {
+    margin: 2px 0 0 0;
+    font-size: 13px;
+    color: #8e8e93;
+  }
+
+  .ios-divider {
+    height: 1px;
+    background-color: rgba(0, 0, 0, 0.1);
+    margin: 0 0 16px 0;
+  }
+
+  .ios-instruction-title {
+    margin: 0 0 16px 0;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #8e8e93;
+    letter-spacing: 0.5px;
+  }
+
+  .ios-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .ios-step {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .ios-step-num {
+    background-color: #007aff;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .ios-step p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #1c1c1e;
+  }
+
+  .ios-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e5e5ea;
+    border-radius: 4px;
+    padding: 2px 4px;
+    vertical-align: middle;
+  }
+
+  .ios-share-svg, .ios-plus-svg {
+    width: 16px;
+    height: 16px;
+    fill: #007aff;
+  }
+
+  .ios-pointer {
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid rgba(255, 255, 255, 0.95);
   }
 </style>
