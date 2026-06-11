@@ -9,6 +9,30 @@
 		<!-- Telegram SDK (Local Copy for instant loading in RF) -->
 		<script src="/js/telegram-web-app.js"></script>
 
+		<!-- Capture PWA Installation intention and event early -->
+		<script>
+			(function() {
+				// Запоминаем намерение установить приложение в sessionStorage,
+				// чтобы оно не потерялось при редиректах авторизации (например, на страницу логина или админки)
+				const params = new URLSearchParams(window.location.search);
+				if (params.get('action') === 'install') {
+					try {
+						sessionStorage.setItem('pwa-trigger-install', 'true');
+					} catch (e) {
+						console.error('sessionStorage is not available', e);
+					}
+				}
+
+				// Перехватываем событие до того, как Svelte закончит загрузку
+				window.addEventListener('beforeinstallprompt', (e) => {
+					e.preventDefault();
+					window.deferredPrompt = e;
+					// Оповещаем Svelte, если компонент уже смонтирован
+					window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
+				});
+			})();
+		</script>
+
 		<!-- Service Worker Registration -->
 		<script>
 			if ('serviceWorker' in navigator) {

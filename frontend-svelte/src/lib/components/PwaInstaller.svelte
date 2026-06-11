@@ -18,34 +18,50 @@
     // 2. Определяем iOS (iPhone/iPad/iPod)
     isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
-    // 3. Проверяем наличие параметра ?action=install в URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const shouldPrompt = urlParams.get('action') === 'install';
+    // 3. Проверяем наличие намерения установки из sessionStorage
+    const shouldPrompt = sessionStorage.getItem('pwa-trigger-install') === 'true';
 
-    // 4. Слушаем событие предложения установки (для Android / Chrome)
+    // 4. Если намерение есть и у нас уже сохранен prompt (пойманный в app.html)
+    if (shouldPrompt) {
+      if (window.deferredPrompt) {
+        deferredPrompt = window.deferredPrompt;
+        showModal = true;
+      } else if (isIOS) {
+        // Для iOS prompt не нужен, сразу показываем модал с инструкцией
+        showModal = true;
+      }
+    }
+
+    // 5. Слушаем кастомное событие готовности prompt (если он придет после монтирования)
+    const handlePromptReady = () => {
+      if (shouldPrompt && window.deferredPrompt) {
+        deferredPrompt = window.deferredPrompt;
+        showModal = true;
+      }
+    };
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
+
+    // Слушаем стандартное событие на случай прямого захода без ранней загрузки
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      
-      // Если перешли с рекламной ссылки, показываем модал
+      window.deferredPrompt = e;
       if (shouldPrompt) {
         showModal = true;
       }
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // 5. Для iOS (где нет beforeinstallprompt)
-    if (shouldPrompt && isIOS) {
-      showModal = true;
-    }
-
     return () => {
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   });
 
   async function handleInstall() {
+    // Сбрасываем триггер, чтобы не донимать пользователя при следующей сессии
+    sessionStorage.removeItem('pwa-trigger-install');
+
     if (isIOS) {
       alert("Для установки приложения на iPhone:\n\n1. Нажмите кнопку «Поделиться» (иконка квадрата со стрелкой вверх внизу экрана).\n2. Прокрутите меню и выберите «На экран \"Домой\"».\n3. Нажмите «Добавить» в правом верхнем углу.");
       showModal = false;
@@ -63,11 +79,13 @@
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`PWA Install Choice: ${outcome}`);
     deferredPrompt = null;
+    window.deferredPrompt = null;
     showModal = false;
   }
 
   function handleClose() {
     showModal = false;
+    sessionStorage.removeItem('pwa-trigger-install');
   }
 </script>
 
