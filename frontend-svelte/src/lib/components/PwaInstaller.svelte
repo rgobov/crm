@@ -7,38 +7,48 @@
   let isAlreadyInstalled = false;
 
   onMount(() => {
+    console.log('[PWA TEST] PwaInstaller mounted');
     // 1. Проверяем, запущено ли уже приложение как установленное PWA
     isAlreadyInstalled = window.matchMedia('(display-mode: standalone)').matches 
                          || window.navigator.standalone === true;
+    console.log('[PWA TEST] isAlreadyInstalled =', isAlreadyInstalled);
 
     if (isAlreadyInstalled) {
+      console.log('[PWA TEST] PWA is already installed, aborting component action');
       return;
     }
 
     // 2. Определяем iOS (iPhone/iPad/iPod)
     isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    console.log('[PWA TEST] isIOS =', isIOS);
 
     // 3. Проверяем наличие намерения установки из sessionStorage
     const shouldPrompt = sessionStorage.getItem('pwa-trigger-install') === 'true';
+    console.log('[PWA TEST] shouldPrompt (from sessionStorage) =', shouldPrompt);
 
     // 4. Если есть намерение установки — показываем модал в любом случае (имитация)
     if (shouldPrompt) {
       showModal = true;
+      console.log('[PWA TEST] showModal set to true');
       if (window.deferredPrompt) {
         deferredPrompt = window.deferredPrompt;
+        console.log('[PWA TEST] deferredPrompt retrieved from window');
       }
     }
 
     // 5. Слушаем кастомное событие готовности prompt (если он придет после монтирования)
     const handlePromptReady = () => {
+      console.log('[PWA TEST] pwa-prompt-ready fired');
       if (window.deferredPrompt) {
         deferredPrompt = window.deferredPrompt;
+        console.log('[PWA TEST] deferredPrompt updated from window via custom event');
       }
     };
     window.addEventListener('pwa-prompt-ready', handlePromptReady);
 
     // Слушаем стандартное событие на случай прямого захода без ранней загрузки
     const handleBeforeInstallPrompt = (e) => {
+      console.log('[PWA TEST] beforeinstallprompt event captured directly in Svelte');
       e.preventDefault();
       deferredPrompt = e;
       window.deferredPrompt = e;

@@ -12,12 +12,13 @@
 		<!-- Capture PWA Installation intention and event early -->
 		<script>
 			(function() {
-				// Запоминаем намерение установить приложение в sessionStorage,
-				// чтобы оно не потерялось при редиректах авторизации (например, на страницу логина или админки)
+				console.log('[PWA TEST] URL on load:', window.location.href);
 				const params = new URLSearchParams(window.location.search);
+				console.log('[PWA TEST] action param is:', params.get('action'));
 				if (params.get('action') === 'install') {
 					try {
 						sessionStorage.setItem('pwa-trigger-install', 'true');
+						console.log('[PWA TEST] Set pwa-trigger-install to sessionStorage');
 					} catch (e) {
 						console.error('sessionStorage is not available', e);
 					}
@@ -27,6 +28,7 @@
 				window.addEventListener('beforeinstallprompt', (e) => {
 					e.preventDefault();
 					window.deferredPrompt = e;
+					console.log('[PWA TEST] beforeinstallprompt event captured');
 					// Оповещаем Svelte, если компонент уже смонтирован
 					window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
 				});
