@@ -1,6 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { initAuth } from '$lib/stores/auth.js';
+    import PwaInstaller from '$lib/components/PwaInstaller.svelte';
     import '../app.css';
 
     export let data;
@@ -22,6 +23,7 @@
 
 <div class="app-viewport">
     <slot />
+    <PwaInstaller />
 </div>
 
 <style>
