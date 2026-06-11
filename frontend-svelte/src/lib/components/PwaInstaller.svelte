@@ -21,22 +21,18 @@
     // 3. Проверяем наличие намерения установки из sessionStorage
     const shouldPrompt = sessionStorage.getItem('pwa-trigger-install') === 'true';
 
-    // 4. Если намерение есть и у нас уже сохранен prompt (пойманный в app.html)
+    // 4. Если есть намерение установки — показываем модал в любом случае (имитация)
     if (shouldPrompt) {
+      showModal = true;
       if (window.deferredPrompt) {
         deferredPrompt = window.deferredPrompt;
-        showModal = true;
-      } else if (isIOS) {
-        // Для iOS prompt не нужен, сразу показываем модал с инструкцией
-        showModal = true;
       }
     }
 
     // 5. Слушаем кастомное событие готовности prompt (если он придет после монтирования)
     const handlePromptReady = () => {
-      if (shouldPrompt && window.deferredPrompt) {
+      if (window.deferredPrompt) {
         deferredPrompt = window.deferredPrompt;
-        showModal = true;
       }
     };
     window.addEventListener('pwa-prompt-ready', handlePromptReady);
@@ -46,9 +42,6 @@
       e.preventDefault();
       deferredPrompt = e;
       window.deferredPrompt = e;
-      if (shouldPrompt) {
-        showModal = true;
-      }
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
@@ -59,20 +52,25 @@
   });
 
   async function handleInstall() {
-    // Сбрасываем триггер, чтобы не донимать пользователя при следующей сессии
-    sessionStorage.removeItem('pwa-trigger-install');
-
     if (isIOS) {
       alert("Для установки приложения на iPhone:\n\n1. Нажмите кнопку «Поделиться» (иконка квадрата со стрелкой вверх внизу экрана).\n2. Прокрутите меню и выберите «На экран \"Домой\"».\n3. Нажмите «Добавить» в правом верхнем углу.");
       showModal = false;
+      sessionStorage.removeItem('pwa-trigger-install');
       return;
     }
 
+    // Если prompt появился пока висел модал, забираем его
+    if (!deferredPrompt && window.deferredPrompt) {
+      deferredPrompt = window.deferredPrompt;
+    }
+
     if (!deferredPrompt) {
-      alert("Приложение уже готово к установке или ваш браузер её не поддерживает. Пожалуйста, воспользуйтесь меню браузера (Добавить на главный экран).");
-      showModal = false;
+      alert("Браузер подготавливает установку. Пожалуйста, подождите 2-3 секунды и нажмите кнопку снова. \n\nЕсли это не сработает, вы можете установить приложение вручную: нажмите на три точки в верхнем углу браузера и выберите «Установить» (или «Добавить на главный экран»).");
       return;
     }
+
+    // Сбрасываем триггер, чтобы не донимать пользователя при следующей сессии
+    sessionStorage.removeItem('pwa-trigger-install');
 
     // Показываем стандартный диалог
     deferredPrompt.prompt();
