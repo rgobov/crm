@@ -12,6 +12,9 @@
 	let tg = null;
 	let isMiniApp = false;
 	let emailInput;
+	let passwordInputEl;
+
+	$: if (passwordInputEl) passwordInputEl.type = showPassword ? 'text' : 'password';
 
 	onMount(async () => {
 		if (typeof window !== 'undefined') {
@@ -139,7 +142,8 @@
 					<label for="password">Пароль</label>
 					<div class="password-container">
 						<input
-							type={showPassword ? "text" : "password"}
+							bind:this={passwordInputEl}
+							type="password"
 							id="password"
 							bind:value={password}
 							placeholder="••••••••"

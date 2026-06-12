@@ -13,6 +13,11 @@
 	let confirmPassword = '';
 	let showPassword = false;
 	let showConfirmPassword = false;
+	let passwordInputEl;
+	let confirmPasswordInputEl;
+
+	$: if (passwordInputEl) passwordInputEl.type = showPassword ? 'text' : 'password';
+	$: if (confirmPasswordInputEl) confirmPasswordInputEl.type = showConfirmPassword ? 'text' : 'password';
 
 	let isLoading = false;
 	let error = '';
@@ -159,7 +164,8 @@
 					<label for="password">Пароль *</label>
 					<div class="password-container">
 						<input
-							type={showPassword ? "text" : "password"}
+							bind:this={passwordInputEl}
+							type="password"
 							id="password"
 							bind:value={password}
 							placeholder="Минимум 6 символов"
@@ -185,7 +191,8 @@
 					<label for="confirmPassword">Подтвердите пароль *</label>
 					<div class="password-container">
 						<input
-							type={showConfirmPassword ? "text" : "password"}
+							bind:this={confirmPasswordInputEl}
+							type="password"
 							id="confirmPassword"
 							bind:value={confirmPassword}
 							placeholder="••••••••"

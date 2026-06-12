@@ -12,6 +12,11 @@
     let confirmPassword = '';
     let showPassword = false;
     let showConfirmPassword = false;
+    let passwordInputEl;
+    let confirmPasswordInputEl;
+
+    $: if (passwordInputEl) passwordInputEl.type = showPassword ? 'text' : 'password';
+    $: if (confirmPasswordInputEl) confirmPasswordInputEl.type = showConfirmPassword ? 'text' : 'password';
     let companyAddress = '';
     let error = '';
     let isLoading = false;
@@ -114,7 +119,7 @@
             <div class="form-group">
                 <label for="password">Пароль</label>
                 <div class="password-container">
-                    <input type={showPassword ? "text" : "password"} id="password" bind:value={password} placeholder="••••••••" />
+                    <input bind:this={passwordInputEl} type="password" id="password" bind:value={password} placeholder="••••••••" />
                     <button type="button" class="toggle-password-btn" on:click={() => showPassword = !showPassword} aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}>
                         {#if showPassword}
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -134,7 +139,7 @@
             <div class="form-group">
                 <label for="confirmPassword">Подтвердите пароль</label>
                 <div class="password-container">
-                    <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" bind:value={confirmPassword} placeholder="••••••••" />
+                    <input bind:this={confirmPasswordInputEl} type="password" id="confirmPassword" bind:value={confirmPassword} placeholder="••••••••" />
                     <button type="button" class="toggle-password-btn" on:click={() => showConfirmPassword = !showConfirmPassword} aria-label={showConfirmPassword ? "Скрыть пароль" : "Показать пароль"}>
                         {#if showConfirmPassword}
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
