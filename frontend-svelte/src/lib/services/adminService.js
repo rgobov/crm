@@ -46,5 +46,16 @@ export const adminService = {
     },
     async deleteAppointment(id) {
         return await api.delete(`/admin/appointments/${id}`);
+    },
+    async exportAppointments(startDate, endDate, contactId = null) {
+        const response = await api.get('/admin/appointments/export', {
+            params: {
+                startDate,
+                endDate,
+                contactId
+            },
+            responseType: 'blob'
+        });
+        return response.data;
     }
 };

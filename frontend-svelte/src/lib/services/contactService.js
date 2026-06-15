@@ -42,5 +42,16 @@ export const contactService = {
 
     async deleteContact(id) {
         await api.delete(`/admin/clients/${id}`);
+    },
+
+    async exportContacts(query = '', showAll = false) {
+        const response = await api.get('/admin/clients/export', {
+            params: {
+                query: query.trim(),
+                showAll: showAll
+            },
+            responseType: 'blob'
+        });
+        return response.data;
     }
 };

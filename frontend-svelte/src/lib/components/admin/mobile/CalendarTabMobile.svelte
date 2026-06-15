@@ -100,6 +100,54 @@
         selectedClientId = id;
         showModal = 'client-profile';
     }
+
+    let isExporting = false;
+    async function exportCurrentMonth() {
+        if (isExporting) return;
+        isExporting = true;
+        try {
+            const year = $selectedDate.getFullYear();
+            const month = $selectedDate.getMonth();
+            const start = new Date(year, month, 1);
+            const end = new Date(year, month + 1, 0);
+
+            const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
+            const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+
+            const blob = await adminService.exportAppointments(startStr, endStr);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `visits_month_${year}_${month + 1}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error('Export month failed', e);
+        } finally {
+            isExporting = false;
+        }
+    }
+
+    async function exportCurrentDay() {
+        if (isExporting) return;
+        isExporting = true;
+        try {
+            const dateStr = `${$selectedDate.getFullYear()}-${String($selectedDate.getMonth() + 1).padStart(2, '0')}-${String($selectedDate.getDate()).padStart(2, '0')}`;
+            const blob = await adminService.exportAppointments(dateStr, dateStr);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `visits_day_${dateStr}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error('Export day failed', e);
+        } finally {
+            isExporting = false;
+        }
+    }
 </script>
 
 <div class="calendar-tab-mobile">
@@ -108,6 +156,9 @@
             <div class="header-row">
                 <h2>Календарь</h2>
                 <div class="header-actions">
+                    <button class="export-cal-btn" class:loading={isExporting} on:click={exportCurrentMonth} title="Выгрузить месяц в Excel" disabled={isExporting}>
+                        {isExporting ? '⏳' : '📥'}
+                    </button>
                     <button class="today-btn" on:click={() => { selectedDate.set(new Date()); viewMode = 'day'; activeTab.set('timeline'); }}>СЕГОДНЯ</button>
                     <button class="more-btn" on:click={() => viewMode = 'more'}>ЕЩЁ</button>
                 </div>
@@ -121,6 +172,9 @@
             <button class="date-chip btn-reset" on:click={() => selectedDate.set(new Date())}>
                 <span class="d">{$selectedDate.getDate()}</span>
                 <span class="m">{$selectedDate.toLocaleDateString('ru-RU', { month: 'short' }).toUpperCase()}</span>
+            </button>
+            <button class="export-cal-btn-mobile btn-reset" class:loading={isExporting} on:click={exportCurrentDay} title="Выгрузить день в Excel" disabled={isExporting}>
+                {isExporting ? '⏳' : '📥'}
             </button>
 
             <!-- ФИЛЬТРЫ В ВИДЕ ПОНЯТНЫХ КНОПОК-ПЕРЕКЛЮЧАТЕЛЕЙ -->
@@ -227,6 +281,10 @@
     .header-actions { display: flex; gap: 8px; align-items: center; }
     h2 { font-size: 20px; font-weight: 850; color: #073642; margin: 0; }
     .today-btn { background: #eee8d5; color: #268bd2; border: 1.5px solid #ddd6c1; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 12px; }
+    .export-cal-btn { background: #eee8d5; color: #268bd2; border: 1.5px solid #ddd6c1; width: 34px; height: 34px; border-radius: 12px; font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+    .export-cal-btn:active { transform: scale(0.92); }
+    .export-cal-btn-mobile { background: #fdf6e3; color: #268bd2; border: 1.5px solid #ddd6c1; width: 36px; height: 36px; border-radius: 14px; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+    .export-cal-btn-mobile:active { transform: scale(0.92); }
     .more-btn { background: #268bd2; color: #fdf6e3; border: 1.5px solid #268bd2; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 12px; }
     .back-btn { background: #859900; color: #fdf6e3; border: 1.5px solid #859900; padding: 8px 12px; border-radius: 12px; font-weight: 800; font-size: 14px; }
     .more-view-mobile { flex: 1; padding: 16px; overflow-y: auto; }

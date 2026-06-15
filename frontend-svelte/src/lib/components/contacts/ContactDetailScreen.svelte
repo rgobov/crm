@@ -2,6 +2,7 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import api from '$lib/api.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
+    import { adminService } from '$lib/services/adminService.js';
     import { fade, slide, scale } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -98,6 +99,26 @@
         tempValues.tags = tempValues.tags.filter((_, i) => i !== index);
         await saveField('removeTag');
     }
+
+    let isExporting = false;
+    async function exportClientVisits() {
+        if (isExporting) return;
+        isExporting = true;
+        try {
+            const blob = await adminService.exportAppointments(null, null, contactId);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `visits_${contact.name.replace(/\s+/g, '_')}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error('Export client visits failed', e);
+        } finally {
+            isExporting = false;
+        }
+    }
 </script>
 
 <div class="profile-card" in:scale={{duration: 400, start: 0.95, easing: quintOut}}>
@@ -123,6 +144,12 @@
                     </button>
                 {/if}
                 <p class="id-hint">ID: {contact.id.split('-')[0]}</p>
+            </div>
+
+            <div class="header-export-wrap" style="margin-left: auto;">
+                <button class="export-client-btn" class:loading={isExporting} on:click={exportClientVisits} title="Выгрузить визиты клиента в Excel" disabled={isExporting}>
+                    {isExporting ? '⏳ Экспорт...' : '📥 Выгрузить визиты'}
+                </button>
             </div>
         </header>
 
@@ -274,4 +301,26 @@
     .center-loader { display: flex; justify-content: center; padding: 60px; }
     .spinner { width: 32px; height: 32px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .export-client-btn {
+        background: #eee8d5;
+        color: #268bd2;
+        border: 1.5px solid #ddd6c1;
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-weight: 800;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .export-client-btn:hover {
+        background: #fdf6e3;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .export-client-btn:active {
+        transform: scale(0.95);
+    }
+    .export-client-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 </style>

@@ -1,6 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
+    import { contactService } from '$lib/services/contactService.js';
     import { goto } from '$app/navigation';
     import { fade, scale } from 'svelte/transition';
     import { user } from '$lib/stores/auth.js';
@@ -63,6 +64,56 @@
         if (!num) return '0';
         if (num >= 1000) return (num/1000).toFixed(1) + 'k';
         return num;
+    }
+
+    let exportStartDate = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    })();
+    let exportEndDate = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+
+    let isExportingClients = false;
+    let isExportingAppointments = false;
+
+    async function handleExportClients() {
+        if (isExportingClients) return;
+        isExportingClients = true;
+        try {
+            const blob = await contactService.exportContacts('', true);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'clients_all.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            isExportingClients = false;
+        }
+    }
+
+    async function handleExportAppointments() {
+        if (isExportingAppointments) return;
+        isExportingAppointments = true;
+        try {
+            const blob = await adminService.exportAppointments(exportStartDate, exportEndDate);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `visits_${exportStartDate}_to_${exportEndDate}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            isExportingAppointments = false;
+        }
     }
 </script>
 
@@ -142,6 +193,31 @@
             </div>
             <span class="phi-arrow">→</span>
         </button>
+
+        <label class="section-caption" style="margin-top: 30px;">ЭКСПОРТ ДАННЫХ</label>
+        <div class="export-settings-card">
+            <div class="export-row">
+                <button class="export-main-btn" on:click={handleExportClients} disabled={isExportingClients}>
+                    {isExportingClients ? 'Экспорт базы...' : '📥 Выгрузить всех клиентов'}
+                </button>
+            </div>
+            <div class="export-divider"></div>
+            <div class="export-row date-range-row">
+                <div class="date-fields">
+                    <div class="date-input-wrap">
+                        <label>С даты:</label>
+                        <input type="date" bind:value={exportStartDate} class="export-date-input" />
+                    </div>
+                    <div class="date-input-wrap">
+                        <label>По дату:</label>
+                        <input type="date" bind:value={exportEndDate} class="export-date-input" />
+                    </div>
+                </div>
+                <button class="export-main-btn highlight" on:click={handleExportAppointments} disabled={isExportingAppointments}>
+                    {isExportingAppointments ? 'Экспорт визитов...' : '📥 Выгрузить визиты'}
+                </button>
+            </div>
+        </div>
 
         <label class="section-caption" style="margin-top: 30px;">ОНЛАЙН-ЗАПИСЬ КЛИЕНТОВ</label>
         <div class="booking-settings-card">
@@ -396,5 +472,97 @@
         color: #586e75;
         margin: 0;
         overflow-x: auto;
+    }
+    .export-settings-card {
+        background: #eee8d5;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-top: 10px;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .export-row {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .export-divider {
+        height: 1.5px;
+        background: #ddd6c1;
+        width: 100%;
+    }
+
+    .date-range-row {
+        gap: 12px;
+    }
+
+    .date-fields {
+        display: flex;
+        gap: 10px;
+    }
+
+    .date-input-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .date-input-wrap label {
+        font-size: 10px;
+        font-weight: 800;
+        color: #586e75;
+        text-transform: uppercase;
+    }
+
+    .export-date-input {
+        padding: 10px;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 10px;
+        background: #fdf6e3;
+        color: #073642;
+        font-size: 12px;
+        font-weight: 700;
+        outline: none;
+    }
+
+    .export-main-btn {
+        padding: 12px;
+        background: #fdf6e3;
+        color: #268bd2;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .export-main-btn:active:not(:disabled) {
+        background: #eee8d5;
+    }
+
+    .export-main-btn.highlight {
+        background: #268bd2;
+        color: white;
+        border: none;
+    }
+
+    .export-main-btn.highlight:active:not(:disabled) {
+        opacity: 0.9;
+    }
+
+    .export-main-btn:disabled {
+        opacity: 0.6;
     }
 </style>

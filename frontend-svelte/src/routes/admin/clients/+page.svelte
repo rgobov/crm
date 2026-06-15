@@ -65,6 +65,34 @@
 
     function openDetails(id) { selectedClientId = id; }
     function closeDetails() { selectedClientId = null; }
+
+    let isExporting = false;
+    async function handleExport() {
+        if (isExporting) return;
+        isExporting = true;
+        try {
+            const blob = await contactService.exportContacts(searchQuery, showAll);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            
+            let filename = 'clients_all.xlsx';
+            if (!showAll) {
+                filename = 'clients_today.xlsx';
+            } else if (searchQuery.trim()) {
+                filename = `clients_search_${searchQuery.trim()}.xlsx`;
+            }
+            
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (e) {
+            console.error('Export failed', e);
+        } finally {
+            isExporting = false;
+        }
+    }
 </script>
 
 <div class="screen-wrapper">
@@ -76,6 +104,9 @@
                 {#if isLoading && clients.length > 0}
                     <div class="mini-top-loader"></div>
                 {/if}
+                <button class="export-header-btn" class:loading={isExporting} on:click={handleExport} title="Выгрузить в Excel" disabled={isExporting}>
+                    {isExporting ? '⏳' : '📥'}
+                </button>
                 <button class="add-header-btn" on:click={() => showAddModal = true}>+</button>
             </div>
 
@@ -195,7 +226,11 @@
     .name-line { font-size: 15px; font-weight: 800; color: #073642; }
     .phone-line { font-size: 13px; color: #586e75; font-weight: 600; }
 
-    .add-header-btn { margin-left: auto; width: 44px; height: 44px; background: #268bd2; color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s; flex-shrink: 0; }
+    .export-header-btn { margin-left: auto; width: 44px; height: 44px; background: #eee8d5; border: 1.5px solid #ddd6c1; border-radius: 14px; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; color: #268bd2; }
+    .export-header-btn:hover { background: #fdf6e3; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .export-header-btn:active { transform: scale(0.92); }
+
+    .add-header-btn { width: 44px; height: 44px; background: #268bd2; color: white; border: none; border-radius: 14px; font-size: 28px; font-weight: 300; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s; flex-shrink: 0; }
     .add-header-btn:active { transform: scale(0.92); }
 
     /* МОДАЛЬНОЕ ОКНО */

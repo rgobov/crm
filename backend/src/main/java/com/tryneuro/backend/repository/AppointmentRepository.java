@@ -82,4 +82,10 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
            "FROM Appointment a WHERE a.staffMemberId = :staffId AND YEAR(a.startTime) = :year AND MONTH(a.startTime) = :month " +
            "GROUP BY DAY(a.startTime)")
     List<WorkloadDto> getWorkloadForStaffAndMonth(@Param("staffId") String staffId, @Param("year") int year, @Param("month") int month);
+
+    @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId AND " +
+           "CAST(a.startTime AS date) BETWEEN :startDate AND :endDate ORDER BY a.startTime DESC")
+    List<Appointment> findByTenantIdAndDateRange(@Param("tenantId") String tenantId, 
+                                                 @Param("startDate") java.time.LocalDate startDate, 
+                                                 @Param("endDate") java.time.LocalDate endDate);
 }

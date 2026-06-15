@@ -38,6 +38,7 @@ public class AdminController {
     private final AppServiceService appServiceService;
     private final ResourceService resourceService;
     private final DashboardService dashboardService;
+    private final ExportService exportService;
 
     private String getRequiredTenantId(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
@@ -259,5 +260,40 @@ public class AdminController {
     public List<ServiceDto> getAllServices(@RequestAttribute("tenantId") String tenantId) {
         return appServiceService.getAllServices(getRequiredTenantId(tenantId))
                 .stream().map(DtoMapper::toDto).collect(Collectors.toList());
+    }
+
+    @GetMapping("/clients/export")
+    public ResponseEntity<byte[]> exportClients(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "true") boolean showAll) {
+        try {
+            byte[] excelBytes = exportService.exportClientsToExcel(getRequiredTenantId(tenantId), query, showAll);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"clients.xlsx\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(excelBytes);
+        } catch (Exception e) {
+            log.error("Error exporting clients", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Ошибка экспорта клиентов");
+        }
+    }
+
+    @GetMapping("/appointments/export")
+    public ResponseEntity<byte[]> exportAppointments(
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(required = false) String contactId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            byte[] excelBytes = exportService.exportAppointmentsToExcel(getRequiredTenantId(tenantId), contactId, startDate, endDate);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"visits.xlsx\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .body(excelBytes);
+        } catch (Exception e) {
+            log.error("Error exporting appointments", e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Ошибка экспорта визитов");
+        }
     }
 }
