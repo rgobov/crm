@@ -66,9 +66,21 @@
     }
 
     async function handleDelete() {
-        if (confirm('Удалить эту запись?')) {
-            await adminService.deleteAppointment(appointment.id);
-            dispatch('deleted', appointment.id);
+        if (appointment.groupId) {
+            if (confirm('Эта запись связана с другими мастерами. Удалить ВСЕ связанные записи? (ОК - удалить все, Отмена - продолжить выбор)')) {
+                await adminService.deleteAppointment(appointment.id, 'all');
+                dispatch('deleted', appointment.id);
+            } else {
+                if (confirm('Удалить только текущую запись для этого сотрудника?')) {
+                    await adminService.deleteAppointment(appointment.id, 'single');
+                    dispatch('deleted', appointment.id);
+                }
+            }
+        } else {
+            if (confirm('Удалить эту запись?')) {
+                await adminService.deleteAppointment(appointment.id, 'single');
+                dispatch('deleted', appointment.id);
+            }
         }
     }
 

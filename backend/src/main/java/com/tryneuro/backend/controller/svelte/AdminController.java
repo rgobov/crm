@@ -211,7 +211,7 @@ public class AdminController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(value = "branchId", required = false) String branchId) {
         return scheduleService.getAppointmentsForDay(date, getRequiredTenantId(tenantId), branchId)
-                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
+                .stream().map(scheduleService::convertToDtoWithGroupStaff).collect(Collectors.toList());
     }
 
     @GetMapping("/schedule/staff")
@@ -239,20 +239,30 @@ public class AdminController {
     }
 
     @PostMapping("/appointments")
-    public AppointmentDto createAppointment(@RequestBody AppointmentDto appointmentDto, @RequestAttribute("tenantId") String tenantId) {
+    public AppointmentDto createAppointment(
+            @RequestBody AppointmentDto appointmentDto, 
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(value = "force", defaultValue = "false") boolean force) {
         Appointment appointment = DtoMapper.toEntity(appointmentDto, getRequiredTenantId(tenantId));
-        return DtoMapper.toDto(scheduleService.addAppointment(appointment));
+        return scheduleService.convertToDtoWithGroupStaff(scheduleService.addAppointment(appointment, appointmentDto.getStaffMemberIds(), force));
     }
 
     @PutMapping("/appointments/{id}")
-    public ResponseEntity<AppointmentDto> updateAppointment(@PathVariable String id, @RequestBody AppointmentDto appointmentDetails, @RequestAttribute("tenantId") String tenantId) {
+    public ResponseEntity<AppointmentDto> updateAppointment(
+            @PathVariable String id, 
+            @RequestBody AppointmentDto appointmentDetails, 
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(value = "force", defaultValue = "false") boolean force,
+            @RequestParam(value = "updateMode", defaultValue = "single") String updateMode) {
         Appointment appointment = DtoMapper.toEntity(appointmentDetails, getRequiredTenantId(tenantId));
-        return ResponseEntity.ok(DtoMapper.toDto(scheduleService.updateAppointment(id, appointment)));
+        return ResponseEntity.ok(scheduleService.convertToDtoWithGroupStaff(scheduleService.updateAppointment(id, appointment, appointmentDetails.getStaffMemberIds(), updateMode, force)));
     }
 
     @DeleteMapping("/appointments/{id}")
-    public ResponseEntity<Void> deleteAppointment(@PathVariable String id) {
-        scheduleService.deleteAppointment(id);
+    public ResponseEntity<Void> deleteAppointment(
+            @PathVariable String id,
+            @RequestParam(value = "deleteMode", defaultValue = "single") String deleteMode) {
+        scheduleService.deleteAppointment(id, deleteMode);
         return ResponseEntity.ok().build();
     }
 

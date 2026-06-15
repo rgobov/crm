@@ -38,14 +38,14 @@ export const adminService = {
         })).data;
     },
 
-    async createAppointment(data) {
-        return await api.post('/admin/appointments', data);
+    async createAppointment(data, force = false) {
+        return await api.post('/admin/appointments', data, { params: { force } });
     },
-    async updateAppointment(id, data) {
-        return await api.put(`/admin/appointments/${id}`, data);
+    async updateAppointment(id, data, force = false, updateMode = 'single') {
+        return await api.put(`/admin/appointments/${id}`, data, { params: { force, updateMode } });
     },
-    async deleteAppointment(id) {
-        return await api.delete(`/admin/appointments/${id}`);
+    async deleteAppointment(id, deleteMode = 'single') {
+        return await api.delete(`/admin/appointments/${id}`, { params: { deleteMode } });
     },
     async exportAppointments(startDate, endDate, contactId = null) {
         const response = await api.get('/admin/appointments/export', {

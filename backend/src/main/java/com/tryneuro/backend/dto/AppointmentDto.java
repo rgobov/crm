@@ -29,4 +29,6 @@ public class AppointmentDto {
     private boolean reminderSent;
     private boolean allowReminder;
     private Integer reminderLeadTimeHours;
+    private String groupId;
+    private java.util.List<String> staffMemberIds;
 }

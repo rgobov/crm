@@ -27,6 +27,7 @@ public class DtoMapper {
                 .reminderSent(entity.isReminderSent())
                 .allowReminder(entity.isAllowReminder())
                 .reminderLeadTimeHours(entity.getReminderLeadTimeHours())
+                .groupId(entity.getGroupId())
                 .build();
     }
 
@@ -49,6 +50,7 @@ public class DtoMapper {
         entity.setAllowReminder(dto.isAllowReminder());
         entity.setReminderLeadTimeHours(dto.getReminderLeadTimeHours() != null ? dto.getReminderLeadTimeHours() : 24);
         entity.setTenantId(tenantId);
+        entity.setGroupId(dto.getGroupId());
         return entity;
     }
 

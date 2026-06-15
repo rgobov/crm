@@ -88,4 +88,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
     List<Appointment> findByTenantIdAndDateRange(@Param("tenantId") String tenantId, 
                                                  @Param("startDate") java.time.LocalDate startDate, 
                                                  @Param("endDate") java.time.LocalDate endDate);
+
+    List<Appointment> findByGroupId(String groupId);
 }

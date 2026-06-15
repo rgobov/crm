@@ -24,13 +24,15 @@
         clientPhone: '',
         service: '',
         staffMemberId: null,
+        staffMemberIds: [],
         resourceId: null,
         branchId: '',
         status: 'SCHEDULED',
         comment: '',
         referenceTag: '',
         allowReminder: true,
-        reminderLeadTimeHours: 24
+        reminderLeadTimeHours: 24,
+        groupId: null
     };
 
     let isNewClientMode = false;
@@ -90,13 +92,15 @@
                 formData = {
                     ...appointment,
                     staffMemberId: appointment.staffMemberId ? String(appointment.staffMemberId) : (appointment.staffMember?.id ? String(appointment.staffMember.id) : null),
+                    staffMemberIds: appointment.staffMemberIds ? appointment.staffMemberIds.map(String) : (appointment.staffMemberId ? [String(appointment.staffMemberId)] : []),
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
                     status: appointment.status || 'SCHEDULED',
                     comment: appointment.comment || '',
                     referenceTag: appointment.referenceTag || '',
-                    clientPhone: appointment.clientPhone || ''
+                    clientPhone: appointment.clientPhone || '',
+                    groupId: appointment.groupId || null
                 };
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
@@ -111,7 +115,9 @@
                     if (c) selectContact(c, true);
                 }
             } else {
+                const initialStaff = preselected.staffId ? [String(preselected.staffId)] : [];
                 formData.staffMemberId = preselected.staffId ? String(preselected.staffId) : null;
+                formData.staffMemberIds = initialStaff;
                 formData.branchId = $activeBranchId;
                 const d = new Date(preselected.date);
                 d.setHours(preselected.hour, preselected.min, 0, 0);
@@ -224,8 +230,11 @@
 
             const correctedStartTime = timeUtils.fromBranchLocalToUTC(formData.startTime, currentBranchData.timezone);
 
+            const firstStaffId = formData.staffMemberIds.length > 0 ? formData.staffMemberIds[0] : null;
+
             const payload = {
                 ...formData,
+                staffMemberId: firstStaffId,
                 service: sName,
                 clientName: clientName,
                 clientPhone: finalPhone,
@@ -234,10 +243,27 @@
                 branchId: $activeBranchId
             };
 
-            if (isEditing) {
-                await adminService.updateAppointment(appointment.id, payload);
-            } else {
-                await adminService.createAppointment(payload);
+            try {
+                if (isEditing) {
+                    await adminService.updateAppointment(appointment.id, payload, false, updateMode);
+                } else {
+                    await adminService.createAppointment(payload, false);
+                }
+            } catch (err) {
+                if (err.response && err.response.status === 409) {
+                    if (confirm('Один из выбранных сотрудников занят или не работает в это время. Все равно сохранить запись?')) {
+                        if (isEditing) {
+                            await adminService.updateAppointment(appointment.id, payload, true, updateMode);
+                        } else {
+                            await adminService.createAppointment(payload, true);
+                        }
+                    } else {
+                        isSaving = false;
+                        return;
+                    }
+                } else {
+                    throw err;
+                }
             }
             dispatch('saved');
         } catch (e) {
@@ -257,6 +283,20 @@
             const res = await contactService.getContacts(q, true, 0, 5);
             searchResults = res.content || [];
         }, 400);
+    }
+
+    let updateMode = 'all';
+
+    function addStaff(event) {
+        const id = event.target.value;
+        if (id && !formData.staffMemberIds.includes(id)) {
+            formData.staffMemberIds = [...formData.staffMemberIds, id];
+        }
+        event.target.value = ""; // reset select
+    }
+
+    function removeStaff(id) {
+        formData.staffMemberIds = formData.staffMemberIds.filter(sid => sid !== id);
     }
 </script>
 
@@ -439,11 +479,39 @@
                     </div>
                 </div>
 
-                <div class="tile-card"><label>ИСПОЛНИТЕЛЬ</label>
-                    <select bind:value={formData.staffMemberId}>
-                        <option value={null}>Не назначен</option>
-                        {#each staffList as s}<option value={s.id}>{s.name}</option>{/each}
-                    </select>
+                <div class="tile-card staff-card">
+                    <label>ИСПОЛНИТЕЛИ ({formData.staffMemberIds.length})</label>
+                    
+                    <div class="selected-staff-container">
+                        {#each formData.staffMemberIds as id}
+                            {@const member = staffList.find(s => s.id === id)}
+                            {#if member}
+                                <div class="staff-badge" in:scale>
+                                    {#if member.photoData}
+                                        <img class="badge-avatar" src="data:image/jpeg;base64,{member.photoData}" alt={member.name} />
+                                    {:else}
+                                        <div class="badge-avatar-placeholder">{member.name.charAt(0)}</div>
+                                    {/if}
+                                    <div class="badge-info">
+                                        <span class="badge-name">{member.name}</span>
+                                        <span class="badge-spec">{member.specialty || 'Специалист'}</span>
+                                    </div>
+                                    <button class="btn-remove-staff" type="button" on:click={() => removeStaff(id)}>✕</button>
+                                </div>
+                            {/if}
+                        {/each}
+                    </div>
+
+                    {#if staffList.filter(s => !formData.staffMemberIds.includes(s.id)).length > 0}
+                        <div class="add-staff-select-wrapper">
+                            <select on:change={addStaff} value="">
+                                <option value="" disabled selected>+ Добавить исполнителя...</option>
+                                {#each staffList.filter(s => !formData.staffMemberIds.includes(s.id)) as s}
+                                    <option value={s.id}>{s.name} ({s.specialty || 'Специалист'})</option>
+                                {/each}
+                            </select>
+                        </div>
+                    {/if}
                 </div>
                 <div class="tile-card"><label>КАБИНЕТ / РЕСУРС</label>
                     <select bind:value={formData.resourceId}>
@@ -477,6 +545,29 @@
                     <textarea bind:value={formData.comment} placeholder="Например: аллергия на материалы..."></textarea>
                 </div>
             </div>
+
+            {#if isEditing && appointment.groupId}
+                <div class="tile-card group-action-card" in:slide>
+                    <div class="group-info">
+                        <span class="group-icon">🔗</span>
+                        <div>
+                            <strong class="group-title">Связанная запись</strong>
+                            <p class="group-desc">На этот объект/время назначено несколько мастеров.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="group-radio-options">
+                        <label class="radio-label">
+                            <input type="radio" bind:group={updateMode} value="all" />
+                            <span class="radio-text">Применить ко всей группе (ко всем мастерам)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" bind:group={updateMode} value="single" />
+                            <span class="radio-text">Применить только к этой записи</span>
+                        </label>
+                    </div>
+                </div>
+            {/if}
 
             <div class="footer-actions">
                 <button class="btn-cancel" on:click={() => dispatch('cancel')}>ОТМЕНА</button>
@@ -568,4 +659,29 @@
     .spinner { width: 28px; height: 28px; border: 3px solid #f1f5f9; border-top-color: #0ea5e9; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loader-center { display: flex; justify-content: center; align-items: center; height: 200px; }
+
+    /* Мультивыбор сотрудников */
+    .staff-card { background: #f8fafc; border-color: #e2e8f0; }
+    .selected-staff-container { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; margin-bottom: 12px; }
+    .staff-badge { display: flex; align-items: center; gap: 10px; background: white; padding: 8px 12px; border-radius: 14px; border: 1px solid #e2e8f0; position: relative; }
+    .badge-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+    .badge-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: #0ea5e9; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    .badge-info { flex: 1; display: flex; flex-direction: column; }
+    .badge-name { font-size: 13px; font-weight: 700; color: #1e293b; }
+    .badge-spec { font-size: 10px; color: #64748b; font-weight: 600; }
+    .btn-remove-staff { background: none; border: none; color: #ef4444; font-size: 14px; font-weight: 700; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
+    
+    .add-staff-select-wrapper { background: white; border: 1px dashed #cbd5e1; border-radius: 14px; padding: 8px 12px; position: relative; }
+    .add-staff-select-wrapper select { color: #64748b; font-size: 13px; cursor: pointer; }
+    
+    /* Карточка группового обновления */
+    .group-action-card { background: #fef2f2; border-color: #fca5a5; margin-top: 12px; }
+    .group-info { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+    .group-icon { font-size: 18px; }
+    .group-title { font-size: 13px; font-weight: 800; color: #991b1b; display: block; }
+    .group-desc { font-size: 11px; color: #b91c1c; margin: 2px 0 0 0; font-weight: 600; }
+    .group-radio-options { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #fecaca; padding-top: 10px; }
+    .radio-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .radio-label input { width: auto; margin: 0; }
+    .radio-text { font-size: 12px; font-weight: 700; color: #7f1d1d; }
 </style>

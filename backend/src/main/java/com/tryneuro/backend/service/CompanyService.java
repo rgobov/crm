@@ -33,8 +33,13 @@ public class CompanyService {
 
     @Transactional
     public Company registerCompany(RegisterCompanyRequest request) {
+        if (request.getAdminEmail() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email не может быть пустым");
+        }
+        String normalizedEmail = request.getAdminEmail().trim().toLowerCase();
+
         // Проверяем, существует ли пользователь с таким email
-        if (userRepository.existsByEmail(request.getAdminEmail())) {
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Пользователь с таким email уже существует");
         }
 
@@ -42,13 +47,13 @@ public class CompanyService {
         Company company = new Company();
         company.setName(request.getCompanyName());
         company.setAddress(request.getCompanyAddress());
-        company.setOwnerEmail(request.getAdminEmail());
+        company.setOwnerEmail(normalizedEmail);
         
         Company savedCompany = companyRepository.save(company);
 
         // 2. Создаем пользователя-админа, привязанного к этой компании
         User admin = new User();
-        admin.setEmail(request.getAdminEmail());
+        admin.setEmail(normalizedEmail);
         admin.setPassword(passwordEncoder.encode(request.getAdminPassword())); // Хешируем пароль
         admin.setRole(UserRole.ADMIN);
         admin.setTenantId(savedCompany.getId());
@@ -68,13 +73,18 @@ public class CompanyService {
         Company company = companyRepository.findById(request.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Указанная компания не найдена"));
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (request.getEmail() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email не может быть пустым");
+        }
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Пользователь с таким email уже существует");
         }
 
         Contact contact = new Contact();
         contact.setName(request.getName());
-        contact.setEmail(request.getEmail());
+        contact.setEmail(normalizedEmail);
         if (request.getPhone() != null && !request.getPhone().isEmpty()) {
             contact.setPhones(java.util.List.of(request.getPhone()));
         } else {
@@ -84,7 +94,7 @@ public class CompanyService {
         contact = contactRepository.save(contact);
 
         User clientUser = new User();
-        clientUser.setEmail(request.getEmail());
+        clientUser.setEmail(normalizedEmail);
         clientUser.setPassword(passwordEncoder.encode(request.getPassword()));
         clientUser.setRole(UserRole.CLIENT);
         clientUser.setTenantId(company.getId());

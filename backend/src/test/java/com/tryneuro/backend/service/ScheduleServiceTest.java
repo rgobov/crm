@@ -108,4 +108,86 @@ class ScheduleServiceTest {
         boolean result = scheduleService.isStaffMemberAvailable("t1", staffId, date, time, duration, null, branchId);
         assertFalse(result, "Мастер не должен быть доступен до начала смены");
     }
+
+    @Test
+    @DisplayName("Создание групповой записи генерирует groupId и сохраняет несколько записей")
+    void testAddAppointment_GroupCreation() {
+        String branchId = "branch-1";
+        LocalDate date = LocalDate.of(2026, 2, 21);
+        LocalTime time = LocalTime.of(10, 0);
+        int duration = 60;
+
+        com.tryneuro.backend.model.Branch branch = new com.tryneuro.backend.model.Branch();
+        branch.setId(branchId);
+        branch.setTimezone("UTC");
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        StaffShift shift = new StaffShift();
+        shift.setWorkStartTime(LocalTime.of(9, 0));
+        shift.setWorkEndTime(LocalTime.of(18, 0));
+        shift.setDayOff(false);
+
+        when(staffShiftRepository.findByStaffIdAndDateAndBranchId("staff-1", date, branchId))
+                .thenReturn(Optional.of(shift));
+        when(staffShiftRepository.findByStaffIdAndDateAndBranchId("staff-2", date, branchId))
+                .thenReturn(Optional.of(shift));
+
+        Appointment app = new Appointment();
+        app.setTenantId("t1");
+        app.setBranchId(branchId);
+        app.setStartTime(java.time.OffsetDateTime.of(date, time, java.time.ZoneOffset.UTC));
+        app.setDurationInMinutes(duration);
+        app.setService("Test Service");
+        app.setClientName("Client");
+        app.setClientPhone("123");
+
+        java.util.List<String> staffIds = java.util.List.of("staff-1", "staff-2");
+
+        when(appointmentRepository.save(org.mockito.Mockito.any(Appointment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment result = scheduleService.addAppointment(app, staffIds, false);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(result.getGroupId());
+        org.mockito.Mockito.verify(appointmentRepository, org.mockito.Mockito.times(2))
+                .save(org.mockito.Mockito.any(Appointment.class));
+    }
+
+    @Test
+    @DisplayName("Обход валидации занятости с флагом force=true")
+    void testAddAppointment_ForceFlagOnConflict() {
+        String branchId = "branch-1";
+        LocalDate date = LocalDate.of(2026, 2, 21);
+        LocalTime time = LocalTime.of(10, 0);
+
+        com.tryneuro.backend.model.Branch branch = new com.tryneuro.backend.model.Branch();
+        branch.setId(branchId);
+        branch.setTimezone("UTC");
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        // Смена не найдена (будет расценено как нерабочий день/конфликт)
+        when(staffShiftRepository.findByStaffIdAndDateAndBranchId("staff-1", date, branchId))
+                .thenReturn(Optional.empty());
+
+        Appointment app = new Appointment();
+        app.setTenantId("t1");
+        app.setBranchId(branchId);
+        app.setStartTime(java.time.OffsetDateTime.of(date, time, java.time.ZoneOffset.UTC));
+        app.setDurationInMinutes(60);
+        app.setService("Test Service");
+        app.setClientName("Client");
+        app.setClientPhone("123");
+
+        // Без force=true должно выбросить исключение ResponseStatusException
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> {
+            scheduleService.addAppointment(app, java.util.List.of("staff-1"), false);
+        });
+
+        // С force=true должно пройти успешно
+        when(appointmentRepository.save(org.mockito.Mockito.any(Appointment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment result = scheduleService.addAppointment(app, java.util.List.of("staff-1"), true);
+        org.junit.jupiter.api.Assertions.assertNotNull(result);
+    }
 }
