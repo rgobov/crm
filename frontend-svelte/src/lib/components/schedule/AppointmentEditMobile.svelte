@@ -25,13 +25,15 @@
         clientPhone: '',
         service: '',
         staffMemberId: '',
+        staffMemberIds: [],
         resourceId: '',
         branchId: '',
         status: 'SCHEDULED',
         comment: '',
         referenceTag: '',
         allowReminder: true,
-        reminderLeadTimeHours: 24
+        reminderLeadTimeHours: 24,
+        groupId: null
     };
 
     let isNewClientMode = false;
@@ -57,6 +59,8 @@
 
     let services = [];
     let resources = [];
+    let staffList = [];
+    let updateMode = 'all';
     let currentBranchData = null;
 
     $: formData.durationInMinutes = (durationHours * 60) + durationMinutes;
@@ -71,13 +75,18 @@
             const allBranches = await branchService.getBranches();
             currentBranchData = allBranches.find(b => b.id === $activeBranchId);
 
-            const [servicesData, resourcesData] = await Promise.all([
+            const [servicesData, resourcesData, staffData] = await Promise.all([
                 serviceService.getServices().catch(e => { console.error('Services load failed:', e); return []; }),
-                resourceService.getResources($activeBranchId).catch(e => { console.error('Resources load failed:', e); return []; })
+                resourceService.getResources($activeBranchId).catch(e => { console.error('Resources load failed:', e); return []; }),
+                adminService.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId).catch(e => { console.error('Staff load failed:', e); return []; })
             ]);
 
             services = servicesData || [];
             resources = resourcesData || [];
+            staffList = (staffData || []).map(s => ({
+                ...s,
+                id: s.id ? String(s.id) : null
+            }));
 
             // Отладочная информация
             console.log('Resources loaded:', resources);
@@ -87,14 +96,16 @@
             if (isEditing) {
                 formData = {
                     ...appointment,
-                    staffMemberId: appointment.staffMemberId || (appointment.staffMember ? appointment.staffMember.id : ''),
+                    staffMemberId: appointment.staffMemberId ? String(appointment.staffMemberId) : (appointment.staffMember?.id ? String(appointment.staffMember.id) : ''),
+                    staffMemberIds: appointment.staffMemberIds ? appointment.staffMemberIds.map(String) : (appointment.staffMemberId ? [String(appointment.staffMemberId)] : []),
                     branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
                     status: appointment.status || 'SCHEDULED',
                     comment: appointment.comment || '',
                     referenceTag: appointment.referenceTag || '',
-                    clientPhone: appointment.clientPhone || ''
+                    clientPhone: appointment.clientPhone || '',
+                    groupId: appointment.groupId || null
                 };
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
@@ -109,7 +120,9 @@
                     if (c) selectContact(c);
                 }
             } else {
-                formData.staffMemberId = preselected.staffId || '';
+                const initialStaff = preselected.staffId ? [String(preselected.staffId)] : [];
+                formData.staffMemberId = preselected.staffId ? String(preselected.staffId) : '';
+                formData.staffMemberIds = initialStaff;
                 formData.branchId = $activeBranchId;
                 const d = new Date(preselected.date);
                 d.setHours(preselected.hour, preselected.min, 0, 0);
@@ -197,6 +210,7 @@
         selectedContact = contact;
         formData.contactId = contact.id;
         formData.clientName = contact.name;
+        formData.clientPhone = contact.phones?.[0] || '';
         searchInput = contact.name;
         searchResults = [];
     }
@@ -211,10 +225,24 @@
         searchResults = [];
     }
 
+    function addStaff(event) {
+        const id = event.target.value;
+        if (id && !formData.staffMemberIds.includes(id)) {
+            formData.staffMemberIds = [...formData.staffMemberIds, id];
+        }
+        event.target.value = "";
+    }
+
+    function removeStaff(id) {
+        formData.staffMemberIds = formData.staffMemberIds.filter(sid => sid !== id);
+    }
+
     async function handleSave() {
         if (!searchInput.trim()) return alert('Укажите имя клиента');
-        if (isNewClientMode && !newClientPhone.trim()) return alert('Укажите телефон нового клиента');
+        let finalPhone = isNewClientMode ? newClientPhone.trim() : formData.clientPhone;
+        if (!finalPhone) return alert('Укажите номер телефона');
         if (!currentBranchData) return alert('Данные филиала еще загружаются...');
+        if (formData.staffMemberIds.length === 0) return alert('Выберите хотя бы одного исполнителя');
 
         isSaving = true;
         try {
@@ -224,7 +252,7 @@
             if (isNewClientMode) {
                 const newContact = await contactService.addContact({
                     name: clientName,
-                    phones: [newClientPhone.trim()],
+                    phones: [finalPhone],
                     tags: formData.referenceTag ? [formData.referenceTag] : []
                 }, $activeBranchId);
                 contactId = newContact.id;
@@ -237,20 +265,40 @@
             }
 
             const correctedStartTime = timeUtils.fromBranchLocalToUTC(formData.startTime, currentBranchData.timezone);
+            const firstStaffId = formData.staffMemberIds[0];
 
             const payload = {
                 ...formData,
+                staffMemberId: firstStaffId,
                 service: sName,
                 clientName: clientName,
+                clientPhone: finalPhone,
                 contactId: contactId,
                 startTime: correctedStartTime,
                 branchId: $activeBranchId
             };
 
-            if (isEditing) {
-                await adminService.updateAppointment(appointment.id, payload);
-            } else {
-                await adminService.createAppointment(payload);
+            try {
+                if (isEditing) {
+                    await adminService.updateAppointment(appointment.id, payload, false, updateMode);
+                } else {
+                    await adminService.createAppointment(payload, false);
+                }
+            } catch (err) {
+                if (err.response && err.response.status === 409) {
+                    if (confirm('Один из выбранных сотрудников занят или не работает в это время. Все равно сохранить запись?')) {
+                        if (isEditing) {
+                            await adminService.updateAppointment(appointment.id, payload, true, updateMode);
+                        } else {
+                            await adminService.createAppointment(payload, true);
+                        }
+                    } else {
+                        isSaving = false;
+                        return;
+                    }
+                } else {
+                    throw err;
+                }
             }
             dispatch('saved');
         } catch (e) {
@@ -325,6 +373,63 @@
             </section>
 
             <div class="tiles-stack">
+                <div class="tile-card staff-card">
+                    <label>ИСПОЛНИТЕЛИ ({formData.staffMemberIds.length})</label>
+                    
+                    <div class="selected-staff-container">
+                        {#each formData.staffMemberIds as id}
+                            {@const member = staffList.find(s => s.id === id)}
+                            {#if member}
+                                <div class="staff-badge" in:scale>
+                                    {#if member.photoData}
+                                        <img class="badge-avatar" src="data:image/jpeg;base64,{member.photoData}" alt={member.name} />
+                                    {:else}
+                                        <div class="badge-avatar-placeholder">{member.name.charAt(0)}</div>
+                                    {/if}
+                                    <div class="badge-info">
+                                        <span class="badge-name">{member.name}</span>
+                                        <span class="badge-spec">{member.specialty || 'Специалист'}</span>
+                                    </div>
+                                    <button class="btn-remove-staff" type="button" on:click={() => removeStaff(id)}>✕</button>
+                                </div>
+                            {/if}
+                        {/each}
+                    </div>
+
+                    {#if staffList.filter(s => !formData.staffMemberIds.includes(s.id)).length > 0}
+                        <div class="add-staff-select-wrapper">
+                            <select on:change={addStaff} value="">
+                                <option value="" disabled selected>+ Добавить исполнителя...</option>
+                                {#each staffList.filter(s => !formData.staffMemberIds.includes(s.id)) as s}
+                                    <option value={s.id}>{s.name} ({s.specialty || 'Специалист'})</option>
+                                {/each}
+                            </select>
+                        </div>
+                    {/if}
+                </div>
+
+                {#if isEditing && formData.groupId}
+                    <div class="tile-card group-action-card" in:slide>
+                        <div class="group-info">
+                            <span class="group-icon">🔗</span>
+                            <div>
+                                <span class="group-title">Групповая запись</span>
+                                <p class="group-desc">Этот визит связан с другими мастерами. Выберите, как применить изменения:</p>
+                            </div>
+                        </div>
+                        <div class="group-radio-options">
+                            <label class="radio-label">
+                                <input type="radio" name="updateMode" value="all" bind:group={updateMode} />
+                                <span class="radio-text">Обновить все связанные записи</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="updateMode" value="single" bind:group={updateMode} />
+                                <span class="radio-text">Обновить только текущую запись</span>
+                            </label>
+                        </div>
+                    </div>
+                {/if}
+
                 <div class="tile-card reference-card">
                     <label for="ref-tag-id">АВТОМОБИЛЬ / ОБЪЕКТ</label>
                     <div class="tag-input-wrap">
@@ -713,4 +818,29 @@
     .inline-phone-field { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .inline-phone-field input { flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid #b58900; background: #fdf6e3; font-size: 15px; font-weight: 700; }
     .btn-cancel-new { background: #eee8d5; border: 1.5px solid #ddd6c1; color: #dc322f; width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+
+    /* Мультивыбор сотрудников (Solarized) */
+    .staff-card { background: #eee8d5; border-color: #ddd6c1; }
+    .selected-staff-container { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; margin-bottom: 12px; }
+    .staff-badge { display: flex; align-items: center; gap: 10px; background: #fdf6e3; padding: 8px 12px; border-radius: 14px; border: 1.5px solid #ddd6c1; position: relative; }
+    .badge-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+    .badge-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: #268bd2; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+    .badge-info { flex: 1; display: flex; flex-direction: column; }
+    .badge-name { font-size: 13px; font-weight: 700; color: #073642; }
+    .badge-spec { font-size: 10px; color: #586e75; font-weight: 600; }
+    .btn-remove-staff { background: none; border: none; color: #dc322f; font-size: 16px; font-weight: 700; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; }
+    
+    .add-staff-select-wrapper { background: #fdf6e3; border: 1.5px dashed #ddd6c1; border-radius: 14px; padding: 8px 12px; position: relative; }
+    .add-staff-select-wrapper select { color: #586e75; font-size: 13px; cursor: pointer; }
+    
+    /* Карточка группового обновления (Solarized) */
+    .group-action-card { background: rgba(220, 50, 47, 0.05); border-color: #dc322f; margin-top: 12px; }
+    .group-info { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+    .group-icon { font-size: 18px; }
+    .group-title { font-size: 13px; font-weight: 800; color: #dc322f; display: block; }
+    .group-desc { font-size: 11px; color: #586e75; margin: 2px 0 0 0; font-weight: 600; }
+    .group-radio-options { display: flex; flex-direction: column; gap: 8px; border-top: 1.5px solid rgba(220, 50, 47, 0.1); padding-top: 10px; }
+    .radio-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .radio-label input { width: auto; margin: 0; min-height: auto; }
+    .radio-text { font-size: 12px; font-weight: 700; color: #586e75; }
 </style>
