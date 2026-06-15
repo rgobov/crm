@@ -61,7 +61,7 @@ const dispatch = createEventDispatcher();
     $: STAFF_WIDTH = 200;
     $: maxCols = Math.floor((containerWidth - TIME_COL_WIDTH) / STAFF_WIDTH);
     $: actualCols = staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
-    $: placeholderColsCount = Math.max(0, maxCols - actualCols);
+    $: placeholderColsCount = actualCols < maxCols ? (maxCols - actualCols + 1) : 0;
     $: totalColsCount = actualCols + placeholderColsCount;
 
     let timer;
