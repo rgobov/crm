@@ -256,7 +256,6 @@ const dispatch = createEventDispatcher();
                                 <button class="slot-btn"
                                         class:is-break={status === 'BREAK'}
                                         class:is-off={status === 'OFF'}
-                                        class:zebra={h % 2 === 0}
                                         style="height: {SLOT_HEIGHT}px"
                                         on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}></button>
                             {/each}
@@ -269,7 +268,7 @@ const dispatch = createEventDispatcher();
                         <div class="staff-col placeholder-col" style="width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
                                 {@const h = hours[Math.floor(i/4)]}
-                                <div class="slot-placeholder" class:zebra={h % 2 === 0} style="height: {SLOT_HEIGHT}px"></div>
+                                <div class="slot-placeholder" style="height: {SLOT_HEIGHT}px"></div>
                             {/each}
                         </div>
                     {/each}
@@ -320,7 +319,6 @@ const dispatch = createEventDispatcher();
     .staff-col { position: relative; height: 100%; border-right: 1.5px solid #ddd6c1; flex-shrink: 0; }
 
     .slot-btn { width: 100%; border: none; cursor: pointer; display: block; background: #fdf6e3; transition: background 0.1s; }
-    .slot-btn.zebra { background: #f5efdc; }
     .slot-btn:hover { background: rgba(38, 139, 210, 0.05); }
 
     .slot-btn.is-off { background-color: #eee8d5 !important; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important; cursor: not-allowed; opacity: 0.6; }
@@ -335,5 +333,4 @@ const dispatch = createEventDispatcher();
     .placeholder-cell { pointer-events: none; opacity: 0.5; }
     .placeholder-col { pointer-events: none; opacity: 0.5; }
     .slot-placeholder { width: 100%; display: block; background: #fdf6e3; }
-    .slot-placeholder.zebra { background: #f5efdc; }
 </style>

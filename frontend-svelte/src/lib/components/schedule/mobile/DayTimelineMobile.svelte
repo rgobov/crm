@@ -198,7 +198,6 @@
                                 <button class="slot-btn"
                                         class:is-break={status === 'BREAK'}
                                         class:is-off={status === 'OFF'}
-                                        class:zebra={h % 2 === 0}
                                         style="height: {SLOT_HEIGHT}px"
                                         on:click|stopPropagation={() => handleEmptySlotClick(s.id, h, m, status)}>
                                 </button>
@@ -249,7 +248,6 @@
     .cols-container { display: flex; height: 100%; }
     .staff-col { position: relative; height: 100%; border-right: 1.5px solid #ddd6c1; flex-shrink: 0; }
     .slot-btn { width: 100%; border: none; display: block; background: #fdf6e3; }
-    .slot-btn.zebra { background: #f5efdc; }
     .slot-btn.is-off { background-color: #eee8d5 !important; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(147, 161, 161, 0.05) 10px, rgba(147, 161, 161, 0.05) 20px) !important; opacity: 0.6; }
     .slot-btn.is-break { background: #f5efdc !important; border-left: 3px solid #b58900; }
     .grid-lines { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
