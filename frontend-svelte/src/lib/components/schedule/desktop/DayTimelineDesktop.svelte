@@ -44,11 +44,8 @@ const dispatch = createEventDispatcher();
     let isDown = false, startX, scrollLeft;
     let hoverY = -1, hoverTimeStr = "", showGuide = false;
 
+    let containerWidth = 800;
     let refreshKey = 0;
-    $: if (staff) {
-        refreshKey++;
-        STAFF_WIDTH = staff.length <= 1 ? Math.max(400, window.innerWidth - TIME_COL_WIDTH - 40) : 200;
-    }
 
     $: apptsByStaff = (() => {
         const map = { 'unassigned': [] };
@@ -60,6 +57,12 @@ const dispatch = createEventDispatcher();
         });
         return map;
     })();
+
+    $: STAFF_WIDTH = 200;
+    $: maxCols = Math.floor((containerWidth - TIME_COL_WIDTH) / STAFF_WIDTH);
+    $: actualCols = staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
+    $: placeholderColsCount = Math.max(0, maxCols - actualCols);
+    $: totalColsCount = actualCols + placeholderColsCount;
 
     let timer;
     let scrollTimeout;
@@ -196,11 +199,11 @@ const dispatch = createEventDispatcher();
     }
 </script>
 
-<div class="timeline-root" on:mouseleave={() => showGuide = false}>
+<div class="timeline-root" bind:clientWidth={containerWidth} on:mouseleave={() => showGuide = false}>
     <header class="staff-header-fixed">
         <div class="time-corner-fixed" style="width: {TIME_COL_WIDTH}px">🕒</div>
         <div class="staff-scroll-area" bind:this={scrollHeader} on:scroll={syncHeaderScroll}>
-            <div class="staff-inner-row" style="width: {(staff.length + (apptsByStaff['unassigned'].length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
+            <div class="staff-inner-row" style="width: {totalColsCount * STAFF_WIDTH}px">
                 {#each staff as s (s.id + refreshKey)}
                     <button class="staff-cell btn-reset" style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
                         <div class="avatar-box">
@@ -216,12 +219,23 @@ const dispatch = createEventDispatcher();
                         </div>
                     </button>
                 {/each}
+                {#each Array(placeholderColsCount) as _}
+                    <div class="staff-cell placeholder-cell" style="width: {STAFF_WIDTH}px">
+                        <div class="avatar-box">
+                            <div class="avatar is-off">—</div>
+                        </div>
+                        <div class="meta">
+                            <span class="n">—</span>
+                            <span class="s">Резерв</span>
+                        </div>
+                    </div>
+                {/each}
             </div>
         </div>
     </header>
 
     <div class="timeline-body-scroll" bind:this={scrollBody} on:scroll={syncScroll} on:mousedown={handleStart} on:mousemove={handleMove} on:mouseup={() => isDown = false}>
-        <div class="body-layout-wrapper" style="width: {(staff.length + (apptsByStaff['unassigned'].length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
+        <div class="body-layout-wrapper" style="width: {totalColsCount * STAFF_WIDTH + TIME_COL_WIDTH}px">
             <div class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h (h)}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px"><span class="h-label">{h}:00</span></div>
@@ -248,6 +262,14 @@ const dispatch = createEventDispatcher();
                             {/each}
                             {#each apptsByStaff[s.id || 'unassigned'] || [] as appt (appt.id)}
                                 <TimelineAppointment {appt} {startHour} hourHeight={HOUR_HEIGHT} timezone={currentBranch?.timezone} on:click={(e) => dispatch('appointmentTap', e.detail)} />
+                            {/each}
+                        </div>
+                    {/each}
+                    {#each Array(placeholderColsCount) as _}
+                        <div class="staff-col placeholder-col" style="width: {STAFF_WIDTH}px">
+                            {#each Array(hours.length * 4) as _, i}
+                                {@const h = hours[Math.floor(i/4)]}
+                                <div class="slot-placeholder" class:zebra={h % 2 === 0} style="height: {SLOT_HEIGHT}px"></div>
                             {/each}
                         </div>
                     {/each}
@@ -308,4 +330,10 @@ const dispatch = createEventDispatcher();
     .l { position: absolute; left: 0; right: 0; height: 1px; }
     .l.bold { background: #ddd6c1; height: 1.5px; opacity: 0.6; }
     .l.dashed { border-top: 1px dashed #ddd6c1; height: 0; opacity: 0.3; }
+
+    /* Стили для колонок-заглушек */
+    .placeholder-cell { pointer-events: none; opacity: 0.5; }
+    .placeholder-col { pointer-events: none; opacity: 0.5; }
+    .slot-placeholder { width: 100%; display: block; background: #fdf6e3; }
+    .slot-placeholder.zebra { background: #f5efdc; }
 </style>
