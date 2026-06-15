@@ -8,3 +8,4 @@ aiofiles>=23.0.0
 qrcode>=7.4.0
 pillow>=10.4.0
 TgCrypto>=1.2.5
+httpx>=0.25.0
