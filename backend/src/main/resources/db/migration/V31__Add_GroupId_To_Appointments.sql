@@ -1,0 +1,1 @@
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS group_id VARCHAR(255);
