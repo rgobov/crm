@@ -223,8 +223,8 @@
 <style>
     * { box-sizing: border-box; }
     .btn-reset { background: none; border: none; padding: 0; margin: 0; text-align: left; cursor: pointer; font-family: inherit; }
-    .mobile-timeline-wrapper { height: 100%; display: flex; flex-direction: column; background: #fdf6e3; }
-    .staff-header-fixed { display: flex; height: 60px; background: #eee8d5; z-index: 900; border-bottom: 1.5px solid #ddd6c1; flex-shrink: 0; position: fixed; top: 60px; left: 0; right: 0; }
+    .mobile-timeline-wrapper { position: relative; height: 100%; display: flex; flex-direction: column; background: #fdf6e3; }
+    .staff-header-fixed { display: flex; height: 60px; background: #eee8d5; z-index: 900; border-bottom: 1.5px solid #ddd6c1; flex-shrink: 0; position: absolute; top: 0; left: 0; right: 0; }
     .time-corner-fixed { display: flex; align-items: center; justify-content: center; color: #93a1a1; font-size: 14px; border-right: 1.5px solid #ddd6c1; background: #eee8d5; z-index: 910; flex-shrink: 0; }
     .staff-scroll-area { flex: 1; overflow-x: auto; scrollbar-width: none; }
     .staff-scroll-area::-webkit-scrollbar { display: none; }
