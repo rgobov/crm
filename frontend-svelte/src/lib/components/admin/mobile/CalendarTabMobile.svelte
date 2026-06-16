@@ -22,6 +22,7 @@
     let currentAppointment = null;
     let preselectedData = null;
     let appointmentEditRef;
+    let scheduleScreenRef;
 
     let onlyBusyStaff = false;
     let onlyWorkingStaff = false;
@@ -88,6 +89,9 @@
         showNestedAddContact = false;
         selectedClientId = null;
         selectedStaffForShift = null;
+        if (scheduleScreenRef && typeof scheduleScreenRef.handleRefresh === 'function') {
+            scheduleScreenRef.handleRefresh();
+        }
     }
 
     function handleContactAdded(event) {
@@ -193,6 +197,7 @@
         <div class="day-view-mobile" in:fade>
             <div class="mobile-timeline-wrapper">
                 <ScheduleScreen
+                    bind:this={scheduleScreenRef}
                     branchId={$activeBranchId}
                     {onlyBusyStaff}
                     {onlyWorkingStaff}

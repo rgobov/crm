@@ -252,7 +252,7 @@
     function handleEmptySlot(event) { dispatch('emptySlotTap', event.detail); }
     function handleAppointment(event) { dispatch('appointmentTap', event.detail); }
     function handleStaffTap(event) { dispatch('staffTap', event.detail); }
-    function handleRefresh() {
+    export function handleRefresh() {
         console.log('🔄 Refresh triggered from timeline component');
         if ($selectedDate && currentBranchId) {
             loadDayData($selectedDate, currentBranchId, true);
