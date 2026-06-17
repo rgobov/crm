@@ -93,7 +93,9 @@
             if (tg) tg.HapticFeedback.notificationOccurred('success');
             goto('/admin/services');
         } catch (e) {
-            alert('Ошибка при сохранении');
+            console.error('Ошибка при сохранении услуги:', e);
+            const errMsg = e.response?.data?.message || e.message || 'Неизвестная ошибка';
+            alert(`Ошибка при сохранении: ${errMsg}`);
         } finally {
             isSaving = false;
         }

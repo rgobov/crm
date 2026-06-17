@@ -29,7 +29,7 @@
         try {
             services = await serviceService.getServices();
         } catch (e) {
-            console.error('Failed to load services');
+            console.error('Failed to load services:', e);
         } finally {
             isLoading = false;
         }
@@ -41,7 +41,9 @@
                 await serviceService.deleteService(id);
                 await loadServices();
             } catch (e) {
-                alert('Ошибка при удалении');
+                console.error('Ошибка при удалении услуги:', e);
+                const errMsg = e.response?.data?.message || e.message || 'Неизвестная ошибка';
+                alert(`Ошибка при удалении: ${errMsg}`);
             }
         }
     }
