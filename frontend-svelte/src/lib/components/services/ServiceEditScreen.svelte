@@ -90,7 +90,7 @@
             } else {
                 await serviceService.addService(formData);
             }
-            if (tg) tg.HapticFeedback.notificationOccurred('success');
+            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             goto('/admin/services');
         } catch (e) {
             console.error('Ошибка при сохранении услуги:', e);

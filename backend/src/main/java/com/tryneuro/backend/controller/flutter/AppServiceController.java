@@ -28,6 +28,11 @@ public class AppServiceController {
         return appServiceService.addService(service, tenantId);
     }
 
+    @PutMapping("/{id}")
+    public Service updateService(@PathVariable String id, @RequestBody Service service, @RequestAttribute("tenantId") String tenantId) {
+        return appServiceService.updateService(id, service, tenantId);
+    }
+
     @DeleteMapping("/{id}")
     public void deleteService(@PathVariable String id) {
         appServiceService.deleteService(id);

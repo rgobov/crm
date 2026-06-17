@@ -24,6 +24,19 @@ public class AppServiceService {
         return serviceRepository.save(service);
     }
 
+    public com.tryneuro.backend.model.Service updateService(String id, com.tryneuro.backend.model.Service details, String tenantId) {
+        com.tryneuro.backend.model.Service existing = serviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service not found: " + id));
+        if (!existing.getTenantId().equals(tenantId)) {
+            throw new RuntimeException("Access denied");
+        }
+        existing.setName(details.getName());
+        existing.setDurationInMinutes(details.getDurationInMinutes());
+        existing.setPriceMin(details.getPriceMin());
+        existing.setPriceMax(details.getPriceMax());
+        return serviceRepository.save(existing);
+    }
+
     public void deleteService(String id) {
         serviceRepository.deleteById(id);
     }

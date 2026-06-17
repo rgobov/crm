@@ -12,8 +12,8 @@ export const serviceService = {
     },
 
     async updateService(data) {
-        const response = await api.post('/services', data);
-        return response.data; // ВОЗВРАЩАЕМ ОБНОВЛЕННУЮ УСЛУГУ
+        const response = await api.put(`/services/${data.id}`, data);
+        return response.data;
     },
 
     async deleteService(id) {

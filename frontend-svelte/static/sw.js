@@ -36,7 +36,7 @@ workbox.routing.registerRoute(
   new workbox.strategies.NetworkOnly()
 );
 
-// Остальные запросы - NetworkFirst с fallback
+// Остальные запросы - NetworkFirst с fallback на offline.html
 workbox.routing.registerRoute(
   new RegExp('/*'),
   new workbox.strategies.NetworkFirst({
@@ -45,28 +45,15 @@ workbox.routing.registerRoute(
       new workbox.expiration.ExpirationPlugin({
         maxEntries: 50,
         maxAgeSeconds: 24 * 60 * 60 // 24 часа
-      })
+      }),
+      {
+        handlerDidError: async ({ request }) => {
+          if (request.mode === 'navigate') {
+            return caches.match(offlineFallbackPage);
+          }
+          return Response.error();
+        }
+      }
     ]
   })
 );
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith((async () => {
-      try {
-        const preloadResp = await event.preloadResponse;
-
-        if (preloadResp) {
-          return preloadResp;
-        }
-
-        const networkResp = await fetch(event.request);
-        return networkResp;
-      } catch (error) {
-        const cache = await caches.open(CACHE);
-        const cachedResp = await cache.match(offlineFallbackPage);
-        return cachedResp;
-      }
-    })());
-  }
-});
