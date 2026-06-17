@@ -426,7 +426,7 @@
                                 {#each filteredServices as s}
                                     <SearchDropdownItem
                                         title={s.name}
-                                        subtitle="{s.durationInMinutes} мин"
+                                        subtitle="{s.durationInMinutes} мин{s.priceMin !== null && s.priceMin !== undefined ? ' • ' + (s.priceMax !== null && s.priceMax !== undefined ? 'от ' + s.priceMin + ' до ' + s.priceMax : s.priceMin) + ' руб.' : ''}"
                                         type="service"
                                         on:select={() => selectService(s)}
                                     />

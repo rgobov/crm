@@ -78,7 +78,12 @@
                             <div class="icon-circle">✨</div>
                             <div class="info">
                                 <h3>{service.name}</h3>
-                                <p>{service.durationInMinutes} минут</p>
+                                <p>
+                                    {service.durationInMinutes} минут
+                                    {#if service.priceMin !== null && service.priceMin !== undefined}
+                                        • {service.priceMax !== null && service.priceMax !== undefined ? `от ${service.priceMin} до ${service.priceMax}` : service.priceMin} руб.
+                                    {/if}
+                                </p>
                             </div>
                             <button class="btn-del" on:click|stopPropagation={() => handleDelete(service.id, service.name)}>
                                 🗑

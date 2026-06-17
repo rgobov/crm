@@ -278,7 +278,9 @@
 							<label for="service-select">Услуга</label>
 							<select id="service-select" bind:value={bookingForm.service}>
 								{#each services as s}
-									<option value={s.name}>{s.name} ({s.durationInMinutes} мин)</option>
+									<option value={s.name}>
+										{s.name} ({s.durationInMinutes} мин){s.priceMin !== null && s.priceMin !== undefined ? ' — ' + (s.priceMax !== null && s.priceMax !== undefined ? 'от ' + s.priceMin + ' до ' + s.priceMax : s.priceMin) + ' руб.' : ''}
+									</option>
 								{/each}
 							</select>
 						</div>
@@ -325,6 +327,17 @@
 							<span class="dt-label">Услуга</span>
 							<span class="dt-value">{currentAppointment.service}</span>
 						</div>
+						{#if services.find(s => s.name === currentAppointment.service)}
+							{@const s = services.find(s => s.name === currentAppointment.service)}
+							{#if s.priceMin !== null && s.priceMin !== undefined}
+								<div class="detail-row">
+									<span class="dt-label">Стоимость</span>
+									<span class="dt-value">
+										{s.priceMax !== null && s.priceMax !== undefined ? `от ${s.priceMin} до ${s.priceMax}` : s.priceMin} руб.
+									</span>
+								</div>
+							{/if}
+						{/if}
 						<div class="detail-row">
 							<span class="dt-label">Дата</span>
 							<span class="dt-value">{formatDate(currentAppointment.startTime)}</span>

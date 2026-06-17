@@ -13,4 +13,6 @@ public class ServiceDto {
     private String id;
     private String name;
     private Integer durationInMinutes;
+    private Integer priceMin;
+    private Integer priceMax;
 }

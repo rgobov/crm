@@ -21,6 +21,12 @@ public class Service {
     @Column(name = "duration_in_minutes")
     private Integer durationInMinutes;
 
+    @Column(name = "price_min")
+    private Integer priceMin;
+
+    @Column(name = "price_max")
+    private Integer priceMax;
+
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 }

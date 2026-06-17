@@ -8,9 +8,12 @@
 
     let formData = {
         name: '',
-        durationInMinutes: 30
+        durationInMinutes: 30,
+        priceMin: null,
+        priceMax: null
     };
 
+    let priceType = 'none';
     let isLoading = isEditing;
     let isSaving = false;
     let tg = null;
@@ -27,7 +30,18 @@
         if (isEditing) {
             try {
                 const res = await serviceService.getServiceById(serviceId);
-                if (res) formData = { ...res };
+                if (res) {
+                    formData = { ...res };
+                    if (formData.priceMin !== null && formData.priceMin !== undefined) {
+                        if (formData.priceMax !== null && formData.priceMax !== undefined) {
+                            priceType = 'range';
+                        } else {
+                            priceType = 'fixed';
+                        }
+                    } else {
+                        priceType = 'none';
+                    }
+                }
             } catch (e) {
                 console.error('Failed to load service');
                 goto('/admin/services');
@@ -40,6 +54,34 @@
     async function handleSave() {
         if (!formData.name.trim()) return alert('Введите название услуги');
         if (formData.durationInMinutes <= 0) return alert('Длительность должна быть больше 0');
+
+        let pMin = null;
+        let pMax = null;
+
+        if (priceType === 'fixed') {
+            pMin = formData.priceMin;
+            if (pMin === null || pMin === undefined || pMin === '') {
+                return alert('Введите стоимость услуги');
+            }
+            pMin = parseInt(pMin);
+            if (pMin < 0) return alert('Стоимость не может быть отрицательной');
+        } else if (priceType === 'range') {
+            pMin = formData.priceMin;
+            pMax = formData.priceMax;
+            if (pMin === null || pMin === undefined || pMin === '') {
+                return alert('Введите минимальную стоимость');
+            }
+            if (pMax === null || pMax === undefined || pMax === '') {
+                return alert('Введите максимальную стоимость');
+            }
+            pMin = parseInt(pMin);
+            pMax = parseInt(pMax);
+            if (pMin < 0 || pMax < 0) return alert('Стоимость не может быть отрицательной');
+            if (pMax < pMin) return alert('Максимальная цена не может быть меньше минимальной');
+        }
+
+        formData.priceMin = pMin;
+        formData.priceMax = pMax;
 
         isSaving = true;
         try {
@@ -81,6 +123,35 @@
                 {/each}
             </div>
 
+            <div class="field">
+                <label for="price-type">Тип стоимости</label>
+                <select id="price-type" bind:value={priceType}>
+                    <option value="none">Не указана</option>
+                    <option value="fixed">Фиксированная</option>
+                    <option value="range">Диапазон цен</option>
+                </select>
+            </div>
+
+            {#if priceType === 'fixed'}
+                <div class="field">
+                    <label for="price-min">Стоимость (руб)</label>
+                    <input type="number" id="price-min" bind:value={formData.priceMin} min="0" placeholder="Напр: 1500" />
+                </div>
+            {/if}
+
+            {#if priceType === 'range'}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px;">
+                    <div class="field" style="margin-bottom: 0;">
+                        <label for="price-min">Цена от (руб)</label>
+                        <input type="number" id="price-min" bind:value={formData.priceMin} min="0" placeholder="Напр: 2000" />
+                    </div>
+                    <div class="field" style="margin-bottom: 0;">
+                        <label for="price-max">Цена до (руб)</label>
+                        <input type="number" id="price-max" bind:value={formData.priceMax} min="0" placeholder="Напр: 3000" />
+                    </div>
+                </div>
+            {/if}
+
             <button class="save-btn" on:click={handleSave} disabled={isSaving}>
                 {isSaving ? 'Сохранение...' : 'СОХРАНИТЬ УСЛУГУ'}
             </button>
@@ -110,9 +181,9 @@
 
     .field { margin-bottom: 24px; }
     label { display: block; font-size: 12px; font-weight: 700; color: #268bd2; margin-bottom: 10px; text-transform: uppercase; }
-    input { width: 100%; padding: 16px; border: 2px solid #ddd6c1; border-radius: 16px; font-size: 16px; background: #fdf6e3; box-sizing: border-box; outline: none; color: #073642; }
+    input, select { width: 100%; padding: 16px; border: 2px solid #ddd6c1; border-radius: 16px; font-size: 16px; background: #fdf6e3; box-sizing: border-box; outline: none; color: #073642; }
     input::placeholder { color: #93a1a1; }
-    input:focus { border-color: #268bd2; background: #fdf6e3; }
+    input:focus, select:focus { border-color: #268bd2; background: #fdf6e3; }
 
     .duration-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 32px; }
     .preset-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid #ddd6c1; background: #fdf6e3; font-size: 13px; font-weight: 600; cursor: pointer; color: #073642; }

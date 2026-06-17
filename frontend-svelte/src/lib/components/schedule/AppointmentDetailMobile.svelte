@@ -2,6 +2,7 @@
     // Импорты и пропсы
     import { createEventDispatcher, onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
+    import { serviceService } from '$lib/services/serviceService.js';
     import { fade, scale, slide } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -11,6 +12,15 @@
     let isEditingComment = false;
     let tempComment = "";
     let isSaving = false;
+    let services = [];
+
+    onMount(async () => {
+        try {
+            services = await serviceService.getServices();
+        } catch (e) {
+            console.error('Failed to load services:', e);
+        }
+    });
 
     const STATUSES = [
         { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
@@ -182,6 +192,14 @@
             <div class="tile-body">
                 <label>Выбранная услуга</label>
                 <p class="val">{appointment.service}</p>
+                {#if services.find(s => s.name === appointment.service)}
+                    {@const s = services.find(s => s.name === appointment.service)}
+                    {#if s.priceMin !== null && s.priceMin !== undefined}
+                        <small style="font-size: 13px; color: #64748b; font-weight: 600; display: block; margin-top: 2px;">
+                            Стоимость: {s.priceMax !== null && s.priceMax !== undefined ? `от ${s.priceMin} до ${s.priceMax}` : s.priceMin} руб.
+                        </small>
+                    {/if}
+                {/if}
             </div>
         </div>
 

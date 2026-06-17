@@ -106,6 +106,8 @@ public class DtoMapper {
                 .id(entity.getId())
                 .name(entity.getName())
                 .durationInMinutes(entity.getDurationInMinutes())
+                .priceMin(entity.getPriceMin())
+                .priceMax(entity.getPriceMax())
                 .build();
     }
 
@@ -115,6 +117,8 @@ public class DtoMapper {
         entity.setId(dto.getId());
         entity.setName(dto.getName());
         entity.setDurationInMinutes(dto.getDurationInMinutes());
+        entity.setPriceMin(dto.getPriceMin());
+        entity.setPriceMax(dto.getPriceMax());
         entity.setTenantId(tenantId);
         return entity;
     }
