@@ -13,6 +13,7 @@
 
     export let appointment = null;
     export let preselected = { date: new Date(), hour: 10, min: 0, staffId: null };
+    export let service = adminService;
 
     const dispatch = createEventDispatcher();
     const isEditing = !!appointment;
@@ -78,7 +79,7 @@
             const [servicesData, resourcesData, staffData] = await Promise.all([
                 serviceService.getServices().catch(e => { console.error('Services load failed:', e); return []; }),
                 resourceService.getResources($activeBranchId).catch(e => { console.error('Resources load failed:', e); return []; }),
-                adminService.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId).catch(e => { console.error('Staff load failed:', e); return []; })
+                service.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId).catch(e => { console.error('Staff load failed:', e); return []; })
             ]);
 
             services = servicesData || [];
@@ -280,17 +281,17 @@
 
             try {
                 if (isEditing) {
-                    await adminService.updateAppointment(appointment.id, payload, false, updateMode);
+                    await service.updateAppointment(appointment.id, payload, false, updateMode);
                 } else {
-                    await adminService.createAppointment(payload, false);
+                    await service.createAppointment(payload, false);
                 }
             } catch (err) {
                 if (err.response && err.response.status === 409) {
                     if (confirm('Один из выбранных сотрудников занят или не работает в это время. Все равно сохранить запись?')) {
                         if (isEditing) {
-                            await adminService.updateAppointment(appointment.id, payload, true, updateMode);
+                            await service.updateAppointment(appointment.id, payload, true, updateMode);
                         } else {
-                            await adminService.createAppointment(payload, true);
+                            await service.createAppointment(payload, true);
                         }
                     } else {
                         isSaving = false;

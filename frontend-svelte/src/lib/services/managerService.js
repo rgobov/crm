@@ -37,6 +37,20 @@ export const managerService = {
         return response.data;
     },
 
+    async createAppointment(data, force = false) {
+        const response = await api.post('/manager/appointments', data, { params: { force } });
+        return response.data;
+    },
+
+    async updateAppointment(id, data, force = false, updateMode = 'single') {
+        const response = await api.put(`/manager/appointments/${id}`, data, { params: { force, updateMode } });
+        return response.data;
+    },
+
+    async deleteAppointment(id, deleteMode = 'single') {
+        await api.delete(`/manager/appointments/${id}`, { params: { deleteMode } });
+    },
+
     // Список сотрудников со сменами на дату
     async getStaffForSchedule(date) {
         const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;

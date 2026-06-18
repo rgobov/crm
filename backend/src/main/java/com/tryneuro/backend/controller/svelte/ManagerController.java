@@ -5,37 +5,22 @@ package com.tryneuro.backend.controller.svelte;
 import com.tryneuro.backend.dto.*;
 
 import com.tryneuro.backend.model.Appointment;
-
 import com.tryneuro.backend.model.WappiSettings;
-
 import com.tryneuro.backend.service.ContactService;
-
 import com.tryneuro.backend.service.ScheduleService;
-
 import com.tryneuro.backend.service.StaffMemberService;
-
 import com.tryneuro.backend.service.WappiService;
-
 import org.springframework.beans.factory.annotation.Autowired;
-
 import org.springframework.format.annotation.DateTimeFormat;
-
 import org.springframework.http.HttpStatus;
-
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import org.springframework.web.server.ResponseStatusException;
 
-
-
 import java.time.LocalDate;
-
 import java.util.HashMap;
-
 import java.util.List;
-
 import java.util.Map;
-
 import java.util.stream.Collectors;
 
 
@@ -160,6 +145,36 @@ public class ManagerController {
     }
 
 
+
+    @PostMapping("/appointments")
+    public AppointmentDto createAppointment(
+            @RequestBody AppointmentDto appointmentDto,
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(value = "force", defaultValue = "false") boolean force) {
+        Appointment appointment = DtoMapper.toEntity(appointmentDto, getRequiredTenantId(tenantId));
+        return scheduleService.convertToDtoWithGroupStaff(
+            scheduleService.addAppointment(appointment, appointmentDto.getStaffMemberIds(), force));
+    }
+
+    @PutMapping("/appointments/{id}")
+    public ResponseEntity<AppointmentDto> updateAppointment(
+            @PathVariable String id,
+            @RequestBody AppointmentDto appointmentDetails,
+            @RequestAttribute("tenantId") String tenantId,
+            @RequestParam(value = "force", defaultValue = "false") boolean force,
+            @RequestParam(value = "updateMode", defaultValue = "single") String updateMode) {
+        Appointment appointment = DtoMapper.toEntity(appointmentDetails, getRequiredTenantId(tenantId));
+        return ResponseEntity.ok(scheduleService.convertToDtoWithGroupStaff(
+            scheduleService.updateAppointment(id, appointment, appointmentDetails.getStaffMemberIds(), updateMode, force)));
+    }
+
+    @DeleteMapping("/appointments/{id}")
+    public ResponseEntity<Void> deleteAppointment(
+            @PathVariable String id,
+            @RequestParam(value = "deleteMode", defaultValue = "single") String deleteMode) {
+        scheduleService.deleteAppointment(id, deleteMode);
+        return ResponseEntity.ok().build();
+    }
 
     // Wappi Settings
 

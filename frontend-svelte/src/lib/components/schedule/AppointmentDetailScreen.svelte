@@ -7,6 +7,7 @@
     import { quintOut } from 'svelte/easing';
 
     export let appointment;
+    export let service = adminService;
     const dispatch = createEventDispatcher();
 
     let staffMember = appointment.staffMember;
@@ -18,7 +19,7 @@
     async function loadStaffMember() {
         if (appointment.staffMemberId && !staffMember) {
             try {
-                const staffData = await adminService.getStaffForSchedule(
+                const staffData = await service.getStaffForSchedule(
                     new Date(appointment.startTime), 
                     appointment.branchId || 'br-virtual'
                 );
@@ -60,7 +61,7 @@
     async function updateStatus(newStatus) {
         try {
             const updated = { ...appointment, status: newStatus };
-            await adminService.updateAppointment(appointment.id, updated);
+            await service.updateAppointment(appointment.id, updated);
             appointment = updated;
             dispatch('updated', updated);
         } catch (e) {
@@ -72,7 +73,7 @@
         isSaving = true;
         try {
             const updated = { ...appointment, comment: tempComment };
-            await adminService.updateAppointment(appointment.id, updated);
+            await service.updateAppointment(appointment.id, updated);
             appointment.comment = tempComment;
             isEditingComment = false;
         } catch (e) {
@@ -89,7 +90,7 @@
 
     async function handlePropertyChange() {
         try {
-            await adminService.updateAppointment(appointment.id, {
+            await service.updateAppointment(appointment.id, {
                 ...appointment
             });
         } catch (e) {
@@ -105,17 +106,17 @@
     async function handleDelete() {
         if (appointment.groupId) {
             if (confirm('Эта запись связана с другими мастерами. Удалить ВСЕ связанные записи? (ОК - удалить все, Отмена - продолжить выбор)')) {
-                await adminService.deleteAppointment(appointment.id, 'all');
+                await service.deleteAppointment(appointment.id, 'all');
                 dispatch('deleted', appointment.id);
             } else {
                 if (confirm('Удалить только текущую запись для этого сотрудника?')) {
-                    await adminService.deleteAppointment(appointment.id, 'single');
+                    await service.deleteAppointment(appointment.id, 'single');
                     dispatch('deleted', appointment.id);
                 }
             }
         } else {
             if (confirm('Удалить эту запись?')) {
-                await adminService.deleteAppointment(appointment.id, 'single');
+                await service.deleteAppointment(appointment.id, 'single');
                 dispatch('deleted', appointment.id);
             }
         }
