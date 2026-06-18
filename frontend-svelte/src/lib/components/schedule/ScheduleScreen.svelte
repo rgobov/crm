@@ -6,6 +6,7 @@
     import { dbService } from '$lib/services/dbService.js';
     import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchStore } from '$lib/stores/branchStore.js';
+    import { timeUtils } from '$lib/utils/timeUtils.js';
     import DayTimeline from './DayTimeline.svelte';
     import api from '$lib/api.js';
 
@@ -27,6 +28,9 @@
 
     // ПРИОРИТЕТ: Проп, если он есть, иначе Стор.
     $: currentBranchId = branchId || $activeBranchId;
+    $: currentBranch = $branchStore.find(b => b.id === currentBranchId);
+    $: branchTimezone = currentBranch?.timezone || 'Europe/Moscow';
+    $: branchLocalDate = timeUtils.toBranchLocalDateStr($selectedDate, branchTimezone);
 
     async function fetchAppointments(date, bId, silent = false) {
         if (!date || !bId) return;
@@ -121,9 +125,9 @@
     function debouncedRefresh() {
         clearTimeout(refreshTimeout);
         refreshTimeout = setTimeout(() => {
-            if ($selectedDate && currentBranchId) {
+            if (branchLocalDate && currentBranchId) {
                 console.log('🔄 WS: Debounced refresh (appointments only)');
-                fetchAppointments($selectedDate, currentBranchId, true);
+                fetchAppointments(branchLocalDate, currentBranchId, true);
             }
         }, 300);
     }
@@ -169,11 +173,11 @@
     })();
 
     // РЕАКТИВНАЯ ЗАГРУЗКА ПРИ СМЕНЕ ДАТЫ ИЛИ ФИЛИАЛА
-    $: if ($selectedDate && currentBranchId) {
+    $: if (branchLocalDate && currentBranchId) {
         const now = Date.now();
         if (now - lastLoadTime > 800) {
             lastLoadTime = now;
-            loadDayData($selectedDate, currentBranchId);
+            loadDayData(branchLocalDate, currentBranchId);
         }
     }
 
@@ -181,7 +185,7 @@
         console.log('📥 WS: Signal received:', signal);
         if (signal && signal.ts > 0 && currentBranchId) {
             const { type, staffId, appointmentId, date, branchId } = signal;
-            const currentLocalDate = toLocalDbDate($selectedDate);
+            const currentLocalDate = branchLocalDate;
 
             console.log('🔍 WS: Current state:', {
                 currentBranchId,
@@ -210,36 +214,27 @@
                 console.log(`🎯 WS: Staff shift updated - debounced refresh`);
                 clearTimeout(staffRefreshTimeout);
                 staffRefreshTimeout = setTimeout(() => {
-                    fetchStaff($selectedDate, currentBranchId, true);
+                    fetchStaff(branchLocalDate, currentBranchId, true);
                 }, 500);
             } else if (type === 'STAFF_UPDATED' || type === 'STAFF_DELETED') {
                 console.log(`🎯 WS: Staff profile updated (${type}) - refreshing staff`);
-                fetchStaff($selectedDate, currentBranchId, true);
+                fetchStaff(branchLocalDate, currentBranchId, true);
             } else if (type && type.startsWith('APPOINTMENT_')) {
                 console.log(`🎯 WS: Appointment updated (${type}) - refreshing appointments only`);
-                fetchAppointments($selectedDate, currentBranchId, true);
+                fetchAppointments(branchLocalDate, currentBranchId, true);
             } else {
                 console.log(`📢 WS: General signal (${type || 'unknown'}) - full refresh`);
-                loadDayData($selectedDate, currentBranchId, true);
+                loadDayData(branchLocalDate, currentBranchId, true);
             }
         }
     });
-
-    function toLocalDbDate(date) {
-        if (!date) return '';
-        const d = new Date(date);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
 
     onMount(async () => {
         if (branchStore && typeof $branchStore !== 'undefined' && $branchStore.length === 0) {
             branchStore.refresh();
         }
-        if ($selectedDate && currentBranchId) {
-            await loadDayData($selectedDate, currentBranchId);
+        if (branchLocalDate && currentBranchId) {
+            await loadDayData(branchLocalDate, currentBranchId);
         }
     });
 
@@ -254,8 +249,8 @@
     function handleStaffTap(event) { dispatch('staffTap', event.detail); }
     export function handleRefresh() {
         console.log('🔄 Refresh triggered from timeline component');
-        if ($selectedDate && currentBranchId) {
-            loadDayData($selectedDate, currentBranchId, true);
+        if (branchLocalDate && currentBranchId) {
+            loadDayData(branchLocalDate, currentBranchId, true);
         }
     }
 </script>

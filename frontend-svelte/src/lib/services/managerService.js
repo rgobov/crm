@@ -1,5 +1,15 @@
 import api from '$lib/api.js';
 
+function toLocalDbDate(date) {
+    if (!date) return '';
+    if (typeof date === 'string') return date;
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export const managerService = {
     async getWappiSettings() {
         const response = await api.get('/manager/wappi/settings');
@@ -30,7 +40,7 @@ export const managerService = {
 
     // Записи на конкретный день
     async getAppointmentsForDay(date) {
-        const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+        const dateStr = toLocalDbDate(date);
         const response = await api.get('/manager/appointments/day', {
             params: { date: dateStr }
         });
@@ -53,7 +63,7 @@ export const managerService = {
 
     // Список сотрудников со сменами на дату
     async getStaffForSchedule(date) {
-        const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+        const dateStr = toLocalDbDate(date);
         const response = await api.get('/manager/schedule/staff', {
             params: { date: dateStr }
         });

@@ -120,10 +120,9 @@
                 formData.staffMemberId = preselected.staffId ? String(preselected.staffId) : null;
                 formData.staffMemberIds = initialStaff;
                 formData.branchId = $activeBranchId;
-                const d = new Date(preselected.date);
-                d.setHours(preselected.hour, preselected.min, 0, 0);
                 const pad = n => n < 10 ? '0'+n : n;
-                formData.startTime = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                const dateStr = timeUtils.toBranchLocalDateStr(preselected.date, currentBranchData?.timezone);
+                formData.startTime = `${dateStr}T${pad(preselected.hour)}:${pad(preselected.min)}`;
             }
         } catch (e) {
             console.error('Load failed', e);

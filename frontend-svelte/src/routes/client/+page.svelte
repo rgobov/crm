@@ -146,7 +146,8 @@
 		// Конвертируем время филиала в UTC
 		const currentBranch = branches.find(b => b.id === selectedBranchId);
 		const pad = n => String(n).padStart(2, '0');
-		const localDateStr = `${$selectedDate.getFullYear()}-${pad($selectedDate.getMonth() + 1)}-${pad($selectedDate.getDate())}T${pad(bookingForm.hour)}:${pad(bookingForm.min)}`;
+		const dateStr = timeUtils.toBranchLocalDateStr($selectedDate, currentBranch?.timezone);
+		const localDateStr = `${dateStr}T${pad(bookingForm.hour)}:${pad(bookingForm.min)}`;
 		const correctedStart = timeUtils.fromBranchLocalToUTC(localDateStr, currentBranch?.timezone) || new Date(localDateStr).toISOString();
 
 		const appointmentData = {

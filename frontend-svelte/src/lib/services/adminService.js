@@ -2,6 +2,7 @@ import api from '$lib/api.js';
 
 function toLocalDbDate(date) {
     if (!date) return '';
+    if (typeof date === 'string') return date;
     const d = new Date(date);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');

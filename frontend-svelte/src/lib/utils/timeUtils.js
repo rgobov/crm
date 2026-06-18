@@ -22,6 +22,15 @@ export const timeUtils = {
         return formatter.format(date).replace(' ', 'T');
     },
 
+    toBranchLocalDateStr(date, timezone = 'Europe/Moscow') {
+        if (!date) return '';
+        const formatter = new Intl.DateTimeFormat('sv-SE', {
+            timeZone: timezone,
+            year: 'numeric', month: '2-digit', day: '2-digit'
+        });
+        return formatter.format(new Date(date));
+    },
+
     fromBranchLocalToUTC(localStr, timezone = 'Europe/Moscow') {
         if (!localStr) return null;
         const date = new Date(localStr);
