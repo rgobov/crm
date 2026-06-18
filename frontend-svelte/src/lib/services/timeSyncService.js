@@ -15,12 +15,12 @@ class TimeSyncService {
     async sync() {
         try {
             const start = Date.now();
-            const response = await api.get('/admin/server-time');
+            const response = await api.get('/system/time');
             const end = Date.now();
 
             // Учитываем задержку сети (RTT / 2)
             const networkLatency = (end - start) / 2;
-            const serverTime = new Date(response.data.currentTime).getTime();
+            const serverTime = new Date(response.data.serverTime).getTime();
 
             this.serverOffset = serverTime + networkLatency - end;
             this.isSynced = true;
