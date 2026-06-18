@@ -4,6 +4,7 @@
 	import { user, logout } from '$lib/stores/auth.js';
 	import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
 	import { clientService } from '$lib/services/clientService.js';
+	import { timeUtils } from '$lib/utils/timeUtils.js';
 	import ScheduleScreen from '$lib/components/schedule/ScheduleScreen.svelte';
 
 	let branches = [];
@@ -134,15 +135,14 @@
 		const selectedService = services.find(s => s.name === bookingForm.service);
 		const duration = selectedService ? selectedService.durationInMinutes : 60;
 
-		// Форматируем startTime в OffsetDateTime
-		const start = new Date($selectedDate);
-		start.setHours(bookingForm.hour);
-		start.setMinutes(bookingForm.min);
-		start.setSeconds(0);
-		start.setMilliseconds(0);
+		// Конвертируем время филиала в UTC
+		const currentBranch = branches.find(b => b.id === selectedBranchId);
+		const pad = n => String(n).padStart(2, '0');
+		const localDateStr = `${$selectedDate.getFullYear()}-${pad($selectedDate.getMonth() + 1)}-${pad($selectedDate.getDate())}T${pad(bookingForm.hour)}:${pad(bookingForm.min)}`;
+		const correctedStart = timeUtils.fromBranchLocalToUTC(localDateStr, currentBranch?.timezone) || new Date(localDateStr).toISOString();
 
 		const appointmentData = {
-			startTime: start.toISOString(),
+			startTime: correctedStart,
 			durationInMinutes: duration,
 			service: bookingForm.service,
 			staffMemberId: bookingForm.staffId,
