@@ -13,7 +13,7 @@ function getRole() {
 export const branchService = {
     async getBranches() {
         const role = getRole();
-        const endpoint = role === 'CLIENT' ? '/client/branches' : '/admin/branches';
+        const endpoint = role === 'ADMIN' ? '/admin/branches' : '/client/branches';
         const res = await api.get(endpoint);
         return res.data;
     },
