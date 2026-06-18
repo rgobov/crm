@@ -1,8 +1,12 @@
 import api from '$lib/api.js';
+import { user } from '$lib/stores/auth.js';
+import { get } from 'svelte/store';
 
 export const branchService = {
     async getBranches() {
-        const res = await api.get('/admin/branches');
+        const currentUser = get(user);
+        const endpoint = currentUser?.role === 'CLIENT' ? '/client/branches' : '/admin/branches';
+        const res = await api.get(endpoint);
         return res.data;
     },
 
