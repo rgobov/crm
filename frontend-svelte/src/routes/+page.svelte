@@ -69,6 +69,7 @@
 		try {
 			const response = await api.get('/auth/me');
 			user.set(response.data);
+			localStorage.setItem('user', JSON.stringify(response.data));
 			if (response.data.role === 'ADMIN') goto('/admin');
 			else if (response.data.role === 'MANAGER') goto('/manager');
 			else if (response.data.role === 'CLIENT') goto('/client');

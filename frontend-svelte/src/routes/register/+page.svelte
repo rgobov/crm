@@ -72,6 +72,7 @@
                 // Получаем данные пользователя
                 const userResponse = await api.get('/auth/me');
                 user.set(userResponse.data);
+                localStorage.setItem('user', JSON.stringify(userResponse.data));
 
                 FeedbackUtils.success(); // Вспышка + вибрация при успехе
 
