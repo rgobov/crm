@@ -33,13 +33,6 @@
 		dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 	}
 
-	$: if (dateStr) {
-		const d = new Date(dateStr + 'T12:00:00');
-		if (!isNaN(d.getTime())) {
-			selectedDate.set(d);
-		}
-	}
-
 	$: timeStr = formatTime(bookingForm.hour, bookingForm.min);
 
 	// Для нахождения имени сотрудника при показе модальных окон
@@ -280,7 +273,15 @@
 					<div class="booking-summary-card">
 						<div class="summary-item">
 							<span class="sum-label">Дата</span>
-							<input type="date" class="sum-input" bind:value={dateStr} />
+							<input type="date" class="sum-input" value={dateStr} on:change={e => {
+								const val = e.target.value;
+								if (val) {
+									const d = new Date(val + 'T12:00:00');
+									if (!isNaN(d.getTime())) {
+										selectedDate.set(d);
+									}
+								}
+							}} />
 						</div>
 						<div class="summary-item">
 							<span class="sum-label">Время</span>
