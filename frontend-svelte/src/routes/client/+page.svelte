@@ -26,6 +26,21 @@
 	let isSubmitting = false;
 	let errorMsg = '';
 	let successMsg = '';
+	let dateStr = '';
+
+	$: if ($selectedDate) {
+		const d = $selectedDate;
+		dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+	}
+
+	$: if (dateStr) {
+		const d = new Date(dateStr + 'T12:00:00');
+		if (!isNaN(d.getTime())) {
+			selectedDate.set(d);
+		}
+	}
+
+	$: timeStr = formatTime(bookingForm.hour, bookingForm.min);
 
 	// Для нахождения имени сотрудника при показе модальных окон
 	let scheduleScreenRef;
@@ -264,12 +279,21 @@
 
 					<div class="booking-summary-card">
 						<div class="summary-item">
-							<span class="sum-label">Время:</span>
-							<span class="sum-val">{formatTime(bookingForm.hour, bookingForm.min)}</span>
+							<span class="sum-label">Дата</span>
+							<input type="date" class="sum-input" bind:value={dateStr} />
 						</div>
 						<div class="summary-item">
-							<span class="sum-label">Дата:</span>
-							<span class="sum-val">{formatDate($selectedDate)}</span>
+							<span class="sum-label">Время</span>
+							<input type="time" class="sum-input" value={timeStr} on:change={e => {
+								const val = e.target.value;
+								if (val && val.includes(':')) {
+									const [h, m] = val.split(':').map(Number);
+									if (!isNaN(h) && !isNaN(m)) {
+										bookingForm.hour = h;
+										bookingForm.min = m;
+									}
+								}
+							}} />
 						</div>
 					</div>
 
@@ -661,6 +685,28 @@
 		font-size: 14px;
 		font-weight: 800;
 		color: #073642;
+	}
+
+	.sum-input {
+		font-size: 14px;
+		font-weight: 800;
+		color: #073642;
+		background: transparent;
+		border: none;
+		outline: none;
+		padding: 0;
+		font-family: inherit;
+		cursor: pointer;
+		min-height: 20px;
+	}
+
+	.sum-input::-webkit-calendar-picker-indicator {
+		opacity: 0.5;
+		cursor: pointer;
+	}
+
+	.sum-input:focus {
+		color: #268bd2;
 	}
 
 	/* ФОРМА МОДАЛЬНОГО ОКНА */
