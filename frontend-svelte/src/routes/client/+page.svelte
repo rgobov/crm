@@ -275,14 +275,30 @@
 
 					<form on:submit|preventDefault={bookAppointment} class="modal-form">
 						<div class="field-group">
-							<label for="service-select">Услуга</label>
-							<select id="service-select" bind:value={bookingForm.service}>
+							<label>Услуга</label>
+							<div class="service-grid">
 								{#each services as s}
-									<option value={s.name}>
-										{s.name} ({s.durationInMinutes} мин){s.priceMin !== null && s.priceMin !== undefined ? ' — ' + (s.priceMax !== null && s.priceMax !== undefined ? 'от ' + s.priceMin + ' до ' + s.priceMax : s.priceMin) + ' руб.' : ''}
-									</option>
+									<button
+										type="button"
+										class="service-card"
+										class:selected={bookingForm.service === s.name}
+										on:click={() => bookingForm.service = s.name}
+									>
+										<div class="card-icon">✦</div>
+										<div class="card-body">
+											<span class="card-name">{s.name}</span>
+											<span class="card-duration">{s.durationInMinutes} мин</span>
+										</div>
+										<div class="card-price">
+											{#if s.priceMin !== null && s.priceMin !== undefined}
+												{s.priceMax !== null && s.priceMax !== undefined
+													? `от ${s.priceMin}₽`
+													: `${s.priceMin}₽`}
+											{/if}
+										</div>
+									</button>
 								{/each}
-							</select>
+							</div>
 						</div>
 
 						<div class="field-group">
@@ -667,7 +683,6 @@
 		margin-bottom: 6px;
 	}
 
-	.field-group select,
 	.field-group textarea {
 		padding: 12px;
 		border-radius: 10px;
@@ -678,9 +693,89 @@
 		box-sizing: border-box;
 	}
 
-	.field-group select:focus,
 	.field-group textarea:focus {
 		border-color: #268bd2;
+	}
+
+	.service-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.service-card {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 14px;
+		background: white;
+		border: 1.5px solid #ddd6c1;
+		border-radius: 12px;
+		cursor: pointer;
+		transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+		text-align: left;
+		box-sizing: border-box;
+		font-family: inherit;
+	}
+
+	.service-card:hover {
+		border-color: #268bd2;
+		transform: translateX(4px);
+	}
+
+	.service-card.selected {
+		border-color: #268bd2;
+		background: #f0f9ff;
+		box-shadow: 0 0 0 2px rgba(38, 139, 210, 0.15);
+	}
+
+	.service-card:active {
+		transform: scale(0.98);
+	}
+
+	.card-icon {
+		width: 36px;
+		height: 36px;
+		background: #fff7ed;
+		color: #f59e0b;
+		border-radius: 10px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		font-size: 16px;
+	}
+
+	.card-body {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.card-name {
+		font-size: 14px;
+		font-weight: 750;
+		color: #0f172a;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.card-duration {
+		font-size: 11px;
+		font-weight: 600;
+		color: #94a3b8;
+	}
+
+	.card-price {
+		font-size: 15px;
+		font-weight: 850;
+		color: #073642;
+		white-space: nowrap;
+		flex-shrink: 0;
 	}
 
 	.submit-booking-btn {
