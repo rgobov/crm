@@ -76,6 +76,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/ws/**", "/api/auth/**", "/api/companies/**", "/api/system/**", "/api/webhooks/**", "/error").permitAll()
                 .requestMatchers("/api/admin/telegram/internal/**").permitAll()
+                .requestMatchers("/api/admin/ai/internal/**").permitAll()
                 .requestMatchers("/api/admin/telegram/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")

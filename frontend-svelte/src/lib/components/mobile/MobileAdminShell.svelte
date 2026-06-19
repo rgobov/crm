@@ -159,6 +159,13 @@
                                 <p>Настройка текстов напоминаний</p>
                             </div>
                         </button>
+                        <button class="action-row" on:click={() => { goto('/admin/settings/ai'); showMoreMenu = false; }}>
+                            <span class="a-icon">🤖</span>
+                            <div class="a-text">
+                                <b>AI Настройки</b>
+                                <p>Провайдер, ключи, база знаний</p>
+                            </div>
+                        </button>
                     </div>
                 </section>
 

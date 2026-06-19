@@ -81,5 +81,9 @@ analysis_options.yaml.lock
 .env.*
 !.env.example
 
+# --- Python ---
+__pycache__/
+*.pyc
+
 # --- Docker ---
 .docker-compose.override.yml

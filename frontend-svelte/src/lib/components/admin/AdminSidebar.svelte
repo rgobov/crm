@@ -15,7 +15,8 @@
 
     const menuItems = [
         { id: 'management', label: 'Главная', icon: '📊' },
-        { id: 'timeline', label: 'Таймлайн', icon: '🕒' }
+        { id: 'timeline', label: 'Таймлайн', icon: '🕒' },
+        { id: 'ai', label: 'AI', icon: '🤖' }
     ];
 
     async function loadBranches() {
@@ -37,6 +38,10 @@
     });
 
     function handleNav(id) {
+        if (id === 'ai') {
+            goto('/admin/settings/ai');
+            return;
+        }
         activeTab.set(id);
         if ($page.url.pathname !== '/admin') goto('/admin');
     }

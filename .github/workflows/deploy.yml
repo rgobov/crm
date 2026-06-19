@@ -36,6 +36,8 @@ jobs:
             TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}
             INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
             TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
+            YANDEX_API_KEY=${{ secrets.YANDEX_API_KEY }}
+            YANDEX_FOLDER_ID=${{ secrets.YANDEX_FOLDER_ID }}
             EOF
 
             echo "--- СБОРКА И ЗАПУСК ЧЕРЕЗ КОРНЕВОЙ DOCKER-COMPOSE ---"
@@ -45,9 +47,12 @@ jobs:
             docker-compose down --remove-orphans
             
             # Удаляем старые конфликтующие контейнеры, если они остались от "неправильного" деплоя
-            docker rm -f tryneuro_backend tryneuro_notifications_python tryneuro_frontend tryneuro_db_prod tryneuro_proxy || true
+            docker rm -f tryneuro_backend tryneuro_notifications_python tryneuro_frontend tryneuro_db_prod tryneuro_proxy tryneuro_ai_knowledge || true
             
             docker-compose up -d
+
+            echo "--- ПЕРЕЗАПУСК HERMES AGENT ---"
+            systemctl restart hermes || echo "Hermes not installed yet"
 
             echo "--- ОТКЛЮЧЕНИЕ IPv6 И ОПТИМИЗАЦИЯ NGINX (GZIP) ---"
             docker exec tryneuro_proxy sh -c "
