@@ -5,9 +5,11 @@ import com.tryneuro.backend.model.UserAiConfig;
 import com.tryneuro.backend.service.UserAiConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -20,6 +22,24 @@ import java.util.Map;
 public class AiConfigController {
 
     private final UserAiConfigService userAiConfigService;
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${ai.knowledge.service.url:http://ai-knowledge-service:8082}")
+    private String aiKnowledgeUrl;
+
+    private String getRequiredTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tenant ID is required");
+        }
+        return tenantId;
+    }
+
+    private HttpHeaders headers() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Internal-Secret", "try-neuro-internal-secret-2026");
+        return headers;
+    }
 
     @GetMapping("/config")
     public ResponseEntity<?> getConfig(@AuthenticationPrincipal User user) {
