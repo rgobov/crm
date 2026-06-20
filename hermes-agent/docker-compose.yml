@@ -20,7 +20,7 @@ services:
       - tryneuro_network
 
   hermes-agent:
-    image: nousresearch/hermes-agent:v0.17.0
+    image: nousresearch/hermes-agent:latest
     container_name: tryneuro_hermes
     restart: always
     logging: *default-logging
