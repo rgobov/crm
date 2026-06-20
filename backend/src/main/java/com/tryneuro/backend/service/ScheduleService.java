@@ -394,6 +394,18 @@ public class ScheduleService {
         return apps;
     }
 
+    public List<Appointment> getAppointmentsForStaffAll(String tenantId, String staffId) {
+        List<Appointment> apps = appointmentRepository.findByTenantIdAndStaffMemberId(tenantId, staffId);
+        apps.forEach(this::enrichAppointmentPhone);
+        return apps;
+    }
+
+    public List<Appointment> getAppointmentsByTenant(String tenantId) {
+        List<Appointment> apps = appointmentRepository.findByTenantId(tenantId);
+        apps.forEach(this::enrichAppointmentPhone);
+        return apps;
+    }
+
     public Optional<Appointment> getAppointmentById(String id) {
         return appointmentRepository.findById(id);
     }

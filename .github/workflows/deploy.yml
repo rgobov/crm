@@ -36,8 +36,6 @@ jobs:
             TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}
             INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
             TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
-            YANDEX_API_KEY=${{ secrets.YANDEX_API_KEY }}
-            YANDEX_FOLDER_ID=${{ secrets.YANDEX_FOLDER_ID }}
             EOF
 
             echo "--- СБОРКА И ЗАПУСК ЧЕРЕЗ КОРНЕВОЙ DOCKER-COMPOSE ---"
@@ -51,8 +49,17 @@ jobs:
             
             docker-compose up -d
 
-            echo "--- ПЕРЕЗАПУСК HERMES AGENT ---"
-            systemctl restart hermes || echo "Hermes not installed yet"
+            echo "--- ЗАПУСК HERMES AGENT СТЕКА ---"
+            if [ -d "hermes-agent" ]; then
+                cd hermes-agent
+                cat > .env << EOF
+TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
+EOF
+                docker-compose build --no-cache
+                docker-compose up -d
+                cd ..
+            fi
 
             echo "--- ОТКЛЮЧЕНИЕ IPv6 И ОПТИМИЗАЦИЯ NGINX (GZIP) ---"
             docker exec tryneuro_proxy sh -c "

@@ -1,0 +1,63 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "3"
+
+services:
+  mcp-crm:
+    build:
+      context: ./mcp-crm
+      dockerfile: Dockerfile
+    container_name: tryneuro_mcp_crm
+    restart: always
+    logging: *default-logging
+    environment:
+      CRM_BACKEND_URL: ${CRM_BACKEND_URL:-http://backend:8080}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      AI_KNOWLEDGE_URL: http://ai-knowledge-service:8082
+    networks:
+      - tryneuro_network
+
+  hermes-agent:
+    image: nousresearch/hermes-agent:v0.17.0
+    container_name: tryneuro_hermes
+    restart: always
+    logging: *default-logging
+    environment:
+      HERMES_TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      HERMES_DEFAULT_MODEL: "openai:openrouter/auto"
+      HERMES_OPENAI_BASE_URL: "http://mcp-crm:8001/v1"
+      HERMES_OPENAI_API_KEY: "dummy"
+      HERMES_MCP_SERVERS: '{"crm":{"transport":"streamable-http","url":"http://mcp-crm:8000/mcp"}}'
+    volumes:
+      - hermes_data:/root/.hermes
+    networks:
+      - tryneuro_network
+    ports:
+      - "8083:8083"
+    depends_on:
+      - mcp-crm
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: tryneuro_watchtower_hermes
+    restart: always
+    logging: *default-logging
+    environment:
+      WATCHTOWER_SCHEDULE: "0 3 * * *"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - tryneuro_network
+
+networks:
+  tryneuro_network:
+    external: true
+
+volumes:
+  hermes_data:

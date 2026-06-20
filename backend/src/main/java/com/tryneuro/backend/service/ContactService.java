@@ -1,5 +1,6 @@
 package com.tryneuro.backend.service;
 
+import com.tryneuro.backend.dto.ai.AiNotificationPreferencesDto;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.repository.AppointmentRepository;
 import com.tryneuro.backend.repository.ContactRepository;
@@ -85,6 +86,22 @@ public class ContactService {
                 contactRepository.save(contact);
             }
         });
+    }
+
+    @Transactional
+    public void updateNotificationPreferences(String contactId, boolean enabled, int leadTimeHours) {
+        Contact contact = contactRepository.findById(contactId)
+                .orElseThrow(() -> new RuntimeException("Contact not found"));
+        contact.setNotificationEnabled(enabled);
+        contact.setNotificationLeadTimeHours(leadTimeHours);
+        contactRepository.save(contact);
+    }
+
+    @Transactional
+    public AiNotificationPreferencesDto getNotificationPreferences(String contactId) {
+        Contact contact = contactRepository.findById(contactId)
+                .orElseThrow(() -> new RuntimeException("Contact not found"));
+        return new AiNotificationPreferencesDto(contact.isNotificationEnabled(), contact.getNotificationLeadTimeHours());
     }
 
     public void deleteContact(String id) {

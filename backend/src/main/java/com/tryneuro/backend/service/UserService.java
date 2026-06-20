@@ -27,6 +27,10 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User or Tenant not found"));
     }
 
+    public Optional<User> findByTelegramId(Long telegramId) {
+        return userRepository.findByTelegramId(telegramId);
+    }
+
     public User createUser(User user) {
         return userRepository.save(user);
     }

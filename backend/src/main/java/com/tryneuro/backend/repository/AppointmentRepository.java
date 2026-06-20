@@ -60,6 +60,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
     @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId AND a.staffMemberId = :staffId AND CAST(a.startTime AS date) = :date")
     List<Appointment> findByTenantIdAndStaffMemberIdAndDate(@Param("tenantId") String tenantId, @Param("staffId") String staffId, @Param("date") LocalDate date);
 
+    @Query("SELECT a FROM Appointment a WHERE a.tenantId = :tenantId AND a.staffMemberId = :staffId ORDER BY a.startTime DESC")
+    List<Appointment> findByTenantIdAndStaffMemberId(@Param("tenantId") String tenantId, @Param("staffId") String staffId);
+
     @Query("SELECT a FROM Appointment a WHERE a.contactId = :contactId AND a.tenantId = :tenantId ORDER BY a.startTime DESC")
     List<Appointment> findByContactIdAndTenantIdOrderByDateDesc(@Param("contactId") String contactId, @Param("tenantId") String tenantId);
 

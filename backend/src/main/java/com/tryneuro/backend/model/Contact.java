@@ -80,39 +80,13 @@ public class Contact {
 
     private List<String> tags = new ArrayList<>();
 
+    @Column(name = "notification_enabled", nullable = false)
 
+    private boolean notificationEnabled = true;
 
-    // Геттеры и сеттеры для обхода проблем с Lombok
+    @Column(name = "notification_lead_time_hours", nullable = false)
 
-    public String getId() { return id; }
-
-    public String getName() { return name; }
-
-    public List<String> getPhones() { return phones; }
-
-    public String getEmail() { return email; }
-
-    public String getNotes() { return notes; }
-
-    public String getTenantId() { return tenantId; }
-
-    public List<String> getTags() { return tags; }
-
-
-
-    public void setId(String id) { this.id = id; }
-
-    public void setName(String name) { this.name = name; }
-
-    public void setPhones(List<String> phones) { this.phones = phones; }
-
-    public void setEmail(String email) { this.email = email; }
-
-    public void setNotes(String notes) { this.notes = notes; }
-
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
-
-    public void setTags(List<String> tags) { this.tags = tags; }
+    private int notificationLeadTimeHours = 24;
 
 }
 

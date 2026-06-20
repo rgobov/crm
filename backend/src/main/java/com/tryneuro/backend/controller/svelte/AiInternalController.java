@@ -8,7 +8,6 @@ import com.tryneuro.backend.dto.DtoMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,6 +28,7 @@ public class AiInternalController {
     private final StaffMemberService staffMemberService;
     private final DashboardService dashboardService;
     private final ExportService exportService;
+    private final UserService userService;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -46,11 +46,30 @@ public class AiInternalController {
         return tenantId;
     }
 
+    private void checkRole(String actorRole, String... allowed) {
+        if (actorRole == null || actorRole.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "X-Actor-Role header is required");
+        }
+        for (String a : allowed) {
+            if (a.equalsIgnoreCase(actorRole)) return;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Role " + actorRole + " not allowed for this action");
+    }
+
+    private String getRequiredActorContactId(String actorContactId) {
+        if (actorContactId == null || actorContactId.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "contactId required for CLIENT role");
+        }
+        return actorContactId;
+    }
+
     @PostMapping("/contacts/search")
     public ResponseEntity<?> searchContact(
             @RequestBody AiSearchRequest req,
-            @RequestHeader("X-Internal-Secret") String secret) {
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
         validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE");
         String tId = getRequiredTenantId(req.getTenantId());
         String query = req.getQuery();
 
@@ -73,8 +92,10 @@ public class AiInternalController {
     @PostMapping("/contacts")
     public ResponseEntity<?> createContact(
             @RequestBody AiContactCreateRequest req,
-            @RequestHeader("X-Internal-Secret") String secret) {
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
         validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER");
         String tId = getRequiredTenantId(req.getTenantId());
 
         Contact contact = new Contact();
@@ -127,7 +148,9 @@ public class AiInternalController {
     @PostMapping("/appointments")
     public ResponseEntity<?> createAppointment(
             @RequestBody AiCreateAppointmentRequest req,
-            @RequestHeader("X-Internal-Secret") String secret) {
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
         validateSecret(secret);
         String tId = getRequiredTenantId(req.getTenantId());
 
@@ -140,6 +163,18 @@ public class AiInternalController {
 
         String contactId = req.getContactId();
         String phone = req.getClientPhone();
+
+        // CLIENT can only book for themselves
+        if ("CLIENT".equalsIgnoreCase(actorRole)) {
+            contactId = getRequiredActorContactId(actorContactId);
+            Optional<Contact> opt = contactService.getContactById(contactId);
+            if (opt.isPresent()) {
+                Contact c = opt.get();
+                if (phone == null && c.getPhones() != null && !c.getPhones().isEmpty()) {
+                    phone = c.getPhones().get(0);
+                }
+            }
+        }
 
         if (contactId == null && phone != null && !phone.isBlank()) {
             Optional<Contact> existing = contactService.findContactByPhone(phone, tId);
@@ -216,11 +251,137 @@ public class AiInternalController {
         }
     }
 
+    @DeleteMapping("/appointments/{id}")
+    public ResponseEntity<?> cancelAppointment(
+            @PathVariable String id,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Tenant-Id") String tenantId,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(tenantId);
+
+        Optional<Appointment> opt = scheduleService.getAppointmentById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Appointment app = opt.get();
+
+        if (!tId.equals(app.getTenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Appointment does not belong to this tenant");
+        }
+
+        // CLIENT can only cancel their own appointments
+        if ("CLIENT".equalsIgnoreCase(actorRole)) {
+            String cId = getRequiredActorContactId(actorContactId);
+            if (!cId.equals(app.getContactId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot cancel another client's appointment");
+            }
+        }
+
+        scheduleService.deleteAppointment(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/appointments/my")
+    public ResponseEntity<?> getMyAppointments(
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Actor-Role") String actorRole,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(tenantId);
+
+        List<Appointment> apps;
+        if ("CLIENT".equalsIgnoreCase(actorRole)) {
+            String contactId = getRequiredActorContactId(actorContactId);
+            apps = scheduleService.getAppointmentsForContact(contactId, tId);
+        } else if ("EMPLOYEE".equalsIgnoreCase(actorRole)) {
+            if (actorStaffId == null || actorStaffId.isEmpty()) {
+                return ResponseEntity.badRequest().body("staffId required for EMPLOYEE role");
+            }
+            apps = scheduleService.getAppointmentsForStaffAll(tId, actorStaffId);
+        } else {
+            apps = scheduleService.getAppointmentsByTenant(tId);
+        }
+        return ResponseEntity.ok(apps.stream().map(scheduleService::convertToDtoWithGroupStaff).toList());
+    }
+
+    @GetMapping("/notifications/preferences")
+    public ResponseEntity<?> getNotificationPreferences(
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Actor-Role") String actorRole,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(tenantId);
+
+        String contactId;
+        if ("CLIENT".equalsIgnoreCase(actorRole)) {
+            contactId = getRequiredActorContactId(actorContactId);
+        } else {
+            return ResponseEntity.badRequest().body("Only CLIENT role can manage notification preferences via this endpoint");
+        }
+
+        try {
+            return ResponseEntity.ok(contactService.getNotificationPreferences(contactId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Contact not found: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/notifications/preferences")
+    public ResponseEntity<?> updateNotificationPreferences(
+            @RequestBody AiNotificationPreferencesDto req,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Actor-Role") String actorRole,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(tenantId);
+
+        String contactId;
+        if ("CLIENT".equalsIgnoreCase(actorRole)) {
+            contactId = getRequiredActorContactId(actorContactId);
+        } else {
+            return ResponseEntity.badRequest().body("Only CLIENT role can manage notification preferences via this endpoint");
+        }
+
+        try {
+            contactService.updateNotificationPreferences(contactId, req.isNotificationEnabled(), req.getNotificationLeadTimeHours());
+            return ResponseEntity.ok(contactService.getNotificationPreferences(contactId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to update: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/users/by-telegram/{telegramId}")
+    public ResponseEntity<?> getUserByTelegramId(
+            @PathVariable Long telegramId,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        Optional<User> userOpt = userService.findByTelegramId(telegramId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User u = userOpt.get();
+        Map<String, Object> result = new HashMap<>();
+        result.put("role", u.getRole() != null ? u.getRole().name() : "CLIENT");
+        result.put("contactId", u.getContactId());
+        result.put("staffId", u.getStaffId());
+        result.put("tenantId", u.getTenantId());
+        result.put("email", u.getEmail());
+        return ResponseEntity.ok(result);
+    }
+
     @PostMapping("/reports")
     public ResponseEntity<?> getReport(
             @RequestBody AiReportRequest req,
-            @RequestHeader("X-Internal-Secret") String secret) {
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
         validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER");
         String tId = getRequiredTenantId(req.getTenantId());
 
         LocalDate date;

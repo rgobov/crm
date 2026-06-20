@@ -1,5 +1,0 @@
-telegram:
-  api-id: ${TELEGRAM_API_ID:0}
-  api-hash: ${TELEGRAM_API_HASH:none}
-  # ГАРАНТИЯ ДЛЯ WSL: Используем native Linux путь, чтобы не было ошибки [Rename binlog failed]
-  sessions-path: /home/roma/.try_neuro/tg-sessions
