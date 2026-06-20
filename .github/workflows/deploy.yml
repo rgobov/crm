@@ -47,6 +47,7 @@ jobs:
             # Удаляем старые конфликтующие контейнеры, если они остались от "неправильного" деплоя
             docker rm -f tryneuro_backend tryneuro_notifications_python tryneuro_frontend tryneuro_db_prod tryneuro_proxy tryneuro_ai_knowledge || true
             
+            docker network create tryneuro_network || true
             docker-compose up -d
 
             echo "--- ЗАПУСК HERMES AGENT СТЕКА ---"
@@ -56,6 +57,7 @@ jobs:
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
             EOF
+                docker network create tryneuro_network || true
                 docker-compose build --no-cache
                 docker-compose up -d
                 cd ..
