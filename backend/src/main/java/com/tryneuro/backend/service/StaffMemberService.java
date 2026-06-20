@@ -82,6 +82,16 @@ public class StaffMemberService {
     }
 
     @Transactional
+    public Optional<StaffMember> findByTelegramId(Long telegramId) {
+        return staffMemberRepository.findByTelegramId(telegramId);
+    }
+
+    @Transactional
+    public Optional<StaffMember> findByUserId(String userId) {
+        return staffMemberRepository.findByUserId(userId);
+    }
+
+    @Transactional
     public Page<StaffMember> getStaffPaged(String tenantId, String query, Boolean active, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("active").descending().and(Sort.by("name").ascending()));
         Page<StaffMember> staffPage = staffMemberRepository.findByTenantIdAndQuery(tenantId, query, active, pageable);
@@ -183,6 +193,10 @@ public class StaffMemberService {
             newUser.setTenantId(tenantId);
             newUser.setStaffId(saved.getId());
             userRepository.save(newUser);
+            
+            // Set the user_id on the staff member
+            saved.setUserId(newUser.getId());
+            staffMemberRepository.save(saved);
         }
         
         // ✅ Уведомляем другие клиенты о появлении нового сотрудника
@@ -233,6 +247,14 @@ public class StaffMemberService {
                 user.setPassword(passwordEncoder.encode("qwerty"));
             }
             userRepository.save(user);
+            
+            // Update user_id on staff member
+            savedStaff.setUserId(user.getId());
+            staffMemberRepository.save(savedStaff);
+        } else if (request.getUserId() != null && !request.getUserId().isEmpty()) {
+            // If userId is provided directly, link it
+            savedStaff.setUserId(request.getUserId());
+            staffMemberRepository.save(savedStaff);
         }
         
         // ✅ Уведомляем другие клиенты об изменении данных или роли сотрудника

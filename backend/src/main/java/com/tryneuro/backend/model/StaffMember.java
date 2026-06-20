@@ -29,6 +29,12 @@ public class StaffMember {
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
 
+    @Column(name = "user_id")
+    private String userId;
+
+    @Column(name = "telegram_id", unique = true)
+    private Long telegramId;
+
     private String phone;
 
     @Column(name = "photo_url")

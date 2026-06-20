@@ -1,0 +1,2 @@
+ALTER TABLE contacts ADD COLUMN telegram_id BIGINT UNIQUE;
+ALTER TABLE staff_members ADD COLUMN telegram_id BIGINT UNIQUE;

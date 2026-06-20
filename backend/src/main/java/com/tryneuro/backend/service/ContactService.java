@@ -42,6 +42,10 @@ public class ContactService {
         return contactRepository.findByCleanPhone(cleanPhone, tenantId);
     }
 
+    public Optional<Contact> findByTelegramId(Long telegramId) {
+        return contactRepository.findByTelegramId(telegramId);
+    }
+
     public Contact addContact(Contact contact, String tenantId) {
         contact.setTenantId(tenantId);
         if (contact.getTags() == null) contact.setTags(new ArrayList<>());

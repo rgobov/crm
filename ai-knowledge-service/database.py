@@ -26,6 +26,16 @@ def init_db():
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_ai_config (
+            user_id TEXT PRIMARY KEY,
+            llm_provider TEXT NOT NULL DEFAULT 'openrouter',
+            llm_model TEXT NOT NULL DEFAULT 'openrouter/auto',
+            api_key TEXT,
+            stt_provider TEXT DEFAULT 'vosk',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS stt_log (
             id TEXT PRIMARY KEY,
             tenant_id TEXT NOT NULL,

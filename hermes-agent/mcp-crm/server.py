@@ -245,10 +245,11 @@ async def resolve_actor_from_chat_id(chat_id: int) -> dict:
 llm_app = FastAPI(title="LLM Proxy")
 
 
-async def get_tenant_key(tenant_id: str):
+async def get_user_key(user_id: str):
+    """Get OpenRouter API key for a specific user."""
     try:
         resp = await http_client.get(
-            f"{AI_KNOWLEDGE_URL}/api/v1/config/{tenant_id}",
+            f"{AI_KNOWLEDGE_URL}/api/v1/user-config/{user_id}",
             headers={"X-Internal-Secret": INTERNAL_SECRET},
         )
         if resp.status_code == 200:
@@ -259,20 +260,58 @@ async def get_tenant_key(tenant_id: str):
     return None
 
 
+async def resolve_user_id_by_chat_id(chat_id: int) -> str:
+    """Resolve user_id by Telegram chat_id via backend API."""
+    try:
+        resp = await http_client.get(
+            f"{CRM_URL}/api/admin/ai/internal/tenant/by-telegram/{chat_id}",
+            headers={"X-Internal-Secret": INTERNAL_SECRET},
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("userId", "")
+    except Exception as e:
+        logger.error(f"Failed to resolve user_id by chat_id {chat_id}: {e}")
+    return ""
+
+
 @llm_app.post("/v1/chat/completions")
 async def llm_proxy(request: Request):
     body = await request.json()
-    tenant_id = request.headers.get("X-Tenant-ID", "")
-    api_key = await get_tenant_key(tenant_id) if tenant_id else None
+    
+    # Try to get user_id from various sources
+    user_id = ""
+    
+    # 1. X-Tenant-ID header (legacy, not used for per-user)
+    # 2. X-User-ID header (if set by caller)
+    user_id = request.headers.get("X-User-ID", "")
+    
+    # 3. OpenAI 'user' field in request body
+    if not user_id:
+        user_id = body.get("user", "")
+    
+    # 4. Resolve via backend using chat_id from user field
+    if not user_id and isinstance(body.get("user"), (str, int)):
+        try:
+            chat_id = int(body.get("user"))
+            user_id = await resolve_user_id_by_chat_id(chat_id)
+        except (ValueError, TypeError):
+            pass
+    
+    if not user_id:
+        raise HTTPException(403, "Unable to identify user. Please ensure your Telegram account is linked in CRM.")
+    
+    api_key = await get_user_key(user_id)
     if not api_key:
-        raise HTTPException(403, "No API key configured for this tenant. Please configure an OpenRouter API key in CRM AI settings.")
+        raise HTTPException(403, "No API key configured for this user. Please configure your OpenRouter API key in CRM AI settings.")
+    
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "HTTP-Referer": "https://crm.999crm.ru",
         "X-Title": "TryNeuro CRM",
     }
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=120.0.0) as client:
         resp = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=body,

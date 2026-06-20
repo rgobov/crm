@@ -23,12 +23,15 @@ import java.util.stream.Collectors;
 public class AiInternalController {
 
     private final ContactService contactService;
+    private final ContactRepository contactRepository;
     private final ScheduleService scheduleService;
     private final AppServiceService appServiceService;
     private final StaffMemberService staffMemberService;
+    private final StaffMemberRepository staffMemberRepository;
     private final DashboardService dashboardService;
     private final ExportService exportService;
     private final UserService userService;
+    private final UserRepository userRepository;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -373,6 +376,107 @@ public class AiInternalController {
         result.put("tenantId", u.getTenantId());
         result.put("email", u.getEmail());
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/tenant/by-telegram/{chatId}")
+    public ResponseEntity<?> getUserIdByTelegramId(
+            @PathVariable Long chatId,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        
+        // 1. Check User.telegram_id
+        Optional<User> userOpt = userService.findByTelegramId(chatId);
+        if (userOpt.isPresent()) {
+            User u = userOpt.get();
+            return ResponseEntity.ok(Map.of(
+                    "userId", u.getId(),
+                    "tenantId", u.getTenantId(),
+                    "source", "user"
+            ));
+        }
+        
+        // 2. Check Contact.telegram_id
+        Optional<Contact> contactOpt = contactService.findByTelegramId(chatId);
+        if (contactOpt.isPresent()) {
+            Contact c = contactOpt.get();
+            // Get User from Contact
+            Optional<User> contactUserOpt = userRepository.findByContactId(c.getId());
+            if (contactUserOpt.isPresent()) {
+                User u = contactUserOpt.get();
+                return ResponseEntity.ok(Map.of(
+                        "userId", u.getId(),
+                        "tenantId", u.getTenantId(),
+                        "source", "contact"
+                ));
+            }
+        }
+        
+        // 3. Check StaffMember.telegram_id
+        Optional<StaffMember> staffOpt = staffMemberService.findByTelegramId(chatId);
+        if (staffOpt.isPresent()) {
+            StaffMember s = staffOpt.get();
+            // Get User from StaffMember
+            if (s.getUserId() != null) {
+                Optional<User> staffUserOpt = userRepository.findById(s.getUserId());
+                if (staffUserOpt.isPresent()) {
+                    User u = staffUserOpt.get();
+                    return ResponseEntity.ok(Map.of(
+                            "userId", u.getId(),
+                            "tenantId", u.getTenantId(),
+                            "source", "staff"
+                    ));
+                }
+            }
+        }
+        
+        return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping("/telegram/bind")
+    public ResponseEntity<?> bindTelegramId(
+            @RequestBody Map<String, Object> req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        
+        String type = (String) req.get("type"); // "contact" | "staff" | "user"
+        String id = (String) req.get("id");     // entity id
+        Long telegramId = ((Number) req.get("telegram_id")).longValue();
+        
+        switch (type) {
+            case "contact" -> {
+                Optional<Contact> contactOpt = contactService.getContactById(id);
+                if (contactOpt.isEmpty()) {
+                    return ResponseEntity.badRequest().body("Contact not found");
+                }
+                Contact c = contactOpt.get();
+                c.setTelegramId(telegramId);
+                contactRepository.save(c);
+                return ResponseEntity.ok(Map.of("status", "bound", "type", "contact"));
+            }
+            case "staff" -> {
+                Optional<StaffMember> staffOpt = staffMemberService.getStaffMemberById(id);
+                if (staffOpt.isEmpty()) {
+                    return ResponseEntity.badRequest().body("Staff member not found");
+                }
+                StaffMember s = staffOpt.get();
+                s.setTelegramId(telegramId);
+                staffMemberRepository.save(s);
+                return ResponseEntity.ok(Map.of("status", "bound", "type", "staff"));
+            }
+            case "user" -> {
+                Optional<User> userOpt = userRepository.findById(id);
+                if (userOpt.isEmpty()) {
+                    return ResponseEntity.badRequest().body("User not found");
+                }
+                User u = userOpt.get();
+                u.setTelegramId(telegramId);
+                userRepository.save(u);
+                return ResponseEntity.ok(Map.of("status", "bound", "type", "user"));
+            }
+            default -> {
+                return ResponseEntity.badRequest().body("Invalid type: " + type);
+            }
+        }
     }
 
     @PostMapping("/reports")

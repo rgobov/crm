@@ -1,14 +1,15 @@
 package com.tryneuro.backend.controller.svelte;
 
+import com.tryneuro.backend.model.User;
+import com.tryneuro.backend.model.UserAiConfig;
+import com.tryneuro.backend.service.UserAiConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -18,52 +19,41 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AiConfigController {
 
-    @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
-    private String internalSecret;
-
-    @Value("${ai.knowledge.service.url:http://ai-knowledge-service:8082}")
-    private String aiKnowledgeUrl;
-
-    private final RestTemplate restTemplate = new RestTemplate();
-
-    private String getRequiredTenantId(String tenantId) {
-        if (tenantId == null || tenantId.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant ID not found");
-        }
-        return tenantId;
-    }
-
-    private HttpHeaders headers() {
-        HttpHeaders h = new HttpHeaders();
-        h.setContentType(MediaType.APPLICATION_JSON);
-        h.set("X-Internal-Secret", internalSecret);
-        return h;
-    }
+    private final UserAiConfigService userAiConfigService;
 
     @GetMapping("/config")
-    public ResponseEntity<?> getConfig(@RequestAttribute("tenantId") String tenantId) {
-        String tId = getRequiredTenantId(tenantId);
-        var exchange = restTemplate.exchange(
-                aiKnowledgeUrl + "/api/v1/config/" + tId,
-                HttpMethod.GET,
-                new HttpEntity<>(headers()),
-                Map.class
-        );
-        return ResponseEntity.ok(exchange.getBody());
+    public ResponseEntity<?> getConfig(@AuthenticationPrincipal User user) {
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
+        UserAiConfig config = userAiConfigService.getConfig(user.getId());
+        return ResponseEntity.ok(Map.of(
+                "llm_provider", config.getLlmProvider(),
+                "llm_model", config.getLlmModel(),
+                "api_key", config.getApiKey(),
+                "stt_provider", config.getSttProvider()
+        ));
     }
 
     @PutMapping("/config")
     public ResponseEntity<?> updateConfig(
             @RequestBody Map<String, Object> config,
-            @RequestAttribute("tenantId") String tenantId) {
-        String tId = getRequiredTenantId(tenantId);
-        var exchange = restTemplate.exchange(
-                aiKnowledgeUrl + "/api/v1/config/" + tId,
-                HttpMethod.PUT,
-                new HttpEntity<>(config, headers()),
-                Map.class
-        );
-        return ResponseEntity.ok(exchange.getBody());
+            @AuthenticationPrincipal User user) {
+        if (user == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
+        String llmProvider = (String) config.getOrDefault("llm_provider", "openrouter");
+        String llmModel = (String) config.getOrDefault("llm_model", "openrouter/auto");
+        String apiKey = (String) config.getOrDefault("api_key", "");
+        String sttProvider = (String) config.getOrDefault("stt_provider", "vosk");
+        
+        UserAiConfig saved = userAiConfigService.saveConfig(user.getId(), llmProvider, llmModel, apiKey, sttProvider);
+        return ResponseEntity.ok(Map.of(
+                "llm_provider", saved.getLlmProvider(),
+                "llm_model", saved.getLlmModel(),
+                "api_key", saved.getApiKey(),
+                "stt_provider", saved.getSttProvider()
+        ));
     }
 
     @GetMapping("/knowledge")

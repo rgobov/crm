@@ -35,4 +35,8 @@ public interface StaffMemberRepository extends JpaRepository<StaffMember, String
                                             @Param("query") String query,
                                             @Param("active") Boolean active,
                                             Pageable pageable);
+
+    Optional<StaffMember> findByTelegramId(Long telegramId);
+
+    Optional<StaffMember> findByUserId(String userId);
 }

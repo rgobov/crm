@@ -88,5 +88,8 @@ public class Contact {
 
     private int notificationLeadTimeHours = 24;
 
+    @Column(name = "telegram_id", unique = true)
+    private Long telegramId;
+
 }
 

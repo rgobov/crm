@@ -90,6 +90,12 @@ class AiConfig(BaseModel):
     api_key: str = ""
     stt_provider: str = "vosk"
 
+class UserAiConfig(BaseModel):
+    llm_provider: str = "openrouter"
+    llm_model: str = "openrouter/auto"
+    api_key: str = ""
+    stt_provider: str = "vosk"
+
 @app.get("/api/v1/config/{tenant_id}")
 def get_config(tenant_id: str, x_internal_secret: str = Header(...)):
     verify_secret(x_internal_secret)
@@ -112,6 +118,37 @@ def upsert_config(tenant_id: str, config: AiConfig, x_internal_secret: str = Hea
             updated_at = CURRENT_TIMESTAMP
     """, (tenant_id, config.llm_provider, config.llm_model, config.api_key, config.stt_provider))
     return {"status": "saved", "tenant_id": tenant_id}
+
+@app.get("/api/v1/user-config/{user_id}")
+def get_user_config(user_id: str, x_internal_secret: str = Header(...)):
+    verify_secret(x_internal_secret)
+    rows = query_db("SELECT * FROM user_ai_config WHERE user_id = ?", (user_id,))
+    if not rows:
+        return {"user_id": user_id, "llm_provider": "openrouter", "llm_model": "openrouter/auto", "api_key": "", "stt_provider": "vosk"}
+    return rows[0]
+
+@app.put("/api/v1/user-config/{user_id}")
+def upsert_user_config(user_id: str, config: UserAiConfig, x_internal_secret: str = Header(...)):
+    verify_secret(x_internal_secret)
+    execute_db("""
+        INSERT INTO user_ai_config (user_id, llm_provider, llm_model, api_key, stt_provider, updated_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id) DO UPDATE SET
+            llm_provider = excluded.llm_provider,
+            llm_model = excluded.llm_model,
+            api_key = excluded.api_key,
+            stt_provider = excluded.stt_provider,
+            updated_at = CURRENT_TIMESTAMP
+    """, (user_id, config.llm_provider, config.llm_model, config.api_key, config.stt_provider))
+    return {"status": "saved", "user_id": user_id}
+
+@app.get("/api/v1/tenant/by-telegram/{chat_id}")
+def get_user_by_telegram(chat_id: str, x_internal_secret: str = Header(...)):
+    verify_secret(x_internal_secret)
+    # 1. Check user_ai_config by telegram_id (we need to join with users)
+    # For now, we'll query the backend service for this mapping
+    # This endpoint will be called by the LLM proxy which will call the backend
+    return {"user_id": "", "tenant_id": ""}
 
 @app.post("/api/v1/stt/{tenant_id}")
 async def transcribe(tenant_id: str, file: UploadFile = File(...), x_internal_secret: str = Header(...)):

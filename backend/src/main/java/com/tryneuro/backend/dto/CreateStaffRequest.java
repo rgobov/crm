@@ -14,4 +14,5 @@ public class CreateStaffRequest {
     private boolean available;
     private List<String> branchIds; // ПОДДЕРЖКА НЕСКОЛЬКИХ ФИЛИАЛОВ
     private String photoData; // Base64 encoded photo
+    private String userId; // Link to User account
 }

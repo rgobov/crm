@@ -47,4 +47,6 @@ public interface ContactRepository extends JpaRepository<Contact, String> {
            "LIMIT 1",
            nativeQuery = true)
     Optional<Contact> findByCleanPhone(@Param("phone") String phone, @Param("tenantId") String tenantId);
+
+    Optional<Contact> findByTelegramId(Long telegramId);
 }

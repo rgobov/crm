@@ -159,6 +159,8 @@ class TelegramClientWrapper:
                             self.is_authorized = True
                             self.auth_state = "CONNECTED"
                             logger.info(f"Client started with existing session for tenant {self.tenant_id}")
+                            # Setup deep link handler for /start command
+                            await self._setup_deep_link_handler()
                             return
                         else:
                             logger.warning(f"Session exists but not authorized for {self.tenant_id}")
@@ -218,6 +220,10 @@ class TelegramClientWrapper:
             self.is_authorized = True
             self.auth_state = "CONNECTED"
             logger.info(f"Client signed in for tenant {self.tenant_id}")
+            
+            # Setup deep link handler after successful authorization
+            await self._setup_deep_link_handler()
+            
             return {"status": "connected"}
         except Exception as e:
             logger.error(f"Failed to sign in: {e}")
@@ -237,6 +243,10 @@ class TelegramClientWrapper:
             self.is_authorized = True
             self.auth_state = "CONNECTED"
             logger.info(f"2FA password checked for tenant {self.tenant_id}")
+            
+            # Setup deep link handler after successful authorization
+            await self._setup_deep_link_handler()
+            
             return {"status": "connected"}
         except Exception as e:
             logger.error(f"Failed to check password: {e}")
@@ -254,7 +264,54 @@ class TelegramClientWrapper:
         self.is_ready = False
         self.is_authorized = False
         self.auth_state = "DISCONNECTED"
+             
+    async def _setup_deep_link_handler(self):
+        """Setup handler for /start command with deep link parameters."""
+        if not self.client:
+            return
             
+        from pyrogram import filters
+        
+        @self.client.on_message(filters.command("start") & filters.private)
+        async def handle_start(client, message):
+            """Handle /start command with deep link parameter."""
+            if not message.text or len(message.text.split()) < 2:
+                return
+            
+            param = message.text.split(maxsplit=1)[1]
+            chat_id = message.from_user.id
+            
+            logger.info(f"Deep link received: {param} from chat_id {chat_id}")
+            
+            # Parse parameter: contact_{id}, staff_{id}, user_{id}
+            try:
+                if param.startswith("contact_") or param.startswith("staff_") or param.startswith("user_"):
+                    parts = param.split("_", 1)
+                    if len(parts) == 2:
+                        entity_type, entity_id = parts
+                        await self._bind_telegram_id(entity_type, entity_id, chat_id)
+                        await message.reply_text("✅ Аккаунт успешно привязан к CRM!")
+                    else:
+                        await message.reply_text("❌ Неверный формат ссылки")
+                else:
+                    await message.reply_text("ℹ️ Используйте специальную ссылку из CRM для привязки аккаунта")
+            except Exception as e:
+                logger.error(f"Failed to handle deep link: {e}")
+                await message.reply_text("❌ Ошибка при привязке аккаунта")
+    
+    async def _bind_telegram_id(self, entity_type: str, entity_id: str, chat_id: int):
+        """Send bind request to backend."""
+        try:
+            await http_client.post(
+                f"{settings.backend_url}/api/admin/ai/internal/telegram/bind",
+                json={"type": entity_type, "id": entity_id, "telegram_id": chat_id},
+                headers={"X-Internal-Secret": settings.internal_secret},
+                timeout=10.0
+            )
+            logger.info(f"Bound telegram_id {chat_id} to {entity_type} {entity_id} for tenant {self.tenant_id}")
+        except Exception as e:
+            logger.error(f"Failed to bind telegram_id: {e}")
+             
     async def send_message(self, phone: str, name: str, text: str):
         if not self.client or not self.is_ready:
             raise HTTPException(status_code=400, detail="Client not connected")
