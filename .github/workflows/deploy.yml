@@ -53,9 +53,9 @@ jobs:
             if [ -d "hermes-agent" ]; then
                 cd hermes-agent
                 cat > .env << EOF
-TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
-EOF
+                TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+                INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
+                EOF
                 docker-compose build --no-cache
                 docker-compose up -d
                 cd ..
