@@ -16,4 +16,7 @@ public interface UserRepository extends JpaRepository<User, String> {
     
     // Поиск пользователя по Telegram ID для авто-входа
     Optional<User> findByTelegramId(Long telegramId);
+    
+    // Поиск пользователя по Contact ID
+    Optional<User> findByContactId(String contactId);
 }
