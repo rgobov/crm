@@ -7,4 +7,4 @@ aiosqlite>=0.19.0
 vosk>=0.3.45
 python-multipart>=0.0.6
 pydub>=0.25.1
-pyaudioop>=0.2.0
+audioop-lts>=0.2.0
