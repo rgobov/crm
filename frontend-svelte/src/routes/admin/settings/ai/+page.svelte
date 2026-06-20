@@ -4,11 +4,13 @@
     import { goto } from '$app/navigation';
 
     let config = {
-        llm_provider: 'yandex',
-        llm_model: 'yandexgpt',
+        llm_provider: 'openrouter',
+        llm_model: 'openrouter/auto',
         api_key: '',
         stt_provider: 'vosk'
     };
+
+    let customModel = '';
 
     let knowledge = [];
     let newEntry = { question: '', answer: '', category: 'FAQ' };
@@ -16,6 +18,8 @@
     let isSaving = false;
     let showAddForm = false;
     let error = '';
+
+    $: if (customModel) config.llm_model = customModel;
 
     onMount(async () => {
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
@@ -98,29 +102,34 @@
                 <h3>🤖 AI Провайдер</h3>
                 <div class="field">
                     <label>Провайдер</label>
-                    <select bind:value={config.llm_provider}>
-                        <option value="yandex">YandexGPT</option>
-                        <option value="deepseek">DeepSeek</option>
-                        <option value="gigachat">GigaChat (Сбер)</option>
+                    <select bind:value={config.llm_provider} disabled>
                         <option value="openrouter">OpenRouter</option>
                     </select>
+                    <p class="hint">Используется только OpenRouter — доступ к 200+ моделям одним ключом</p>
                 </div>
                 <div class="field">
                     <label>Модель</label>
                     <select bind:value={config.llm_model}>
-                        {#if config.llm_provider === 'yandex'}
-                            <option value="yandexgpt">YandexGPT</option>
-                            <option value="yandexgpt-lite">YandexGPT Lite</option>
-                        {:else if config.llm_provider === 'deepseek'}
-                            <option value="deepseek-chat">DeepSeek Chat</option>
-                            <option value="deepseek-reasoner">DeepSeek Reasoner</option>
-                        {:else if config.llm_provider === 'gigachat'}
-                            <option value="gigachat">GigaChat</option>
-                            <option value="gigachat-pro">GigaChat Pro</option>
-                        {:else if config.llm_provider === 'openrouter'}
-                            <option value="openrouter/auto">OpenRouter Auto</option>
-                        {/if}
+                        <option value="openrouter/auto">🤖 OpenRouter Auto (авто-выбор)</option>
+                        <optgroup label="🆓 Бесплатные">
+                            <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (free)</option>
+                            <option value="google/gemma-2-9b-it:free">Gemma 2 9B (free)</option>
+                            <option value="mistralai/mistral-7b-instruct:free">Mistral 7B (free)</option>
+                            <option value="microsoft/phi-3-mini-128k-instruct:free">Phi-3 Mini (free)</option>
+                            <option value="qwen/qwen-2-7b-instruct:free">Qwen 2 7B (free)</option>
+                        </optgroup>
+                        <optgroup label="💎 Популярные платные">
+                            <option value="openai/gpt-4o">GPT-4o</option>
+                            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                            <option value="google/gemini-pro-1.5">Gemini 1.5 Pro</option>
+                            <option value="meta-llama/llama-3.1-405b-instruct">Llama 3.1 405B</option>
+                        </optgroup>
                     </select>
+                </div>
+                <div class="field">
+                    <label>Или ввести свой ID модели</label>
+                    <input type="text" bind:value={customModel} placeholder="напр. meta-llama/llama-3.1-70b-instruct" />
+                    <p class="hint">Полный каталог — <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a>. Бесплатные модели имеют суффикс <code>:free</code></p>
                 </div>
                 <div class="field">
                     <label>API-ключ</label>
