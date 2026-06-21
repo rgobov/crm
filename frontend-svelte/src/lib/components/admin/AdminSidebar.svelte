@@ -39,6 +39,7 @@
 
     function handleNav(id) {
         if (id === 'ai') {
+            activeTab.set('ai');
             goto('/admin/settings/ai');
             return;
         }

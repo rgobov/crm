@@ -90,6 +90,15 @@
         <h1>AI Настройки</h1>
     </div>
 
+    <div class="bot-link-card">
+        <span class="bot-icon">🤖</span>
+        <div>
+            <b>Telegram AI-бот</b>
+            <p>Напишите боту для общения с AI-ассистентом</p>
+            <a href="https://t.me/NineCRM_AI_bot" target="_blank">@NineCRM_AI_bot</a>
+        </div>
+    </div>
+
     {#if isLoading}
         <div class="center"><span class="spinner"></span></div>
     {:else}
@@ -128,12 +137,12 @@
                 </div>
                 <div class="field">
                     <label>Или ввести свой ID модели</label>
-                    <input type="text" bind:value={customModel} placeholder="напр. meta-llama/llama-3.1-70b-instruct" />
+                    <input type="text" bind:value={customModel} placeholder="напр. meta-llama/llama-3.1-70b-instruct" autocomplete="off" />
                     <p class="hint">Полный каталог — <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a>. Бесплатные модели имеют суффикс <code>:free</code></p>
                 </div>
                 <div class="field">
                     <label>API-ключ</label>
-                    <input type="password" bind:value={config.api_key} placeholder="Ваш API-ключ" />
+                    <input type="password" bind:value={config.api_key} placeholder="Ваш API-ключ" autocomplete="new-password" />
                     <p class="hint">Каждый тенант использует свой ключ. Ключ хранится зашифрованным.</p>
                 </div>
                 <div class="field">
@@ -240,6 +249,13 @@
     .confirm-btn { background: #268bd2; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 700; cursor: pointer; }
     .add-btn { width: 100%; background: none; border: 1.5px dashed #93a1a1; border-radius: 14px; padding: 14px; font-weight: 700; color: #586e75; cursor: pointer; transition: 0.2s; }
     .add-btn:hover { border-color: #268bd2; color: #268bd2; }
+
+    .bot-link-card { display: flex; align-items: center; gap: 16px; background: #eee8d5; border: 1px solid #ddd6c1; border-radius: 20px; padding: 16px 20px; margin-bottom: 24px; }
+    .bot-link-card b { display: block; font-size: 14px; color: #073642; margin-bottom: 2px; }
+    .bot-link-card p { margin: 0; font-size: 12px; color: #586e75; margin-bottom: 4px; }
+    .bot-link-card a { color: #268bd2; font-weight: 700; font-size: 14px; text-decoration: none; }
+    .bot-link-card a:hover { text-decoration: underline; }
+    .bot-icon { font-size: 28px; }
 
     .spinner { width: 30px; height: 30px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
