@@ -35,6 +35,7 @@ public class AiInternalController {
     private final ExportService exportService;
     private final UserService userService;
     private final UserRepository userRepository;
+    private final UserAiConfigService userAiConfigService;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -433,6 +434,21 @@ public class AiInternalController {
         }
         
         return ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/user-config/{userId}")
+    public ResponseEntity<?> getUserConfig(
+            @PathVariable String userId,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        UserAiConfig config = userAiConfigService.getConfig(userId);
+        return ResponseEntity.ok(Map.of(
+                "userId", userId,
+                "llm_provider", config.getLlmProvider(),
+                "llm_model", config.getLlmModel(),
+                "api_key", config.getApiKey(),
+                "stt_provider", config.getSttProvider()
+        ));
     }
 
     @PostMapping("/telegram/bind")

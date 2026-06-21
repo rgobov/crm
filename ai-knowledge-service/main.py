@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AI Knowledge Service", lifespan=lifespan)
 
 INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "try-neuro-internal-secret-2026")
+BACKEND_URL = os.getenv("CRM_BACKEND_URL", "http://backend:8080")
 
 def verify_secret(secret: str):
     if secret != INTERNAL_SECRET:
@@ -122,10 +123,36 @@ def upsert_config(tenant_id: str, config: AiConfig, x_internal_secret: str = Hea
 @app.get("/api/v1/user-config/{user_id}")
 def get_user_config(user_id: str, x_internal_secret: str = Header(...)):
     verify_secret(x_internal_secret)
+
     rows = query_db("SELECT * FROM user_ai_config WHERE user_id = ?", (user_id,))
-    if not rows:
-        return {"user_id": user_id, "llm_provider": "openrouter", "llm_model": "openrouter/auto", "api_key": "", "stt_provider": "vosk"}
-    return rows[0]
+    if rows:
+        return rows[0]
+
+    try:
+        import httpx
+        resp = httpx.get(
+            f"{BACKEND_URL}/api/admin/ai/internal/user-config/{user_id}",
+            headers={"X-Internal-Secret": INTERNAL_SECRET},
+            timeout=5.0,
+        )
+        if resp.status_code == 200:
+            config = resp.json()
+            execute_db("""
+                INSERT INTO user_ai_config (user_id, llm_provider, llm_model, api_key, stt_provider, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    llm_provider = excluded.llm_provider,
+                    llm_model = excluded.llm_model,
+                    api_key = excluded.api_key,
+                    stt_provider = excluded.stt_provider,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user_id, config.get("llm_provider", "openrouter"), config.get("llm_model", "openrouter/auto"),
+                  config.get("api_key", ""), config.get("stt_provider", "vosk")))
+            return config
+    except Exception as e:
+        logger.warning(f"Failed to fetch user config from backend: {e}")
+
+    return {"user_id": user_id, "llm_provider": "openrouter", "llm_model": "openrouter/auto", "api_key": "", "stt_provider": "vosk"}
 
 @app.put("/api/v1/user-config/{user_id}")
 def upsert_user_config(user_id: str, config: UserAiConfig, x_internal_secret: str = Header(...)):
