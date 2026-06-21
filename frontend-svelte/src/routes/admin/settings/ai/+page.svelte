@@ -7,7 +7,8 @@
         llm_provider: 'openrouter',
         llm_model: 'openrouter/auto',
         api_key: '',
-        stt_provider: 'vosk'
+        stt_provider: 'vosk',
+        telegram_id: null
     };
 
     let customModel = '';
@@ -150,6 +151,14 @@
                     <select bind:value={config.stt_provider}>
                         <option value="vosk">Vosk (локальный, бесплатно)</option>
                     </select>
+                </div>
+                <div class="field">
+                    <label>Telegram ID (привязка к боту)</label>
+                    <input type="number" bind:value={config.telegram_id} placeholder="Введите ваш Telegram ID" />
+                    <p class="hint">
+                        Напишите <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>
+                        → получите ваш числовой ID → вставьте сюда
+                    </p>
                 </div>
             </div>
 

@@ -2,6 +2,7 @@ package com.tryneuro.backend.controller.svelte;
 
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.model.UserAiConfig;
+import com.tryneuro.backend.repository.UserRepository;
 import com.tryneuro.backend.service.UserAiConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class AiConfigController {
 
     private final UserAiConfigService userAiConfigService;
+    private final UserRepository userRepository;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${ai.knowledge.service.url:http://ai-knowledge-service:8082}")
@@ -51,7 +53,8 @@ public class AiConfigController {
                 "llm_provider", config.getLlmProvider(),
                 "llm_model", config.getLlmModel(),
                 "api_key", config.getApiKey(),
-                "stt_provider", config.getSttProvider()
+                "stt_provider", config.getSttProvider(),
+                "telegram_id", user.getTelegramId()
         ));
     }
 
@@ -67,6 +70,15 @@ public class AiConfigController {
         String apiKey = (String) config.getOrDefault("api_key", "");
         String sttProvider = (String) config.getOrDefault("stt_provider", "vosk");
         
+        Object telegramIdRaw = config.get("telegram_id");
+        if (telegramIdRaw != null) {
+            Long telegramId = telegramIdRaw instanceof Number
+                    ? ((Number) telegramIdRaw).longValue()
+                    : Long.valueOf(telegramIdRaw.toString());
+            user.setTelegramId(telegramId);
+            userRepository.save(user);
+        }
+
         UserAiConfig saved = userAiConfigService.saveConfig(user.getId(), llmProvider, llmModel, apiKey, sttProvider);
 
         try {
