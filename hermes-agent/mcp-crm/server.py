@@ -282,21 +282,20 @@ async def llm_proxy(request: Request):
     # Try to get user_id from various sources
     user_id = ""
     
-    # 1. X-Tenant-ID header (legacy, not used for per-user)
-    # 2. X-User-ID header (if set by caller)
+    # 1. X-User-ID header (if set by caller)
     user_id = request.headers.get("X-User-ID", "")
     
-    # 3. OpenAI 'user' field in request body
+    # 2. Resolve via backend if 'user' field contains a chat_id (numeric)
     if not user_id:
-        user_id = body.get("user", "")
-    
-    # 4. Resolve via backend using chat_id from user field
-    if not user_id and isinstance(body.get("user"), (str, int)):
-        try:
-            chat_id = int(body.get("user"))
-            user_id = await resolve_user_id_by_chat_id(chat_id)
-        except (ValueError, TypeError):
-            pass
+        user_field = body.get("user", "")
+        if isinstance(user_field, (str, int)):
+            try:
+                chat_id = int(user_field)
+                resolved = await resolve_user_id_by_chat_id(chat_id)
+                if resolved:
+                    user_id = resolved
+            except (ValueError, TypeError):
+                pass
     
     if not user_id:
         raise HTTPException(403, "Unable to identify user. Please ensure your Telegram account is linked in CRM.")
