@@ -311,7 +311,7 @@ async def llm_proxy(request: Request):
         "HTTP-Referer": "https://crm.999crm.ru",
         "X-Title": "TryNeuro CRM",
     }
-    async with httpx.AsyncClient(timeout=120.0.0) as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=body,
