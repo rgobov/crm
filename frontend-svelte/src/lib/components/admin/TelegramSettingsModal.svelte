@@ -25,6 +25,7 @@
 
     $: isAuthorized = status === 'CONNECTED';
     $: isFloodWait = status && status.startsWith('FLOOD_WAIT');
+    $: floodWaitSeconds = isFloodWait ? parseInt(status.split(':')[1]) || 0 : 0;
     $: isWaitPassword = status === 'WAITING_PASSWORD' || status === 'PASSWORD_ERROR';
     $: isWaitCode = status === 'WAITING_CODE' || status === 'CODE_ERROR';
 
@@ -129,7 +130,7 @@
             status = 'WAITING_CODE';
             isProcessing = false;
         } catch (e) {
-            errorMessage = 'Ошибка отправки кода';
+            errorMessage = e.message || 'Ошибка отправки кода';
             isProcessing = false;
         }
     }
@@ -145,7 +146,7 @@
             verificationCode = '';
             isProcessing = false;
         } catch (e) {
-            errorMessage = 'Неверный код';
+            errorMessage = e.message || 'Неверный код';
             isProcessing = false;
         }
     }
@@ -158,7 +159,7 @@
             await telegramService.sendPassword(cloudPassword);
             cloudPassword = '';
         } catch (e) {
-            errorMessage = 'Неверный пароль';
+            errorMessage = e.message || 'Неверный пароль';
             isProcessing = false;
         }
     }
@@ -234,6 +235,12 @@
                             <label>АКТИВНО</label>
                             <b>Аккаунт успешно привязан</b>
                             <p>Уведомления клиентам будут уходить автоматически.</p>
+                        </div>
+                    {:else if isFloodWait}
+                        <div class="card setup-card warning" in:slide>
+                            <label>⏳ FLOOD WAIT</label>
+                            <b>Слишком много попыток</b>
+                            <p>Подождите {floodWaitSeconds} секунд перед следующей попыткой.</p>
                         </div>
                     {:else if isWaitPassword}
                         <div class="card setup-card" in:slide>

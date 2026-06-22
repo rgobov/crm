@@ -46,38 +46,24 @@ public class TelegramSettingsService {
     }
 
     public void checkPassword(String tenantId, String password) {
-        try {
-            notificationClient.checkPassword(internalSecret, Map.of(
-                "tenantId", tenantId,
-                "password", password
-            ));
-        } catch (Exception e) {
-            log.error("Failed to proxy TG password: {}", e.getMessage());
-        }
+        notificationClient.checkPassword(internalSecret, Map.of(
+            "tenantId", tenantId,
+            "password", password
+        ));
     }
 
     public Map<String, String> sendCode(String tenantId, String phoneNumber) {
-        try {
-            return notificationClient.sendCode(internalSecret, Map.of(
-                "tenantId", tenantId,
-                "phoneNumber", phoneNumber
-            ));
-        } catch (Exception e) {
-            log.error("Failed to send code: {}", e.getMessage());
-            return Map.of("status", "error", "message", e.getMessage());
-        }
+        return notificationClient.sendCode(internalSecret, Map.of(
+            "tenantId", tenantId,
+            "phoneNumber", phoneNumber
+        ));
     }
 
     public Map<String, String> signIn(String tenantId, String code) {
-        try {
-            return notificationClient.signIn(internalSecret, Map.of(
-                "tenantId", tenantId,
-                "code", code
-            ));
-        } catch (Exception e) {
-            log.error("Failed to sign in: {}", e.getMessage());
-            return Map.of("status", "error", "message", e.getMessage());
-        }
+        return notificationClient.signIn(internalSecret, Map.of(
+            "tenantId", tenantId,
+            "code", code
+        ));
     }
 
     public void cancelQrGeneration(String tenantId) {

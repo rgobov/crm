@@ -1,5 +1,16 @@
 import api from '../api.js';
 
+function extractErrorMessage(error) {
+    if (error.response && error.response.data) {
+        const data = error.response.data;
+        if (data.detail) return data.detail;
+        if (data.message) return data.message;
+        return JSON.stringify(data);
+    }
+    if (error.message) return error.message;
+    return 'Unknown error';
+}
+
 export const telegramService = {
     async getStatus() {
         const res = await api.get('/admin/telegram/status');
@@ -15,10 +26,18 @@ export const telegramService = {
         await api.post('/admin/telegram/password', { password });
     },
     async sendCode(phoneNumber) {
-        await api.post('/admin/telegram/send-code', { phoneNumber });
+        try {
+            await api.post('/admin/telegram/send-code', { phoneNumber });
+        } catch (error) {
+            throw new Error(extractErrorMessage(error));
+        }
     },
     async signIn(code) {
-        await api.post('/admin/telegram/sign-in', { code });
+        try {
+            await api.post('/admin/telegram/sign-in', { code });
+        } catch (error) {
+            throw new Error(extractErrorMessage(error));
+        }
     },
     async cancelQrGeneration() {
         await api.post('/admin/telegram/cancel-qr');

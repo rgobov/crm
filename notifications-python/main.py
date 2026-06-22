@@ -17,6 +17,16 @@ from typing import Optional, Dict, Set
 from datetime import datetime, timedelta
 from pyrogram import Client
 from pyrogram.types import User, InputPhoneContact
+from pyrogram.errors import (
+    FloodWait,
+    PhoneCodeExpired,
+    PhoneCodeInvalid,
+    PhoneNumberInvalid,
+    PhoneNumberFlood,
+    PhoneNumberBanned,
+    SessionPasswordNeeded,
+    ApiIdInvalid,
+)
 import httpx
 import traceback
 
@@ -206,9 +216,20 @@ class TelegramClientWrapper:
             logger.info(f"Telegram send_code response: type={sent_code.type}, timeout={sent_code.timeout}")
             logger.info(f"Code sent to {phone_number} for tenant {self.tenant_id}")
             return {"status": "code_sent"}
+        except FloodWait as e:
+            logger.error(f"FloodWait {e.value}s for {self.tenant_id}")
+            raise HTTPException(status_code=429, detail=f"FLOOD_WAIT:{e.value}")
+        except PhoneNumberInvalid:
+            raise HTTPException(status_code=400, detail="PHONE_NUMBER_INVALID")
+        except PhoneNumberFlood as e:
+            raise HTTPException(status_code=429, detail=f"PHONE_NUMBER_FLOOD:{e.value}")
+        except PhoneNumberBanned:
+            raise HTTPException(status_code=400, detail="PHONE_NUMBER_BANNED")
+        except ApiIdInvalid:
+            raise HTTPException(status_code=500, detail="API_ID_INVALID")
         except Exception as e:
-            logger.error(f"Failed to send code: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.error(f"Failed to send code: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=f"UNKNOWN:{type(e).__name__}:{e}")
         
     async def sign_in(self, code: str):
         """Sign in with code"""
@@ -226,12 +247,18 @@ class TelegramClientWrapper:
             await self._setup_deep_link_handler()
             
             return {"status": "connected"}
+        except FloodWait as e:
+            raise HTTPException(status_code=429, detail=f"FLOOD_WAIT:{e.value}")
+        except PhoneCodeExpired:
+            raise HTTPException(status_code=400, detail="CODE_EXPIRED")
+        except PhoneCodeInvalid:
+            raise HTTPException(status_code=400, detail="CODE_INVALID")
+        except SessionPasswordNeeded:
+            self.auth_state = "WAITING_PASSWORD"
+            raise HTTPException(status_code=400, detail="PASSWORD_NEEDED")
         except Exception as e:
-            logger.error(f"Failed to sign in: {e}")
-            if "SESSION_PASSWORD_NEEDED" in str(e) or "SessionPasswordNeeded" in str(e):
-                self.auth_state = "WAITING_PASSWORD"
-                raise HTTPException(status_code=400, detail="PASSWORD_NEEDED")
-            raise HTTPException(status_code=400, detail="Invalid code")
+            logger.error(f"Failed to sign in: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            raise HTTPException(status_code=400, detail=f"UNKNOWN:{type(e).__name__}:{e}")
         
     async def check_password(self, password: str):
         """Check 2FA password"""
@@ -249,9 +276,11 @@ class TelegramClientWrapper:
             await self._setup_deep_link_handler()
             
             return {"status": "connected"}
+        except FloodWait as e:
+            raise HTTPException(status_code=429, detail=f"FLOOD_WAIT:{e.value}")
         except Exception as e:
-            logger.error(f"Failed to check password: {e}")
-            raise HTTPException(status_code=400, detail="Invalid password")
+            logger.error(f"Failed to check password: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            raise HTTPException(status_code=400, detail=f"PASSWORD_ERROR:{type(e).__name__}:{e}")
         
     async def stop(self):
         if self.client:
