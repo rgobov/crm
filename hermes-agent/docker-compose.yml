@@ -29,9 +29,9 @@ services:
     logging: *default-logging
     command: >
       sh -c "
-        hermes config set provider openai &&
-        hermes config set base_url http://mcp-crm:8001/v1 &&
-        hermes config set api_key dummy &&
+        hermes config set model.provider openai &&
+        hermes config set model.base_url http://mcp-crm:8001/v1 &&
+        hermes config set model.api_key dummy &&
         exec hermes gateway run
       "
     environment:
