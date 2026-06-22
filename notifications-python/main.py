@@ -203,6 +203,7 @@ class TelegramClientWrapper:
             self.phone_code_hash = sent_code.phone_code_hash
             self.auth_state = "WAITING_CODE"
             self.is_ready = True
+            logger.info(f"Telegram send_code response: type={sent_code.type}, timeout={sent_code.timeout}")
             logger.info(f"Code sent to {phone_number} for tenant {self.tenant_id}")
             return {"status": "code_sent"}
         except Exception as e:
