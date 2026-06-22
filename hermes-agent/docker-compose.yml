@@ -14,7 +14,7 @@ services:
     logging: *default-logging
     environment:
       CRM_BACKEND_URL: ${CRM_BACKEND_URL:-http://backend:8080}
-      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
       AI_KNOWLEDGE_URL: http://ai-knowledge-service:8082
     networks:
       - tryneuro_network
