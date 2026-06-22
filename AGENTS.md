@@ -6,6 +6,19 @@
 - **Proxy**: HTTP CONNECT `87.121.86.253:8888` — all Telegram traffic
 - **Network**: `tryneuro_network` (external)
 
+## Two Telegram Connections
+
+This project uses **two separate Telegram connections** with different responsibilities:
+
+| Connection | Type | Responsible for |
+|---|---|---|
+| `notifications-python` (Pyrogram) | **User client** | Sending notifications, auth by phone number |
+| Hermes Agent (`@NineCRM_AI_bot`) | **Bot** | AI chat, MCP tools (contacts, appointments) |
+
+- **no deep link binding** — auth is via phone number only, through CRM Telegram Settings UI
+- The Pyrogram user client is NOT a bot — it's a Telegram user session authorized by phone + code
+- The Hermes bot is a separate bot running on its own docker stack (`hermes-agent/`)
+
 ## CRITICAL: Telegram Notification Chain
 
 Any modification to files in this chain MUST verify consistency across ALL layers.

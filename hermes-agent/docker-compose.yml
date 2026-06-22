@@ -38,6 +38,7 @@ services:
         hermes config set model.provider auto &&
         hermes config set model.base_url http://mcp-crm:8001/v1 &&
         hermes config set model.api_key dummy &&
+        hermes config set model.model openrouter/auto &&
         exec hermes gateway run
       "
     environment:

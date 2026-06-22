@@ -245,19 +245,18 @@ async def resolve_actor_from_chat_id(chat_id: int) -> dict:
 llm_app = FastAPI(title="LLM Proxy")
 
 
-async def get_user_key(user_id: str):
-    """Get OpenRouter API key for a specific user."""
+async def get_user_config(user_id: str) -> dict:
+    """Get full user AI config (API key + model) from ai-knowledge-service."""
     try:
         resp = await http_client.get(
             f"{AI_KNOWLEDGE_URL}/api/v1/user-config/{user_id}",
             headers={"X-Internal-Secret": INTERNAL_SECRET},
         )
         if resp.status_code == 200:
-            config = resp.json()
-            return config.get("api_key") or None
+            return resp.json()
     except Exception:
         pass
-    return None
+    return {"api_key": "", "llm_model": ""}
 
 
 async def resolve_user_id_by_chat_id(chat_id: int) -> str:
@@ -327,7 +326,9 @@ async def llm_proxy(request: Request):
             }]
         }, status_code=200)
 
-    api_key = await get_user_key(user_id)
+    user_config = await get_user_config(user_id)
+    api_key = user_config.get("api_key") or None
+    
     if not api_key:
         return JSONResponse(content={
             "id": "chatcmpl-no-key",
@@ -343,6 +344,12 @@ async def llm_proxy(request: Request):
                 "finish_reason": "stop"
             }]
         }, status_code=200)
+    
+    # Override model from user config if set
+    user_model = user_config.get("llm_model", "").strip()
+    if user_model:
+        body["model"] = user_model
+        logger.info(f"Using model from user config: {user_model}")
     
     headers = {
         "Authorization": f"Bearer {api_key}",
