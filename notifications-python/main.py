@@ -450,29 +450,52 @@ async def sync_status_with_backend(tenant_id: str, status: str, qr_link: Optiona
     if is_stopping:
         return
         
-    try:
-        data = {
-            "tenantId": tenant_id,
-            "status": status
-        }
-        if qr_link:
-            data["qrCode"] = qr_link
-            
-        response = await http_client.post(
-            f"{settings.backend_url}/api/admin/telegram/internal/sync",
-            json=data,
-            headers={"X-Internal-Secret": settings.internal_secret},
-            timeout=5.0
-        )
-        logger.info(f"Synced status {status} for tenant {tenant_id}")
-    except Exception as e:
-        logger.warning(f"Sync failed for {tenant_id}: {e}")
+    for attempt in range(3):
+        try:
+            data = {
+                "tenantId": tenant_id,
+                "status": status
+            }
+            if qr_link:
+                data["qrCode"] = qr_link
+                
+            await http_client.post(
+                f"{settings.backend_url}/api/admin/telegram/internal/sync",
+                json=data,
+                headers={"X-Internal-Secret": settings.internal_secret},
+                timeout=5.0
+            )
+            logger.info(f"Synced status {status} for tenant {tenant_id}")
+            return
+        except Exception as e:
+            if attempt < 2:
+                await asyncio.sleep(2 ** attempt)
+            else:
+                logger.warning(f"Sync failed for {tenant_id} after 3 attempts: {e}")
 
 async def warmup_clients():
     """Auto-warmup clients on startup"""
     try:
         sessions_dir = settings.sessions_path
         if os.path.exists(sessions_dir) and os.path.isdir(sessions_dir):
+            # Migrate flat *.session files -> tenant_id/tg_session.session
+            for entry in os.listdir(sessions_dir):
+                entry_path = os.path.join(sessions_dir, entry)
+                if entry.endswith(".session") and os.path.isfile(entry_path):
+                    tenant_id = entry[:-8]  # remove ".session"
+                    target_dir = os.path.join(sessions_dir, tenant_id)
+                    target_file = os.path.join(target_dir, "tg_session.session")
+                    os.makedirs(target_dir, exist_ok=True)
+                    if not os.path.exists(target_file):
+                        shutil.move(entry_path, target_file)
+                        journal = f"{entry_path}-journal"
+                        if os.path.exists(journal):
+                            shutil.move(journal, os.path.join(target_dir, "tg_session.session-journal"))
+                        logger.info(f"Migrated flat session {entry} -> {tenant_id}/tg_session.session")
+                    else:
+                        os.remove(entry_path)
+                        logger.info(f"Removed stale flat session {entry} (target already exists)")
+
             folders = [f for f in os.listdir(sessions_dir) if os.path.isdir(os.path.join(sessions_dir, f))]
             logger.info(f"Starting auto-warmup for {len(folders)} telegram clients...")
             
