@@ -218,8 +218,7 @@ class TelegramClientWrapper:
                 f"type={sent_code.type}, "
                 f"timeout={sent_code.timeout}, "
                 f"phone_code_hash={sent_code.phone_code_hash}, "
-                f"next_type={sent_code.next_type}, "
-                f"phone_registered={sent_code.phone_registered}"
+                f"next_type={sent_code.next_type}"
             )
             logger.info(f"Code sent to {phone_number} for tenant {self.tenant_id}")
             return {"status": "code_sent"}
