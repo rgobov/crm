@@ -41,7 +41,7 @@ jobs:
             echo "--- СБОРКА И ЗАПУСК ЧЕРЕЗ КОРНЕВОЙ DOCKER-COMPOSE ---"
             export DOCKER_BUILDKIT=1
             # Используем основной файл, он настроен на Nginx Proxy Manager
-            docker-compose build --no-cache
+            docker-compose build --no-cache --parallel
             docker-compose down --remove-orphans
             
             # Удаляем старые конфликтующие контейнеры, если они остались от "неправильного" деплоя
@@ -55,10 +55,11 @@ jobs:
                 cd hermes-agent
             cat > .env << EOF
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
             INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
             EOF
                 docker network create tryneuro_network || true
-                docker-compose build --no-cache
+            docker-compose build --no-cache --parallel
                 docker-compose up -d
                 cd ..
             fi

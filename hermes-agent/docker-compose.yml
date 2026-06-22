@@ -30,6 +30,9 @@ services:
       HERMES_OPENAI_BASE_URL: "http://mcp-crm:8001/v1"
       HERMES_OPENAI_API_KEY: "dummy"
       HERMES_MCP_SERVERS: '{"crm":{"transport":"streamable-http","url":"http://mcp-crm:8000/mcp"}}'
+      HTTP_PROXY: ${TELEGRAM_PROXY}
+      HTTPS_PROXY: ${TELEGRAM_PROXY}
+      NO_PROXY: "localhost,127.0.0.1,backend,mcp-crm,ai-knowledge-service,tryneuro_database,tryneuro_db"
     volumes:
       - hermes_data:/root/.hermes
     networks:
