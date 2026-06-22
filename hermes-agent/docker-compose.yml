@@ -24,8 +24,11 @@ services:
     container_name: tryneuro_hermes
     restart: always
     logging: *default-logging
+    command: ["gateway", "run"]
     environment:
-      HERMES_TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_PROXY: ${TELEGRAM_PROXY}
+      GATEWAY_ALLOW_ALL_USERS: "true"
       HERMES_DEFAULT_MODEL: "openai:openrouter/auto"
       HERMES_OPENAI_BASE_URL: "http://mcp-crm:8001/v1"
       HERMES_OPENAI_API_KEY: "dummy"
