@@ -275,9 +275,23 @@ async def resolve_user_id_by_chat_id(chat_id: int) -> str:
     return ""
 
 
+@llm_app.get("/v1/models")
+async def list_models():
+    return {
+        "object": "list",
+        "data": [
+            {"id": "gpt-4", "object": "model"},
+            {"id": "openrouter/auto", "object": "model"},
+            {"id": "anthropic/claude-opus-4.6", "object": "model"},
+        ]
+    }
+
+
 @llm_app.post("/v1/chat/completions")
 async def llm_proxy(request: Request):
     body = await request.json()
+    logger.info(f"LLM request body: {body}")
+    logger.info(f"LLM request headers: {dict(request.headers)}")
     
     # Try to get user_id from various sources
     user_id = ""
