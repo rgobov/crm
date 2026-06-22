@@ -213,7 +213,14 @@ class TelegramClientWrapper:
             self.phone_code_hash = sent_code.phone_code_hash
             self.auth_state = "WAITING_CODE"
             self.is_ready = True
-            logger.info(f"Telegram send_code response: type={sent_code.type}, timeout={sent_code.timeout}")
+            logger.info(
+                f"Telegram send_code response: "
+                f"type={sent_code.type}, "
+                f"timeout={sent_code.timeout}, "
+                f"phone_code_hash={sent_code.phone_code_hash}, "
+                f"next_type={sent_code.next_type}, "
+                f"phone_registered={sent_code.phone_registered}"
+            )
             logger.info(f"Code sent to {phone_number} for tenant {self.tenant_id}")
             return {"status": "code_sent"}
         except FloodWait as e:
@@ -228,7 +235,12 @@ class TelegramClientWrapper:
         except ApiIdInvalid:
             raise HTTPException(status_code=500, detail="API_ID_INVALID")
         except Exception as e:
-            logger.error(f"Failed to send code: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            logger.error(f"Failed to send code: {type(e).__name__}: {e}")
+            if hasattr(e, 'value'):
+                logger.error(f"Error value: {e.value}")
+            if hasattr(e, 'x'):
+                logger.error(f"Extra error info: {e.x}")
+            logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=f"UNKNOWN:{type(e).__name__}:{e}")
         
     async def sign_in(self, code: str):
@@ -237,11 +249,14 @@ class TelegramClientWrapper:
             raise HTTPException(status_code=400, detail="No code request pending")
 
         try:
-            await self.client.sign_in(self.phone_number, self.phone_code_hash, code)
+            me = await self.client.sign_in(self.phone_number, self.phone_code_hash, code)
             self.is_ready = True
             self.is_authorized = True
             self.auth_state = "CONNECTED"
-            logger.info(f"Client signed in for tenant {self.tenant_id}")
+            logger.info(
+                f"Client signed in for tenant {self.tenant_id}: "
+                f"user_id={me.id}, username={me.username}, first_name={me.first_name}, last_name={me.last_name}"
+            )
             
             # Setup deep link handler after successful authorization
             await self._setup_deep_link_handler()
@@ -257,7 +272,12 @@ class TelegramClientWrapper:
             self.auth_state = "WAITING_PASSWORD"
             raise HTTPException(status_code=400, detail="PASSWORD_NEEDED")
         except Exception as e:
-            logger.error(f"Failed to sign in: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            logger.error(f"Failed to sign in: {type(e).__name__}: {e}")
+            if hasattr(e, 'value'):
+                logger.error(f"Error value: {e.value}")
+            if hasattr(e, 'x'):
+                logger.error(f"Extra error info: {e.x}")
+            logger.error(traceback.format_exc())
             raise HTTPException(status_code=400, detail=f"UNKNOWN:{type(e).__name__}:{e}")
         
     async def check_password(self, password: str):
@@ -266,11 +286,14 @@ class TelegramClientWrapper:
             raise HTTPException(status_code=400, detail="Client not ready")
             
         try:
-            await self.client.check_password(password)
+            me = await self.client.check_password(password)
             self.is_ready = True
             self.is_authorized = True
             self.auth_state = "CONNECTED"
-            logger.info(f"2FA password checked for tenant {self.tenant_id}")
+            logger.info(
+                f"2FA password checked for tenant {self.tenant_id}: "
+                f"user_id={me.id}, username={me.username}"
+            )
             
             # Setup deep link handler after successful authorization
             await self._setup_deep_link_handler()
@@ -279,7 +302,12 @@ class TelegramClientWrapper:
         except FloodWait as e:
             raise HTTPException(status_code=429, detail=f"FLOOD_WAIT:{e.value}")
         except Exception as e:
-            logger.error(f"Failed to check password: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            logger.error(f"Failed to check password: {type(e).__name__}: {e}")
+            if hasattr(e, 'value'):
+                logger.error(f"Error value: {e.value}")
+            if hasattr(e, 'x'):
+                logger.error(f"Extra error info: {e.x}")
+            logger.error(traceback.format_exc())
             raise HTTPException(status_code=400, detail=f"PASSWORD_ERROR:{type(e).__name__}:{e}")
         
     async def stop(self):
@@ -358,16 +386,25 @@ class TelegramClientWrapper:
                 raise HTTPException(status_code=404, detail="Contact not found")
                 
             user = contacts.users[0]
-            logger.info(f"Sending message to user_id {user.id}")
-
-            # Send message
-            await self.client.send_message(user.id, text)
+            logger.info(f"Sending message to user_id={user.id}, username={user.username}, first_name={user.first_name}, last_name={user.last_name}")
             
-            return {"status": "sent"}
+            # Send message
+            msg = await self.client.send_message(user.id, text)
+            
+            logger.info(
+                f"Message sent to {phone} (user_id={user.id}): "
+                f"msg_id={msg.id}, date={msg.date}, out={msg.outgoing}"
+            )
+            
+            return {"status": "sent", "msg_id": msg.id}
             
         except Exception as e:
-            error_trace = traceback.format_exc()
-            logger.error(f"Failed to send message to {phone}: {e}\n{error_trace}")
+            logger.error(f"Failed to send message to {phone}: {type(e).__name__}: {e}")
+            if hasattr(e, 'value'):
+                logger.error(f"Error value: {e.value}")
+            if hasattr(e, 'x'):
+                logger.error(f"Extra error info: {e.x}")
+            logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail=str(e))
 
 # Request/Response models
