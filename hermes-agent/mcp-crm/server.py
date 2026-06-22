@@ -298,11 +298,37 @@ async def llm_proxy(request: Request):
                 pass
     
     if not user_id:
-        raise HTTPException(403, "Unable to identify user. Please ensure your Telegram account is linked in CRM.")
-    
+        return JSONResponse(content={
+            "id": "chatcmpl-unknown-user",
+            "object": "chat.completion",
+            "created": 0,
+            "model": body.get("model", "unknown"),
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "❌ Ваш Telegram-аккаунт не привязан к CRM.\n\nПожалуйста, привяжите Telegram ID в настройках AI:\n1. Напишите @userinfobot, скопируйте ваш ID (число)\n2. В CRM: Настройки → AI → поле Telegram ID\n3. Сохраните и попробуйте снова"
+                },
+                "finish_reason": "stop"
+            }]
+        }, status_code=200)
+
     api_key = await get_user_key(user_id)
     if not api_key:
-        raise HTTPException(403, "No API key configured for this user. Please configure your OpenRouter API key in CRM AI settings.")
+        return JSONResponse(content={
+            "id": "chatcmpl-no-key",
+            "object": "chat.completion",
+            "created": 0,
+            "model": body.get("model", "unknown"),
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "❌ У вас не настроен API-ключ OpenRouter.\n\nПожалуйста, добавьте ключ в CRM: Настройки → AI → поле OpenRouter API Key.\n\nПолучить ключ: https://openrouter.ai/keys"
+                },
+                "finish_reason": "stop"
+            }]
+        }, status_code=200)
     
     headers = {
         "Authorization": f"Bearer {api_key}",

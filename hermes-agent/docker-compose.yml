@@ -16,6 +16,9 @@ services:
       CRM_BACKEND_URL: ${CRM_BACKEND_URL:-http://backend:8080}
       INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
       AI_KNOWLEDGE_URL: http://ai-knowledge-service:8082
+      HTTP_PROXY: ${TELEGRAM_PROXY}
+      HTTPS_PROXY: ${TELEGRAM_PROXY}
+      NO_PROXY: "localhost,127.0.0.1,backend,ai-knowledge-service,tryneuro_database,tryneuro_db"
     networks:
       - tryneuro_network
 
