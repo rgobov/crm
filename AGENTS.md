@@ -35,7 +35,8 @@ Any modification to files in this chain MUST verify consistency across ALL layer
 | Backend | `backend/.../controller/.../TelegramSettingsController.java` | REST endpoints |
 | Backend | `backend/.../exception/GlobalExceptionHandler.java` | Error propagation |
 | Python | `notifications-python/main.py` | Telegram client (Pyrogram) |
-| Deploy | `.github/workflows/deploy.yml` | Deploy pipeline |
+| Deploy | `.github/workflows/deploy-main.yml` | Main stack deploy |
+| Deploy | `.github/workflows/deploy-hermes.yml` | Hermes AI stack deploy |
 | Deploy | `docker-compose.yml` | Infrastructure definition |
 
 ### What to verify before editing any of these files
@@ -44,7 +45,7 @@ Any modification to files in this chain MUST verify consistency across ALL layer
    - `tenantId` / `phone` / `code` / `status` / `phoneCodeHash` — same names everywhere
 2. **Phone number format**: digits only (`79022566116`), no `+` or formatting (NotificationManager strips non-digits)
 3. **Error types**: `FLOOD_WAIT`, `CODE_EXPIRED`, `CODE_INVALID`, `PASSWORD_NEEDED` — handled identically in Python and Java
-4. **Secrets/env**: any new env var must be added to deploy.yml AND docker-compose.yml
+4. **Secrets/env**: any new env var must be added to deploy-main.yml AND docker-compose.yml (and deploy-hermes.yml if hermes needs it)
 5. **Proxy**: never remove `TELEGRAM_PROXY` — VPS in Russia, Telegram blocked without it
 
 ### Pyrogram-specific rules (notifications-python/main.py)

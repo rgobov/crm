@@ -1,0 +1,72 @@
+name: Deploy Main Stack
+
+on:
+  push:
+    branches:
+      - fix/ios-final-attempt
+      - feature/roles
+    paths-ignore:
+      - 'hermes-agent/**'
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          command_timeout: 60m
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ~/crm
+
+            echo "--- ПЕРЕКЛЮЧЕНИЕ НА ВЕТКУ ${{ github.ref_name }} ---"
+            git fetch origin ${{ github.ref_name }}
+            git checkout ${{ github.ref_name }} || git checkout -b ${{ github.ref_name }} origin/${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+
+            echo "--- СОЗДАНИЕ .env ФАЙЛА В КОРНЕ ---"
+            cat > .env << EOF
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}
+            TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}
+            INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
+            TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
+            EOF
+
+            echo "--- СБОРКА И ЗАПУСК ЧЕРЕЗ КОРНЕВОЙ DOCKER-COMPOSE ---"
+            export DOCKER_BUILDKIT=1
+            docker-compose build --no-cache --parallel
+            docker-compose down --remove-orphans
+
+            docker rm -f tryneuro_backend tryneuro_notifications_python tryneuro_frontend tryneuro_db_prod tryneuro_proxy tryneuro_ai_knowledge || true
+
+            docker network create tryneuro_network || true
+            docker-compose up -d
+
+            echo "--- ОТКЛЮЧЕНИЕ IPv6 И ОПТИМИЗАЦИЯ NGINX (GZIP) ---"
+            docker exec tryneuro_proxy sh -c "
+              sed -i 's/listen \[::\]/#listen [::]/g' /data/nginx/proxy_host/*.conf /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/production.conf
+              echo 'gzip on;
+              gzip_proxied any;
+              gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+              gzip_vary on;
+              gzip_comp_level 6;' > /etc/nginx/conf.d/gzip.conf
+            " || true
+            docker exec tryneuro_proxy nginx -s reload || true
+
+            echo "--- ОЧИСТКА ---"
+            docker system prune -f
+
+            echo "--- СТАТУС ---"
+            docker-compose ps
