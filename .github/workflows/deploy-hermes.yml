@@ -43,10 +43,14 @@ jobs:
             EOF
 
             echo "--- СБОРКА И ЗАПУСК ---"
+            export DOCKER_BUILDKIT=1
             docker network create tryneuro_network || true
-            docker-compose build --no-cache --parallel
             docker-compose down --remove-orphans
+            docker-compose build --no-cache --parallel
             docker-compose up -d
+
+            echo "--- ОЧИСТКА ---"
+            docker system prune -f
 
             echo "--- СТАТУС ---"
             docker-compose ps
