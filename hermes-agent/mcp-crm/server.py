@@ -6,7 +6,7 @@ import logging
 import httpx
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastmcp import FastMCP
 
 logging.basicConfig(level=logging.INFO)
@@ -374,6 +374,11 @@ async def llm_proxy(request: Request):
             json=body,
             headers=headers,
         )
+        if body.get("stream"):
+            return StreamingResponse(
+                resp.aiter_bytes(),
+                media_type="text/event-stream",
+            )
         return JSONResponse(content=resp.json(), status_code=resp.status_code)
 
 
