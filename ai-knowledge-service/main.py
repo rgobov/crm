@@ -32,7 +32,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AI Knowledge Service", lifespan=lifespan)
 
 INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "try-neuro-internal-secret-2026")
-BACKEND_URL = os.getenv("CRM_BACKEND_URL", "http://backend:8080")
 
 def verify_secret(secret: str):
     if secret != INTERNAL_SECRET:
@@ -54,7 +53,7 @@ def create_knowledge(tenant_id: str, entry: KnowledgeEntry, x_internal_secret: s
     verify_secret(x_internal_secret)
     entry_id = str(uuid.uuid4())
     execute_db(
-        "INSERT INTO knowledge_base (id, tenant_id, question, answer, category) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO knowledge_base (id, tenant_id, question, answer, category) VALUES (%s, %s, %s, %s, %s)",
         (entry_id, tenant_id, entry.question, entry.answer, entry.category)
     )
     return KnowledgeResponse(id=entry_id, question=entry.question, answer=entry.answer, category=entry.category)
@@ -63,111 +62,39 @@ def create_knowledge(tenant_id: str, entry: KnowledgeEntry, x_internal_secret: s
 def list_knowledge(tenant_id: str, category: str = None, x_internal_secret: str = Header(...)):
     verify_secret(x_internal_secret)
     if category:
-        rows = query_db("SELECT * FROM knowledge_base WHERE tenant_id = ? AND category = ?", (tenant_id, category))
+        rows = query_db("SELECT * FROM knowledge_base WHERE tenant_id = %s AND category = %s", (tenant_id, category))
     else:
-        rows = query_db("SELECT * FROM knowledge_base WHERE tenant_id = ?", (tenant_id,))
+        rows = query_db("SELECT * FROM knowledge_base WHERE tenant_id = %s", (tenant_id,))
     return [KnowledgeResponse(**row) for row in rows]
 
 @app.delete("/api/v1/knowledge/{entry_id}")
 def delete_knowledge(entry_id: str, x_internal_secret: str = Header(...)):
     verify_secret(x_internal_secret)
-    execute_db("DELETE FROM knowledge_base WHERE id = ?", (entry_id,))
+    execute_db("DELETE FROM knowledge_base WHERE id = %s", (entry_id,))
     return {"status": "deleted"}
 
 @app.post("/api/v1/knowledge/{tenant_id}/search")
 def search_knowledge(tenant_id: str, body: dict, x_internal_secret: str = Header(...)):
     verify_secret(x_internal_secret)
     query = body.get("query", "").lower()
-    rows = query_db("SELECT * FROM knowledge_base WHERE tenant_id = ?", (tenant_id,))
+    rows = query_db("SELECT * FROM knowledge_base WHERE tenant_id = %s", (tenant_id,))
     results = []
     for row in rows:
         if query in row["question"].lower() or query in row["answer"].lower():
             results.append(row)
     return {"results": results}
 
-class AiConfig(BaseModel):
-    llm_provider: str = "yandex"
-    llm_model: str = "yandexgpt"
-    api_key: str = ""
-    stt_provider: str = "vosk"
-
-class UserAiConfig(BaseModel):
-    llm_provider: str = "openrouter"
-    llm_model: str = "openrouter/auto"
-    api_key: str = ""
-    stt_provider: str = "vosk"
-
-@app.get("/api/v1/config/{tenant_id}")
-def get_config(tenant_id: str, x_internal_secret: str = Header(...)):
-    verify_secret(x_internal_secret)
-    rows = query_db("SELECT * FROM tenant_ai_config WHERE tenant_id = ?", (tenant_id,))
-    if not rows:
-        return {"tenant_id": tenant_id, "llm_provider": "yandex", "llm_model": "yandexgpt", "api_key": "", "stt_provider": "vosk"}
-    return rows[0]
-
-@app.put("/api/v1/config/{tenant_id}")
-def upsert_config(tenant_id: str, config: AiConfig, x_internal_secret: str = Header(...)):
-    verify_secret(x_internal_secret)
-    execute_db("""
-        INSERT INTO tenant_ai_config (tenant_id, llm_provider, llm_model, api_key, stt_provider, updated_at)
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(tenant_id) DO UPDATE SET
-            llm_provider = excluded.llm_provider,
-            llm_model = excluded.llm_model,
-            api_key = excluded.api_key,
-            stt_provider = excluded.stt_provider,
-            updated_at = CURRENT_TIMESTAMP
-    """, (tenant_id, config.llm_provider, config.llm_model, config.api_key, config.stt_provider))
-    return {"status": "saved", "tenant_id": tenant_id}
-
 @app.get("/api/v1/user-config/{user_id}")
 def get_user_config(user_id: str, x_internal_secret: str = Header(...)):
     verify_secret(x_internal_secret)
-
-    rows = query_db("SELECT * FROM user_ai_config WHERE user_id = ?", (user_id,))
+    rows = query_db(
+        "SELECT user_id, llm_provider, llm_model, api_key, stt_provider "
+        "FROM user_ai_config WHERE user_id = %s",
+        (user_id,)
+    )
     if rows:
         return rows[0]
-
-    try:
-        import httpx
-        resp = httpx.get(
-            f"{BACKEND_URL}/api/admin/ai/internal/user-config/{user_id}",
-            headers={"X-Internal-Secret": INTERNAL_SECRET},
-            timeout=5.0,
-        )
-        if resp.status_code == 200:
-            config = resp.json()
-            execute_db("""
-                INSERT INTO user_ai_config (user_id, llm_provider, llm_model, api_key, stt_provider, updated_at)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(user_id) DO UPDATE SET
-                    llm_provider = excluded.llm_provider,
-                    llm_model = excluded.llm_model,
-                    api_key = excluded.api_key,
-                    stt_provider = excluded.stt_provider,
-                    updated_at = CURRENT_TIMESTAMP
-            """, (user_id, config.get("llm_provider", "openrouter"), config.get("llm_model", "openrouter/auto"),
-                  config.get("api_key", ""), config.get("stt_provider", "vosk")))
-            return config
-    except Exception as e:
-        logger.warning(f"Failed to fetch user config from backend: {e}")
-
     return {"user_id": user_id, "llm_provider": "openrouter", "llm_model": "openrouter/auto", "api_key": "", "stt_provider": "vosk"}
-
-@app.put("/api/v1/user-config/{user_id}")
-def upsert_user_config(user_id: str, config: UserAiConfig, x_internal_secret: str = Header(...)):
-    verify_secret(x_internal_secret)
-    execute_db("""
-        INSERT INTO user_ai_config (user_id, llm_provider, llm_model, api_key, stt_provider, updated_at)
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(user_id) DO UPDATE SET
-            llm_provider = excluded.llm_provider,
-            llm_model = excluded.llm_model,
-            api_key = excluded.api_key,
-            stt_provider = excluded.stt_provider,
-            updated_at = CURRENT_TIMESTAMP
-    """, (user_id, config.llm_provider, config.llm_model, config.api_key, config.stt_provider))
-    return {"status": "saved", "user_id": user_id}
 
 @app.get("/api/v1/tenant/by-telegram/{chat_id}")
 def get_user_by_telegram(chat_id: str, x_internal_secret: str = Header(...)):
@@ -220,7 +147,7 @@ async def transcribe(tenant_id: str, file: UploadFile = File(...), x_internal_se
 
     log_id = str(uuid.uuid4())
     execute_db(
-        "INSERT INTO stt_log (id, tenant_id, duration_ms, text, confidence) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO stt_log (id, tenant_id, duration_ms, text, confidence) VALUES (%s, %s, %s, %s, %s)",
         (log_id, tenant_id, duration_ms, text, confidence)
     )
 

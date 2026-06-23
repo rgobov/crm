@@ -81,22 +81,6 @@ public class AiConfigController {
 
         UserAiConfig saved = userAiConfigService.saveConfig(user.getId(), llmProvider, llmModel, apiKey, sttProvider);
 
-        try {
-            restTemplate.exchange(
-                    aiKnowledgeUrl + "/api/v1/user-config/" + user.getId(),
-                    HttpMethod.PUT,
-                    new HttpEntity<>(Map.of(
-                            "llm_provider", saved.getLlmProvider(),
-                            "llm_model", saved.getLlmModel(),
-                            "api_key", saved.getApiKey(),
-                            "stt_provider", saved.getSttProvider()
-                    ), headers()),
-                    Void.class
-            );
-        } catch (Exception e) {
-            log.warn("Failed to push config to ai-knowledge: {}", e.getMessage());
-        }
-
         return ResponseEntity.ok(Map.of(
                 "llm_provider", saved.getLlmProvider(),
                 "llm_model", saved.getLlmModel(),

@@ -1,11 +1,17 @@
-import sqlite3
 import os
+import psycopg2
+import psycopg2.extras
 
-DB_PATH = os.getenv("DB_PATH", "/data/knowledge.db")
+DATABASE_URL = os.getenv("DATABASE_URL",
+    "postgresql://postgres:postgres@tryneuro_database:5432/tryneuro_db")
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS knowledge_base (
             id TEXT PRIMARY KEY,
             tenant_id TEXT NOT NULL,
@@ -15,27 +21,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS tenant_ai_config (
-            tenant_id TEXT PRIMARY KEY,
-            llm_provider TEXT NOT NULL DEFAULT 'yandex',
-            llm_model TEXT NOT NULL DEFAULT 'yandexgpt',
-            api_key TEXT,
-            stt_provider TEXT DEFAULT 'vosk',
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS user_ai_config (
-            user_id TEXT PRIMARY KEY,
-            llm_provider TEXT NOT NULL DEFAULT 'openrouter',
-            llm_model TEXT NOT NULL DEFAULT 'openrouter/auto',
-            api_key TEXT,
-            stt_provider TEXT DEFAULT 'vosk',
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("""
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS stt_log (
             id TEXT PRIMARY KEY,
             tenant_id TEXT NOT NULL,
@@ -46,20 +32,22 @@ def init_db():
         )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 def query_db(sql, params=()):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cur = conn.execute(sql, params)
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(sql, params)
     rows = [dict(row) for row in cur.fetchall()]
+    cur.close()
     conn.close()
     return rows
 
 def execute_db(sql, params=()):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.execute(sql, params)
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(sql, params)
     conn.commit()
-    last_id = cur.lastrowid
+    cur.close()
     conn.close()
-    return last_id

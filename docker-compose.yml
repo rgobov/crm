@@ -70,10 +70,8 @@ services:
     restart: always
     logging: *default-logging
     environment:
-      DB_PATH: /data/knowledge.db
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@tryneuro_database:5432/tryneuro_db
       INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
-    volumes:
-      - ai_knowledge_data:/data
     networks:
       - tryneuro_network
     ports:
@@ -120,6 +118,5 @@ networks:
 volumes:
   postgres_data:
   tg_sessions_python:
-  ai_knowledge_data:
   crm_tg_sessions_python:
     external: true
