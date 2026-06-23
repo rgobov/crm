@@ -368,17 +368,25 @@ async def llm_proxy(request: Request):
         "HTTP-Referer": "https://crm.999crm.ru",
         "X-Title": "TryNeuro CRM",
     }
+    if body.get("stream"):
+        async def generate():
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream(
+                    "POST",
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    json=body,
+                    headers=headers,
+                ) as resp:
+                    async for chunk in resp.aiter_bytes():
+                        yield chunk
+        return StreamingResponse(generate(), media_type="text/event-stream")
+
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=body,
             headers=headers,
         )
-        if body.get("stream"):
-            return StreamingResponse(
-                resp.aiter_bytes(),
-                media_type="text/event-stream",
-            )
         return JSONResponse(content=resp.json(), status_code=resp.status_code)
 
 
