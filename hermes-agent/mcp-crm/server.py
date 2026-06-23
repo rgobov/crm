@@ -286,6 +286,17 @@ async def list_models():
     }
 
 
+@llm_app.get("/v1/models/{model}")
+async def get_model(model: str):
+    """Return model info for Hermes provider validation."""
+    return {
+        "id": model,
+        "object": "model",
+        "created": 1700000000,
+        "owned_by": "crm",
+    }
+
+
 @llm_app.post("/v1/chat/completions")
 async def llm_proxy(request: Request):
     body = await request.json()
