@@ -286,7 +286,7 @@ async def list_models():
     }
 
 
-@llm_app.get("/v1/models/{model}")
+@llm_app.get("/v1/models/{model:path}")
 async def get_model(model: str):
     """Return model info for Hermes provider validation."""
     return {
