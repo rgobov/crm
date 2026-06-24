@@ -2,10 +2,11 @@
 """Генератор шард-профилей Hermes для multiplexed gateway.
 
 Читает user_ai_config из PostgreSQL, распределяет пользователей по 4 шардам
-(chat_id % 4), создаёт профили с SOUL.md, config.yaml и hook-плагином.
+(chat_id % 4), создаёт профили с SOUL.md, config.yaml и httpx-плагином.
 
-Hook читает модель/api_key из PostgreSQL на каждый запрос (кэш 5 мин),
-поэтому .env с ключами не нужен — обновление CRM сразу применяется.
+Плагин перехватывает HTTP-запросы Hermes к OpenRouter и подставляет
+модель/api_key из PostgreSQL для каждого пользователя (через session_context).
+Кэш 5 мин. Без прокси, без мёртвых хуков.
 """
 import os
 import yaml
@@ -25,54 +26,162 @@ BASE_SOUL = """# TryNeuro CRM Assistant
 Отвечаешь кратко, по делу, на русском.
 """
 
-HOOK_PLUGIN = """# dynamic_model_hook.py
+PLUGIN_YAML = """name: tryneuro-user-config
+version: "1.0"
+description: Per-user model/api_key from PostgreSQL via httpx monkey-patch
+requires_env:
+  - name: DATABASE_URL
+    description: PostgreSQL connection string for user_ai_config lookups
+"""
+
+PLUGIN_INIT = r'''"""tryneuro-user-config — intercepts httpx requests to OpenRouter.
+
+Reads current session chat_id from gateway.session_context,
+looks up user_ai_config from PostgreSQL, and rewrites the request
+with the user's model and API key. Cached 5 minutes.
+"""
 import os
+import sys
+import json
 import time
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import httpx
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@tryneuro_database:5432/tryneuro_db")
-_user_config_cache = {}
+_USER_CONFIG_CACHE: dict = {}
+_CACHE_TTL = 300
 
-async def pre_model_request(ctx, kwargs):
-    context_id = ctx.get("context_id")
-    if not context_id:
-        return kwargs
-    cfg = _get_config(context_id)
-    if cfg:
-        kwargs["model"] = cfg["llm_model"]
-        kwargs["api_key"] = cfg["api_key"]
-        kwargs["base_url"] = "https://openrouter.ai/api/v1"
-        kwargs.setdefault("default_headers", {})["Authorization"] = f"Bearer {cfg['api_key']}"
-    return kwargs
 
-def _get_config(telegram_id_str):
+def _ensure_psycopg2():
+    """Lazy-install psycopg2-binary if not available."""
+    try:
+        import psycopg2  # noqa: F401
+    except ImportError:
+        import subprocess
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "psycopg2-binary", "-q"]
+        )
+
+
+def _get_user_config(telegram_id: int) -> dict | None:
+    """Read user AI config from PostgreSQL, cached 5 min."""
+    _ensure_psycopg2()
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+
     now = time.time()
-    if telegram_id_str in _user_config_cache:
-        cached, ts = _user_config_cache[telegram_id_str]
-        if now - ts < 300:
+    key = str(telegram_id)
+    if key in _USER_CONFIG_CACHE:
+        cached, ts = _USER_CONFIG_CACHE[key]
+        if now - ts < _CACHE_TTL:
             return cached
     try:
-        telegram_id = int(telegram_id_str)
         conn = psycopg2.connect(DB_URL)
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(\"\"\"
-            SELECT uac.llm_model, uac.api_key
-            FROM \"users\" u
-            JOIN user_ai_config uac ON u.id = uac.user_id
-            WHERE u.telegram_id = %s AND uac.api_key IS NOT NULL AND uac.api_key != ''
-        \"\"\", (telegram_id,))
+        cur.execute(
+            'SELECT uac.llm_model, uac.api_key '
+            'FROM "users" u '
+            'JOIN user_ai_config uac ON u.id = uac.user_id '
+            'WHERE u.telegram_id = %s AND uac.api_key IS NOT NULL AND uac.api_key != \'\'',
+            (telegram_id,),
+        )
         row = cur.fetchone()
         cur.close()
         conn.close()
         if row:
             cfg = {"llm_model": row["llm_model"], "api_key": row["api_key"]}
-            _user_config_cache[telegram_id_str] = (cfg, now)
+            _USER_CONFIG_CACHE[key] = (cfg, now)
+            print(f"[tryneuro-user-config] loaded tg={telegram_id} model={row['llm_model']}")
             return cfg
     except Exception as e:
-        print(f"[hook] Error for {telegram_id_str}: {e}")
+        print(f"[tryneuro-user-config] error for tg={telegram_id}: {e}")
     return None
-"""
+
+
+def _get_session_chat_id() -> int | None:
+    """Read Telegram chat_id from session context."""
+    try:
+        from gateway.session_context import get_session_env
+        val = get_session_env("HERMES_SESSION_CHAT_ID")
+        if val:
+            return int(val)
+    except Exception:
+        pass
+    try:
+        from gateway.session_context import _SESSION_CHAT_ID
+        val = _SESSION_CHAT_ID.get()
+        if val:
+            return int(val)
+    except Exception:
+        pass
+    return None
+
+
+# ── httpx.Client monkey-patch ──────────────────────────────────────────
+_ORIGINAL_SEND = getattr(httpx.Client, "send", None)
+
+
+def _patched_send(self, request: httpx.Request, **kwargs):
+    """Patched httpx.Client.send — rewrites OpenRouter requests per user."""
+    url = str(request.url)
+    if _ORIGINAL_SEND is None or ("openrouter.ai" not in url and "/v1/" not in url):
+        return _ORIGINAL_SEND(self, request, **kwargs)
+
+    telegram_id = _get_session_chat_id()
+    if telegram_id:
+        cfg = _get_user_config(telegram_id)
+        if cfg:
+            request.headers["Authorization"] = f"Bearer {cfg['api_key']}"
+            if request.content:
+                try:
+                    body = json.loads(request.content)
+                    orig_model = body.get("model", "")
+                    body["model"] = cfg["llm_model"]
+                    request.content = json.dumps(body).encode()
+                    request.headers.pop("Content-Length", None)
+                    print(f"[tryneuro-user-config] rewrite tg={telegram_id} {orig_model} -> {cfg['llm_model']}")
+                except (json.JSONDecodeError, Exception) as e:
+                    print(f"[tryneuro-user-config] body rewrite failed: {e}")
+
+    return _ORIGINAL_SEND(self, request, **kwargs)
+
+
+# ── httpx.AsyncClient monkey-patch ─────────────────────────────────────
+_ORIGINAL_ASYNC_SEND = getattr(httpx.AsyncClient, "send", None)
+
+
+async def _patched_async_send(self, request: httpx.Request, **kwargs):
+    """Patched httpx.AsyncClient.send — rewrites OpenRouter requests per user."""
+    url = str(request.url)
+    if _ORIGINAL_ASYNC_SEND is None or ("openrouter.ai" not in url and "/v1/" not in url):
+        return await _ORIGINAL_ASYNC_SEND(self, request, **kwargs)
+
+    telegram_id = _get_session_chat_id()
+    if telegram_id:
+        cfg = _get_user_config(telegram_id)
+        if cfg:
+            request.headers["Authorization"] = f"Bearer {cfg['api_key']}"
+            if request.content:
+                try:
+                    body = json.loads(request.content)
+                    orig_model = body.get("model", "")
+                    body["model"] = cfg["llm_model"]
+                    request.content = json.dumps(body).encode()
+                    request.headers.pop("Content-Length", None)
+                    print(f"[tryneuro-user-config] rewrite tg={telegram_id} {orig_model} -> {cfg['llm_model']}")
+                except (json.JSONDecodeError, Exception) as e:
+                    print(f"[tryneuro-user-config] body rewrite failed: {e}")
+
+    return await _ORIGINAL_ASYNC_SEND(self, request, **kwargs)
+
+
+def register(ctx):
+    """Apply httpx patches on plugin load."""
+    # Patch sync client
+    httpx.Client.send = _patched_send
+    # Patch async client
+    httpx.AsyncClient.send = _patched_async_send
+    print("[tryneuro-user-config] httpx patches applied")
+'''
 
 
 def assign_shard(telegram_id: int) -> int:
@@ -116,12 +225,19 @@ def main():
             },
             "toolsets": ["crm", "files", "web"],
             "memory": {"enabled": True, "max_tokens": 4000},
+            "plugins": {"enabled": ["tryneuro-user-config"]},
         }
         (prof_dir / "config.yaml").write_text(yaml.dump(prof_config, sort_keys=False))
 
-        plugins_dir = prof_dir / "plugins"
-        plugins_dir.mkdir(exist_ok=True)
-        (plugins_dir / "dynamic_model_hook.py").write_text(HOOK_PLUGIN)
+        plugin_dir = prof_dir / "plugins" / "tryneuro-user-config"
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+        (plugin_dir / "plugin.yaml").write_text(PLUGIN_YAML)
+        (plugin_dir / "__init__.py").write_text(PLUGIN_INIT)
+
+        # Remove old dead hook if present
+        old_hook = prof_dir / "plugins" / "dynamic_model_hook.py"
+        if old_hook.exists():
+            old_hook.unlink()
 
         print(f"✅ shard_{idx+1}: {len(data['users'])} users, bot={data['bot_token'][:12]}...")
 
