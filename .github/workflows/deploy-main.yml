@@ -7,6 +7,8 @@ on:
       - feature/roles
     paths-ignore:
       - 'hermes-agent/**'
+      - 'AGENTS.md'
+      - '*.md'
 
 concurrency:
   group: deploy-vps
