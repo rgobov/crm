@@ -2,11 +2,12 @@
 """Генератор шард-профилей Hermes для multiplexed gateway.
 
 Читает user_ai_config из PostgreSQL, распределяет пользователей по 4 шардам
-(chat_id % 4), создаёт профили с SOUL.md, config.yaml и нативным pre_llm_call плагином.
+(chat_id % 4), создаёт профили с SOUL.md, config.yaml, shell hook (pre_llm_call)
+и нативным плагином (запасной вариант, т.к. plugin hooks имеют баг #2817).
 
-Плагин inject'ит маркер <<UM tg=id model="model_name">> в user message.
+Shell hook inject'ит маркер <<UM tg=id model="model_name">> в user message.
 OpenRouter Proxy читает маркер, подменяет api_key и model в HTTP-запросе.
-Кэш 5 мин. Нативный Hermes plugin hook.
+Кэш 5 мин (файловый /tmp).
 """
 import os
 import yaml
@@ -150,6 +151,144 @@ def register(ctx):
 '''
 
 
+SHELL_HOOK = r'''#!/usr/bin/env python3
+"""Shell hook: inject <<UM>> marker for OpenRouter Proxy.
+
+Reads JSON from stdin (pre_llm_call event), looks up user config
+from PostgreSQL via session_id (tg:<chat_id>), outputs {"context": "<<UM tg=X model="Y">>"}.
+File-based cache in /tmp, TTL 5 min.
+Uses sys.stderr for debug logging (visible in docker logs).
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+DB_URL = os.getenv("DATABASE_URL")
+_CACHE_FILE = "/tmp/tryneuro_user_config_cache.json"
+_CACHE_TTL = 300
+_PSYCOPG2_CHECKED = False
+
+
+def _ensure_psycopg2():
+    """Lazy-install psycopg2-binary if not available."""
+    global _PSYCOPG2_CHECKED
+    if _PSYCOPG2_CHECKED:
+        return
+    try:
+        import psycopg2  # noqa: F401
+        _PSYCOPG2_CHECKED = True
+        return
+    except ImportError:
+        pass
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "psycopg2-binary", "-q"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    _PSYCOPG2_CHECKED = True
+
+
+def _read_cache():
+    try:
+        with open(_CACHE_FILE) as f:
+            data = json.load(f)
+        now = time.time()
+        return {k: v for k, v in data.items() if now - v["ts"] < _CACHE_TTL}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _write_cache(cache):
+    tmp = _CACHE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cache, f)
+    os.rename(tmp, _CACHE_FILE)
+
+
+def _get_user_config(telegram_id):
+    _ensure_psycopg2()
+    cache = _read_cache()
+    key = str(telegram_id)
+    if key in cache:
+        return cache[key]["cfg"]
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(
+            "SELECT uac.llm_model, uac.api_key "
+            'FROM "users" u '
+            "JOIN user_ai_config uac ON u.id = uac.user_id "
+            "WHERE u.telegram_id = %s AND uac.api_key IS NOT NULL AND uac.api_key != ''",
+            (telegram_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if row:
+            cfg = {"llm_model": row["llm_model"], "api_key": row["api_key"]}
+            cache[key] = {"cfg": cfg, "ts": time.time()}
+            _write_cache(cache)
+            print(f"[tryneuro-user-config] loaded tg={telegram_id} model={row['llm_model']}", file=sys.stderr)
+            return cfg
+    except Exception as e:
+        print(f"[tryneuro-user-config] error for tg={telegram_id}: {e}", file=sys.stderr)
+    return None
+
+
+def _parse_chat_id(payload):
+    """Extract Telegram chat_id from shell hook stdin payload."""
+    session_id = payload.get("session_id", "")
+    m = re.match(r"tg[_:](\d+)", session_id)
+    if m:
+        return int(m.group(1))
+    extra = payload.get("extra", {})
+    for key in ("chat_id", "telegram_id", "user_id"):
+        val = extra.get(key)
+        if val is not None:
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                pass
+    return None
+
+
+def main():
+    raw = sys.stdin.read()
+    print("[tryneuro-user-config] RAW stdin: " + raw[:500], file=sys.stderr)
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"[tryneuro-user-config] JSON parse error: {e}", file=sys.stderr)
+        print("{}")
+        return
+
+    telegram_id = _parse_chat_id(payload)
+    if not telegram_id:
+        sid = payload.get("session_id", "")
+        ekeys = list(payload.get("extra", {}).keys())
+        print(f"[tryneuro-user-config] no chat_id in session_id={sid} extra_keys={ekeys}", file=sys.stderr)
+        print("{}")
+        return
+
+    cfg = _get_user_config(telegram_id)
+    if not cfg:
+        print("{}")
+        return
+
+    marker = f"<<UM tg={telegram_id} model=\"{cfg['llm_model']}\">>"
+    print(json.dumps({"context": marker}))
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+
 def assign_shard(telegram_id: int) -> int:
     return telegram_id % NUM_SHARDS
 
@@ -192,6 +331,15 @@ def main():
             "toolsets": ["crm"],
             "memory": {"enabled": True, "max_tokens": 4000},
             "plugins": {"enabled": ["tryneuro-user-config"]},
+            "hooks": {
+                "pre_llm_call": [
+                    {
+                        "command": f"python3 /opt/hermes/profiles/shard_{idx+1}/plugins/tryneuro-user-config/shell_hook.py",
+                        "timeout": 10,
+                    }
+                ],
+            },
+            "hooks_auto_accept": True,
         }
         (prof_dir / "config.yaml").write_text(yaml.dump(prof_config, sort_keys=False))
 
@@ -199,6 +347,7 @@ def main():
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "plugin.yaml").write_text(PLUGIN_YAML)
         (plugin_dir / "__init__.py").write_text(PLUGIN_INIT)
+        (plugin_dir / "shell_hook.py").write_text(SHELL_HOOK)
 
         # Remove old dead hook if present
         old_hook = prof_dir / "plugins" / "dynamic_model_hook.py"
