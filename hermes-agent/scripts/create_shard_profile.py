@@ -216,6 +216,7 @@ def main():
 
     global_config = {
         "gateway": {"multiplex_profiles": True},
+        "plugins": {"enabled": ["tryneuro-user-config"]},
         "routes": [
             {"match": {"platform": "telegram", "bot_token": f"${{BOT_TOKEN_{i+1}}}"}, "agent_id": f"shard_{i+1}"}
             for i in range(NUM_SHARDS)

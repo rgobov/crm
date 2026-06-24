@@ -1,6 +1,10 @@
 gateway:
   multiplex_profiles: true
 
+plugins:
+  enabled:
+    - tryneuro-user-config
+
 routes:
   - match:
       platform: telegram
