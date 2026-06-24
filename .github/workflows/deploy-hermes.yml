@@ -49,7 +49,7 @@ jobs:
             echo "--- СБОРКА И ЗАПУСК ---"
             export DOCKER_BUILDKIT=1
             docker network create tryneuro_network || true
-            mkdir -p profiles scripts
+            mkdir -p profiles scripts plugins
             docker-compose down --remove-orphans
             docker-compose build --parallel
             docker-compose up -d
@@ -60,6 +60,7 @@ jobs:
               -v ~/crm/hermes-agent/profiles:/opt/hermes/profiles:rw \
               -v ~/crm/hermes-agent/config.yaml:/opt/hermes/config.yaml:rw \
               -v ~/crm/hermes-agent/scripts:/scripts:ro \
+              -v ~/crm/hermes-agent/plugins:/root/.hermes/plugins:rw \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e BOT_TOKEN_1="${{ secrets.BOT_TOKEN_1 }}" \
               -e BOT_TOKEN_2="${{ secrets.BOT_TOKEN_2 }}" \
@@ -67,6 +68,7 @@ jobs:
               -e BOT_TOKEN_4="${{ secrets.BOT_TOKEN_4 }}" \
               -e PROFILES_DIR=/opt/hermes/profiles \
               -e CONFIG_DIR=/opt/hermes \
+              -e HOME_PLUGINS_DIR=/root/.hermes/plugins \
               python:3.13-slim bash -c "
                 pip install pyyaml psycopg2-binary -q &&
                 python /scripts/create_shard_profile.py

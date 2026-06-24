@@ -20,6 +20,7 @@ BOT_TOKENS = [os.getenv(f"BOT_TOKEN_{i}") for i in range(1, 5)]
 NUM_SHARDS = len([t for t in BOT_TOKENS if t])
 PROFILES_DIR = Path(os.getenv("PROFILES_DIR", "/opt/hermes/profiles"))
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", str(PROFILES_DIR.parent)))
+HOME_PLUGINS_DIR = Path(os.getenv("HOME_PLUGINS_DIR", "/root/.hermes/plugins"))
 
 BASE_SOUL = """# TryNeuro CRM Assistant
 Ты — AI-ассистент CRM системы TryNeuro.
@@ -83,9 +84,15 @@ def _ensure_psycopg2():
         import psycopg2  # noqa: F401
     except ImportError:
         import subprocess
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "psycopg2-binary", "-q"]
-        )
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "psycopg2-binary", "-q"]
+            )
+        except (subprocess.CalledProcessError, ModuleNotFoundError):
+            subprocess.check_call([sys.executable, "-m", "ensurepip", "--upgrade"])
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "psycopg2-binary", "-q"]
+            )
 
 
 def _get_user_config(telegram_id: int) -> dict | None:
@@ -193,17 +200,19 @@ def main():
         }
         (prof_dir / "config.yaml").write_text(yaml.dump(prof_config, sort_keys=False))
 
-        plugin_dir = prof_dir / "plugins" / "tryneuro-user-config"
-        plugin_dir.mkdir(parents=True, exist_ok=True)
-        (plugin_dir / "plugin.yaml").write_text(PLUGIN_YAML)
-        (plugin_dir / "__init__.py").write_text(PLUGIN_INIT)
-
         # Remove old dead hook if present
         old_hook = prof_dir / "plugins" / "dynamic_model_hook.py"
         if old_hook.exists():
             old_hook.unlink()
 
         print(f"✅ shard_{idx+1}: {len(data['users'])} users, bot={data['bot_token'][:12]}...")
+
+    # Write plugin to HOME_PLUGINS_DIR (Hermes discovers plugins from ~/.hermes/plugins/)
+    home_plugin_dir = HOME_PLUGINS_DIR / "tryneuro-user-config"
+    home_plugin_dir.mkdir(parents=True, exist_ok=True)
+    (home_plugin_dir / "plugin.yaml").write_text(PLUGIN_YAML)
+    (home_plugin_dir / "__init__.py").write_text(PLUGIN_INIT)
+    print(f"✅ Plugin written to {home_plugin_dir}")
 
     global_config = {
         "gateway": {"multiplex_profiles": True},
