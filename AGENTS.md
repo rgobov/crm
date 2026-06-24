@@ -64,3 +64,7 @@ When editing `notifications-python/main.py`:
 - `docker compose build --no-cache --parallel` + `docker compose up -d` on VPS
 - `docker logs tryneuro_notifications_python --tail 50` — check logs
 - `docker compose up -d --build notifications` — rebuild single service
+
+## Hermes
+
+- **Source**: https://github.com/NousResearch/hermes-agent
