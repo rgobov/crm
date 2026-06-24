@@ -73,6 +73,8 @@ import os
 import sys
 import time
 
+print("PLUGIN MODULE LOADED", flush=True)
+
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@tryneuro_database:5432/tryneuro_db")
 _USER_CONFIG_CACHE: dict = {}
 _CACHE_TTL = 300
@@ -154,6 +156,7 @@ def register(ctx):
         return {"action": "rewrite", "text": f"{marker}\\n{event.text}"}
     
     ctx.register_hook("pre_gateway_dispatch", inject_user_marker)
+    print("[tryneuro-user-config] hook registered: pre_gateway_dispatch")
 '''
 
 
