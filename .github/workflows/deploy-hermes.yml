@@ -76,7 +76,8 @@ jobs:
             docker restart tryneuro_hermes
 
             echo "--- ОЧИСТКА ---"
-            docker system prune -f
+            docker system prune -af --volumes
+            docker image prune -a -f
 
             echo "--- СТАТУС ---"
             docker-compose ps
