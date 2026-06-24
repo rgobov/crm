@@ -18,8 +18,8 @@ from pathlib import Path
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@tryneuro_database:5432/tryneuro_db")
 BOT_TOKENS = [os.getenv(f"BOT_TOKEN_{i}") for i in range(1, 5)]
 NUM_SHARDS = len([t for t in BOT_TOKENS if t])
-PROFILES_DIR = Path(os.getenv("PROFILES_DIR", "/opt/hermes/profiles"))
-CONFIG_DIR = Path(os.getenv("CONFIG_DIR", str(PROFILES_DIR.parent)))
+PROFILES_DIR = Path(os.getenv("PROFILES_DIR", "/opt/data/profiles"))
+CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "/opt/data"))
 HOME_PLUGINS_DIR = Path(os.getenv("HOME_PLUGINS_DIR", "/root/.hermes/plugins"))
 
 BASE_SOUL = """# TryNeuro CRM Assistant
@@ -134,7 +134,6 @@ def register(ctx):
     """Register pre_gateway_dispatch hook to inject <<UM>> marker."""
     print("[tryneuro-user-config] register() called")
     
-    @ctx.register_hook("pre_gateway_dispatch")
     async def inject_user_marker(event, gateway, session_store, **kwargs):
         """Rewrite incoming message with <<UM>> marker for the proxy."""
         telegram_id = None
@@ -153,6 +152,8 @@ def register(ctx):
         
         marker = f"<<UM tg={telegram_id} model=\\"{cfg['llm_model']}\\">>"
         return {"action": "rewrite", "text": f"{marker}\\n{event.text}"}
+    
+    ctx.register_hook("pre_gateway_dispatch", inject_user_marker)
 '''
 
 

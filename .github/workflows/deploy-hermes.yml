@@ -57,8 +57,8 @@ jobs:
             echo "--- ГЕНЕРАЦИЯ ПРОФИЛЕЙ ---"
             docker run --rm \
               --network tryneuro_network \
-              -v ~/crm/hermes-agent/profiles:/opt/hermes/profiles:rw \
-              -v ~/crm/hermes-agent/config.yaml:/opt/hermes/config.yaml:rw \
+              -v ~/crm/hermes-agent/profiles:/opt/data/profiles:rw \
+              -v ~/crm/hermes-agent/config.yaml:/opt/data/config.yaml:rw \
               -v ~/crm/hermes-agent/scripts:/scripts:ro \
               -v ~/crm/hermes-agent/plugins:/root/.hermes/plugins:rw \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
@@ -66,8 +66,8 @@ jobs:
               -e BOT_TOKEN_2="${{ secrets.BOT_TOKEN_2 }}" \
               -e BOT_TOKEN_3="${{ secrets.BOT_TOKEN_3 }}" \
               -e BOT_TOKEN_4="${{ secrets.BOT_TOKEN_4 }}" \
-              -e PROFILES_DIR=/opt/hermes/profiles \
-              -e CONFIG_DIR=/opt/hermes \
+              -e PROFILES_DIR=/opt/data/profiles \
+              -e CONFIG_DIR=/opt/data \
               -e HOME_PLUGINS_DIR=/root/.hermes/plugins \
               python:3.13-slim bash -c "
                 pip install pyyaml psycopg2-binary -q &&
