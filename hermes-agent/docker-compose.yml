@@ -48,7 +48,7 @@ services:
       - hermes_data:/opt/data
       - ./config.yaml:/opt/data/config.yaml:rw
       - ./profiles:/opt/data/profiles:rw
-      - ./plugins:/root/.hermes/plugins
+      - ./plugins:/opt/data/plugins
     networks:
       - tryneuro_network
     ports:

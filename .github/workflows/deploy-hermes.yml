@@ -60,7 +60,7 @@ jobs:
               -v ~/crm/hermes-agent/profiles:/opt/data/profiles:rw \
               -v ~/crm/hermes-agent/config.yaml:/opt/data/config.yaml:rw \
               -v ~/crm/hermes-agent/scripts:/scripts:ro \
-              -v ~/crm/hermes-agent/plugins:/root/.hermes/plugins:rw \
+              -v ~/crm/hermes-agent/plugins:/opt/data/plugins:rw \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
               -e BOT_TOKEN_1="${{ secrets.BOT_TOKEN_1 }}" \
               -e BOT_TOKEN_2="${{ secrets.BOT_TOKEN_2 }}" \
@@ -68,7 +68,7 @@ jobs:
               -e BOT_TOKEN_4="${{ secrets.BOT_TOKEN_4 }}" \
               -e PROFILES_DIR=/opt/data/profiles \
               -e CONFIG_DIR=/opt/data \
-              -e HOME_PLUGINS_DIR=/root/.hermes/plugins \
+              -e HOME_PLUGINS_DIR=/opt/data/plugins \
               python:3.13-slim bash -c "
                 pip install pyyaml psycopg2-binary -q &&
                 python /scripts/create_shard_profile.py
