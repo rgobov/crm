@@ -1,16 +1,21 @@
-"""Diagnostic: patch OpenAI SDK completions.create to trace LLM calls and inject user."""
+"""Diagnostic + fix: inject chat_id as user field into all LLM API calls (sync + async)."""
 import sys
 import os
 import logging
 import traceback
+import threading
 
 logging.basicConfig(level=logging.INFO, format="%(name)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("hermes-patch")
 
-# ── 1. Patch AIAgent._build_api_kwargs (original approach) ──
+# Thread-local to pass chat_id from AIAgent context to OpenAI call
+_tls = threading.local()
+
+# ── 1. Patch AIAgent to capture chat_id ──
 try:
     from run_agent import AIAgent
 
+    # _build_api_kwargs (original approach)
     _build_prev = getattr(AIAgent, "_build_api_kwargs", None)
     if _build_prev:
         def _patched_build(self, *args, **kwargs):
@@ -19,75 +24,87 @@ try:
             if chat_id is not None:
                 result['user'] = str(chat_id)
                 logger.info("Injected user=%s into _build_api_kwargs result", chat_id)
-            else:
-                logger.warning("_build_api_kwargs called but _chat_id is None")
             return result
         setattr(AIAgent, "_build_api_kwargs", _patched_build)
         logger.info("Patched AIAgent._build_api_kwargs")
-    else:
-        logger.warning("AIAgent has no _build_api_kwargs method")
 
-    # Also patch __init__ to log chat_id
+    # __init__ — log and store chat_id in thread-local
     _init_prev = AIAgent.__init__
     def _patched_init(self, *args, **kwargs):
         _init_prev(self, *args, **kwargs)
         chat_id = getattr(self, '_chat_id', None)
         logger.info("AIAgent.__init__ called, _chat_id=%s, kwargs keys=%s",
                      chat_id, list(kwargs.keys()))
+        if chat_id:
+            _tls.chat_id = str(chat_id)
     AIAgent.__init__ = _patched_init
     logger.info("Patched AIAgent.__init__")
+
+    # run_conversation — also store chat_id
+    if hasattr(AIAgent, "run_conversation"):
+        _run_prev = AIAgent.run_conversation
+        def _patched_run(self, *args, **kwargs):
+            chat_id = getattr(self, '_chat_id', None) or getattr(self, '_user_id', None)
+            if chat_id:
+                _tls.chat_id = str(chat_id)
+                logger.info("run_conversation called, chat_id=%s", _tls.chat_id)
+            else:
+                logger.warning("run_conversation called but no chat_id on agent")
+            return _run_prev(self, *args, **kwargs)
+        AIAgent.run_conversation = _patched_run
+        logger.info("Patched AIAgent.run_conversation")
 
 except Exception as e:
     logger.error("Failed to patch AIAgent: %s", e)
     traceback.print_exc()
 
-# ── 2. Patch OpenAI SDK completions.create (most reliable interception) ──
+# ── 2. Helper: inject user into kwargs ──
+def _inject_user(kwargs):
+    chat_id = kwargs.get("user") or getattr(_tls, "chat_id", None)
+    if chat_id:
+        kwargs["user"] = str(chat_id)
+        logger.info("Injected user=%s into API call (model=%s)", chat_id, kwargs.get("model"))
+    elif not kwargs.get("user"):
+        logger.warning("No chat_id available to inject — _tls.chat_id=%s",
+                       getattr(_tls, "chat_id", None))
+    return kwargs
+
+# ── 3. Patch SYNC completions.create ──
 try:
     import openai
+    _orig_sync = openai.resources.chat.completions.Completions.create
 
-    _orig_completions_create = openai.resources.chat.completions.Completions.create
-
-    def _patched_completions_create(self, *args, **kwargs):
-        # Log what we received
-        logger.info("OPENAI CALL: model=%s, user=%s, messages=%d",
-                     kwargs.get("model"),
-                     kwargs.get("user"),
+    def _patched_sync(self, *args, **kwargs):
+        _inject_user(kwargs)
+        logger.info("OPENAI SYNC CALL: model=%s, user=%s, messages=%d",
+                     kwargs.get("model"), kwargs.get("user"),
                      len(kwargs.get("messages", [])))
-
-        # Try to find chat_id from any accessible context
-        chat_id = kwargs.get("user")
-
-        # If no user field, try to find AIAgent instance in call stack
-        if not chat_id:
-            for frame_info in traceback.extract_stack():
-                if "run_agent" in frame_info.filename or "gateway" in frame_info.filename:
-                    logger.info("  stack frame: %s:%d %s", frame_info.filename,
-                                frame_info.lineno, frame_info.name)
-
-        result = _orig_completions_create(self, *args, **kwargs)
-        logger.info("OPENAI RESPONSE: model=%s, usage=%s",
-                     getattr(result, "model", "?"),
-                     getattr(result, "usage", "?"))
+        result = _orig_sync(self, *args, **kwargs)
+        logger.info("OPENAI SYNC RESPONSE: model=%s", getattr(result, "model", "?"))
         return result
 
-    openai.resources.chat.completions.Completions.create = _patched_completions_create
-    logger.info("Patched openai.resources.chat.completions.Completions.create")
-
+    openai.resources.chat.completions.Completions.create = _patched_sync
+    logger.info("Patched SYNC Completions.create")
 except Exception as e:
-    logger.error("Failed to patch OpenAI SDK: %s", e)
-    traceback.print_exc()
+    logger.error("Failed to patch SYNC Completions.create: %s", e)
 
-# ── 3. Try to patch client.chat.completions.create too ──
+# ── 4. Patch ASYNC completions.create ──
 try:
-    from openai import OpenAI
-    _orig_client_create = OpenAI.chat.completions.create
-    def _patched_client_create(self, *args, **kwargs):
-        logger.info("CLIENT CALL: model=%s, user=%s", kwargs.get("model"), kwargs.get("user"))
-        return _orig_client_create(self, *args, **kwargs)
-    OpenAI.chat.completions.create = _patched_client_create
-    logger.info("Patched OpenAI.chat.completions.create")
+    _orig_async = openai.resources.chat.completions.AsyncCompletions.create
+
+    async def _patched_async(self, *args, **kwargs):
+        _inject_user(kwargs)
+        logger.info("OPENAI ASYNC CALL: model=%s, user=%s, messages=%d",
+                     kwargs.get("model"), kwargs.get("user"),
+                     len(kwargs.get("messages", [])))
+        result = await _orig_async(self, *args, **kwargs)
+        logger.info("OPENAI ASYNC RESPONSE: model=%s", getattr(result, "model", "?"))
+        return result
+
+    openai.resources.chat.completions.AsyncCompletions.create = _patched_async
+    logger.info("Patched ASYNC AsyncCompletions.create")
 except Exception as e:
-    logger.error("Failed to patch OpenAI client method: %s", e)
+    logger.error("Failed to patch ASYNC AsyncCompletions.create: %s", e)
 
 # ── Bootstrap Hermes ──
 sys.argv = ['hermes', 'gateway', 'run']
