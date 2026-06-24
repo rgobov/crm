@@ -69,9 +69,8 @@ pre_llm_call/post_llm_call/on_session_start/on_session_end are never invoked
 in gateway/run.py and receives the MessageEvent with .source.user_id.
 """
 import os
+import sys
 import time
-import psycopg2
-from psycopg2.extras import RealDictCursor
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@tryneuro_database:5432/tryneuro_db")
 _USER_CONFIG_CACHE: dict = {}
