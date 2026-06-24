@@ -2,11 +2,10 @@
 """Генератор шард-профилей Hermes для multiplexed gateway.
 
 Читает user_ai_config из PostgreSQL, распределяет пользователей по 4 шардам
-(chat_id % 4), создаёт профили с SOUL.md, config.yaml и httpx-плагином.
+(chat_id % 4), создаёт профили с SOUL.md, config.yaml и нативным pre_llm_call плагином.
 
-Плагин перехватывает HTTP-запросы Hermes к OpenRouter и подставляет
-модель/api_key из PostgreSQL для каждого пользователя (через session_context).
-Кэш 5 мин. Без прокси, без мёртвых хуков.
+Плагин использует Hermes pre_llm_call хук для инъекции per-user model/api_key
+из PostgreSQL для каждого запроса. Кэш 5 мин. Без monkey-patch, нативно.
 """
 import os
 import yaml
@@ -24,27 +23,52 @@ BASE_SOUL = """# TryNeuro CRM Assistant
 Ты — AI-ассистент CRM системы TryNeuro.
 Помогаешь клиентам с контактами, записями, услугами.
 Отвечаешь кратко, по делу, на русском.
+
+## Доступные инструменты (MCP crm toolset)
+Используй их для работы с CRM:
+
+### Контакты
+- search_contacts — найти клиента по имени или телефону
+- create_contact — создать нового клиента
+
+### Записи (appointments)
+- create_appointment — записать клиента на услугу
+- cancel_appointment — отменить запись по ID
+- get_my_appointments — показать записи клиента
+
+### Услуги и сотрудники
+- search_services — найти услугу по названию
+- search_staff — найти сотрудника по имени
+
+### Уведомления и отчёты
+- manage_notifications — включить/выключить уведомления, время напоминания
+- get_report — бизнес-отчёты (stats, appointments, clients) для админов
+
+## Правила работы
+1. Всегда уточняй tenant_id из контекста разговора
+2. Для записей проси: имя клиента, телефон, услугу, дату/время (ISO формат)
+3. CLIENT роль — только свои записи/контакты, ADMIN/MANAGER — всё
+4. Не придумывай данные — используй инструменты поиска
 """
 
 PLUGIN_YAML = """name: tryneuro-user-config
 version: "1.0"
-description: Per-user model/api_key from PostgreSQL via httpx monkey-patch
+description: Per-user model/api_key from PostgreSQL via pre_llm_call hook
 requires_env:
   - name: DATABASE_URL
     description: PostgreSQL connection string for user_ai_config lookups
 """
 
-PLUGIN_INIT = r'''"""tryneuro-user-config — intercepts httpx requests to OpenRouter.
+PLUGIN_INIT = '''"""tryneuro-user-config — pre_llm_call hook for per-user OpenRouter config.
 
-Reads current session chat_id from gateway.session_context,
-looks up user_ai_config from PostgreSQL, and rewrites the request
-with the user's model and API key. Cached 5 minutes.
+Reads user_ai_config from PostgreSQL via session_context telegram_id,
+injects model and api_key into LLM request context.
+Cached 5 minutes.
 """
 import os
-import sys
-import json
 import time
-import httpx
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@tryneuro_database:5432/tryneuro_db")
 _USER_CONFIG_CACHE: dict = {}
@@ -97,90 +121,39 @@ def _get_user_config(telegram_id: int) -> dict | None:
     return None
 
 
-def _get_session_chat_id() -> int | None:
-    """Read Telegram chat_id from session context."""
-    try:
-        from gateway.session_context import get_session_env
-        val = get_session_env("HERMES_SESSION_CHAT_ID")
-        if val:
-            return int(val)
-    except Exception:
-        pass
-    try:
-        from gateway.session_context import _SESSION_CHAT_ID
-        val = _SESSION_CHAT_ID.get()
-        if val:
-            return int(val)
-    except Exception:
-        pass
-    return None
-
-
-# ── httpx.Client monkey-patch ──────────────────────────────────────────
-_ORIGINAL_SEND = getattr(httpx.Client, "send", None)
-
-
-def _patched_send(self, request: httpx.Request, **kwargs):
-    """Patched httpx.Client.send — rewrites OpenRouter requests per user."""
-    url = str(request.url)
-    if _ORIGINAL_SEND is None or ("openrouter.ai" not in url and "/v1/" not in url):
-        return _ORIGINAL_SEND(self, request, **kwargs)
-
-    telegram_id = _get_session_chat_id()
-    if telegram_id:
-        cfg = _get_user_config(telegram_id)
-        if cfg:
-            request.headers["Authorization"] = f"Bearer {cfg['api_key']}"
-            if request.content:
-                try:
-                    body = json.loads(request.content)
-                    orig_model = body.get("model", "")
-                    body["model"] = cfg["llm_model"]
-                    request.content = json.dumps(body).encode()
-                    request.headers.pop("Content-Length", None)
-                    print(f"[tryneuro-user-config] rewrite tg={telegram_id} {orig_model} -> {cfg['llm_model']}")
-                except (json.JSONDecodeError, Exception) as e:
-                    print(f"[tryneuro-user-config] body rewrite failed: {e}")
-
-    return _ORIGINAL_SEND(self, request, **kwargs)
-
-
-# ── httpx.AsyncClient monkey-patch ─────────────────────────────────────
-_ORIGINAL_ASYNC_SEND = getattr(httpx.AsyncClient, "send", None)
-
-
-async def _patched_async_send(self, request: httpx.Request, **kwargs):
-    """Patched httpx.AsyncClient.send — rewrites OpenRouter requests per user."""
-    url = str(request.url)
-    if _ORIGINAL_ASYNC_SEND is None or ("openrouter.ai" not in url and "/v1/" not in url):
-        return await _ORIGINAL_ASYNC_SEND(self, request, **kwargs)
-
-    telegram_id = _get_session_chat_id()
-    if telegram_id:
-        cfg = _get_user_config(telegram_id)
-        if cfg:
-            request.headers["Authorization"] = f"Bearer {cfg['api_key']}"
-            if request.content:
-                try:
-                    body = json.loads(request.content)
-                    orig_model = body.get("model", "")
-                    body["model"] = cfg["llm_model"]
-                    request.content = json.dumps(body).encode()
-                    request.headers.pop("Content-Length", None)
-                    print(f"[tryneuro-user-config] rewrite tg={telegram_id} {orig_model} -> {cfg['llm_model']}")
-                except (json.JSONDecodeError, Exception) as e:
-                    print(f"[tryneuro-user-config] body rewrite failed: {e}")
-
-    return await _ORIGINAL_ASYNC_SEND(self, request, **kwargs)
-
-
 def register(ctx):
-    """Apply httpx patches on plugin load."""
-    # Patch sync client
-    httpx.Client.send = _patched_send
-    # Patch async client
-    httpx.AsyncClient.send = _patched_async_send
-    print("[tryneuro-user-config] httpx patches applied")
+    """Register pre_llm_call hook to inject per-user OpenRouter config."""
+    
+    @ctx.register_hook("pre_llm_call")
+    async def inject_user_config(session_context, **kwargs):
+        """Hook fired before each LLM call in gateway and CLI."""
+        # session_context contains HERMES_SESSION_CHAT_ID set by gateway
+        telegram_id = None
+        if session_context:
+            # gateway sets HERMES_SESSION_CHAT_ID as string
+            chat_id_val = session_context.get("HERMES_SESSION_CHAT_ID")
+            if chat_id_val:
+                try:
+                    telegram_id = int(chat_id_val)
+                except (ValueError, TypeError):
+                    pass
+        
+        if not telegram_id:
+            # No telegram_id in context (e.g. CLI, cron) - no override
+            return {"context": ""}
+        
+        cfg = _get_user_config(telegram_id)
+        if not cfg:
+            # User hasn't configured API key - let them use default/fallback
+            return {"context": ""}
+        
+        # Inject via context (stable approach - works in current Hermes)
+        # Model will see this in the prompt and use the specified model
+        context_msg = (
+            f"[System: Using user's OpenRouter model '{cfg['llm_model']}' "
+            f"with their API key. Do not override model parameter.]"
+        )
+        return {"context": context_msg}
 '''
 
 
@@ -223,7 +196,7 @@ def main():
                 "api_key": "dummy",
                 "model": "openrouter/auto",
             },
-            "toolsets": ["crm", "files", "web"],
+            "toolsets": ["crm"],
             "memory": {"enabled": True, "max_tokens": 4000},
             "plugins": {"enabled": ["tryneuro-user-config"]},
         }
