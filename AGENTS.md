@@ -148,3 +148,9 @@ When editing `notifications-python/main.py`:
 - **Source**: https://github.com/NousResearch/hermes-agent
 - **Profiles docs**: https://hermes-agent.nousresearch.com/docs/user-guide/profiles
 - **Multiplexed gateway**: https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways
+
+## Внимание: Hermes документация
+
+При любых правках `hermes-agent/` — workflow, профилей, плагинов, хуков — **обязательно сверяться с официальной документацией Hermes** (ссылки выше).
+Особенно: названия хуков (`pre_llm_call` / `pre_model_request`), параметры provider, поддержка `runtime_override`.
+Не делать предположений — API Hermes меняется между версиями.
