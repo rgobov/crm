@@ -68,7 +68,7 @@ jobs:
             docker exec tryneuro_proxy nginx -s reload || true
 
             echo "--- ОЧИСТКА ---"
-            docker system prune -af --volumes
+            docker system prune -af
             docker image prune -a -f
 
             echo "--- СТАТУС ---"
