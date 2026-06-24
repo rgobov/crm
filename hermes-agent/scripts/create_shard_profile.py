@@ -132,6 +132,7 @@ def _get_user_config(telegram_id: int) -> dict | None:
 
 def register(ctx):
     """Register pre_gateway_dispatch hook to inject <<UM>> marker."""
+    print("[tryneuro-user-config] register() called")
     
     @ctx.register_hook("pre_gateway_dispatch")
     async def inject_user_marker(event, gateway, session_store, **kwargs):
