@@ -46,7 +46,7 @@ services:
       BOT_TOKEN_4: ${BOT_TOKEN_4}
     volumes:
       - hermes_data:/opt/data
-      - ./config.yaml:/opt/data/config.yaml:ro
+      - ./config.yaml:/opt/data/config.yaml:rw
       - ./profiles:/opt/data/profiles:rw
       - ./plugins:/root/.hermes/plugins
     networks:
