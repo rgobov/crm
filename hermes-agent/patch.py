@@ -18,7 +18,7 @@ if _prev is None:
 
 def _patched(self, *args, **kwargs):
     result = _prev(self, *args, **kwargs)
-    chat_id = getattr(self, 'chat_id', None) or getattr(self, 'user_id', None)
+    chat_id = getattr(self, '_chat_id', None) or getattr(self, '_user_id', None)
     if chat_id is not None:
         result['user'] = str(chat_id)
         logger.info("Injected user=%s into API request", chat_id)
