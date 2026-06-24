@@ -309,7 +309,19 @@ async def llm_proxy(request: Request):
     
     # 1. X-User-ID header (if set by caller)
     user_id = request.headers.get("X-User-ID", "")
-    
+
+    # 1b. X-Chat-ID header — resolve chat_id via backend (set by sidecar patch.py)
+    if not user_id:
+        chat_id_header = request.headers.get("X-Chat-ID", "")
+        if chat_id_header:
+            try:
+                chat_id = int(chat_id_header)
+                resolved = await resolve_user_id_by_chat_id(chat_id)
+                if resolved:
+                    user_id = resolved
+            except (ValueError, TypeError):
+                pass
+
     # 2. Resolve via backend if 'user' field contains a chat_id (numeric)
     if not user_id:
         user_field = body.get("user", "")
