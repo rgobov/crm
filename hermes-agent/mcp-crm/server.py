@@ -1,13 +1,10 @@
 import asyncio
 import json
-import threading
 import os
 import logging
 
 import httpx
-import uvicorn
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import HTTPException
 from fastmcp import FastMCP
 
 logging.basicConfig(level=logging.INFO)
@@ -15,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 CRM_URL = os.getenv("CRM_BACKEND_URL", "http://backend:8080")
 INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "try-neuro-internal-secret-2026")
-AI_KNOWLEDGE_URL = os.getenv("AI_KNOWLEDGE_URL", "http://ai-knowledge-service:8082")
 
 http_client = httpx.AsyncClient(timeout=30.0)
 
@@ -243,204 +239,6 @@ async def resolve_actor_from_chat_id(chat_id: int) -> dict:
         return {"role": "CLIENT", "contact_id": "", "staff_id": "", "tenant_id": ""}
 
 
-llm_app = FastAPI(title="LLM Proxy")
-
-
-async def get_user_config(user_id: str) -> dict:
-    """Get full user AI config (API key + model) from ai-knowledge-service."""
-    try:
-        resp = await http_client.get(
-            f"{AI_KNOWLEDGE_URL}/api/v1/user-config/{user_id}",
-            headers={"X-Internal-Secret": INTERNAL_SECRET},
-        )
-        if resp.status_code == 200:
-            return resp.json()
-    except Exception:
-        pass
-    return {"api_key": "", "llm_model": ""}
-
-
-async def resolve_user_id_by_chat_id(chat_id: int) -> str:
-    """Resolve user_id by Telegram chat_id via backend API."""
-    try:
-        resp = await http_client.get(
-            f"{CRM_URL}/api/admin/ai/internal/tenant/by-telegram/{chat_id}",
-            headers={"X-Internal-Secret": INTERNAL_SECRET},
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("userId", "")
-    except Exception as e:
-        logger.error(f"Failed to resolve user_id by chat_id {chat_id}: {e}")
-    return ""
-
-
-@llm_app.get("/v1/models")
-async def list_models():
-    return {
-        "object": "list",
-        "data": [
-            {"id": "gpt-4", "object": "model"},
-            {"id": "openrouter/auto", "object": "model"},
-            {"id": "anthropic/claude-opus-4.6", "object": "model"},
-        ]
-    }
-
-
-@llm_app.get("/v1/models/{model:path}")
-async def get_model(model: str):
-    """Return model info for Hermes provider validation."""
-    return {
-        "id": model,
-        "object": "model",
-        "created": 1700000000,
-        "owned_by": "crm",
-    }
-
-
-@llm_app.post("/v1/chat/completions")
-async def llm_proxy(request: Request):
-    body = await request.json()
-    logger.info(f"LLM request body: {body}")
-    logger.info(f"LLM request headers: {dict(request.headers)}")
-    
-    # Try to get user_id from various sources
-    user_id = ""
-    
-    # 1. X-User-ID header (if set by caller)
-    user_id = request.headers.get("X-User-ID", "")
-
-    # 1b. X-Chat-ID header — resolve chat_id via backend (set by sidecar patch.py)
-    if not user_id:
-        chat_id_header = request.headers.get("X-Chat-ID", "")
-        if chat_id_header:
-            try:
-                chat_id = int(chat_id_header)
-                resolved = await resolve_user_id_by_chat_id(chat_id)
-                if resolved:
-                    user_id = resolved
-            except (ValueError, TypeError):
-                pass
-
-    # 2. Resolve via backend if 'user' field contains a chat_id (numeric)
-    if not user_id:
-        user_field = body.get("user", "")
-        if isinstance(user_field, (str, int)):
-            try:
-                chat_id = int(user_field)
-                resolved = await resolve_user_id_by_chat_id(chat_id)
-                if resolved:
-                    user_id = resolved
-            except (ValueError, TypeError):
-                pass
-    
-    if not user_id:
-        model = body.get("model", "unknown")
-        error_content = ("❌ Ваш Telegram-аккаунт не привязан к CRM.\n\n"
-                         "Пожалуйста, привяжите Telegram ID в настройках AI:\n"
-                         "1. Напишите @userinfobot, скопируйте ваш ID (число)\n"
-                         "2. В CRM: Настройки → AI → поле Telegram ID\n"
-                         "3. Сохраните и попробуйте снова")
-        if body.get("stream"):
-            async def error_stream():
-                chunk = json.dumps({
-                    "id": "chatcmpl-unknown-user",
-                    "object": "chat.completion.chunk",
-                    "created": 0,
-                    "model": model,
-                    "choices": [{
-                        "index": 0,
-                        "delta": {"role": "assistant", "content": error_content},
-                        "finish_reason": "stop",
-                    }],
-                })
-                yield f"data: {chunk}\n\n".encode()
-                yield b"data: [DONE]\n\n"
-            return StreamingResponse(error_stream(), media_type="text/event-stream")
-        return JSONResponse(content={
-            "id": "chatcmpl-unknown-user",
-            "object": "chat.completion",
-            "created": 0,
-            "model": model,
-            "choices": [{
-                "index": 0,
-                "message": {"role": "assistant", "content": error_content},
-                "finish_reason": "stop",
-            }]
-        }, status_code=200)
-
-    user_config = await get_user_config(user_id)
-    api_key = user_config.get("api_key") or None
-    
-    if not api_key:
-        return JSONResponse(content={
-            "id": "chatcmpl-no-key",
-            "object": "chat.completion",
-            "created": 0,
-            "model": body.get("model", "unknown"),
-            "choices": [{
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": "❌ У вас не настроен API-ключ OpenRouter.\n\nПожалуйста, добавьте ключ в CRM: Настройки → AI → поле OpenRouter API Key.\n\nПолучить ключ: https://openrouter.ai/keys"
-                },
-                "finish_reason": "stop"
-            }]
-        }, status_code=200)
-    
-    # Override model from user config if set
-    user_model = user_config.get("llm_model", "").strip()
-    if user_model:
-        body["model"] = user_model
-        logger.info(f"Using model from user config: {user_model}")
-    
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://crm.999crm.ru",
-        "X-Title": "TryNeuro CRM",
-    }
-    if body.get("stream"):
-        async def generate():
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                async with client.stream(
-                    "POST",
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    json=body,
-                    headers=headers,
-                ) as resp:
-                    async for chunk in resp.aiter_bytes():
-                        yield chunk
-        return StreamingResponse(generate(), media_type="text/event-stream")
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            json=body,
-            headers=headers,
-        )
-        return JSONResponse(content=resp.json(), status_code=resp.status_code)
-
-
-@llm_app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-def run_mcp():
+if __name__ == "__main__":
     logger.info("Starting MCP server on port 8000")
     mcp.run(transport="streamable-http", port=8000)
-
-
-def run_llm():
-    logger.info("Starting LLM proxy on port 8001")
-    uvicorn.run(llm_app, host="0.0.0.0", port=8001, log_level="info")
-
-
-if __name__ == "__main__":
-    t1 = threading.Thread(target=run_mcp, daemon=True)
-    t2 = threading.Thread(target=run_llm, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()

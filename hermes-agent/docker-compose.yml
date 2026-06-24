@@ -15,10 +15,9 @@ services:
     environment:
       CRM_BACKEND_URL: ${CRM_BACKEND_URL:-http://backend:8080}
       INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
-      AI_KNOWLEDGE_URL: http://ai-knowledge-service:8082
       HTTP_PROXY: ${TELEGRAM_PROXY}
       HTTPS_PROXY: ${TELEGRAM_PROXY}
-      NO_PROXY: "localhost,127.0.0.1,backend,ai-knowledge-service,tryneuro_database,tryneuro_db"
+      NO_PROXY: "localhost,127.0.0.1,backend,tryneuro_database"
     networks:
       - tryneuro_network
 
@@ -32,24 +31,23 @@ services:
         echo 'TELEGRAM_PROXY=${TELEGRAM_PROXY}' > /opt/data/.env &&
         echo 'HTTP_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env &&
         echo 'HTTPS_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env &&
-        echo 'NO_PROXY=localhost,127.0.0.1,backend,mcp-crm,ai-knowledge-service,tryneuro_database,tryneuro_db' >> /opt/data/.env &&
-        hermes config set model.provider custom &&
-        hermes config set model.base_url http://mcp-crm:8001/v1 &&
-        hermes config set model.api_key dummy &&
-        hermes config set model.model openrouter/auto &&
-        exec python /tmp/patch.py
+        echo 'NO_PROXY=localhost,127.0.0.1,backend,tryneuro_database' >> /opt/data/.env &&
+        exec hermes gateway run
       "
     environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_TOKEN: ${BOT_TOKEN_1}
       TELEGRAM_PROXY: ${TELEGRAM_PROXY}
       GATEWAY_ALLOW_ALL_USERS: "true"
       HERMES_MCP_SERVERS: '{"crm":{"transport":"streamable-http","url":"http://mcp-crm:8000/mcp"}}'
-      HTTP_PROXY: ${TELEGRAM_PROXY}
-      HTTPS_PROXY: ${TELEGRAM_PROXY}
-      NO_PROXY: "localhost,127.0.0.1,backend,mcp-crm,ai-knowledge-service,tryneuro_database,tryneuro_db"
+      DATABASE_URL: ${DATABASE_URL}
+      BOT_TOKEN_1: ${BOT_TOKEN_1}
+      BOT_TOKEN_2: ${BOT_TOKEN_2}
+      BOT_TOKEN_3: ${BOT_TOKEN_3}
+      BOT_TOKEN_4: ${BOT_TOKEN_4}
     volumes:
       - hermes_data:/opt/data
-      - ./patch.py:/tmp/patch.py:ro
+      - ./config.yaml:/opt/hermes/config.yaml:ro
+      - ./profiles:/opt/hermes/profiles:ro
     networks:
       - tryneuro_network
     ports:
