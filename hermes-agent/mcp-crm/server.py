@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 import os
 import logging
@@ -322,18 +323,37 @@ async def llm_proxy(request: Request):
                 pass
     
     if not user_id:
+        model = body.get("model", "unknown")
+        error_content = ("❌ Ваш Telegram-аккаунт не привязан к CRM.\n\n"
+                         "Пожалуйста, привяжите Telegram ID в настройках AI:\n"
+                         "1. Напишите @userinfobot, скопируйте ваш ID (число)\n"
+                         "2. В CRM: Настройки → AI → поле Telegram ID\n"
+                         "3. Сохраните и попробуйте снова")
+        if body.get("stream"):
+            async def error_stream():
+                chunk = json.dumps({
+                    "id": "chatcmpl-unknown-user",
+                    "object": "chat.completion.chunk",
+                    "created": 0,
+                    "model": model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {"role": "assistant", "content": error_content},
+                        "finish_reason": "stop",
+                    }],
+                })
+                yield f"data: {chunk}\n\n".encode()
+                yield b"data: [DONE]\n\n"
+            return StreamingResponse(error_stream(), media_type="text/event-stream")
         return JSONResponse(content={
             "id": "chatcmpl-unknown-user",
             "object": "chat.completion",
             "created": 0,
-            "model": body.get("model", "unknown"),
+            "model": model,
             "choices": [{
                 "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": "❌ Ваш Telegram-аккаунт не привязан к CRM.\n\nПожалуйста, привяжите Telegram ID в настройках AI:\n1. Напишите @userinfobot, скопируйте ваш ID (число)\n2. В CRM: Настройки → AI → поле Telegram ID\n3. Сохраните и попробуйте снова"
-                },
-                "finish_reason": "stop"
+                "message": {"role": "assistant", "content": error_content},
+                "finish_reason": "stop",
             }]
         }, status_code=200)
 
