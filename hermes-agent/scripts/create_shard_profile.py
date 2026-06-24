@@ -57,7 +57,7 @@ def _get_config(telegram_id_str):
         cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(\"\"\"
             SELECT uac.llm_model, uac.api_key
-            FROM \"user\" u
+            FROM \"users\" u
             JOIN user_ai_config uac ON u.id = uac.user_id
             WHERE u.telegram_id = %s AND uac.api_key IS NOT NULL AND uac.api_key != ''
         \"\"\", (telegram_id,))
@@ -83,7 +83,7 @@ def main():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("""
         SELECT u.id as user_id, u.telegram_id, u.tenant_id
-        FROM "user" u
+        FROM "users" u
         WHERE u.telegram_id IS NOT NULL
     """)
     users = cur.fetchall()

@@ -86,6 +86,18 @@ Flow:
 
 Any new env var must be added to deploy-main.yml AND deploy-hermes.yml.
 
+## Database Schema (Flyway)
+
+- **Tool**: Flyway — Spring Boot auto-config (`spring.flyway.enabled=true`)
+- **Location**: `backend/src/main/resources/db/migration/V*__.sql`
+- **Current latest**: `V37__Add_User_Id_To_Staff_Member.sql` (2026-06-24)
+- **Table naming**: все таблицы в `snake_case` + plural:
+  - `users` (**НЕ** `"user"`, а `"users"`) — CRM пользователи
+  - `user_ai_config` — per-user AI config (V35)
+  - `staff_members`, `contacts`, `appointments` и т.д.
+- **Схема создаётся при старте `backend`** (не через `ddl-auto`, а Flyway)
+- **Hermes скрипты** (`create_shard_profile.py`, `dynamic_model_hook.py`) должны использовать `"users"`, а не `"user"` (PostgreSQL reserved word)
+
 ## Pyrogram-specific rules (notifications-python/main.py)
 
 When editing `notifications-python/main.py`:
