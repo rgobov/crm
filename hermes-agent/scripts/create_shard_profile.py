@@ -42,6 +42,7 @@ async def pre_model_request(ctx, kwargs):
     if cfg:
         kwargs["model"] = cfg["llm_model"]
         kwargs["api_key"] = cfg["api_key"]
+        kwargs["base_url"] = "https://openrouter.ai/api/v1"
         kwargs.setdefault("default_headers", {})["Authorization"] = f"Bearer {cfg['api_key']}"
     return kwargs
 
