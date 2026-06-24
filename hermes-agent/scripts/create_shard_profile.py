@@ -134,7 +134,7 @@ def register(ctx):
     """Register pre_gateway_dispatch hook to inject <<UM>> marker."""
     print("[tryneuro-user-config] register() called")
     
-    async def inject_user_marker(event, gateway, session_store, **kwargs):
+    def inject_user_marker(event, gateway, session_store, **kwargs):
         """Rewrite incoming message with <<UM>> marker for the proxy."""
         telegram_id = None
         if event and event.source:
