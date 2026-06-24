@@ -5,6 +5,12 @@ plugins:
   enabled:
     - tryneuro-user-config
 
+model:
+  provider: openrouter
+  default: openrouter/auto
+  base_url: http://proxy:8003/v1
+  api_mode: chat_completions
+
 routes:
   - match:
       platform: telegram

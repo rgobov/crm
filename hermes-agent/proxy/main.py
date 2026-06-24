@@ -157,8 +157,15 @@ async def chat_completions(request: Request):
     if telegram_id is None:
         logger.warning("No marker found in messages")
         return Response(
-            content=json.dumps({"error": "No user config marker found - contact is not configured"}),
-            status_code=400,
+            content=json.dumps({
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": "⚠️ Не удалось определить ваш профиль. Пожалуйста, настройте AI в CRM → Настройки → AI провайдер (укажите API-ключ OpenRouter и модель)."
+                    }
+                }]
+            }),
+            status_code=200,
             media_type="application/json",
         )
 
@@ -167,8 +174,15 @@ async def chat_completions(request: Request):
     if cfg is None:
         logger.warning("No config found for tg=%s", telegram_id)
         return Response(
-            content=json.dumps({"error": "No OpenRouter API key configured for this user"}),
-            status_code=400,
+            content=json.dumps({
+                "choices": [{
+                    "message": {
+                        "role": "assistant",
+                        "content": "⚠️ API-ключ не настроен. Перейдите в CRM → Настройки → AI провайдер и укажите ваш OpenRouter API ключ."
+                    }
+                }]
+            }),
+            status_code=200,
             media_type="application/json",
         )
 

@@ -191,10 +191,10 @@ def main():
 
         prof_config = {
             "model": {
-                "provider": "custom",
+                "provider": "openrouter",
+                "default": "openrouter/auto",
                 "base_url": "http://proxy:8003/v1",
-                "api_key": "proxy",
-                "model": "proxy",
+                "api_mode": "chat_completions",
             },
             "toolsets": ["crm"],
             "memory": {"enabled": True, "max_tokens": 4000},
@@ -216,7 +216,14 @@ def main():
     (home_plugin_dir / "__init__.py").write_text(PLUGIN_INIT)
     print(f"✅ Plugin written to {home_plugin_dir}")
 
+    model_config = {
+        "provider": "openrouter",
+        "default": "openrouter/auto",
+        "base_url": "http://proxy:8003/v1",
+        "api_mode": "chat_completions",
+    }
     global_config = {
+        "model": model_config,
         "gateway": {"multiplex_profiles": True},
         "plugins": {"enabled": ["tryneuro-user-config"]},
         "routes": [
