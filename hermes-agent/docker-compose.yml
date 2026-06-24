@@ -29,10 +29,8 @@ services:
     command: >
       sh -c "
         echo 'TELEGRAM_PROXY=${TELEGRAM_PROXY}' > /opt/data/.env &&
-        if [ -n \"${TELEGRAM_PROXY}\" ]; then
-          echo 'HTTP_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env &&
-          echo 'HTTPS_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env;
-        fi &&
+        echo 'HTTP_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env &&
+        echo 'HTTPS_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env &&
         echo 'NO_PROXY=localhost,127.0.0.1,backend,tryneuro_database' >> /opt/data/.env &&
         exec hermes gateway run
       "
