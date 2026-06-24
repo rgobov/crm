@@ -331,15 +331,6 @@ def main():
             "toolsets": ["crm"],
             "memory": {"enabled": True, "max_tokens": 4000},
             "plugins": {"enabled": ["tryneuro-user-config"]},
-            "hooks": {
-                "pre_llm_call": [
-                    {
-                        "command": f"python3 /opt/hermes/profiles/shard_{idx+1}/plugins/tryneuro-user-config/shell_hook.py",
-                        "timeout": 10,
-                    }
-                ],
-            },
-            "hooks_auto_accept": True,
         }
         (prof_dir / "config.yaml").write_text(yaml.dump(prof_config, sort_keys=False))
 
@@ -347,7 +338,6 @@ def main():
         plugin_dir.mkdir(parents=True, exist_ok=True)
         (plugin_dir / "plugin.yaml").write_text(PLUGIN_YAML)
         (plugin_dir / "__init__.py").write_text(PLUGIN_INIT)
-        (plugin_dir / "shell_hook.py").write_text(SHELL_HOOK)
 
         # Remove old dead hook if present
         old_hook = prof_dir / "plugins" / "dynamic_model_hook.py"
@@ -356,12 +346,28 @@ def main():
 
         print(f"✅ shard_{idx+1}: {len(data['users'])} users, bot={data['bot_token'][:12]}...")
 
+    # Shared shell hook for all shards (not per-profile, because
+    # hooks: section must go in global config.yaml, not profile config)
+    shared_plugin_dir = PROFILES_DIR / "plugins" / "tryneuro-user-config"
+    shared_plugin_dir.mkdir(parents=True, exist_ok=True)
+    (shared_plugin_dir / "shell_hook.py").write_text(SHELL_HOOK)
+    print(f"✅ Shared shell_hook.py written to {shared_plugin_dir}")
+
     global_config = {
         "gateway": {"multiplex_profiles": True},
         "routes": [
             {"match": {"platform": "telegram", "bot_token": f"${{BOT_TOKEN_{i+1}}}"}, "agent_id": f"shard_{i+1}"}
             for i in range(NUM_SHARDS)
         ],
+        "hooks": {
+            "pre_llm_call": [
+                {
+                    "command": "python3 /opt/hermes/profiles/plugins/tryneuro-user-config/shell_hook.py",
+                    "timeout": 10,
+                }
+            ],
+        },
+        "hooks_auto_accept": True,
     }
     (CONFIG_DIR / "config.yaml").write_text(yaml.dump(global_config, sort_keys=False))
     print("✅ Global config.yaml written")
