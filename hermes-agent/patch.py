@@ -29,5 +29,5 @@ logger.info("Patched AIAgent.%s — user field will be injected with chat_id", P
 
 sys.argv = ['hermes', 'gateway', 'run']
 
-import hermes.__main__
-hermes.__main__.main()
+from hermes_cli.main import main
+main()
