@@ -4,8 +4,9 @@
 Читает user_ai_config из PostgreSQL, распределяет пользователей по 4 шардам
 (chat_id % 4), создаёт профили с SOUL.md, config.yaml и нативным pre_llm_call плагином.
 
-Плагин использует Hermes pre_llm_call хук для инъекции per-user model/api_key
-из PostgreSQL для каждого запроса. Кэш 5 мин. Без monkey-patch, нативно.
+Плагин inject'ит маркер <<UM tg=id model="model_name">> в user message.
+OpenRouter Proxy читает маркер, подменяет api_key и model в HTTP-запросе.
+Кэш 5 мин. Нативный Hermes plugin hook.
 """
 import os
 import yaml
@@ -59,10 +60,11 @@ requires_env:
     description: PostgreSQL connection string for user_ai_config lookups
 """
 
-PLUGIN_INIT = '''"""tryneuro-user-config — pre_llm_call hook for per-user OpenRouter config.
+PLUGIN_INIT = '''"""tryneuro-user-config — injects <<UM>> marker for OpenRouter Proxy.
 
 Reads user_ai_config from PostgreSQL via session_context telegram_id,
-injects model and api_key into LLM request context.
+injects <<UM tg=id model="model_name">> marker into the user message.
+OpenRouter Proxy reads this marker and overrides api_key + model upstream.
 Cached 5 minutes.
 """
 import os
@@ -122,15 +124,13 @@ def _get_user_config(telegram_id: int) -> dict | None:
 
 
 def register(ctx):
-    """Register pre_llm_call hook to inject per-user OpenRouter config."""
+    """Register pre_llm_call hook to inject <<UM>> marker for OpenRouter Proxy."""
     
     @ctx.register_hook("pre_llm_call")
-    async def inject_user_config(session_context, **kwargs):
-        """Hook fired before each LLM call in gateway and CLI."""
-        # session_context contains HERMES_SESSION_CHAT_ID set by gateway
+    async def inject_user_marker(session_context, **kwargs):
+        """Inject <<UM tg=id model="name">> marker for the proxy."""
         telegram_id = None
         if session_context:
-            # gateway sets HERMES_SESSION_CHAT_ID as string
             chat_id_val = session_context.get("HERMES_SESSION_CHAT_ID")
             if chat_id_val:
                 try:
@@ -139,21 +139,14 @@ def register(ctx):
                     pass
         
         if not telegram_id:
-            # No telegram_id in context (e.g. CLI, cron) - no override
             return {"context": ""}
         
         cfg = _get_user_config(telegram_id)
         if not cfg:
-            # User hasn't configured API key - let them use default/fallback
             return {"context": ""}
         
-        # Inject via context (stable approach - works in current Hermes)
-        # Model will see this in the prompt and use the specified model
-        context_msg = (
-            f"[System: Using user's OpenRouter model '{cfg['llm_model']}' "
-            f"with their API key. Do not override model parameter.]"
-        )
-        return {"context": context_msg}
+        marker = f"<<UM tg={telegram_id} model=\\"{cfg['llm_model']}\\">>"
+        return {"context": marker}
 '''
 
 
@@ -192,9 +185,9 @@ def main():
         prof_config = {
             "model": {
                 "provider": "custom",
-                "base_url": "https://openrouter.ai/api/v1",
-                "api_key": "dummy",
-                "model": "openrouter/auto",
+                "base_url": "http://proxy:8003/v1",
+                "api_key": "proxy",
+                "model": "proxy",
             },
             "toolsets": ["crm"],
             "memory": {"enabled": True, "max_tokens": 4000},

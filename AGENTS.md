@@ -21,7 +21,7 @@
 - The Pyrogram user client is NOT a bot — it's a Telegram user session authorized by phone + code
 - Hermes runs as a **multiplexed gateway** (1 process, 4 profiles/shard)
 
-## Architecture: Hermes Profiles (Multiplexed Gateway)
+## Architecture: Hermes Profiles + OpenRouter Proxy
 
 ```
 User → Telegram (bot_N) → Hermes gateway (1 process, multiplexed)
@@ -31,22 +31,31 @@ User → Telegram (bot_N) → Hermes gateway (1 process, multiplexed)
                shard_1      shard_2      shard_3/4
                     │           │           │
                     └───────────┼─────────────┘
-                                ▼
-                      pre_llm_call hook (трyneuro-user-config)
+                                │
+                      pre_llm_call hook injects
+                      <<UM tg=id model="...">> marker
                                 │
                                 ▼
-                        PostgreSQL (user_ai_config)
-                        JOIN users ON user_id
-                        WHERE users.telegram_id = chat_id
-                                │
-                                ▼
+                      ┌───────────────────┐
+                      │ OpenRouter Proxy  │
+                      │ (порт 8003)       │
+                      │                   │
+                      │ 1. Парсит маркер  │
+                      │ 2. Читает api_key │
+                      │    из PostgreSQL  │
+                      │    (кэш 5 мин)    │
+                      │ 3. Подменяет      │
+                      │    model + auth   │
+                      └───────┬───────────┘
+                              │
+                              ▼
                         OpenRouter (ключ юзера + модель)
 ```
 
-- **No mcp-crm LLM proxy** — Hermes profiles call OpenRouter directly
-- **No ai-knowledge-service** — удалён (заменён хуком + PostgreSQL)
+- **OpenRouter Proxy** (`hermes-agent/proxy/`) — FastAPI сервис, подменяет `api_key` и `model` для каждого пользователя
+- **No ai-knowledge-service** — удалён
 - **MCP tools** — `mcp-crm` служит MCP сервером (порт 8000)
-- **Native plugins** — используется `pre_llm_call` hook, не monkey-patch
+- **Native plugins** — `pre_llm_call` hook inject'ит маркер `<<UM tg=id model="name">>`, прокси его читает
 
 ## Files in the chain
 
@@ -59,7 +68,8 @@ User → Telegram (bot_N) → Hermes gateway (1 process, multiplexed)
 | Backend | `backend/.../model/UserAiConfig.java` | Per-user AI config entity |
 | Hermes | `hermes-agent/config.yaml` | Global multiplexed config + routes (4 shards) |
 | Hermes | `hermes-agent/profiles/shard_N/config.yaml` | Per-shard profile config (provider: custom, base_url: openrouter.ai) |
-| Hermes | `hermes-agent/profiles/shard_N/plugins/tryneuro-user-config/` | **pre_llm_call hook plugin** — инъекция model/api_key из PostgreSQL |
+| Hermes | `hermes-agent/profiles/shard_N/plugins/tryneuro-user-config/` | **pre_llm_call hook plugin** — инъекция маркера `<<UM>>` в user message |
+| Proxy | `hermes-agent/proxy/main.py` | OpenRouter Proxy — парсит маркер, подменяет api_key/model |
 | Hermes | `hermes-agent/profiles/shard_N/SOUL.md` | Персонality агента с инструкциями CRM инструментов |
 | MCP | `hermes-agent/mcp-crm/server.py` | MCP tools server (порт 8000) — contacts, appointments, services |
 | Python | `notifications-python/main.py` | Telegram клиент (Pyrogram) — уведомления |
@@ -84,14 +94,16 @@ Hermes профили используют `pre_llm_call` hook plugin, кото�
 1. Пользователь сохраняет API key/model в CRM → backend пишет в PostgreSQL
 2. Пользователь пишет боту Hermes → gateway роутит в shard профиль
 3. `tryneuro-user-config` hook срабатывает → читает `user_ai_config` по `telegram_id`
-4. Hook инъектирует `model` и `api_key` в контекст LLM запроса
-5. Hermes вызывает OpenRouter с ключом пользователя
+4. Hook инъектирует `<<UM tg=id model="name">>` маркер в user message
+5. Hermes шлёт запрос в **OpenRouter Proxy** (base_url: `http://proxy:8003/v1`)
+6. Proxy парсит маркер, достаёт api_key из PostgreSQL (кэш 5 мин), подменяет `model` и `Authorization`
+7. Проксирует запрос в OpenRouter с ключом пользователя
 
 ## Secrets/env
 
 - `BOT_TOKEN_1` … `BOT_TOKEN_4` — Telegram bot tokens (GitHub secrets)
 - `DATABASE_URL` — PostgreSQL connection для profile hook
-- `TELEGRAM_PROXY` — **опционально** — HTTP CONNECT proxy (пусто = без прокси)
+- `TELEGRAM_PROXY` — HTTP CONNECT proxy для доступа к Telegram из РФ (обязателен на VPS в России)
 - `INTERNAL_SECRET` — shared secret для backend ↔ MCP communication
 
 Новые env var добавляются в deploy-main.yml И deploy-hermes.yml.
@@ -103,7 +115,7 @@ Hermes профили используют `pre_llm_call` hook plugin, кото�
 | Workflow | Branch Trigger | Path Filter | Деплоит |
 |----------|--------------|-------------|--------|
 | `deploy-main.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths-ignore: 'hermes-agent/**'` | backend, notifications, frontend, database |
-| `deploy-hermes.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'hermes-agent/**'` | mcp-crm, hermes-agent, генерацию профилей |
+| `deploy-hermes.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'hermes-agent/**'` | mcp-crm, hermes-agent, openrouter-proxy, генерацию профилей |
 
 **Изоляция:** оба workflow используют `concurrency.group: deploy-vps` → не выполняются одновременно.
 **Деплой Hermes НЕ ломает CRM и уведомления** — workflow отдельные.
@@ -120,7 +132,7 @@ Hermes профили используют `pre_llm_call` hook plugin, кото�
   - `user_ai_config` — per-user AI config (V35)
   - `staff_members`, `contacts`, `appointments` и т.д.
 - **Схема создаётся при старте `backend`** (не через `ddl-auto`, а Flyway)
-- **Hermes скрипты** (`create_shard_profile.py`) должны использовать `"users"`, а не `"user"` (PostgreSQL reserved word)
+- **Hermes скрипты** (`create_shard_profile.py`, `proxy/main.py`) должны использовать `"users"`, а не `"user"` (PostgreSQL reserved word)
 
 ## Pyrogram-specific rules (notifications-python/main.py)
 
@@ -142,6 +154,7 @@ When editing `notifications-python/main.py`:
 **Проверка после деплоя:**
 - `docker logs tryneuro_hermes --tail 50 | grep "tryneuro-user-config"` — проверка хука
 - `docker logs tryneuro_mcp_crm --tail 20` — проверка MCP сервера
+- `docker logs tryneuro_openrouter_proxy --tail 20` — проверка прокси
 
 ## Hermes
 
