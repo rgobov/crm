@@ -1,0 +1,13 @@
+{
+  "id": "tryneuro-provider",
+  "name": "TryNeuro Provider",
+  "description": "Per-user OpenRouter API key + model from CRM PostgreSQL",
+  "providers": ["tryneuro"],
+  "setup": {
+    "providers": [{"id": "tryneuro", "envVars": ["DATABASE_URL"]}]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}
