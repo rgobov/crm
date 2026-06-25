@@ -21,36 +21,64 @@ services:
     networks:
       - tryneuro_network
 
-  openclaw-gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: tryneuro_openclaw
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    container_name: tryneuro_hermes
     restart: always
     logging: *default-logging
+    command: >
+      sh -c "
+        echo 'TELEGRAM_PROXY=${TELEGRAM_PROXY}' > /opt/data/.env &&
+        echo 'HTTP_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env &&
+        echo 'HTTPS_PROXY=${TELEGRAM_PROXY}' >> /opt/data/.env &&
+        echo 'NO_PROXY=localhost,127.0.0.1,backend,tryneuro_database,proxy' >> /opt/data/.env &&
+        exec hermes gateway run
+      "
     environment:
+      TELEGRAM_BOT_TOKEN: ${BOT_TOKEN_1}
+      TELEGRAM_PROXY: ${TELEGRAM_PROXY}
+      GATEWAY_ALLOW_ALL_USERS: "true"
+      HERMES_MCP_SERVERS: '{"crm":{"transport":"streamable-http","url":"http://mcp-crm:8000/mcp"}}'
       DATABASE_URL: ${DATABASE_URL}
       BOT_TOKEN_1: ${BOT_TOKEN_1}
       BOT_TOKEN_2: ${BOT_TOKEN_2}
       BOT_TOKEN_3: ${BOT_TOKEN_3}
       BOT_TOKEN_4: ${BOT_TOKEN_4}
-      TELEGRAM_PROXY: ${TELEGRAM_PROXY}
     volumes:
-      - openclaw_data:/home/node/.openclaw
-      - ./openclaw.json:/home/node/.openclaw/openclaw.json:ro
-      - ./extensions:/app/extensions:ro
+      - hermes_data:/opt/data
+      - ./config.yaml:/opt/data/config.yaml:rw
+      - ./profiles:/opt/data/profiles:rw
+      - ./plugins:/opt/data/plugins
     networks:
       - tryneuro_network
     ports:
       - "8083:8083"
     depends_on:
       - mcp-crm
+      - proxy
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    container_name: tryneuro_openrouter_proxy
+    restart: always
+    logging: *default-logging
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      HTTP_PROXY: ${TELEGRAM_PROXY}
+      HTTPS_PROXY: ${TELEGRAM_PROXY}
+      NO_PROXY: "localhost,127.0.0.1,backend,tryneuro_database"
+    networks:
+      - tryneuro_network
+    ports:
+      - "8003:8003"
+
   watchtower:
     image: containrrr/watchtower
-    container_name: tryneuro_watchtower_openclaw
+    container_name: tryneuro_watchtower_hermes
     restart: always
     logging: *default-logging
     environment:
@@ -67,4 +95,4 @@ networks:
     external: true
 
 volumes:
-  openclaw_data:
+  hermes_data:

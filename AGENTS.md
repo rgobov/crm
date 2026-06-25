@@ -1,7 +1,7 @@
-# CRM Project — OpenClaw Multi-Agent Gateway
+# CRM Project — Hermes Profiles (Multiplexed Gateway)
 
 ## Project Overview
-- **Stack**: Spring Boot (Java) + PostgreSQL + Svelte (Node) + OpenClaw (Node) + Pyrogram (Python)
+- **Stack**: Spring Boot (Java) + PostgreSQL + Svelte (Node) + Python (FastAPI/Pyrogram)
 - **Deploy**: GitHub Actions → VPS via SSH, docker-compose (только через push в ветку `feature/roles` или `fix/ios-final-attempt`)
 - **Proxy**: HTTP CONNECT `87.121.86.253:8888` — optional, только если нужен доступ к Telegram из РФ
 - **Network**: `tryneuro_network` (external)
@@ -16,36 +16,46 @@
 | Connection | Type | Responsible for |
 |---|---|---|
 | `notifications-python` (Pyrogram) | **User client** | Sending notifications, auth by phone number |
-| OpenClaw (`@NineCRM_AI_bot_1` … `_4`) | **4 bots** | AI chat, MCP tools (contacts, appointments), 1 процесс, 4 аккаунта |
+| Hermes (`@NineCRM_AI_bot_1` … `_4`) | **4 bots** | AI chat, MCP tools (contacts, appointments), sharded by `chat_id % 4` |
 
 - The Pyrogram user client is NOT a bot — it's a Telegram user session authorized by phone + code
-- OpenClaw runs as a **multi-agent gateway** (1 process, 4 Telegram accounts, 4 agents via `bindings`)
+- Hermes runs as a **multiplexed gateway** (1 process, 4 profiles/shard)
 
-## Architecture: OpenClaw Multi-Agent + tryneuro-provider
+## Architecture: Hermes Profiles + OpenRouter Proxy
 
 ```
-User → Telegram (bot_N) → OpenClaw Gateway (1 process)
+User → Telegram (bot_N) → Hermes gateway (1 process, multiplexed)
                                 │
-                    ┌───────────┼──────────────┐
-                    ▼           ▼              ▼
-              shard_1      shard_2       shard_3/4
-              (agent)      (agent)        (agent)
-                    │           │              │
-                    └───────────┼──────────────┘
+                    ┌─────────────┼─────────────┐
+                    ▼           ▼           ▼
+               shard_1      shard_2      shard_3/4
+                    │           │           │
+                    └───────────┼─────────────┘
                                 │
-                    tryneuro-provider plugin
-                    resolveSyntheticAuth + wrapStreamFn
-                    читает user_ai_config из PostgreSQL
+                      pre_llm_call hook injects
+                      <<UM tg=id model="...">> marker
                                 │
                                 ▼
-                          OpenRouter (ключ юзера + модель)
+                      ┌───────────────────┐
+                      │ OpenRouter Proxy  │
+                      │ (порт 8003)       │
+                      │                   │
+                      │ 1. Парсит маркер  │
+                      │ 2. Читает api_key │
+                      │    из PostgreSQL  │
+                      │    (кэш 5 мин)    │
+                      │ 3. Подменяет      │
+                      │    model + auth   │
+                      └───────┬───────────┘
+                              │
+                              ▼
+                        OpenRouter (ключ юзера + модель)
 ```
 
-- **tryneuro-provider** (`extensions/tryneuro-provider/index.ts`) — OpenClaw provider plugin
-- **No OpenRouter Proxy** — логика встроена в provider (бывший `proxy/main.py` удалён)
-- **MCP tools** — `mcp-crm` (FastAPI, порт 8000), подключается через OpenClaw `mcp.servers`
-- **Per-user auth** — `resolveSyntheticAuth` inject'ит api_key, `wrapStreamFn` подменяет model
-- **Кэш 5 мин** — in-memory cache в provider плагине
+- **OpenRouter Proxy** (`hermes-agent/proxy/`) — FastAPI сервис, подменяет `api_key` и `model` для каждого пользователя
+- **No ai-knowledge-service** — удалён
+- **MCP tools** — `mcp-crm` служит MCP сервером (порт 8000)
+- **Native plugins** — `pre_llm_call` hook inject'ит маркер `<<UM tg=id model="name">>`, прокси его читает
 
 ## Files in the chain
 
@@ -56,44 +66,47 @@ User → Telegram (bot_N) → OpenClaw Gateway (1 process)
 | Backend | `backend/.../controller/svelte/AiConfigController.java` | User AI config (model, api_key) |
 | Backend | `backend/.../controller/svelte/AiInternalController.java` | Internal API для MCP инструментов |
 | Backend | `backend/.../model/UserAiConfig.java` | Per-user AI config entity |
-| OpenClaw | `hermes-agent/openclaw.json` | Multi-agent config + Telegram accounts + MCP |
-| OpenClaw | `hermes-agent/extensions/tryneuro-provider/index.ts` | Provider plugin — per-user OpenRouter api_key/model |
-| OpenClaw | `hermes-agent/extensions/tryneuro-provider/package.json` | Package manifest |
-| OpenClaw | `hermes-agent/extensions/tryneuro-provider/openclaw.plugin.json` | Plugin manifest |
+| Hermes | `hermes-agent/config.yaml` | Global multiplexed config + routes (4 shards) |
+| Hermes | `hermes-agent/profiles/shard_N/config.yaml` | Per-shard profile config (provider: custom, base_url: openrouter.ai) |
+| Hermes | `hermes-agent/profiles/shard_N/plugins/tryneuro-user-config/` | **pre_llm_call hook plugin** — инъекция маркера `<<UM>>` в user message |
+| Proxy | `hermes-agent/proxy/main.py` | OpenRouter Proxy — парсит маркер, подменяет api_key/model |
+| Hermes | `hermes-agent/profiles/shard_N/SOUL.md` | Персонality агента с инструкциями CRM инструментов |
 | MCP | `hermes-agent/mcp-crm/server.py` | MCP tools server (порт 8000) — contacts, appointments, services |
 | Python | `notifications-python/main.py` | Telegram клиент (Pyrogram) — уведомления |
+| Script | `hermes-agent/scripts/create_shard_profile.py` | Генератор профилей из PostgreSQL |
 | Deploy | `.github/workflows/deploy-main.yml` | Деплой основного стека (backend, notifications, frontend) |
-| Deploy | `.github/workflows/deploy-openclaw.yml` | Деплой OpenClaw + MCP |
+| Deploy | `.github/workflows/deploy-hermes.yml` | Деплой Hermes стека + генерация профилей |
 
 ## Sharding Strategy
 
 - **4 Telegram bots**: `@NineCRM_AI_1_bot` … `@NineCRM_AI_4_bot`
-- **User assignment**: детерминированно через OpenClaw `bindings` — один аккаунт (`shard_N`) → один агент
-- **Each account = one agent**: `channels.telegram.accounts.shard_N` → `bindings[].agentId`
+- **User assignment**: `chat_id % 4` — детерминированно, один пользователь → один бот всегда
+- **Each bot has its own profile**: `shard_1` … `shard_4`
 - **~30 msg/sec per bot** → ~120 msg/sec total
+- **Routes in config.yaml** map `bot_token` → `agent_id` (shard)
 
 ## Dynamic AI Config (без per-user .env)
 
 Пользователи сохраняют OpenRouter API key + model в CRM UI → записывается в `user_ai_config` (PostgreSQL).
-OpenClaw provider plugin читает конфиг из PostgreSQL (кэш 5 мин).
+Hermes профили используют `pre_llm_call` hook plugin, который читает конфиг из PostgreSQL (кэш 5 мин).
 
 **Flow:**
 1. Пользователь сохраняет API key/model в CRM → backend пишет в PostgreSQL
-2. Пользователь пишет боту → OpenClaw route'ит в агента по `accountId`
-3. `tryneuro-provider` plugin hook (`wrapStreamFn`) срабатывает:
-   - `resolveSyntheticAuth` читает api_key из PostgreSQL по `telegram_id`
-   - Если у пользователя нет api_key — fallback на `OPENROUTER_API_KEY`
-4. `wrapStreamFn` подменяет model на пользовательскую (если задана)
-5. Запрос к OpenRouter с ключом пользователя
+2. Пользователь пишет боту Hermes → gateway роутит в shard профиль
+3. `tryneuro-user-config` hook срабатывает → читает `user_ai_config` по `telegram_id`
+4. Hook инъектирует `<<UM tg=id model="name">>` маркер в user message
+5. Hermes шлёт запрос в **OpenRouter Proxy** (base_url: `http://proxy:8003/v1`)
+6. Proxy парсит маркер, достаёт api_key из PostgreSQL (кэш 5 мин), подменяет `model` и `Authorization`
+7. Проксирует запрос в OpenRouter с ключом пользователя
 
 ## Secrets/env
 
 - `BOT_TOKEN_1` … `BOT_TOKEN_4` — Telegram bot tokens (GitHub secrets)
-- `DATABASE_URL` — PostgreSQL connection для provider plugin
+- `DATABASE_URL` — PostgreSQL connection для profile hook
 - `TELEGRAM_PROXY` — HTTP CONNECT proxy для доступа к Telegram из РФ (обязателен на VPS в России)
 - `INTERNAL_SECRET` — shared secret для backend ↔ MCP communication
 
-Новые env var добавляются в deploy-main.yml И deploy-openclaw.yml.
+Новые env var добавляются в deploy-main.yml И deploy-hermes.yml.
 
 ## Deploy Workflows (GitHub Actions)
 
@@ -102,10 +115,10 @@ OpenClaw provider plugin читает конфиг из PostgreSQL (кэш 5 м�
 | Workflow | Branch Trigger | Path Filter | Деплоит |
 |----------|--------------|-------------|--------|
 | `deploy-main.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths-ignore: 'hermes-agent/**'` | backend, notifications, frontend, database |
-| `deploy-openclaw.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'hermes-agent/**'` | openclaw-gateway, mcp-crm |
+| `deploy-hermes.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'hermes-agent/**'` | mcp-crm, hermes-agent, openrouter-proxy, генерацию профилей |
 
 **Изоляция:** оба workflow используют `concurrency.group: deploy-vps` → не выполняются одновременно.
-**Деплой OpenClaw НЕ ломает CRM и уведомления** — workflow отдельные.
+**Деплой Hermes НЕ ломает CRM и уведомления** — workflow отдельные.
 
 **Текущая ветка:** `feature/roles`
 
@@ -119,6 +132,7 @@ OpenClaw provider plugin читает конфиг из PostgreSQL (кэш 5 м�
   - `user_ai_config` — per-user AI config (V35)
   - `staff_members`, `contacts`, `appointments` и т.д.
 - **Схема создаётся при старте `backend`** (не через `ddl-auto`, а Flyway)
+- **Hermes скрипты** (`create_shard_profile.py`, `proxy/main.py`) должны использовать `"users"`, а не `"user"` (PostgreSQL reserved word)
 
 ## Pyrogram-specific rules (notifications-python/main.py)
 
@@ -138,22 +152,18 @@ When editing `notifications-python/main.py`:
 - Workflow определяется по изменённым путям (см. Deploy Workflows выше)
 
 **Проверка после деплоя:**
-- `docker logs tryneuro_openclaw --tail 50 | grep "tryneuro-provider"` — проверка провайдера
+- `docker logs tryneuro_hermes --tail 50 | grep "tryneuro-user-config"` — проверка хука
 - `docker logs tryneuro_mcp_crm --tail 20` — проверка MCP сервера
-- `openclaw agents list --bindings` — 4 агента в статусе online
-- `openclaw channels status --probe` — 4 Telegram аккаунта
+- `docker logs tryneuro_openrouter_proxy --tail 20` — проверка прокси
 
-## OpenClaw
+## Hermes
 
-- **Source**: https://github.com/openclaw/openclaw
-- **Docs**: https://docs.openclaw.ai
-- **Plugin SDK**: https://docs.openclaw.ai/plugins/building-plugins
-- **Provider hooks**: https://docs.openclaw.ai/plugins/sdk-provider-plugins
-- **Telegram channels**: https://docs.openclaw.ai/channels/telegram
-- **Multi-agent routing**: https://docs.openclaw.ai/concepts/multi-agent
+- **Source**: https://github.com/NousResearch/hermes-agent
+- **Profiles docs**: https://hermes-agent.nousresearch.com/docs/user-guide/profiles
+- **Multiplexed gateway**: https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways
 
-## Внимание: OpenClaw плагины
+## Внимание: Hermes документация
 
-При любых правках `hermes-agent/extensions/` — обязательно сверяться с официальной документацией OpenClaw (ссылки выше).
-Особенно: названия provider hooks (`before_model_resolve`, `wrapStreamFn`, `resolveSyntheticAuth`), API SDK (`definePluginEntry`), структура манифеста (`openclaw.plugin.json`).
-TypeScript, не Python. Не делать предположений — API OpenClaw быстро меняется.
+При любых правках `hermes-agent/` — workflow, профилей, плагинов, хуков — **обязательно сверяться с официальной документацией Hermes** (ссылки выше).
+Особенно: названия хуков (`pre_llm_call` / `pre_model_request`), параметры provider, поддержка `runtime_override`.
+Не делать предположений — API Hermes меняется между версиями.

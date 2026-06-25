@@ -7,7 +7,7 @@ on:
       - feature/roles
     paths-ignore:
       - 'hermes-agent/**'
-      - '.github/workflows/deploy-openclaw.yml'
+      - '.github/workflows/deploy-hermes.yml'
       - 'AGENTS.md'
       - '*.md'
 

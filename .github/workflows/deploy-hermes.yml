@@ -1,4 +1,4 @@
-name: Deploy OpenClaw AI
+name: Deploy Hermes AI
 
 on:
   push:
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-openclaw:
+  deploy-hermes:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,14 +28,14 @@ jobs:
             set -e
             cd ~/crm/hermes-agent
 
-            echo "--- SWITCHING TO BRANCH ${{ github.ref_name }} ---"
+            echo "--- ПЕРЕКЛЮЧЕНИЕ НА ВЕТКУ ${{ github.ref_name }} ---"
             cd ~/crm
             git fetch origin ${{ github.ref_name }}
             git checkout ${{ github.ref_name }} || git checkout -b ${{ github.ref_name }} origin/${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
             cd hermes-agent
 
-            echo "--- CREATING .env FILE ---"
+            echo "--- СОЗДАНИЕ .env ФАЙЛА ---"
             cat > .env << EOF
             BOT_TOKEN_1=${{ secrets.BOT_TOKEN_1 }}
             BOT_TOKEN_2=${{ secrets.BOT_TOKEN_2 }}
@@ -46,17 +46,40 @@ jobs:
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             EOF
 
-            echo "--- BUILDING AND STARTING ---"
+            echo "--- СБОРКА И ЗАПУСК ---"
             export DOCKER_BUILDKIT=1
             docker network create tryneuro_network || true
+            mkdir -p profiles scripts plugins
             docker-compose down --remove-orphans
             docker-compose build --parallel
             docker-compose up -d
 
-            echo "--- CLEANUP ---"
+            echo "--- ГЕНЕРАЦИЯ ПРОФИЛЕЙ ---"
+            docker run --rm \
+              --network tryneuro_network \
+              -v ~/crm/hermes-agent/profiles:/opt/data/profiles:rw \
+              -v ~/crm/hermes-agent/config.yaml:/opt/data/config.yaml:rw \
+              -v ~/crm/hermes-agent/scripts:/scripts:ro \
+              -v ~/crm/hermes-agent/plugins:/opt/data/plugins:rw \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              -e BOT_TOKEN_1="${{ secrets.BOT_TOKEN_1 }}" \
+              -e BOT_TOKEN_2="${{ secrets.BOT_TOKEN_2 }}" \
+              -e BOT_TOKEN_3="${{ secrets.BOT_TOKEN_3 }}" \
+              -e BOT_TOKEN_4="${{ secrets.BOT_TOKEN_4 }}" \
+              -e PROFILES_DIR=/opt/data/profiles \
+              -e CONFIG_DIR=/opt/data \
+              -e HOME_PLUGINS_DIR=/opt/data/plugins \
+              python:3.13-slim bash -c "
+                pip install pyyaml psycopg2-binary -q &&
+                python /scripts/create_shard_profile.py
+              "
+
+            echo "--- ПЕРЕЗАПУСК HERMES (НОВЫЕ ПРОФИЛИ) ---"
+            docker restart tryneuro_hermes
+
+            echo "--- ОЧИСТКА ---"
             docker system prune -af
             docker image prune -a -f
 
-            echo "--- STATUS ---"
+            echo "--- СТАТУС ---"
             docker-compose ps
-            docker logs tryneuro_openclaw --tail 20

@@ -1,0 +1,30 @@
+gateway:
+  multiplex_profiles: true
+
+plugins:
+  enabled:
+    - tryneuro-user-config
+
+model:
+  provider: openrouter
+  default: openrouter/auto
+  base_url: http://proxy:8003/v1
+  api_mode: chat_completions
+
+routes:
+  - match:
+      platform: telegram
+      bot_token: ${BOT_TOKEN_1}
+    agent_id: shard_1
+  - match:
+      platform: telegram
+      bot_token: ${BOT_TOKEN_2}
+    agent_id: shard_2
+  - match:
+      platform: telegram
+      bot_token: ${BOT_TOKEN_3}
+    agent_id: shard_3
+  - match:
+      platform: telegram
+      bot_token: ${BOT_TOKEN_4}
+    agent_id: shard_4

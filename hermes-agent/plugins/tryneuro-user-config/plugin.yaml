@@ -1,0 +1,6 @@
+name: tryneuro-user-config
+version: "1.0"
+description: Per-user model/api_key from PostgreSQL via pre_gateway_dispatch hook
+requires_env:
+  - name: DATABASE_URL
+    description: PostgreSQL connection string for user_ai_config lookups
