@@ -62,6 +62,7 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
     client = AsyncOpenAI(api_key=api_key, base_url=OPENROUTER_BASE)
 
     for iteration in range(MAX_TOOL_ITERATIONS):
+        logger.info("Agent iteration %d/%d for chat_id=%s", iteration + 1, MAX_TOOL_ITERATIONS, chat_id)
         try:
             response = await client.chat.completions.create(
                 model=model,
