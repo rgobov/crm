@@ -102,7 +102,7 @@
         <div>
             <b>Telegram AI-бот</b>
             <p>Напишите боту для общения с AI-ассистентом</p>
-            <a href="https://t.me/NineCRM_AI_bot" target="_blank">@NineCRM_AI_bot</a>
+            <a href="https://t.me/NineCRM_AI_1_bot" target="_blank">@NineCRM_AI_1_bot</a>
         </div>
     </div>
 
