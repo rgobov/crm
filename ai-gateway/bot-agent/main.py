@@ -6,7 +6,7 @@ import sys
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 
-from config import BOT_TOKENS, MAX_HISTORY_EXCHANGES
+from config import BOT_TOKENS, MAX_HISTORY_EXCHANGES, TELEGRAM_PROXY
 from db import get_user_config
 from agent import run_agent
 
@@ -94,7 +94,10 @@ def _prune_history(chat_id: int):
 
 
 async def build_application(token: str, bot_index: int) -> Application:
-    app = Application.builder().token(token).build()
+    builder = Application.builder().token(token)
+    if TELEGRAM_PROXY:
+        builder.proxy(TELEGRAM_PROXY)
+    app = builder.build()
     app.add_handler(CommandHandler("start", handle_start))
     app.add_handler(CommandHandler("new", handle_new))
     app.add_handler(CommandHandler("help", handle_help))
