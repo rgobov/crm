@@ -92,3 +92,4 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
             return choice.message.content or ""
 
     return "Превышено количество шагов обработки. Пожалуйста, уточните запрос."
+
