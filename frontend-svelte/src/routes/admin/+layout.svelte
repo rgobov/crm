@@ -90,7 +90,7 @@
         position: relative;
     }
     .resize-handle { position: absolute; top: 0; right: -4px; width: 8px; height: 100%; cursor: col-resize; z-index: 10; }
-    .content-body { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; position: relative; }
+    .content-body { flex: 1; display: flex; flex-direction: column; height: 100%; overflow-y: auto; position: relative; }
 
     .global-modal-backdrop { position: fixed; inset: 0; background: rgba(0, 43, 54, 0.6); backdrop-filter: blur(4px); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; }
     .global-modal-content { background: #fdf6e3; width: 100%; max-width: 550px; border-radius: 32px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); border: 1px solid #ddd6c1; }
