@@ -49,6 +49,12 @@ async def handle_help(update: Update, _context):
     )
 
 
+async def keep_typing(context, chat_id, done_event):
+    while not done_event.is_set():
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        await asyncio.sleep(4)
+
+
 async def handle_message(update: Update, context):
     chat_id = update.effective_chat.id
     user_text = update.message.text.strip()
@@ -64,7 +70,8 @@ async def handle_message(update: Update, context):
         )
         return
 
-    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    done_event = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(context, chat_id, done_event))
 
     if chat_id not in conversations:
         conversations[chat_id] = []
@@ -75,6 +82,9 @@ async def handle_message(update: Update, context):
     except Exception as e:
         logger.error("Agent error for tg=%s: %s", chat_id, e)
         response = "Произошла внутренняя ошибка. Попробуйте позже."
+    finally:
+        done_event.set()
+        await typing_task
 
     conversations[chat_id].append({"role": "assistant", "content": response})
 

@@ -155,7 +155,14 @@ async def resolve_actor(chat_id: int) -> dict:
                 headers={"X-Internal-Secret": INTERNAL_SECRET},
             )
             if resp.status_code == 200:
-                return resp.json()
+                data = resp.json()
+                return {
+                    "role": data.get("role", "CLIENT"),
+                    "contact_id": data.get("contactId"),
+                    "staff_id": data.get("staffId"),
+                    "tenant_id": data.get("tenantId"),
+                    "user_id": data.get("userId"),
+                }
         except Exception as e:
             logger.error("resolve_actor error for chat_id %s: %s", chat_id, e)
     return {"role": "CLIENT", "contact_id": None, "staff_id": None, "tenant_id": None, "user_id": None}
