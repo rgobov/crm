@@ -37,11 +37,12 @@ jobs:
             git reset --hard origin/${{ github.ref_name }}
 
             echo "--- ДАМП БД ПЕРЕД ДЕПЛОЕМ ---"
-            mkdir -p ~/crm/backups
+            BACKUP_DIR="$HOME/crm/backups"
+            mkdir -p "$BACKUP_DIR"
             docker exec tryneuro_db pg_dump -U postgres -d tryneuro_db \
               --no-owner --no-acl \
-              --file=~/crm/backups/db-$(date +%Y-%m-%d_%H%M).sql || echo "⚠️ Дамп не удался, продолжаем..."
-            ls -t ~/crm/backups/db-*.sql | tail -n +25 | xargs rm -f 2>/dev/null || true
+              > "$BACKUP_DIR/db-$(date +%Y-%m-%d_%H%M).sql" || echo "⚠️ Дамп не удался, продолжаем..."
+            ls -t "$BACKUP_DIR"/db-*.sql | tail -n +25 | xargs rm -f 2>/dev/null || true
 
             echo "--- СОЗДАНИЕ .env ФАЙЛА В КОРНЕ ---"
             cat > .env << EOF
@@ -65,6 +66,11 @@ jobs:
             docker-compose up -d
 
             echo "--- HEALTH CHECK BACKEND ---"
+            docker ps | grep tryneuro_backend || {
+              echo "❌ Контейнер tryneuro_backend не запущен"
+              docker-compose logs --tail=50 backend
+              exit 1
+            }
             for i in $(seq 1 30); do
               status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || echo "000")
               if [ "$status" = "200" ]; then
@@ -72,11 +78,16 @@ jobs:
                 break
               fi
               echo "⏳ Ожидание backend... попытка $i/30 (статус: $status)"
+              if [ "$i" -eq 30 ]; then
+                echo "--- ЛОГИ BACKEND ---"
+                docker logs tryneuro_backend --tail 50
+                echo "--- СТАТУС КОНТЕЙНЕРОВ ---"
+                docker ps -a
+              fi
               sleep 5
             done
             if [ "$status" != "200" ]; then
-              echo "❌ Backend не запустился за 150 сек. Откат..."
-              docker-compose logs --tail=20 backend
+              echo "❌ Backend не запустился за 150 сек."
               exit 1
             fi
 
