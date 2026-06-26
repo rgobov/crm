@@ -26,12 +26,6 @@
 ```
 User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
                                 │
-                    ┌───────────┼───────────┐
-                    ▼           ▼           ▼
-               shard_1      shard_2      shard_3/4
-                    │           │           │
-                    └───────────┼─────────────┘
-                                │
                       Per-user api_key lookup
                       (PostgreSQL user_ai_config)
                                 │
@@ -46,9 +40,11 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
                     └───────────────────────┘
 ```
 
-- **Bot Agent** (`ai-gateway/bot-agent/`) — Python asyncio, 4 Telegram bot instances
+- **Bot Agent** (`ai-gateway/bot-agent/`) — Python asyncio, 4 Telegram bot instances (каждый слушает свои сообщения напрямую от Telegram, шардирование не требуется)
 - **Per-user auth**: `AsyncOpenAI(api_key=user_cfg["api_key"])` — читает из PostgreSQL `user_ai_config`
 - **CRM tools**: ReAct loop с OpenAI function calling → вызов Backend API напрямую (без MCP)
+- **keep_typing**: фоновая задача отправляет `chat_action="typing"` каждые 4 сек пока ждёт ответ от OpenRouter
+- **resolve_actor**: получает из Backend API роль, tenant_id, contact_id, staff_id через `X-Internal-Secret`. Backend возвращает camelCase → маппинг в snake_case в `tools.py`
 - **MCP server** (`mcp-crm`) — оставлен для future external integration
 
 ## Flow: Per-User AI Config
@@ -63,12 +59,16 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 ## Files in the chain
 
 | Layer | File | Role |
-|---|---|---|
+|---|---|---|---|
 | Frontend | `frontend-svelte/src/lib/services/aiService.js` | API calls to backend |
-| Frontend | `frontend-svelte/src/routes/admin/settings/ai/+page.svelte` | AI config UI (api_key, model, telegram_id) |
+| Frontend | `frontend-svelte/src/routes/admin/settings/ai/+page.svelte` | AI config UI (api_key, model, telegram_id, knowledge base) |
 | Backend | `backend/.../controller/svelte/AiConfigController.java` | User AI config CRUD |
 | Backend | `backend/.../controller/svelte/AiInternalController.java` | Internal API for CRM tools |
+| Backend | `backend/.../controller/svelte/AiKnowledgeController.java` | Knowledge base CRUD (tenant-scoped) |
 | Backend | `backend/.../model/UserAiConfig.java` | Per-user AI config entity |
+| Backend | `backend/.../model/AiKnowledge.java` | Knowledge base entry entity |
+| Backend | `backend/.../service/AiKnowledgeService.java` | Knowledge base logic |
+| Backend | `backend/.../repository/AiKnowledgeRepository.java` | Knowledge base DB access |
 | Bot Agent | `ai-gateway/bot-agent/main.py` | 4 Telegram bots, message handlers, conv. history |
 | Bot Agent | `ai-gateway/bot-agent/agent.py` | ReAct loop: OpenRouter + tool execution |
 | Bot Agent | `ai-gateway/bot-agent/tools.py` | Tool schemas + Backend API calls |
@@ -94,8 +94,8 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 
 | Workflow | Branch Trigger | Path Filter | Деплоит |
 |----------|--------------|-------------|--------|
-| `deploy-main.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths-ignore: 'ai-gateway/**'` | backend, notifications, frontend, database |
-| `deploy-openclaw.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'ai-gateway/**'` | bot-agent, mcp-crm |
+| `deploy-main.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths-ignore: 'ai-gateway/**', '.github/workflows/deploy-openclaw.yml', 'AGENTS.md', '*.md'` | backend, notifications, frontend, database |
+| `deploy-openclaw.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'ai-gateway/**', '.github/workflows/deploy-openclaw.yml'` | bot-agent, mcp-crm |
 
 **Изоляция:** оба workflow используют `concurrency.group: deploy-vps` → не выполняются одновременно.
 
@@ -106,6 +106,7 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 - **Table naming**: все таблицы в `snake_case` + plural:
   - `users` (**НЕ** `"user"`, а `"users"`) — CRM пользователи
   - `user_ai_config` — per-user AI config (V35)
+  - `ai_knowledge` — knowledge base entries (V38)
   - `staff_members`, `contacts`, `appointments` и т.д.
 
 ## Pyrogram-specific rules (notifications-python/main.py)
@@ -131,5 +132,5 @@ When editing `notifications-python/main.py`:
 ## TODO (future)
 - **External MCP** — публичный MCP-сервер для сторонних разработчиков (HTTPS, API ключи, документация)
 - **Streaming** — ответ чанками через `editMessageText`
-- **Knowledge Base** — интеграция с AI Settings KB
+- **Knowledge Base** — интеграция с AI Settings KB (search для bot-agent)
 - **Redis** — для session state и персистентности диалогов
