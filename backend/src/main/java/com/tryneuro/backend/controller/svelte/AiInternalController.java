@@ -36,6 +36,7 @@ public class AiInternalController {
     private final UserService userService;
     private final UserRepository userRepository;
     private final UserAiConfigService userAiConfigService;
+    private final AiKnowledgeService aiKnowledgeService;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -554,5 +555,21 @@ public class AiInternalController {
             log.error("Failed to generate report", e);
             return ResponseEntity.badRequest().body("Failed to generate report: " + e.getMessage());
         }
+    }
+
+    @PostMapping("/knowledge/search")
+    public ResponseEntity<?> searchKnowledge(
+            @RequestBody AiSearchRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+        String query = req.getQuery();
+
+        if (query == null || query.isEmpty()) {
+            return ResponseEntity.badRequest().body("Query is required");
+        }
+
+        var results = aiKnowledgeService.search(tId, query);
+        return ResponseEntity.ok(results);
     }
 }

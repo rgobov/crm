@@ -27,24 +27,30 @@
             goto('/admin');
             return;
         }
-        await loadData();
+        await loadConfig();
+        loadKnowledge();
     });
 
-    async function loadData() {
+    async function loadConfig() {
         isLoading = true;
         error = '';
         try {
-            const [cfg, kn] = await Promise.all([
-                aiService.getConfig(),
-                aiService.getKnowledge()
-            ]);
+            const cfg = await aiService.getConfig();
             if (cfg) config = { ...config, ...cfg };
-            if (kn) knowledge = kn;
         } catch (e) {
             console.error('Failed to load AI settings', e);
             error = 'Не удалось загрузить настройки';
         } finally {
             isLoading = false;
+        }
+    }
+
+    async function loadKnowledge() {
+        try {
+            const kn = await aiService.getKnowledge();
+            if (kn) knowledge = kn;
+        } catch (e) {
+            console.error('Failed to load knowledge base', e);
         }
     }
 
