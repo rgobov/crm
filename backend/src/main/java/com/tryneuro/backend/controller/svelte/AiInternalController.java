@@ -31,6 +31,7 @@ public class AiInternalController {
     private final AppServiceService appServiceService;
     private final StaffMemberService staffMemberService;
     private final StaffMemberRepository staffMemberRepository;
+    private final BranchService branchService;
     private final DashboardService dashboardService;
     private final ExportService exportService;
     private final UserService userService;
@@ -157,9 +158,10 @@ public class AiInternalController {
     public ResponseEntity<?> createAppointment(
             @RequestBody AiCreateAppointmentRequest req,
             @RequestHeader("X-Internal-Secret") String secret,
-            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
+            @RequestHeader("X-Actor-Role") String actorRole,
             @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
         validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
         String tId = getRequiredTenantId(req.getTenantId());
 
         if (req.getClientName() == null || req.getClientName().isBlank()) {
@@ -264,9 +266,11 @@ public class AiInternalController {
             @PathVariable String id,
             @RequestHeader("X-Internal-Secret") String secret,
             @RequestHeader("X-Tenant-Id") String tenantId,
-            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
-            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
+            @RequestHeader("X-Actor-Role") String actorRole,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId) {
         validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
         String tId = getRequiredTenantId(tenantId);
 
         Optional<Appointment> opt = scheduleService.getAppointmentById(id);
@@ -279,11 +283,19 @@ public class AiInternalController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Appointment does not belong to this tenant");
         }
 
-        // CLIENT can only cancel their own appointments
         if ("CLIENT".equalsIgnoreCase(actorRole)) {
             String cId = getRequiredActorContactId(actorContactId);
             if (!cId.equals(app.getContactId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot cancel another client's appointment");
+            }
+        }
+
+        if ("EMPLOYEE".equalsIgnoreCase(actorRole)) {
+            if (actorStaffId == null || actorStaffId.isEmpty()) {
+                return ResponseEntity.badRequest().body("staffId required for EMPLOYEE role");
+            }
+            if (!actorStaffId.equals(app.getStaffMemberId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot cancel another employee's appointment");
             }
         }
 
@@ -361,6 +373,325 @@ public class AiInternalController {
             return ResponseEntity.ok(contactService.getNotificationPreferences(contactId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Failed to update: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/appointments/{id}")
+    public ResponseEntity<?> getAppointment(
+            @PathVariable String id,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Actor-Role") String actorRole,
+            @RequestHeader("X-Tenant-Id") String tenantId,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
+        String tId = getRequiredTenantId(tenantId);
+
+        Optional<Appointment> opt = scheduleService.getAppointmentById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Appointment app = opt.get();
+
+        if (!tId.equals(app.getTenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Appointment does not belong to this tenant");
+        }
+
+        if ("CLIENT".equalsIgnoreCase(actorRole)) {
+            String cId = getRequiredActorContactId(actorContactId);
+            if (!cId.equals(app.getContactId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot view another client's appointment");
+            }
+        }
+
+        if ("EMPLOYEE".equalsIgnoreCase(actorRole)) {
+            if (actorStaffId == null || actorStaffId.isEmpty()) {
+                return ResponseEntity.badRequest().body("staffId required for EMPLOYEE role");
+            }
+            if (!actorStaffId.equals(app.getStaffMemberId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot view another employee's appointment");
+            }
+        }
+
+        return ResponseEntity.ok(scheduleService.convertToDtoWithGroupStaff(app));
+    }
+
+    @PutMapping("/appointments/{id}")
+    public ResponseEntity<?> updateAppointment(
+            @PathVariable String id,
+            @RequestBody AiCreateAppointmentRequest req,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Actor-Role") String actorRole,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        Optional<Appointment> existingOpt = scheduleService.getAppointmentById(id);
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Appointment existing = existingOpt.get();
+
+        if (!tId.equals(existing.getTenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Appointment does not belong to this tenant");
+        }
+
+        if ("CLIENT".equalsIgnoreCase(actorRole)) {
+            String cId = getRequiredActorContactId(actorContactId);
+            if (!cId.equals(existing.getContactId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot update another client's appointment");
+            }
+        }
+
+        if ("EMPLOYEE".equalsIgnoreCase(actorRole)) {
+            if (actorStaffId == null || actorStaffId.isEmpty()) {
+                return ResponseEntity.badRequest().body("staffId required for EMPLOYEE role");
+            }
+            if (!actorStaffId.equals(existing.getStaffMemberId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot update another employee's appointment");
+            }
+        }
+
+        if (req.getClientName() != null && !req.getClientName().isBlank()) {
+            existing.setClientName(req.getClientName());
+        }
+        if (req.getClientPhone() != null && !req.getClientPhone().isBlank()) {
+            existing.setClientPhone(req.getClientPhone());
+        }
+        if (req.getServiceName() != null && !req.getServiceName().isBlank()) {
+            List<Service> all = appServiceService.getAllServices(tId);
+            Optional<Service> found = all.stream()
+                    .filter(s -> s.getName().toLowerCase().contains(req.getServiceName().toLowerCase()))
+                    .findFirst();
+            if (found.isPresent()) {
+                existing.setService(found.get().getName());
+            }
+        }
+        if (req.getStaffName() != null && !req.getStaffName().isBlank()) {
+            var page = staffMemberService.getStaffPaged(tId, req.getStaffName(), true, 0, 5);
+            if (!page.isEmpty()) {
+                StaffMember staff = page.getContent().get(0);
+                existing.setStaffMemberId(staff.getId());
+            }
+        }
+        if (req.getBranchId() != null && !req.getBranchId().isBlank()) {
+            existing.setBranchId(req.getBranchId());
+        }
+        if (req.getDateTime() != null && !req.getDateTime().isBlank()) {
+            try {
+                existing.setStartTime(OffsetDateTime.parse(req.getDateTime()));
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body("Invalid date time format: " + req.getDateTime());
+            }
+        }
+        if (req.getDurationMinutes() != null) {
+            existing.setDurationInMinutes(req.getDurationMinutes());
+        }
+
+        try {
+            AppointmentDto result = scheduleService.convertToDtoWithGroupStaff(
+                    scheduleService.updateAppointment(id, existing));
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Failed to update appointment", e);
+            return ResponseEntity.badRequest().body("Failed to update appointment: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/branches")
+    public ResponseEntity<?> getBranches(
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Tenant-Id") String tenantId) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(tenantId);
+
+        List<Branch> branches = branchService.getBranches(tId);
+        return ResponseEntity.ok(branches.stream().map(DtoMapper::toDto).toList());
+    }
+
+    @PostMapping("/availability")
+    public ResponseEntity<?> checkAvailability(
+            @RequestBody AiAvailabilityRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        if (req.getStaffId() == null || req.getStaffId().isBlank()) {
+            return ResponseEntity.badRequest().body("staffId is required");
+        }
+        if (req.getDate() == null || req.getDate().isBlank()) {
+            return ResponseEntity.badRequest().body("date is required");
+        }
+        if (req.getTime() == null || req.getTime().isBlank()) {
+            return ResponseEntity.badRequest().body("time is required");
+        }
+        if (req.getDuration() == null || req.getDuration() <= 0) {
+            return ResponseEntity.badRequest().body("duration is required");
+        }
+
+        try {
+            LocalDate date = LocalDate.parse(req.getDate());
+            LocalTime time = LocalTime.parse(req.getTime());
+            boolean available = scheduleService.isStaffMemberAvailable(
+                    tId, req.getStaffId(), date, time, req.getDuration(), null, null);
+            return ResponseEntity.ok(Map.of("available", available));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid date/time format: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/staff/schedule")
+    public ResponseEntity<?> getStaffSchedule(
+            @RequestBody AiStaffScheduleRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        if (req.getStaffId() == null || req.getStaffId().isBlank()) {
+            return ResponseEntity.badRequest().body("staffId is required");
+        }
+        if (req.getDate() == null || req.getDate().isBlank()) {
+            return ResponseEntity.badRequest().body("date is required");
+        }
+
+        try {
+            LocalDate date = LocalDate.parse(req.getDate());
+            Optional<StaffMember> staffOpt = staffMemberService.getStaffByIdAndDate(req.getStaffId(), date, null);
+            if (staffOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(DtoMapper.toScheduleDto(staffOpt.get()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid date format: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/contacts/{id}")
+    public ResponseEntity<?> getContact(
+            @PathVariable String id,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE");
+
+        Optional<Contact> opt = contactService.getContactById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(DtoMapper.toDto(opt.get()));
+    }
+
+    @PutMapping("/contacts/{id}")
+    public ResponseEntity<?> updateContact(
+            @PathVariable String id,
+            @RequestBody ContactDto req,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader("X-Tenant-Id") String tenantId,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER");
+        String tId = getRequiredTenantId(tenantId);
+
+        try {
+            Contact updated = contactService.updateContact(id, DtoMapper.toEntity(req, tId), tId);
+            return ResponseEntity.ok(DtoMapper.toDto(updated));
+        } catch (Exception e) {
+            log.error("Failed to update contact", e);
+            return ResponseEntity.badRequest().body("Failed to update contact: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/contacts/{id}")
+    public ResponseEntity<?> deleteContact(
+            @PathVariable String id,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER");
+
+        try {
+            contactService.deleteContact(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Failed to delete contact", e);
+            return ResponseEntity.badRequest().body("Failed to delete contact: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/services")
+    public ResponseEntity<?> createService(
+            @RequestBody AiServiceCreateRequest req,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER");
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        if (req.getName() == null || req.getName().isBlank()) {
+            return ResponseEntity.badRequest().body("Service name is required");
+        }
+
+        Service service = new Service();
+        service.setName(req.getName());
+        service.setDurationInMinutes(req.getDurationMinutes());
+        service.setPriceMin(req.getPriceMin());
+        service.setPriceMax(req.getPriceMax());
+
+        try {
+            Service saved = appServiceService.addService(service, tId);
+            return ResponseEntity.ok(DtoMapper.toDto(saved));
+        } catch (Exception e) {
+            log.error("Failed to create service", e);
+            return ResponseEntity.badRequest().body("Failed to create service: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/services/{id}")
+    public ResponseEntity<?> updateService(
+            @PathVariable String id,
+            @RequestBody AiServiceCreateRequest req,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER");
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        if (req.getName() == null || req.getName().isBlank()) {
+            return ResponseEntity.badRequest().body("Service name is required");
+        }
+
+        Service service = new Service();
+        service.setName(req.getName());
+        service.setDurationInMinutes(req.getDurationMinutes());
+        service.setPriceMin(req.getPriceMin());
+        service.setPriceMax(req.getPriceMax());
+
+        try {
+            Service updated = appServiceService.updateService(id, service, tId);
+            return ResponseEntity.ok(DtoMapper.toDto(updated));
+        } catch (Exception e) {
+            log.error("Failed to update service", e);
+            return ResponseEntity.badRequest().body("Failed to update service: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/services/{id}")
+    public ResponseEntity<?> deleteService(
+            @PathVariable String id,
+            @RequestHeader("X-Internal-Secret") String secret,
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+        validateSecret(secret);
+        checkRole(actorRole, "ADMIN", "MANAGER");
+
+        try {
+            appServiceService.deleteService(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Failed to delete service", e);
+            return ResponseEntity.badRequest().body("Failed to delete service: " + e.getMessage());
         }
     }
 

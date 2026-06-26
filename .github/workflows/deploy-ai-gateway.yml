@@ -7,7 +7,7 @@ on:
       - feature/roles
     paths:
       - 'ai-gateway/**'
-      - '.github/workflows/deploy-openclaw.yml'
+      - '.github/workflows/deploy-ai-gateway.yml'
 
 concurrency:
   group: deploy-vps
@@ -47,9 +47,7 @@ jobs:
             EOF
 
             echo "--- FORCE REMOVE STALE CONTAINERS ---"
-            docker rm -f tryneuro_mcp_crm tryneuro_bot_agent tryneuro_openclaw \
-              tryneuro_hermes tryneuro_openrouter_proxy \
-              tryneuro_watchtower_hermes tryneuro_watchtower_openclaw 2>/dev/null || true
+            docker rm -f tryneuro_mcp_crm tryneuro_bot_agent 2>/dev/null || true
 
             echo "--- BUILDING AND STARTING ---"
             export DOCKER_BUILDKIT=1
@@ -57,8 +55,7 @@ jobs:
             docker-compose up -d --build
 
             echo "--- CLEANUP ---"
-            docker system prune -af
-            docker image prune -a -f
+            docker image prune -a --filter "until=24h" -f
 
             echo "--- STATUS ---"
             docker-compose ps

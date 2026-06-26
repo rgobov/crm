@@ -7,7 +7,7 @@ on:
       - feature/roles
     paths-ignore:
       - 'ai-gateway/**'
-      - '.github/workflows/deploy-openclaw.yml'
+      - '.github/workflows/deploy-ai-gateway.yml'
       - 'AGENTS.md'
       - '*.md'
 
@@ -36,6 +36,13 @@ jobs:
             git checkout ${{ github.ref_name }} || git checkout -b ${{ github.ref_name }} origin/${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
 
+            echo "--- ДАМП БД ПЕРЕД ДЕПЛОЕМ ---"
+            mkdir -p ~/crm/backups
+            docker exec tryneuro_db pg_dump -U postgres -d tryneuro_db \
+              --no-owner --no-acl \
+              --file=~/crm/backups/db-$(date +%Y-%m-%d_%H%M).sql || echo "⚠️ Дамп не удался, продолжаем..."
+            ls -t ~/crm/backups/db-*.sql | tail -n +25 | xargs rm -f 2>/dev/null || true
+
             echo "--- СОЗДАНИЕ .env ФАЙЛА В КОРНЕ ---"
             cat > .env << EOF
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
@@ -57,6 +64,22 @@ jobs:
             docker network create tryneuro_network || true
             docker-compose up -d
 
+            echo "--- HEALTH CHECK BACKEND ---"
+            for i in $(seq 1 30); do
+              status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || echo "000")
+              if [ "$status" = "200" ]; then
+                echo "✅ Backend здоров"
+                break
+              fi
+              echo "⏳ Ожидание backend... попытка $i/30 (статус: $status)"
+              sleep 5
+            done
+            if [ "$status" != "200" ]; then
+              echo "❌ Backend не запустился за 150 сек. Откат..."
+              docker-compose logs --tail=20 backend
+              exit 1
+            fi
+
             echo "--- ОТКЛЮЧЕНИЕ IPv6 И ОПТИМИЗАЦИЯ NGINX (GZIP) ---"
             docker exec tryneuro_proxy sh -c "
               sed -i 's/listen \[::\]/#listen [::]/g' /data/nginx/proxy_host/*.conf /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/production.conf
@@ -68,9 +91,8 @@ jobs:
             " || true
             docker exec tryneuro_proxy nginx -s reload || true
 
-            echo "--- ОЧИСТКА ---"
-            docker system prune -af
-            docker image prune -a -f
+            echo "--- ОЧИСТКА СТАРЫХ ОБРАЗОВ ---"
+            docker image prune -a --filter "until=24h" -f
 
             echo "--- СТАТУС ---"
             docker-compose ps

@@ -15,14 +15,27 @@ SYSTEM_PROMPT = """Ты — AI-ассистент CRM системы TryNeuro.
 
 Правила:
 1. Для поиска контактов используй search_contacts
-2. Для создания клиента используй create_contact
-3. Для поиска услуг используй search_services
-4. Для поиска сотрудников используй search_staff
-5. Для записи на услугу используй create_appointment (нужно имя, телефон, услуга, дата/время)
-6. Для отмены записи используй cancel_appointment
-7. Для просмотра своих записей используй get_my_appointments
-8. Для настройки уведомлений используй manage_notifications
-9. Для отчётов используй get_report (только для ADMIN/MANAGER)
+2. Для просмотра контакта используй get_contact
+3. Для создания клиента используй create_contact
+4. Для изменения контакта используй update_contact (только ADMIN/MANAGER)
+5. Для удаления контакта используй delete_contact (только ADMIN/MANAGER)
+6. Для поиска услуг используй search_services
+7. Для создания услуги используй add_service (только ADMIN/MANAGER)
+8. Для изменения услуги используй update_service (только ADMIN/MANAGER)
+9. Для удаления услуги используй delete_service (только ADMIN/MANAGER)
+10. Для поиска сотрудников используй search_staff
+11. Для расписания сотрудника используй get_staff_schedule
+12. Для списка филиалов используй get_branches
+13. Для проверки свободного времени используй check_availability
+14. Для записи на услугу используй create_appointment (нужно имя, телефон, услуга, дата/время)
+15. Для просмотра записи используй get_appointment
+16. Для изменения записи используй update_appointment
+17. Для отмены записи используй cancel_appointment
+18. Для просмотра своих записей используй get_my_appointments
+19. Для настройки уведомлений используй manage_notifications
+20. Для отчётов используй get_report (только для ADMIN/MANAGER)
+21. Для поиска по базе знаний используй search_knowledge
+22. Если ты EMPLOYEE, ты можешь записывать клиентов на услуги, но отменять можешь только свои записи
 """
 
 
@@ -32,8 +45,10 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
     role = actor.get("role", "CLIENT")
 
     system = SYSTEM_PROMPT
-    if role in ("ADMIN", "MANAGER", "EMPLOYEE"):
-        system += f"\nТвоя роль: {role}. У тебя полный доступ к CRM."
+    if role in ("ADMIN", "MANAGER"):
+        system += f"\nТвоя роль: {role}. У тебя полный доступ ко всем функциям CRM."
+    elif role == "EMPLOYEE":
+        system += f"\nТвоя роль: {role}. Ты можешь создавать записи для любых клиентов, искать контакты, просматривать расписание и филиалы, но отменять можешь только свои записи."
     else:
         system += f"\nТвоя роль: {role}. Ты можешь управлять только своими данными."
 
