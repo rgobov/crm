@@ -45,12 +45,15 @@ jobs:
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             EOF
 
+            echo "--- FORCE REMOVE STALE CONTAINERS ---"
+            docker rm -f tryneuro_mcp_crm tryneuro_bot_agent tryneuro_openclaw \
+              tryneuro_hermes tryneuro_openrouter_proxy \
+              tryneuro_watchtower_hermes tryneuro_watchtower_openclaw 2>/dev/null || true
+
             echo "--- BUILDING AND STARTING ---"
             export DOCKER_BUILDKIT=1
             docker network create tryneuro_network || true
-            docker-compose down --remove-orphans
-            docker-compose build --parallel
-            docker-compose up -d
+            docker-compose up -d --build
 
             echo "--- CLEANUP ---"
             docker system prune -af
