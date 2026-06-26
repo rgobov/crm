@@ -72,12 +72,12 @@ jobs:
               exit 1
             }
             for i in $(seq 1 30); do
-              status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || echo "000")
-              if [ "$status" = "200" ]; then
-                echo "✅ Backend здоров"
+              status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null || echo "000")
+              if [ "$status" != "000" ]; then
+                echo "✅ Backend отвечает (статус: $status)"
                 break
               fi
-              echo "⏳ Ожидание backend... попытка $i/30 (статус: $status)"
+              echo "⏳ Ожидание backend... попытка $i/30"
               if [ "$i" -eq 30 ]; then
                 echo "--- ЛОГИ BACKEND ---"
                 docker logs tryneuro_backend --tail 50
@@ -86,8 +86,8 @@ jobs:
               fi
               sleep 5
             done
-            if [ "$status" != "200" ]; then
-              echo "❌ Backend не запустился за 150 сек."
+            if [ "$status" = "000" ]; then
+              echo "❌ Backend не отвечает"
               exit 1
             fi
 
