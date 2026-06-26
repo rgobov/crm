@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from openai import AsyncOpenAI
@@ -6,6 +7,9 @@ from config import OPENROUTER_BASE, MAX_TOOL_ITERATIONS
 from tools import TOOL_SCHEMAS, execute_tool, resolve_actor
 
 logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+RETRY_DELAY = 2
 
 SYSTEM_PROMPT = """Ты — AI-ассистент CRM системы TryNeuro.
 Помогаешь клиентам с контактами, записями, услугами.
@@ -63,16 +67,28 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
 
     for iteration in range(MAX_TOOL_ITERATIONS):
         logger.info("Agent iteration %d/%d for chat_id=%s", iteration + 1, MAX_TOOL_ITERATIONS, chat_id)
-        try:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                tools=TOOL_SCHEMAS,
-                tool_choice="auto",
-            )
-        except Exception as e:
-            logger.error("LLM call error for tg=%s: %s", chat_id, e)
-            return f"Ошибка при обращении к нейросети: {e}"
+        last_error = None
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    tools=TOOL_SCHEMAS,
+                    tool_choice="auto",
+                )
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                if attempt < MAX_RETRIES and ("502" in err_str or "503" in err_str or "500" in err_str):
+                    logger.warning("LLM call attempt %d/%d failed for tg=%s, retrying: %s", attempt, MAX_RETRIES, chat_id, e)
+                    await asyncio.sleep(RETRY_DELAY * attempt)
+                else:
+                    break
+        if last_error:
+            logger.error("LLM call error for tg=%s after %d attempts: %s", chat_id, MAX_RETRIES, last_error)
+            return f"Ошибка при обращении к нейросети: {last_error}"
 
         choice = response.choices[0]
 
