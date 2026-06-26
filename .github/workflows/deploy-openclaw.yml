@@ -1,0 +1,61 @@
+name: Deploy AI Gateway
+
+on:
+  push:
+    branches:
+      - fix/ios-final-attempt
+      - feature/roles
+    paths:
+      - 'ai-gateway/**'
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy-ai-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          command_timeout: 30m
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            echo "--- SWITCHING TO BRANCH ${{ github.ref_name }} ---"
+            cd ~/crm
+            git fetch origin ${{ github.ref_name }}
+            git checkout ${{ github.ref_name }} || git checkout -b ${{ github.ref_name }} origin/${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+            cd ai-gateway
+
+            echo "--- CREATING .env FILE ---"
+            cat > .env << EOF
+            BOT_TOKEN_1=${{ secrets.BOT_TOKEN_1 }}
+            BOT_TOKEN_2=${{ secrets.BOT_TOKEN_2 }}
+            BOT_TOKEN_3=${{ secrets.BOT_TOKEN_3 }}
+            BOT_TOKEN_4=${{ secrets.BOT_TOKEN_4 }}
+            TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
+            INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            EOF
+
+            echo "--- BUILDING AND STARTING ---"
+            export DOCKER_BUILDKIT=1
+            docker network create tryneuro_network || true
+            docker-compose down --remove-orphans
+            docker-compose build --parallel
+            docker-compose up -d
+
+            echo "--- CLEANUP ---"
+            docker system prune -af
+            docker image prune -a -f
+
+            echo "--- STATUS ---"
+            docker-compose ps
+            docker logs tryneuro_bot_agent --tail 20

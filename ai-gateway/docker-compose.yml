@@ -1,0 +1,48 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "3"
+
+services:
+  mcp-crm:
+    build:
+      context: ./mcp-crm
+      dockerfile: Dockerfile
+    container_name: tryneuro_mcp_crm
+    restart: always
+    logging: *default-logging
+    environment:
+      CRM_BACKEND_URL: ${CRM_BACKEND_URL:-http://backend:8080}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
+      HTTP_PROXY: ${TELEGRAM_PROXY}
+      HTTPS_PROXY: ${TELEGRAM_PROXY}
+      NO_PROXY: "localhost,127.0.0.1,backend,tryneuro_database"
+    networks:
+      - tryneuro_network
+
+  bot-agent:
+    build:
+      context: ./bot-agent
+      dockerfile: Dockerfile
+    container_name: tryneuro_bot_agent
+    restart: always
+    logging: *default-logging
+    environment:
+      BOT_TOKEN_1: ${BOT_TOKEN_1}
+      BOT_TOKEN_2: ${BOT_TOKEN_2}
+      BOT_TOKEN_3: ${BOT_TOKEN_3}
+      BOT_TOKEN_4: ${BOT_TOKEN_4}
+      DATABASE_URL: ${DATABASE_URL}
+      TELEGRAM_PROXY: ${TELEGRAM_PROXY}
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-try-neuro-internal-secret-2026}
+      CRM_BACKEND_URL: ${CRM_BACKEND_URL:-http://backend:8080}
+      HTTP_PROXY: ${TELEGRAM_PROXY}
+      HTTPS_PROXY: ${TELEGRAM_PROXY}
+      NO_PROXY: "localhost,127.0.0.1,backend,tryneuro_database"
+    networks:
+      - tryneuro_network
+
+networks:
+  tryneuro_network:
+    external: true

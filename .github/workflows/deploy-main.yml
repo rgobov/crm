@@ -6,8 +6,8 @@ on:
       - fix/ios-final-attempt
       - feature/roles
     paths-ignore:
-      - 'hermes-agent/**'
-      - '.github/workflows/deploy-hermes.yml'
+      - 'ai-gateway/**'
+      - '.github/workflows/deploy-openclaw.yml'
       - 'AGENTS.md'
       - '*.md'
 
