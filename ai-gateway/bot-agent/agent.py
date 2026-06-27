@@ -78,11 +78,17 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
             for attempt in range(1, MAX_RETRIES + 1):
                 try:
                     logger.info("LLM call model=%s attempt=%d for chat_id=%s", try_model, attempt, chat_id)
+                    extra_kwargs = {}
+                    if try_model == model:
+                        extra_kwargs["extra_body"] = {
+                            "provider": {"ignore": ["Poolside"]}
+                        }
                     response = await client.chat.completions.create(
                         model=try_model,
                         messages=messages,
                         tools=TOOL_SCHEMAS,
                         tool_choice="auto",
+                        **extra_kwargs,
                     )
                     success = True
                     break
