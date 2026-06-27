@@ -113,6 +113,9 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
             return "Ошибка при обращении к нейросети: все провайдеры недоступны"
 
         choice = response.choices[0]
+        num_tool_calls = len(choice.message.tool_calls) if choice.message.tool_calls else 0
+        logger.info("Agent iteration %d: finish_reason=%s tool_calls=%d for chat_id=%s",
+                     iteration + 1, choice.finish_reason, num_tool_calls, chat_id)
 
         if choice.finish_reason == "stop":
             return choice.message.content or ""

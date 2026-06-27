@@ -12,5 +12,5 @@ INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "try-neuro-internal-secret-2
 CRM_BACKEND_URL = os.environ.get("CRM_BACKEND_URL", "http://backend:8080")
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 TELEGRAM_PROXY = os.environ.get("TELEGRAM_PROXY", "")
-MAX_TOOL_ITERATIONS = 15
+MAX_TOOL_ITERATIONS = 30
 MAX_HISTORY_EXCHANGES = 10
