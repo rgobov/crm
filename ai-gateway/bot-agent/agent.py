@@ -80,12 +80,12 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
                     break
                 except Exception as e:
                     err_str = str(e)
-                    is_provider_5xx = "502" in err_str or "503" in err_str or "500" in err_str
-                    if attempt < MAX_RETRIES and is_provider_5xx:
+                    is_retryable = any(c in err_str for c in ("502", "503", "500", "429"))
+                    if attempt < MAX_RETRIES and is_retryable:
                         logger.warning("LLM model=%s attempt %d/%d failed for tg=%s, retrying: %s",
                                        try_model, attempt, MAX_RETRIES, chat_id, e)
                         await asyncio.sleep(RETRY_DELAY * attempt)
-                    elif is_provider_5xx:
+                    elif is_retryable:
                         logger.warning("LLM model=%s exhausted retries for tg=%s, trying next model: %s",
                                        try_model, chat_id, e)
                         await asyncio.sleep(RETRY_DELAY)

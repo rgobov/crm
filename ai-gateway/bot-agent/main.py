@@ -90,7 +90,10 @@ async def handle_message(update: Update, context):
 
     _prune_history(chat_id)
 
-    await update.message.reply_text(response)
+    try:
+        await update.message.reply_text(response)
+    except Exception as e:
+        logger.error("Failed to send reply for tg=%s: %s", chat_id, e)
 
 
 def _prune_history(chat_id: int):
