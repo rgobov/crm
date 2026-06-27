@@ -10,6 +10,10 @@ logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 RETRY_DELAY = 2
+FALLBACK_MODELS = [
+    "openai/gpt-oss-120b:free",
+    "liquid/lfm-2.5-1.2b-thinking:free",
+]
 
 SYSTEM_PROMPT = """Ты — AI-ассистент CRM системы TryNeuro.
 Помогаешь клиентам с контактами, записями, услугами.
@@ -65,30 +69,42 @@ async def run_agent(history: list, user_cfg: dict, chat_id: int) -> str:
 
     client = AsyncOpenAI(api_key=api_key, base_url=OPENROUTER_BASE)
 
+    models_to_try = [model] + [m for m in FALLBACK_MODELS if m != model]
+
     for iteration in range(MAX_TOOL_ITERATIONS):
         logger.info("Agent iteration %d/%d for chat_id=%s", iteration + 1, MAX_TOOL_ITERATIONS, chat_id)
-        last_error = None
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                response = await client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    tools=TOOL_SCHEMAS,
-                    tool_choice="auto",
-                )
-                last_error = None
-                break
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                if attempt < MAX_RETRIES and ("502" in err_str or "503" in err_str or "500" in err_str):
-                    logger.warning("LLM call attempt %d/%d failed for tg=%s, retrying: %s", attempt, MAX_RETRIES, chat_id, e)
-                    await asyncio.sleep(RETRY_DELAY * attempt)
-                else:
+        success = False
+        for try_model in models_to_try:
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    logger.info("LLM call model=%s attempt=%d for chat_id=%s", try_model, attempt, chat_id)
+                    response = await client.chat.completions.create(
+                        model=try_model,
+                        messages=messages,
+                        tools=TOOL_SCHEMAS,
+                        tool_choice="auto",
+                    )
+                    success = True
                     break
-        if last_error:
-            logger.error("LLM call error for tg=%s after %d attempts: %s", chat_id, MAX_RETRIES, last_error)
-            return f"Ошибка при обращении к нейросети: {last_error}"
+                except Exception as e:
+                    err_str = str(e)
+                    is_provider_5xx = "502" in err_str or "503" in err_str or "500" in err_str
+                    if attempt < MAX_RETRIES and is_provider_5xx:
+                        logger.warning("LLM model=%s attempt %d/%d failed for tg=%s, retrying: %s",
+                                       try_model, attempt, MAX_RETRIES, chat_id, e)
+                        await asyncio.sleep(RETRY_DELAY * attempt)
+                    elif is_provider_5xx:
+                        logger.warning("LLM model=%s exhausted retries for tg=%s, trying next model: %s",
+                                       try_model, chat_id, e)
+                        await asyncio.sleep(RETRY_DELAY)
+                    else:
+                        logger.error("LLM non-retryable error model=%s for tg=%s: %s", try_model, chat_id, e)
+                        return f"Ошибка при обращении к нейросети: {e}"
+            if success:
+                break
+        if not success:
+            logger.error("All models exhausted for chat_id=%s", chat_id)
+            return "Ошибка при обращении к нейросети: все провайдеры недоступны"
 
         choice = response.choices[0]
 
