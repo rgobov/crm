@@ -13,4 +13,5 @@ public class AiAvailabilityRequest {
     private String date;
     private String time;
     private Integer duration;
+    private String resourceId;
 }

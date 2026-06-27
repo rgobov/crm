@@ -191,8 +191,22 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
+            "name": "search_resources",
+            "description": "Search resources (rooms, equipment) by name",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Resource name to search"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "check_availability",
-            "description": "Check if a staff member is available at a specific time slot",
+            "description": "Check if a staff member and resource are available at a specific time slot",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -200,6 +214,7 @@ TOOL_SCHEMAS = [
                     "date": {"type": "string", "description": "Date in YYYY-MM-DD format"},
                     "time": {"type": "string", "description": "Time in HH:MM format"},
                     "duration": {"type": "integer", "description": "Duration in minutes"},
+                    "resource_id": {"type": "string", "description": "Resource ID (optional)"},
                 },
                 "required": ["staff_id", "date", "time", "duration"],
             },
@@ -219,6 +234,7 @@ TOOL_SCHEMAS = [
                     "dateTime": {"type": "string", "description": "Date and time in ISO format (e.g. 2026-06-20T14:00:00+03:00)"},
                     "staffName": {"type": "string", "description": "Staff name (optional)"},
                     "durationMinutes": {"type": "integer", "description": "Duration in minutes (default 60)"},
+                    "resourceId": {"type": "string", "description": "Resource ID (optional)"},
                 },
                 "required": ["clientName", "clientPhone", "serviceName", "dateTime"],
             },
@@ -323,6 +339,20 @@ TOOL_SCHEMAS = [
                     "query": {"type": "string", "description": "Search query"},
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_instructions",
+            "description": "Get step-by-step instructions for complex tasks",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string", "description": "Task name, e.g. create_appointment, search_contacts, search_services, search_staff, search_resources"},
+                },
+                "required": ["task"],
             },
         },
     },
@@ -454,16 +484,27 @@ async def execute_tool(name: str, args: dict, tenant_id: str, chat_id: int, acto
                     f"{CRM_BACKEND_URL}/api/admin/ai/internal/staff/schedule",
                     json=sched_body, headers=headers,
                 )
+            elif name == "search_resources":
+                resp = await client.post(
+                    f"{CRM_BACKEND_URL}/api/admin/ai/internal/resources/search",
+                    json=body, headers=headers,
+                )
             elif name == "get_branches":
                 headers["X-Tenant-Id"] = tenant_id
                 resp = await client.get(
                     f"{CRM_BACKEND_URL}/api/admin/ai/internal/branches",
                     headers=headers,
                 )
+            elif name == "get_instructions":
+                resp = await client.get(
+                    f"{CRM_BACKEND_URL}/api/admin/ai/internal/instructions",
+                    headers=headers,
+                )
             elif name == "check_availability":
                 avail_body = {"tenantId": tenant_id, "staffId": args.get("staff_id"),
                               "date": args.get("date"), "time": args.get("time"),
-                              "duration": args.get("duration")}
+                              "duration": args.get("duration"),
+                              "resourceId": args.get("resource_id")}
                 resp = await client.post(
                     f"{CRM_BACKEND_URL}/api/admin/ai/internal/availability",
                     json=avail_body, headers=headers,

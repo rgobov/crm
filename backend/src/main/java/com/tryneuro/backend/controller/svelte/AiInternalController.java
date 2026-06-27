@@ -38,6 +38,7 @@ public class AiInternalController {
     private final UserRepository userRepository;
     private final UserAiConfigService userAiConfigService;
     private final AiKnowledgeService aiKnowledgeService;
+    private final ResourceService resourceService;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -136,6 +137,24 @@ public class AiInternalController {
                 .toList();
 
         return ResponseEntity.ok(matches.stream().map(DtoMapper::toDto).toList());
+    }
+
+    @PostMapping("/resources/search")
+    public ResponseEntity<?> searchResources(
+            @RequestBody AiSearchRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        List<Resource> all = resourceService.getResources(tId, null);
+        String query = req.getQuery();
+        if (query != null && !query.isBlank()) {
+            all = all.stream()
+                    .filter(r -> r.getName().toLowerCase().contains(query.toLowerCase()))
+                    .limit(10)
+                    .toList();
+        }
+        return ResponseEntity.ok(all.stream().map(DtoMapper::toDto).toList());
     }
 
     @PostMapping("/staff/search")
@@ -243,6 +262,7 @@ public class AiInternalController {
         appointment.setContactId(contactId);
         appointment.setService(service.getName());
         appointment.setStaffMemberId(staff != null ? staff.getId() : null);
+        appointment.setResourceId(req.getResourceId());
         appointment.setBranchId(req.getBranchId());
         appointment.setStartTime(startTime);
         appointment.setDurationInMinutes(duration);
@@ -480,6 +500,9 @@ public class AiInternalController {
         if (req.getBranchId() != null && !req.getBranchId().isBlank()) {
             existing.setBranchId(req.getBranchId());
         }
+        if (req.getResourceId() != null && !req.getResourceId().isBlank()) {
+            existing.setResourceId(req.getResourceId());
+        }
         if (req.getDateTime() != null && !req.getDateTime().isBlank()) {
             try {
                 existing.setStartTime(OffsetDateTime.parse(req.getDateTime()));
@@ -535,9 +558,19 @@ public class AiInternalController {
         try {
             LocalDate date = LocalDate.parse(req.getDate());
             LocalTime time = LocalTime.parse(req.getTime());
-            boolean available = scheduleService.isStaffMemberAvailable(
+            boolean staffAvailable = scheduleService.isStaffMemberAvailable(
                     tId, req.getStaffId(), date, time, req.getDuration(), null, null);
-            return ResponseEntity.ok(Map.of("available", available));
+            if (!staffAvailable) {
+                return ResponseEntity.ok(Map.of("available", false, "reason", "staff_busy"));
+            }
+            if (req.getResourceId() != null && !req.getResourceId().isBlank()) {
+                boolean resourceAvailable = scheduleService.isResourceAvailable(
+                        tId, req.getResourceId(), date, time, req.getDuration(), null);
+                if (!resourceAvailable) {
+                    return ResponseEntity.ok(Map.of("available", false, "reason", "resource_busy"));
+                }
+            }
+            return ResponseEntity.ok(Map.of("available", true));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Invalid date/time format: " + e.getMessage());
         }
@@ -886,6 +919,43 @@ public class AiInternalController {
             log.error("Failed to generate report", e);
             return ResponseEntity.badRequest().body("Failed to generate report: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/instructions")
+    public ResponseEntity<?> getInstructions(
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        Map<String, List<String>> instructions = new LinkedHashMap<>();
+        instructions.put("create_appointment", List.of(
+                "Поиск клиента через search_contacts. Если не найден — спроси телефон и создай через create_contact.",
+                "Поиск услуги через search_services. Если не найдена — покажи все услуги или предложи создать (ADMIN/MANAGER).",
+                "Поиск мастера через search_staff. Если не указан — покажи всех доступных.",
+                "Поиск ресурса через search_resources (кабинет, оборудование). Если услуга требует ресурс — укажи его.",
+                "Проверка слотов через check_availability с staffId и resourceId.",
+                "Создание записи через create_appointment с resourceId если нужен.",
+                "Подтверди пользователю: дата, время, мастер, услуга, ресурс."
+        ));
+        instructions.put("search_contacts", List.of(
+                "search_contacts по имени или телефону.",
+                "Если найден — покажи данные.",
+                "Если НЕ найден — спроси телефон для создания через create_contact."
+        ));
+        instructions.put("search_services", List.of(
+                "search_services по названию.",
+                "Если не найдена — покажи все услуги (search_services с пустым query).",
+                "Если все пусто — предложи создать (ADMIN/MANAGER).",
+                "CLIENT — сообщи что услуг нет."
+        ));
+        instructions.put("search_staff", List.of(
+                "search_staff по имени.",
+                "Если не найден — покажи всех (search_staff с пустым query).",
+                "Если пусто — сообщи что сотрудников нет."
+        ));
+        instructions.put("search_resources", List.of(
+                "search_resources по названию кабинета/оборудования.",
+                "Если не найден — покажи все (search_resources с пустым query)."
+        ));
+        return ResponseEntity.ok(instructions);
     }
 
     @PostMapping("/knowledge/search")
