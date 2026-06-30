@@ -1,6 +1,6 @@
 CREATE TABLE user_consents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id),
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL REFERENCES users(id),
     consent_type VARCHAR(50) NOT NULL DEFAULT 'personal_data',
     policy_version VARCHAR(20) NOT NULL,
     ip_address VARCHAR(45),
