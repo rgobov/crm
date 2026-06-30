@@ -4,6 +4,7 @@
     import { user, token } from '$lib/stores/auth.js';
     import { goto } from '$app/navigation';
     import { FeedbackUtils } from '$lib/utils/feedback.js';
+    import ConsentCheckbox from '$lib/components/ConsentCheckbox.svelte';
 
     let companyName = '';
     let adminName = '';
@@ -17,9 +18,11 @@
 
     $: if (passwordInputEl) passwordInputEl.type = showPassword ? 'text' : 'password';
     $: if (confirmPasswordInputEl) confirmPasswordInputEl.type = showConfirmPassword ? 'text' : 'password';
+
     let companyAddress = '';
     let error = '';
     let isLoading = false;
+    let agreedToPolicy = false;
     let tg = null;
 
     onMount(() => {
@@ -35,7 +38,13 @@
     async function handleRegister() {
         if (!companyName || !adminName || !email || !password || !confirmPassword) {
             error = 'Заполните все поля';
-            FeedbackUtils.error(); // Вспышка + вибрация при ошибке валидации
+            FeedbackUtils.error();
+            return;
+        }
+
+        if (!agreedToPolicy) {
+            error = 'Необходимо согласие на обработку персональных данных';
+            FeedbackUtils.error();
             return;
         }
 
@@ -55,7 +64,8 @@
                 adminName,
                 adminEmail: email.trim(),
                 adminPassword: password,
-                companyAddress: companyAddress || 'Не указан'
+                companyAddress: companyAddress || 'Не указан',
+                agreedToPolicy
             });
 
             // 2. АВТОМАТИЧЕСКИЙ ВХОД (как вы просили для бесшовности)
@@ -156,6 +166,8 @@
                     </button>
                 </div>
             </div>
+
+            <ConsentCheckbox bind:agreed={agreedToPolicy} disabled={isLoading} />
 
             <button class="login-btn" on:click={handleRegister} disabled={isLoading}>
                 {isLoading ? 'Создание...' : 'Создать и войти'}

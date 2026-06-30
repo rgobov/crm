@@ -22,20 +22,27 @@ public class CompanyService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ContactRepository contactRepository;
+    private final ConsentService consentService;
 
     @Autowired
-    public CompanyService(CompanyRepository companyRepository, UserRepository userRepository, PasswordEncoder passwordEncoder, ContactRepository contactRepository) {
+    public CompanyService(CompanyRepository companyRepository, UserRepository userRepository, PasswordEncoder passwordEncoder, ContactRepository contactRepository, ConsentService consentService) {
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.contactRepository = contactRepository;
+        this.consentService = consentService;
     }
 
     @Transactional
-    public Company registerCompany(RegisterCompanyRequest request) {
+    public Company registerCompany(RegisterCompanyRequest request, String ipAddress, String userAgent) {
         if (request.getAdminEmail() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email не может быть пустым");
         }
+
+        if (request.getAgreedToPolicy() != null && !request.getAgreedToPolicy()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Необходимо согласие на обработку персональных данных");
+        }
+
         String normalizedEmail = request.getAdminEmail().trim().toLowerCase();
 
         // Проверяем, существует ли пользователь с таким email
@@ -54,11 +61,16 @@ public class CompanyService {
         // 2. Создаем пользователя-админа, привязанного к этой компании
         User admin = new User();
         admin.setEmail(normalizedEmail);
-        admin.setPassword(passwordEncoder.encode(request.getAdminPassword())); // Хешируем пароль
+        admin.setPassword(passwordEncoder.encode(request.getAdminPassword()));
         admin.setRole(UserRole.ADMIN);
         admin.setTenantId(savedCompany.getId());
 
-        userRepository.save(admin);
+        User savedUser = userRepository.save(admin);
+
+        // 3. Сохраняем согласие, если дано
+        if (request.getAgreedToPolicy() != null && request.getAgreedToPolicy()) {
+            consentService.saveConsent(savedUser.getId(), "personal_data", "1", ipAddress, userAgent);
+        }
 
         return savedCompany;
     }
@@ -69,9 +81,13 @@ public class CompanyService {
     }
 
     @Transactional
-    public User registerClient(RegisterClientRequest request) {
+    public User registerClient(RegisterClientRequest request, String ipAddress, String userAgent) {
         Company company = companyRepository.findById(request.getTenantId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Указанная компания не найдена"));
+
+        if (request.getAgreedToPolicy() != null && !request.getAgreedToPolicy()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Необходимо согласие на обработку персональных данных");
+        }
 
         if (request.getEmail() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email не может быть пустым");
@@ -100,6 +116,12 @@ public class CompanyService {
         clientUser.setTenantId(company.getId());
         clientUser.setContactId(contact.getId());
 
-        return userRepository.save(clientUser);
+        User savedUser = userRepository.save(clientUser);
+
+        if (request.getAgreedToPolicy() != null && request.getAgreedToPolicy()) {
+            consentService.saveConsent(savedUser.getId(), "personal_data", "1", ipAddress, userAgent);
+        }
+
+        return savedUser;
     }
 }

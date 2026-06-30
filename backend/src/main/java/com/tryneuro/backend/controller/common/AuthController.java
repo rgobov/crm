@@ -12,6 +12,7 @@ import com.tryneuro.backend.repository.UserRepository;
 import com.tryneuro.backend.security.JwtUtil;
 import com.tryneuro.backend.service.TelegramAuthService;
 import com.tryneuro.backend.service.UserDetailsServiceImpl;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +43,6 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthResponse login(@RequestBody AuthRequest authRequest, @RequestHeader(value = "X-Telegram-Init-Data", required = false) String initData) {
-        // ТЕХНИЧЕСКОЕ РЕШЕНИЕ: Приводим email к нижнему регистру для надежности в эмуляторах
         String normalizedEmail = authRequest.getEmail().trim().toLowerCase();
         log.info("AUTH: Login attempt for email: {}", normalizedEmail);
 
@@ -86,8 +86,24 @@ public class AuthController {
     }
 
     @PostMapping("/register-client")
-    public User registerClient(@RequestBody RegisterClientRequest request) {
+    public User registerClient(@RequestBody RegisterClientRequest request, HttpServletRequest httpRequest) {
         log.info("AUTH: Register client attempt for email: {}", request.getEmail());
-        return companyService.registerClient(request);
+        String ip = resolveIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        return companyService.registerClient(request, ip, userAgent);
+    }
+
+    private String resolveIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

@@ -12,4 +12,5 @@ public class RegisterCompanyRequest {
     private String companyAddress;
     private String adminEmail;
     private String adminPassword;
+    private Boolean agreedToPolicy;
 }

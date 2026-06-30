@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import api from '$lib/api.js';
 	import { token, user } from '$lib/stores/auth.js';
+	import ConsentCheckbox from '$lib/components/ConsentCheckbox.svelte';
 
 	let tenantId = '';
 	let companyName = '';
@@ -22,6 +23,7 @@
 	let isLoading = false;
 	let error = '';
 	let successMsg = '';
+	let agreedToPolicy = false;
 
 	onMount(async () => {
 		// 1. Получаем tenantId из строки запроса или localStorage
@@ -56,6 +58,11 @@
 			return;
 		}
 
+		if (!agreedToPolicy) {
+			error = 'Необходимо согласие на обработку персональных данных';
+			return;
+		}
+
 		if (password !== confirmPassword) {
 			error = 'Пароли не совпадают';
 			return;
@@ -70,7 +77,8 @@
 				password,
 				name: name.trim(),
 				phone: phone.trim(),
-				tenantId
+				tenantId,
+				agreedToPolicy
 			});
 
 			successMsg = 'Регистрация успешна! Входим...';
@@ -213,6 +221,8 @@
 						</button>
 					</div>
 				</div>
+
+				<ConsentCheckbox bind:agreed={agreedToPolicy} disabled={isLoading} />
 
 				<button type="submit" class="register-btn" disabled={isLoading}>
 					{#if isLoading}

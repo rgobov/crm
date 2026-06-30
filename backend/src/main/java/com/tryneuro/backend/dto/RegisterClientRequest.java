@@ -13,4 +13,5 @@ public class RegisterClientRequest {
     private String name;
     private String phone;
     private String tenantId;
+    private Boolean agreedToPolicy;
 }
