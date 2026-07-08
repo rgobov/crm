@@ -63,7 +63,7 @@ jobs:
             docker-compose build --parallel
             docker-compose down --remove-orphans
 
-            docker rm -f tryneuro_backend tryneuro_notifications_python tryneuro_frontend tryneuro_db_prod tryneuro_proxy || true
+            docker rm -f tryneuro_backend tryneuro_notifications_python tryneuro_frontend tryneuro_db_prod tryneuro_proxy tryneuro_bot_agent tryneuro_mcp_crm || true
 
             docker network create tryneuro_network || true
             docker-compose up -d
