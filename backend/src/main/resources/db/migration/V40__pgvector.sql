@@ -2,8 +2,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE ai_knowledge_chunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES users(id),
-    knowledge_id UUID REFERENCES ai_knowledge(id) ON DELETE CASCADE,
+    tenant_id VARCHAR(36) NOT NULL,
+    knowledge_id VARCHAR(36) REFERENCES ai_knowledge(id) ON DELETE CASCADE,
     chunk_index INT NOT NULL,
     content TEXT NOT NULL,
     embedding vector(1536),
