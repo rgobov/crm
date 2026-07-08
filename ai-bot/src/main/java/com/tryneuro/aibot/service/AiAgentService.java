@@ -79,6 +79,7 @@ public class AiAgentService {
                     @Override
                     public List<Proxy> select(URI targetUri) {
                         if (targetUri.getHost() != null && targetUri.getHost().contains("openrouter.ai")) {
+                            log.debug("Proxy routing {} via {}:{}", targetUri, host, port);
                             return List.of(proxy);
                         }
                         return defaultSelector != null
@@ -92,37 +93,54 @@ public class AiAgentService {
                     }
                 });
 
-                log.info("OpenRouter proxy enabled: {}:{}", host, port);
+                log.info("OpenRouter proxy enabled: {}:{} (env: OPENROUTER_PROXY={}, TELEGRAM_PROXY={})",
+                    host, port,
+                    System.getenv("OPENROUTER_PROXY") != null ? "set" : "not set",
+                    System.getenv("TELEGRAM_PROXY") != null ? "set" : "not set");
             } catch (Exception e) {
                 log.warn("Failed to parse proxy {}: {}", proxyUrl, e.getMessage());
             }
+        } else {
+            log.info("No proxy configured for OpenRouter — direct connection");
         }
     }
 
     @SuppressWarnings("unchecked")
     public String processMessage(List<Map<String, String>> history, long chatId) {
+        log.info("processMessage chat_id={}, history_size={}", chatId, history.size());
+
         UserConfigService.UserConfig cfg = userConfigService.getConfig(chatId);
         if (cfg == null || cfg.apiKey() == null || cfg.apiKey().isEmpty()) {
+            log.warn("processMessage chat_id={}: no API key configured", chatId);
             return "У вас не настроен API ключ для нейросети.\n"
                 + "Перейдите в CRM → AI Настройки, сохраните ваш OpenRouter API key и Telegram ID.";
         }
+        log.info("processMessage chat_id={}: apiKey={}..., model={}",
+            chatId, cfg.apiKey().substring(0, Math.min(8, cfg.apiKey().length())), cfg.llmModel());
 
         Map<String, String> actor = actorResolver.resolveActor(chatId);
         String tenantId = actor.get("tenant_id");
         String role = actor.getOrDefault("role", "CLIENT");
         String modelName = cfg.llmModel() != null && !cfg.llmModel().isEmpty()
             ? cfg.llmModel() : "openrouter/auto";
+        log.info("processMessage chat_id={}: role={}, tenantId={}, model={}", chatId, role, tenantId, modelName);
 
         String systemPrompt = buildSystemPrompt(role);
 
         String lastUserQuery = history.isEmpty() ? "" :
             history.get(history.size() - 1).getOrDefault("content", "");
+        log.info("processMessage chat_id={}: calling RAG with query=\"{}\"", chatId, lastUserQuery);
         String ragContext = ragService.enhancePrompt(tenantId, lastUserQuery);
         if (!ragContext.isEmpty()) {
             systemPrompt += ragContext;
+            log.info("processMessage chat_id={}: RAG context added, len={}", chatId, ragContext.length());
+        } else {
+            log.info("processMessage chat_id={}: no RAG context", chatId);
         }
 
         List<Message> historyMessages = buildHistoryMessages(history);
+        log.info("processMessage chat_id={}: calling OpenRouter model={}, messages_count={}",
+            chatId, modelName, historyMessages.size());
 
         try {
             OpenAiChatModel chatModel = OpenAiChatModel.builder()
@@ -136,18 +154,28 @@ public class AiAgentService {
             ChatClient chatClient = ChatClient.builder(chatModel).build();
 
             List<FunctionToolCallback<Map<String, Object>, String>> callbacks = buildCallbacks(tenantId, actor);
+            log.info("processMessage chat_id={}: {} tool callbacks registered", chatId, callbacks.size());
 
             ChatClient.ChatClientRequestSpec request = chatClient.prompt()
                 .system(systemPrompt)
                 .messages(historyMessages)
                 .tools(callbacks.toArray());
 
+            long openrouterStart = System.currentTimeMillis();
             String content = request.call().content();
+            long openrouterElapsed = System.currentTimeMillis() - openrouterStart;
+
+            log.info("processMessage chat_id={}: OpenRouter responded in {}ms, content len={}",
+                chatId, openrouterElapsed, content != null ? content.length() : 0);
+            if (content != null && !content.isEmpty()) {
+                log.debug("processMessage chat_id={}: response preview: {}", chatId,
+                    content.substring(0, Math.min(200, content.length())));
+            }
             return content != null ? content : "";
 
         } catch (Exception e) {
             String errMsg = e.getMessage() != null ? e.getMessage() : "";
-            log.error("Error model={} chat_id={}: {}", modelName, chatId, errMsg);
+            log.error("processMessage chat_id={} model={}: exception: {}", chatId, modelName, errMsg, e);
 
             if (errMsg.contains("403")) {
                 return "Модель \"" + modelName + "\" недоступна. Проверьте API-ключ и баланс на OpenRouter.\n"

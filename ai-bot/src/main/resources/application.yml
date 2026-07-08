@@ -26,5 +26,6 @@ spring:
 
 logging:
   level:
-    com.tryneuro: INFO
-    com.tryneuro.aibot.service.UserConfigService: DEBUG
+    com.tryneuro: DEBUG
+    org.springframework.ai: DEBUG
+    org.springframework.web.client: TRACE

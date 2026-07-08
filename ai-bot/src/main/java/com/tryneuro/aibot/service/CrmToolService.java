@@ -41,6 +41,9 @@ public class CrmToolService {
 
     public String executeTool(String name, Map<String, Object> args, String tenantId,
                               Map<String, String> actorHeaders) {
+        long startMs = System.currentTimeMillis();
+        log.info("executeTool: name={}, args={}, tenantId={}", name, args, tenantId);
+
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Internal-Secret", internalSecret);
         headers.set("Content-Type", "application/json");
@@ -61,7 +64,7 @@ public class CrmToolService {
             String json = mapper.writeValueAsString(body);
             HttpEntity<String> entity = new HttpEntity<>(json, headers);
 
-            return switch (name) {
+            String result = switch (name) {
                 case "search_contacts" -> post("/api/admin/ai/internal/contacts/search", entity);
                 case "get_contact" -> get("/api/admin/ai/internal/contacts/" + args.get("contact_id"), Map.of("tenantId", tenantId), headers);
                 case "create_contact" -> post("/api/admin/ai/internal/contacts", entity);
@@ -158,8 +161,13 @@ public class CrmToolService {
                 }
                 default -> "{\"error\":\"Unknown tool: " + name + "\"}";
             };
+            long elapsed = System.currentTimeMillis() - startMs;
+            log.info("executeTool done: name={}, elapsed={}ms, response_len={}", name, elapsed, result != null ? result.length() : 0);
+            log.debug("executeTool response preview: {}", result != null ? result.substring(0, Math.min(200, result.length())) : "null");
+            return result;
         } catch (Exception e) {
-            log.error("Tool {} error: {}", name, e.getMessage());
+            long elapsed = System.currentTimeMillis() - startMs;
+            log.error("executeTool failed: name={}, elapsed={}ms, error={}", name, elapsed, e.getMessage(), e);
             return "{\"error\":\"" + e.getMessage() + "\"}";
         }
     }

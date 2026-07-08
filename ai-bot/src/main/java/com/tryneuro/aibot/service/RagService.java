@@ -32,7 +32,11 @@ public class RagService {
     }
 
     public String enhancePrompt(String tenantId, String query) {
-        if (query == null || query.trim().isEmpty()) return "";
+        if (query == null || query.trim().isEmpty()) {
+            log.debug("RAG: empty query, skipping");
+            return "";
+        }
+        log.info("RAG enhancePrompt: tenantId={}, query=\"{}\"", tenantId, query);
 
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -48,32 +52,44 @@ public class RagService {
             String json = mapper.writeValueAsString(body);
             HttpEntity<String> entity = new HttpEntity<>(json, headers);
 
+            long startMs = System.currentTimeMillis();
             String response = rest.postForObject(
                 backendUrl + "/api/admin/ai/internal/knowledge/rag-search",
                 entity,
                 String.class
             );
+            long elapsed = System.currentTimeMillis() - startMs;
 
-            if (response == null) return "";
+            if (response == null) {
+                log.warn("RAG: null response from backend (elapsed={}ms)", elapsed);
+                return "";
+            }
+            log.info("RAG: response in {}ms, raw len={}", elapsed, response.length());
 
             Map<String, Object> parsed = mapper.readValue(response,
                 new TypeReference<Map<String, Object>>() {});
             Object chunksObj = parsed.get("chunks");
 
-            if (chunksObj instanceof List<?> chunks && !chunks.isEmpty()) {
-                StringBuilder context = new StringBuilder("\n\nКонтекст из базы знаний:\n");
-                for (Object chunkObj : chunks) {
-                    if (chunkObj instanceof Map<?, ?> chunk) {
-                        String content = (String) chunk.get("content");
-                        if (content != null) {
-                            context.append("- ").append(content).append("\n");
+            if (chunksObj instanceof List<?> chunks) {
+                log.info("RAG: got {} chunks", chunks.size());
+                if (!chunks.isEmpty()) {
+                    StringBuilder context = new StringBuilder("\n\nКонтекст из базы знаний:\n");
+                    for (Object chunkObj : chunks) {
+                        if (chunkObj instanceof Map<?, ?> chunk) {
+                            String content = (String) chunk.get("content");
+                            if (content != null) {
+                                context.append("- ").append(content).append("\n");
+                            }
                         }
                     }
+                    log.info("RAG: context built, len={}", context.length());
+                    return context.toString();
                 }
-                return context.toString();
+            } else {
+                log.warn("RAG: response has no 'chunks' field, keys: {}", parsed.keySet());
             }
         } catch (Exception e) {
-            log.warn("RAG enhance failed for tenant {}: {}", tenantId, e.getMessage());
+            log.warn("RAG enhance failed for tenant {}: {}", tenantId, e.getMessage(), e);
         }
 
         return "";

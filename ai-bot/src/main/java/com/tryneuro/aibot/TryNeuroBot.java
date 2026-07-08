@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -15,6 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 public class TryNeuroBot extends TelegramLongPollingBot {
 
@@ -27,6 +30,7 @@ public class TryNeuroBot extends TelegramLongPollingBot {
 
     private final Map<Long, List<Map<String, String>>> conversations = new ConcurrentHashMap<>();
     private static final int MAX_HISTORY_EXCHANGES = 10;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public TryNeuroBot(String token, String username, int index, DefaultBotOptions options,
                        AiAgentService aiAgent) {
@@ -39,10 +43,15 @@ public class TryNeuroBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
+        log.info("Bot {} received update: hasMessage={}, hasText={}", index,
+            update.hasMessage(), update.hasMessage() && update.getMessage().hasText());
+
         if (!update.hasMessage() || !update.getMessage().hasText()) return;
 
         Long chatId = update.getMessage().getChatId();
         String text = update.getMessage().getText().strip();
+
+        log.info("Bot {} received text from chat_id={}: \"{}\"", index, chatId, text);
 
         if (text.isEmpty()) return;
 
@@ -51,37 +60,52 @@ public class TryNeuroBot extends TelegramLongPollingBot {
             return;
         }
 
-        log.info("Bot {} received from {}: {}", index, chatId, text);
-
-        try {
-            SendChatAction action = new SendChatAction();
-            action.setChatId(chatId.toString());
-            action.setAction(ActionType.TYPING);
-            execute(action);
-        } catch (TelegramApiException e) {
-            log.warn("Bot {} failed to send typing: {}", index, e.getMessage());
-        }
+        ScheduledFuture<?> typingTask = scheduler.scheduleAtFixedRate(() -> {
+            try {
+                SendChatAction action = SendChatAction.builder()
+                    .chatId(chatId.toString())
+                    .action("typing")
+                    .build();
+                execute(action);
+                log.debug("Bot {} typing sent to {}", index, chatId);
+            } catch (TelegramApiException e) {
+                log.warn("Bot {} failed to send typing: {}", index, e.getMessage());
+            }
+        }, 0, 4, TimeUnit.SECONDS);
 
         conversations.computeIfAbsent(chatId, k -> new ArrayList<>());
         List<Map<String, String>> history = conversations.get(chatId);
         history.add(Map.of("role", "user", "content", text));
 
+        long startMs = System.currentTimeMillis();
         String response;
         try {
             response = aiAgent.processMessage(history, chatId);
         } catch (Exception e) {
-            log.error("Agent error for tg={}: {}", chatId, e.getMessage());
+            log.error("Agent error for tg={}: {}", chatId, e.getMessage(), e);
             response = "Произошла внутренняя ошибка. Попробуйте позже.";
         }
+        long elapsed = System.currentTimeMillis() - startMs;
+
+        typingTask.cancel(false);
+
+        log.info("Bot {} agent responded in {}ms for chat_id={}, response len={}",
+            index, elapsed, chatId, response != null ? response.length() : 0);
+        log.debug("Bot {} response preview for {}: {}", index, chatId,
+            response != null ? response.substring(0, Math.min(200, response.length())) : "null");
 
         history.add(Map.of("role", "assistant", "content", response));
         pruneHistory(chatId);
 
         try {
-            SendMessage msg = new SendMessage(chatId.toString(), response);
+            SendMessage msg = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(response)
+                .build();
             execute(msg);
+            log.info("Bot {} reply sent to {}", index, chatId);
         } catch (TelegramApiException e) {
-            log.error("Bot {} failed to reply: {}", index, e.getMessage());
+            log.error("Bot {} failed to reply to {}: {}", index, chatId, e.getMessage(), e);
         }
     }
 

@@ -31,27 +31,35 @@ public class MapResolverService {
     }
 
     public Map<String, String> resolveActor(long chatId) {
+        log.info("resolveActor: chat_id={}", chatId);
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-Internal-Secret", internalSecret);
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
+            long startMs = System.currentTimeMillis();
             String json = rest.getForObject(
                 backendUrl + "/api/admin/ai/internal/users/by-telegram/" + chatId,
                 String.class);
+            long elapsed = System.currentTimeMillis() - startMs;
 
+            log.info("resolveActor: backend responded in {}ms, json={}", elapsed, json);
             Map<String, Object> data = mapper.readValue(json,
                 new TypeReference<Map<String, Object>>() {});
 
-            return Map.of(
+            Map<String, String> result = Map.of(
                 "role", String.valueOf(data.getOrDefault("role", "CLIENT")),
                 "contact_id", String.valueOf(data.getOrDefault("contactId", "")),
                 "staff_id", String.valueOf(data.getOrDefault("staffId", "")),
                 "tenant_id", String.valueOf(data.getOrDefault("tenantId", "")),
                 "user_id", String.valueOf(data.getOrDefault("userId", ""))
             );
+            log.info("resolveActor result: role={}, tenantId={}, contactId={}, staffId={}",
+                result.get("role"), result.get("tenant_id"),
+                result.get("contact_id"), result.get("staff_id"));
+            return result;
         } catch (Exception e) {
-            log.warn("resolveActor error for chat_id {}: {}", chatId, e.getMessage());
+            log.warn("resolveActor error for chat_id {}: {}", chatId, e.getMessage(), e);
             return Map.of(
                 "role", "CLIENT",
                 "contact_id", "",
