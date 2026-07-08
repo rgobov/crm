@@ -8,6 +8,7 @@ on:
     paths:
       - 'ai-gateway/**'
       - '.github/workflows/deploy-ai-gateway.yml'
+  workflow_dispatch:
 
 concurrency:
   group: deploy-vps

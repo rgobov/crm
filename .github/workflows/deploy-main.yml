@@ -10,6 +10,7 @@ on:
       - '.github/workflows/deploy-ai-gateway.yml'
       - 'AGENTS.md'
       - '*.md'
+  workflow_dispatch:
 
 concurrency:
   group: deploy-vps
