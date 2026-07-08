@@ -8,7 +8,7 @@ x-logging: &default-logging
 
 services:
   tryneuro_database:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:0.7.4-pg15
     container_name: tryneuro_db
     restart: always
     logging: *default-logging

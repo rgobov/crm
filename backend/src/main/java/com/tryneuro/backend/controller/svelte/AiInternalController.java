@@ -39,6 +39,8 @@ public class AiInternalController {
     private final UserAiConfigService userAiConfigService;
     private final AiKnowledgeService aiKnowledgeService;
     private final ResourceService resourceService;
+    private final RagSearchService ragSearchService;
+    private final KnowledgeIngestService knowledgeIngestService;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -972,5 +974,44 @@ public class AiInternalController {
 
         var results = aiKnowledgeService.search(tId, query);
         return ResponseEntity.ok(results);
+    }
+
+    @PostMapping("/knowledge/rag-search")
+    public ResponseEntity<?> ragSearch(
+            @RequestBody AiRagSearchRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+        if (req.getQuery() == null || req.getQuery().isEmpty()) {
+            return ResponseEntity.badRequest().body("Query is required");
+        }
+        int topK = req.getTopK() > 0 ? req.getTopK() : 5;
+        var result = ragSearchService.search(tId, req.getQuery(), topK);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/knowledge/ingest")
+    public ResponseEntity<?> ingestKnowledge(
+            @RequestBody Map<String, String> req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.get("tenantId"));
+        String knowledgeId = req.get("knowledgeId");
+        String text = req.get("text");
+        if (knowledgeId == null || text == null || text.isEmpty()) {
+            return ResponseEntity.badRequest().body("knowledgeId and text are required");
+        }
+        knowledgeIngestService.ingest(tId, knowledgeId, text);
+        return ResponseEntity.ok(Map.of("status", "ok"));
+    }
+
+    @PostMapping("/knowledge/reindex")
+    public ResponseEntity<?> reindexKnowledge(
+            @RequestBody Map<String, String> req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.get("tenantId"));
+        knowledgeIngestService.reindex(tId);
+        return ResponseEntity.ok(Map.of("status", "ok"));
     }
 }

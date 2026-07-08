@@ -5,6 +5,7 @@ on:
     branches:
       - fix/ios-final-attempt
       - feature/roles
+      - feature/spring-ai
     paths-ignore:
       - 'ai-gateway/**'
       - '.github/workflows/deploy-ai-gateway.yml'
@@ -106,5 +107,30 @@ jobs:
             echo "--- ОЧИСТКА СТАРЫХ ОБРАЗОВ ---"
             docker image prune -a --filter "until=24h" -f
 
+            echo "--- СБОРКА И ЗАПУСК AI-BOT ---"
+            cd ~/crm/ai-bot
+            cat > .env << EOF
+            BOT_TOKEN_1=${{ secrets.BOT_TOKEN_1 }}
+            BOT_TOKEN_2=${{ secrets.BOT_TOKEN_2 }}
+            BOT_TOKEN_3=${{ secrets.BOT_TOKEN_3 }}
+            BOT_TOKEN_4=${{ secrets.BOT_TOKEN_4 }}
+            TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
+            INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            CRM_BACKEND_URL=http://tryneuro_backend:8080
+            EOF
+            docker rm -f tryneuro_spring_ai_bot 2>/dev/null || true
+            docker network create tryneuro_network || true
+            docker-compose up -d --build
+            docker ps | grep tryneuro_spring_ai_bot || {
+              echo "❌ Контейнер tryneuro_spring_ai_bot не запущен"
+              docker-compose logs --tail=20
+              exit 1
+            }
+            echo "--- AI-BOT HEALTH CHECK ---"
+            sleep 10
+            docker logs tryneuro_spring_ai_bot --tail 10
+
             echo "--- СТАТУС ---"
+            cd ~/crm
             docker-compose ps

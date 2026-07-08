@@ -1,0 +1,79 @@
+package com.tryneuro.aibot.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class RagService {
+
+    private static final Logger log = LoggerFactory.getLogger(RagService.class);
+
+    private final RestTemplate rest;
+    private final ObjectMapper mapper;
+    private final String backendUrl;
+    private final String internalSecret;
+
+    public RagService(RestTemplate rest, ObjectMapper mapper) {
+        this.rest = rest;
+        this.mapper = mapper;
+        this.backendUrl = System.getenv().getOrDefault("CRM_BACKEND_URL", "http://backend:8080");
+        this.internalSecret = System.getenv().getOrDefault("INTERNAL_SECRET", "try-neuro-internal-secret-2026");
+    }
+
+    public String enhancePrompt(String tenantId, String query) {
+        if (query == null || query.trim().isEmpty()) return "";
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Internal-Secret", internalSecret);
+            headers.set("Content-Type", "application/json");
+
+            Map<String, Object> body = Map.of(
+                "tenantId", tenantId,
+                "query", query,
+                "topK", 3
+            );
+
+            String json = mapper.writeValueAsString(body);
+            HttpEntity<String> entity = new HttpEntity<>(json, headers);
+
+            String response = rest.postForObject(
+                backendUrl + "/api/admin/ai/internal/knowledge/rag-search",
+                entity,
+                String.class
+            );
+
+            if (response == null) return "";
+
+            Map<String, Object> parsed = mapper.readValue(response,
+                new TypeReference<Map<String, Object>>() {});
+            Object chunksObj = parsed.get("chunks");
+
+            if (chunksObj instanceof List<?> chunks && !chunks.isEmpty()) {
+                StringBuilder context = new StringBuilder("\n\nКонтекст из базы знаний:\n");
+                for (Object chunkObj : chunks) {
+                    if (chunkObj instanceof Map<?, ?> chunk) {
+                        String content = (String) chunk.get("content");
+                        if (content != null) {
+                            context.append("- ").append(content).append("\n");
+                        }
+                    }
+                }
+                return context.toString();
+            }
+        } catch (Exception e) {
+            log.warn("RAG enhance failed for tenant {}: {}", tenantId, e.getMessage());
+        }
+
+        return "";
+    }
+}

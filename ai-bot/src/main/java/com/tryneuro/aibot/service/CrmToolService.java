@@ -147,6 +147,14 @@ public class CrmToolService {
                 case "manage_notifications" -> put("/api/admin/ai/internal/notifications/preferences", entity);
                 case "get_report" -> post("/api/admin/ai/internal/reports", entity);
                 case "search_knowledge" -> post("/api/admin/ai/internal/knowledge/search", entity);
+                case "search_knowledge_rag" -> {
+                    Map<String, Object> ragBody = new java.util.LinkedHashMap<>();
+                    ragBody.put("tenantId", tenantId);
+                    ragBody.put("query", args.get("query"));
+                    ragBody.put("topK", args.getOrDefault("topK", 5));
+                    String ragJson = mapper.writeValueAsString(ragBody);
+                    yield post("/api/admin/ai/internal/knowledge/rag-search", new HttpEntity<>(ragJson, headers));
+                }
                 default -> "{\"error\":\"Unknown tool: " + name + "\"}";
             };
         } catch (Exception e) {
@@ -334,6 +342,12 @@ public class CrmToolService {
                 "name", "search_knowledge", "description", "Search knowledge base",
                 "parameters", Map.of("type", "object", "properties", Map.of(
                     "query", Map.of("type", "string", "description", "Search query")
+                ), "required", List.of("query")))),
+            Map.of("type", "function", "function", Map.of(
+                "name", "search_knowledge_rag", "description", "Semantic search in knowledge base using AI",
+                "parameters", Map.of("type", "object", "properties", Map.of(
+                    "query", Map.of("type", "string", "description", "Search query"),
+                    "topK", Map.of("type", "integer", "description", "Number of results (default 5)")
                 ), "required", List.of("query"))))
         );
     }

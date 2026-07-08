@@ -31,6 +31,7 @@ public class AiAgentService {
     private final UserConfigService userConfigService;
     private final ObjectMapper mapper;
     private final MapResolverService actorResolver;
+    private final RagService ragService;
 
     private static final int MAX_RETRIES = 3;
     private static final List<String> FALLBACK_MODELS = List.of(
@@ -54,11 +55,13 @@ public class AiAgentService {
         """;
 
     public AiAgentService(CrmToolService toolService, UserConfigService userConfigService,
-                          ObjectMapper mapper, MapResolverService actorResolver) {
+                          ObjectMapper mapper, MapResolverService actorResolver,
+                          RagService ragService) {
         this.toolService = toolService;
         this.userConfigService = userConfigService;
         this.mapper = mapper;
         this.actorResolver = actorResolver;
+        this.ragService = ragService;
     }
 
     public String processMessage(List<Map<String, String>> history, long chatId) {
@@ -75,6 +78,14 @@ public class AiAgentService {
             ? cfg.llmModel() : "openrouter/auto";
 
         String systemPrompt = buildSystemPrompt(role);
+
+        String lastUserQuery = history.isEmpty() ? "" :
+            history.get(history.size() - 1).getOrDefault("content", "");
+        String ragContext = ragService.enhancePrompt(tenantId, lastUserQuery);
+        if (!ragContext.isEmpty()) {
+            systemPrompt += ragContext;
+        }
+
         List<Message> messages = buildMessages(systemPrompt, history);
 
         List<String> modelsToTry = new ArrayList<>();
