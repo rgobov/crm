@@ -94,7 +94,7 @@ public class AiAgentService {
             if (!fb.equals(modelName)) modelsToTry.add(fb);
         }
 
-        OpenAiApi openAiApi = new OpenAiApi(cfg.apiKey(), "https://openrouter.ai/api/v1");
+        OpenAiApi openAiApi = new OpenAiApi("https://openrouter.ai/api/v1", cfg.apiKey());
 
         for (String tryModel : modelsToTry) {
             for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
