@@ -25,8 +25,10 @@ public class UserConfigService {
     public UserConfig getConfig(long telegramId) {
         Long cached = cacheTimestamps.get(telegramId);
         if (cached != null && System.currentTimeMillis() - cached < CACHE_TTL_MS) {
+            log.debug("Cache hit for telegram_id={}", telegramId);
             return cache.get(telegramId);
         }
+        log.debug("Cache miss for telegram_id={}, querying DB", telegramId);
 
         try {
             Map<String, Object> row = jdbcTemplate.queryForMap(
@@ -40,11 +42,20 @@ public class UserConfigService {
                 (String) row.get("llm_model")
             );
 
+            log.debug("Found config for telegram_id={}: apiKey={}, model={}",
+                telegramId,
+                cfg.apiKey() != null ? "***" + cfg.apiKey().substring(Math.max(0, cfg.apiKey().length() - 4)) : "null",
+                cfg.llmModel());
+
             cache.put(telegramId, cfg);
             cacheTimestamps.put(telegramId, System.currentTimeMillis());
             return cfg;
         } catch (Exception e) {
-            log.warn("User config not found for telegram_id={}: {}", telegramId, e.getMessage());
+            log.error("Failed to get config for telegram_id={}: {} ({})",
+                telegramId, e.getClass().getSimpleName(), e.getMessage());
+            if (log.isDebugEnabled()) {
+                log.debug("Stack trace:", e);
+            }
             return null;
         }
     }

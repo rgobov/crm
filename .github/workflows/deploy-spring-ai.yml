@@ -60,4 +60,9 @@ jobs:
 
             echo "--- STATUS ---"
             docker-compose ps
-            docker logs tryneuro_spring_ai_bot --tail 20
+
+            echo "--- WAITING FOR BOT STARTUP ---"
+            sleep 10
+
+            echo "--- BOT LOGS ---"
+            docker logs tryneuro_spring_ai_bot --tail 50
