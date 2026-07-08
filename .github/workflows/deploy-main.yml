@@ -6,15 +6,11 @@ on:
       - fix/ios-final-attempt
       - feature/roles
       - feature/spring-ai
-    paths:
-      - 'backend/**'
-      - 'frontend-svelte/**'
-      - 'notifications-python/**'
-      - 'docker-compose.yml'
-      - '.github/workflows/deploy-main.yml'
     paths-ignore:
       - 'ai-gateway/**'
       - 'ai-bot/**'
+      - '.github/workflows/deploy-ai-gateway.yml'
+      - '.github/workflows/deploy-spring-ai.yml'
       - '*.md'
   workflow_dispatch:
 
