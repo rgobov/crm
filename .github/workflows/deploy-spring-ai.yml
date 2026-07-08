@@ -44,7 +44,7 @@ jobs:
             TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
             INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
             CRM_BACKEND_URL=${{ secrets.CRM_BACKEND_URL }}
-            SPRING_DATASOURCE_URL=jdbc:postgresql://tryneuro_database:5432/tryneuro_db
+            SPRING_DATASOURCE_URL=jdbc:postgresql://tryneuro_db:5432/tryneuro_db
             SPRING_DATASOURCE_USERNAME=postgres
             SPRING_DATASOURCE_PASSWORD=${{ secrets.DB_PASSWORD }}
             EOF

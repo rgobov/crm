@@ -9,7 +9,7 @@ management:
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://tryneuro_database:5432/tryneuro_db}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://tryneuro_db:5432/tryneuro_db}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
