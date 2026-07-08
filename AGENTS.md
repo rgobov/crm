@@ -2,7 +2,7 @@
 
 ## Project Overview
 - **Stack**: Spring Boot (Java) + PostgreSQL (pgvector) + Svelte (Node) + Python (FastAPI/Pyrogram for notifications)
-- **AI Bot**: Spring AI (Java 17, 4 Telegram бота) — замена Python bot-agent
+- **AI Bot**: Spring AI (ai-bot — **Java 21**, backend — **Java 17**, 4 Telegram бота) — замена Python bot-agent
 - **Build**: Maven (`mvn package`), Python 3.13+, Node for Svelte
 - **Deploy**: GitHub Actions → VPS via SSH, docker-compose (push в `feature/spring-ai`, `feature/roles` или `fix/ios-final-attempt`)
 - **Proxy**: HTTP CONNECT `87.121.86.253:8888` — опционально
@@ -29,7 +29,7 @@
 User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бота)
                                 │
                       Per-user api_key lookup
-                      (PostgreSQL user_ai_config, кеш 5 мин)
+                      (PostgreSQL user_ai_config, без кеша — читается на каждый запрос)
                                 │
                                 ▼
                         OpenRouter (ключ + модель пользователя)
@@ -40,8 +40,8 @@ User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бот
          (AiInternalController)   (ai_knowledge_chunks)
 ```
 
-- **Per-user auth**: `AsyncOpenAI(api_key=user_cfg["api_key"])` из `user_ai_config`
-- **ReAct loop**: LLM → tool call (function calling) → Backend API → continue → ответ
+- **Per-user auth**: `OpenAiChatModel.builder().apiKey(user_cfg.apiKey())` из `user_ai_config`
+- **ReAct loop** (внутри Spring AI): `ChatClient` + `FunctionToolCallback` → LLM → tool call (function calling) → Backend API → continue → ответ
 - **Auto-RAG**: перед каждым LLM вызовом в system prompt добавляется контекст из PGvector поиска
 - **keep_typing**: фоновая задача `chat_action="typing"` каждые 4 сек
 - **resolve_actor**: `GET /users/by-telegram/{chatId}` → role, tenant_id, contact_id, staff_id
@@ -49,7 +49,7 @@ User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бот
 
 ## Ролевая матрица AI Tools
 
-Инструменты в `CrmToolService.java` (getToolSchemas), роли проверяются в `AiInternalController.java`:
+Инструменты в `CrmToolService.java` (getToolDefinitions), роли проверяются в `AiInternalController.java`:
 
 | Инструмент | ADMIN | MANAGER | EMPLOYEE | CLIENT |
 |---|---|---|---|---|
@@ -101,6 +101,7 @@ User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бот
 | POST | `/staff/search` | любые |
 | POST | `/staff/schedule` | любые |
 | GET | `/branches` | любые |
+| GET | `/instructions` | любые |
 | POST | `/availability` | любые |
 | POST | `/appointments` | ADMIN, MANAGER, EMPLOYEE, CLIENT |
 | GET | `/appointments/{id}` | ADMIN, MANAGER, EMPLOYEE, CLIENT |
@@ -132,10 +133,10 @@ User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бот
 | Backend (RAG) | `.../service/RagSearchService.java` | PGvector cosine similarity search |
 | Backend (RAG) | `.../service/KnowledgeIngestService.java` | Chunking (512/50 токенов) + вставка |
 | Backend (Flyway) | `.../V40__pgvector.sql` | pgvector extension + ai_knowledge_chunks |
-| Bot Agent (Spring AI) | `ai-bot/.../CrmToolService.java` | 24 tool schemas + executeTool |
-| Bot Agent (Spring AI) | `ai-bot/.../AiAgentService.java` | ReAct loop + auto-RAG |
+| Bot Agent (Spring AI) | `ai-bot/.../CrmToolService.java` | 24 tool definitions (getToolDefinitions) + executeTool |
+| Bot Agent (Spring AI) | `ai-bot/.../AiAgentService.java` | ChatClient + FunctionToolCallback + auto-RAG |
 | Bot Agent (Spring AI) | `ai-bot/.../RagService.java` | RAG search call to backend |
-| Bot Agent (Spring AI) | `ai-bot/.../UserConfigService.java` | PostgreSQL cache (5 мин) |
+| Bot Agent (Spring AI) | `ai-bot/.../UserConfigService.java` | PostgreSQL lookup (без кеша) |
 | Bot Agent (Spring AI) | `ai-bot/.../MapResolverService.java` | resolve actor by telegramId |
 | Bot Agent (Spring AI) | `ai-bot/.../TryNeuroBot.java` | 4 TelegramLongPollingBot + команды |
 | Bot Agent (Spring AI) | `ai-bot/.../BotInitializer.java` | Регистрация 4 ботов + proxy |
@@ -146,10 +147,11 @@ User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бот
 ## Secrets/env
 
 - `BOT_TOKEN_1` … `BOT_TOKEN_4` — Telegram bot tokens
-- `DATABASE_URL` — PostgreSQL
-- `TELEGRAM_PROXY` — HTTP CONNECT proxy (обязателен на VPS в РФ)
+- `SPRING_DATASOURCE_URL` — PostgreSQL JDBC URL (`jdbc:postgresql://tryneuro_db:5432/tryneuro_db`)
+- `TELEGRAM_PROXY` — HTTP CONNECT proxy (обязателен на VPS в РФ), также используется для OpenRouter
+- `OPENROUTER_PROXY` — опциональный отдельный прокси для OpenRouter (fallback на `TELEGRAM_PROXY`)
 - `INTERNAL_SECRET` — shared secret для backend ↔ bot
-- `CRM_BACKEND_URL` — URL backend для ai-bot (`http://tryneuro_backend:8080`)
+- `CRM_BACKEND_URL` — URL backend для ai-bot (`http://backend:8080`)
 - Новые env var добавляются в **нужные** workflow: deploy-main.yml / deploy-spring-ai.yml
 
 ## Deploy Workflows
