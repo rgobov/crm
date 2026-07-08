@@ -8,6 +8,11 @@ management:
         include: health
 
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://tryneuro_db:5432/tryneuro_db}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
@@ -16,6 +21,8 @@ spring:
     hikari:
       maximum-pool-size: 5
   ai:
+    openai:
+      api-key: ${SPRING_AI_OPENAI_API_KEY:placeholder}
     retry:
       max-attempts: 3
       backoff:
