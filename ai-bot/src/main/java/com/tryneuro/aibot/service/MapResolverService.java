@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -38,9 +40,10 @@ public class MapResolverService {
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
             long startMs = System.currentTimeMillis();
-            String json = rest.getForObject(
+            ResponseEntity<String> response = rest.exchange(
                 backendUrl + "/api/admin/ai/internal/users/by-telegram/" + chatId,
-                String.class);
+                HttpMethod.GET, entity, String.class);
+            String json = response.getBody();
             long elapsed = System.currentTimeMillis() - startMs;
 
             log.info("resolveActor: backend responded in {}ms, json={}", elapsed, json);
