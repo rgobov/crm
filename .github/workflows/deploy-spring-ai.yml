@@ -43,12 +43,15 @@ jobs:
             BOT_TOKEN_4=${{ secrets.BOT_TOKEN_4 }}
             TELEGRAM_PROXY=${{ secrets.TELEGRAM_PROXY }}
             INTERNAL_SECRET=${{ secrets.INTERNAL_SECRET }}
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
             CRM_BACKEND_URL=${{ secrets.CRM_BACKEND_URL }}
+            SPRING_DATASOURCE_URL=jdbc:postgresql://tryneuro_database:5432/tryneuro_db
+            SPRING_DATASOURCE_USERNAME=postgres
+            SPRING_DATASOURCE_PASSWORD=${{ secrets.DB_PASSWORD }}
             EOF
 
             echo "--- FORCE REMOVE STALE CONTAINERS ---"
             docker rm -f tryneuro_spring_ai_bot 2>/dev/null || true
+            docker rm -f tryneuro_bot_agent tryneuro_mcp_crm 2>/dev/null || true
 
             echo "--- BUILDING AND STARTING ---"
             export DOCKER_BUILDKIT=1
