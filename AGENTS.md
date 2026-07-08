@@ -1,9 +1,10 @@
-# CRM Project — Bot Agent (Python Telegram AI Gateway)
+# CRM Project — Spring AI Bot (Java Telegram AI Gateway)
 
 ## Project Overview
-- **Stack**: Spring Boot (Java) + PostgreSQL + Svelte (Node) + Python (FastAPI/Pyrogram for notifications, custom bot-agent for AI)
+- **Stack**: Spring Boot (Java) + PostgreSQL (pgvector) + Svelte (Node) + Python (FastAPI/Pyrogram for notifications)
+- **AI Bot**: Spring AI (Java 17, 4 Telegram бота) — замена Python bot-agent
 - **Build**: Maven (`mvn package`), Python 3.13+, Node for Svelte
-- **Deploy**: GitHub Actions → VPS via SSH, docker-compose (только push в `feature/roles` или `fix/ios-final-attempt`)
+- **Deploy**: GitHub Actions → VPS via SSH, docker-compose (push в `feature/spring-ai`, `feature/roles` или `fix/ios-final-attempt`)
 - **Proxy**: HTTP CONNECT `87.121.86.253:8888` — опционально
 - **Network**: `tryneuro_network` (external)
 
@@ -11,40 +12,44 @@
 - Все ответы, комментарии, UI, коммиты, документация — **русский**
 - Документация (AGENTS.md, коммиты) — русский.
 
-## Two Telegram Connections
+## Два Telegram-подключения
 
-| Connection | Type | Responsible for |
+| Подключение | Тип | Отвечает за |
 |---|---|---|
-| `notifications-python` (Pyrogram) | **User client** | Sending notifications, auth by phone |
-| Bot Agent (`@NineCRM_AI_1_bot` … `_4`) | **4 bots** | AI chat, CRM tools |
+| `notifications-python` (Pyrogram) | **User client** | Отправка уведомлений, авторизация по phone |
+| Spring AI ai-bot (`@NineCRM_AI_1_bot` … `_4`) | **4 бота (Java)** | AI чат, CRM tools, RAG |
 
 - Pyrogram — **не бот**, а user session (авторизация по phone + code)
-- Bot Agent — один Python asyncio процесс на 4 ботов
+- Spring AI ai-bot — один Java-процесс на 4 ботов, **основной AI-бот**
+- Python bot-agent (`ai-gateway/bot-agent`) — **DEPRECATED**, пока работает на сервере, но не деплоится
 
 ## Architecture
 
 ```
-User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
+User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бота)
                                 │
                       Per-user api_key lookup
-                      (PostgreSQL user_ai_config)
+                      (PostgreSQL user_ai_config, кеш 5 мин)
                                 │
                                 ▼
                         OpenRouter (ключ + модель пользователя)
                                 │
-                                ▼
-              Backend API (AiInternalController — CRM tools)
+                     ┌──────────┴──────────┐
+                     ▼                      ▼
+              Backend API             PGvector RAG
+         (AiInternalController)   (ai_knowledge_chunks)
 ```
 
 - **Per-user auth**: `AsyncOpenAI(api_key=user_cfg["api_key"])` из `user_ai_config`
 - **ReAct loop**: LLM → tool call (function calling) → Backend API → continue → ответ
+- **Auto-RAG**: перед каждым LLM вызовом в system prompt добавляется контекст из PGvector поиска
 - **keep_typing**: фоновая задача `chat_action="typing"` каждые 4 сек
 - **resolve_actor**: `GET /users/by-telegram/{chatId}` → role, tenant_id, contact_id, staff_id
-- **MCP server** (`mcp-crm`) — оставлен для future external integration
+- **MCP server** (`mcp-crm`) — оставлен для future external integration (не используется)
 
 ## Ролевая матрица AI Tools
 
-Инструменты в `ai-gateway/bot-agent/tools.py` (TOOL_SCHEMAS), роли проверяются в `AiInternalController.java`:
+Инструменты в `CrmToolService.java` (getToolSchemas), роли проверяются в `AiInternalController.java`:
 
 | Инструмент | ADMIN | MANAGER | EMPLOYEE | CLIENT |
 |---|---|---|---|---|
@@ -59,7 +64,9 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 | `delete_service` | ✅ | ✅ | ❌ | ❌ |
 | `search_staff` | ✅ | ✅ | ✅ | ✅ |
 | `get_staff_schedule` | ✅ | ✅ | ✅ | ✅ |
+| `search_resources` | ✅ | ✅ | ✅ | ✅ |
 | `get_branches` | ✅ | ✅ | ✅ | ✅ |
+| `get_instructions` | ✅ | ✅ | ✅ | ✅ |
 | `check_availability` | ✅ | ✅ | ✅ | ✅ |
 | `create_appointment` | ✅ | ✅ | ✅ | ✅ (себе) |
 | `get_appointment` | ✅ | ✅ | ✅ | ✅ (свои) |
@@ -69,10 +76,12 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 | `manage_notifications` | ❌ | ❌ | ❌ | ✅ |
 | `get_report` | ✅ | ✅ | ❌ | ❌ |
 | `search_knowledge` | ✅ | ✅ | ✅ | ✅ |
+| `search_knowledge_rag` | ✅ | ✅ | ✅ | ✅ |
 
-- EMPLOYEY может создавать записи для любых клиентов, но отменять/изменять — только свои
+- EMPLOYEE может создавать записи для любых клиентов, но отменять/изменять — только свои
 - CLIENT управляет только своими данными (contactId проверяется)
 - Заголовки: `X-Actor-Role`, `X-Actor-Contact-Id`, `X-Actor-Staff-Id`, `X-Tenant-Id`
+- snake_case от LLM → маппинг в camelCase в `execute_tool()` (CrmToolService.java)
 
 ## AiInternalController — эндпоинты
 
@@ -105,8 +114,9 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 | POST | `/telegram/bind` | внутренний |
 | POST | `/reports` | ADMIN, MANAGER |
 | POST | `/knowledge/search` | любые |
-
-**Важно:** snake_case от LLM → маппинг в camelCase в `execute_tool()` (tools.py:390-500)
+| POST | `/knowledge/rag-search` | внутренний (X-Internal-Secret) |
+| POST | `/knowledge/ingest` | внутренний (X-Internal-Secret) |
+| POST | `/knowledge/reindex` | внутренний (X-Internal-Secret) |
 
 ## Files in the chain
 
@@ -115,15 +125,23 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 | Frontend | `frontend-svelte/src/lib/services/aiService.js` | API to backend |
 | Frontend | `frontend-svelte/src/routes/admin/settings/ai/+page.svelte` | AI config UI |
 | Backend | `.../controller/svelte/AiConfigController.java` | AI config CRUD |
-| Backend | `.../controller/svelte/AiInternalController.java` | Internal API (CRM tools) |
+| Backend | `.../controller/svelte/AiInternalController.java` | Internal API (CRM tools + RAG) |
 | Backend | `.../controller/svelte/AiKnowledgeController.java` | Knowledge base CRUD |
-| Backend | `.../dto/ai/*.java` | Request DTOs (7 шт) |
-| Bot Agent | `ai-gateway/bot-agent/tools.py` | Tool schemas + Backend calls |
-| Bot Agent | `ai-gateway/bot-agent/agent.py` | ReAct loop |
-| Bot Agent | `ai-gateway/bot-agent/main.py` | 4 bot instances, handlers |
-| Bot Agent | `ai-gateway/bot-agent/db.py` | PostgreSQL cache (5 мин) |
-| Bot Agent | `ai-gateway/bot-agent/config.py` | Env vars |
-| Python | `notifications-python/main.py` | Telegram notifications (Pyrogram) |
+| Backend | `.../dto/ai/*.java` | Request DTOs (9 шт) |
+| Backend (RAG) | `.../service/EmbeddingService.java` | OpenRouter text-embedding-ada-002 |
+| Backend (RAG) | `.../service/RagSearchService.java` | PGvector cosine similarity search |
+| Backend (RAG) | `.../service/KnowledgeIngestService.java` | Chunking (512/50 токенов) + вставка |
+| Backend (Flyway) | `.../V40__pgvector.sql` | pgvector extension + ai_knowledge_chunks |
+| Bot Agent (Spring AI) | `ai-bot/.../CrmToolService.java` | 24 tool schemas + executeTool |
+| Bot Agent (Spring AI) | `ai-bot/.../AiAgentService.java` | ReAct loop + auto-RAG |
+| Bot Agent (Spring AI) | `ai-bot/.../RagService.java` | RAG search call to backend |
+| Bot Agent (Spring AI) | `ai-bot/.../UserConfigService.java` | PostgreSQL cache (5 мин) |
+| Bot Agent (Spring AI) | `ai-bot/.../MapResolverService.java` | resolve actor by telegramId |
+| Bot Agent (Spring AI) | `ai-bot/.../TryNeuroBot.java` | 4 TelegramLongPollingBot + команды |
+| Bot Agent (Spring AI) | `ai-bot/.../BotInitializer.java` | Регистрация 4 ботов + proxy |
+| Bot Agent (Spring AI) | `ai-bot/.../AppConfig.java` | RestTemplate + JdbcTemplate бины |
+| Bot Agent (Python) | `ai-gateway/bot-agent/*` | **DEPRECATED** (не деплоится) |
+| Notifications | `notifications-python/main.py` | Telegram notifications (Pyrogram) |
 
 ## Secrets/env
 
@@ -131,25 +149,30 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 - `DATABASE_URL` — PostgreSQL
 - `TELEGRAM_PROXY` — HTTP CONNECT proxy (обязателен на VPS в РФ)
 - `INTERNAL_SECRET` — shared secret для backend ↔ bot
-- Новые env var добавляются в **оба** workflow: deploy-main.yml + deploy-ai-gateway.yml
+- `CRM_BACKEND_URL` — URL backend для ai-bot (`http://tryneuro_backend:8080`)
+- Новые env var добавляются в **нужные** workflow: deploy-main.yml / deploy-spring-ai.yml
 
 ## Deploy Workflows
 
 | Workflow | Branch | Path Filter | Деплоит |
 |---|---|---|---|
-| `deploy-main.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths-ignore: 'ai-gateway/**'` | backend, notifications, frontend |
-| `deploy-ai-gateway.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'ai-gateway/**'` | bot-agent, mcp-crm |
-| `deploy-spring-ai.yml` | `feature/spring-ai` | `paths: 'ai-bot/**'` | spring-ai бот (tryneuro_spring_ai_bot) |
+| `deploy-main.yml` | `feature/spring-ai`, `feature/roles`, `fix/ios-final-attempt` | `paths-ignore: ai-gateway/**, ai-bot/**, *.md, deploy-ai-gateway.yml, deploy-spring-ai.yml` | backend, notifications, frontend |
+| `deploy-spring-ai.yml` | `feature/spring-ai` | `paths: ai-bot/**` | spring-ai бот (tryneuro_spring_ai_bot) |
+| `deploy-ai-gateway.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: ai-gateway/**` | Python bot-agent, mcp-crm **(DEPRECATED)** |
 
-- `deploy-main.yml`, `deploy-ai-gateway.yml` — имеют `workflow_dispatch` (ручной запуск из GitHub UI)
 - Все три используют `concurrency.group: deploy-vps` → не выполняются одновременно.
-- `notifications-python` деплоится ТОЛЬКО через `deploy-main.yml` и никак не связан с ai-gateway/ai-bot.
+- `notifications-python` деплоится ТОЛЬКО через `deploy-main.yml`.
+- `deploy-spring-ai.yml` запускается ТОЛЬКО при изменении `ai-bot/**` (не дублируется с deploy-main.yml).
 
 ## Database Schema (Flyway)
 
 - **Tool**: Flyway (`spring.flyway.enabled=true`)
 - **Location**: `backend/src/main/resources/db/migration/V*__.sql`
-- **Table naming**: snake_case + plural (`users`, `staff_members`, `appointments`, `user_ai_config`, `ai_knowledge`)
+- **Table naming**: snake_case + plural
+- **pgvector**: образ БД `pgvector/pgvector:0.7.4-pg15` (PostgreSQL 15 + vector extension)
+- **Таблицы**: `users`, `staff_members`, `appointments`, `user_ai_config`, `ai_knowledge`, `ai_knowledge_chunks`
+- **ai_knowledge_chunks**: `id UUID`, `tenant_id VARCHAR(36)`, `knowledge_id VARCHAR(36)`, `chunk_index INT`, `content TEXT`, `embedding vector(1536)`, `metadata JSONB`
+- **Индекс**: ivfflat на `embedding` (vector_cosine_ops, lists=100)
 - **Роли**: `UserRole` enum — `ADMIN`, `MANAGER`, `EMPLOYEE`, `CLIENT`
 
 ## Pyrogram-specific rules (notifications-python/main.py)
@@ -166,7 +189,7 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 **1. Откат кода + передеплой** (самое быстрое):
 ```bash
 git revert HEAD --no-edit
-git push origin feature/roles
+git push origin feature/spring-ai    # или feature/roles — в зависимости от активной ветки
 # GitHub Actions сам передеплоит предыдущую версию
 ```
 
@@ -184,9 +207,11 @@ cat ~/crm/backups/db-2026-06-26_2200.sql | docker exec -i tryneuro_db psql -U po
 ## Build & Deploy
 
 **Только через GitHub Actions:**
-- Push в `feature/roles` или `fix/ios-final-attempt` → автодеплой
+- Push в `feature/spring-ai` → автодеплой Spring AI стека
+- Push в `feature/roles` или `fix/ios-final-attempt` → автодеплой основного стека
 - **Проверка после деплоя:**
-  - `docker logs tryneuro_bot_agent --tail 20`
+  - `docker logs tryneuro_backend --tail 20`
+  - `docker logs tryneuro_spring_ai_bot --tail 20`
   - `docker logs tryneuro_notifications_python --tail 20`
 
 ## TODO (future)
@@ -194,3 +219,4 @@ cat ~/crm/backups/db-2026-06-26_2200.sql | docker exec -i tryneuro_db psql -U po
 - **Streaming** — ответ чанками через `editMessageText`
 - **Redis** — для session state и персистентности диалогов
 - **MAX Messenger** — интеграция уведомлений (ждёт верифицированное юрлицо РФ)
+- **Удаление Python bot-agent** — после стабилизации Spring AI ai-bot

@@ -1,13 +1,14 @@
-name: Deploy AI Gateway
+name: Deploy AI Gateway (DEPRECATED)
 
 on:
-  push:
-    branches:
-      - fix/ios-final-attempt
-      - feature/roles
-    paths:
-      - 'ai-gateway/**'
-      - '.github/workflows/deploy-ai-gateway.yml'
+  # push отключён — Python bot-agent заменён на Spring AI ai-bot
+  # push:
+  #   branches:
+  #     - fix/ios-final-attempt
+  #     - feature/roles
+  #   paths:
+  #     - 'ai-gateway/**'
+  #     - '.github/workflows/deploy-ai-gateway.yml'
   workflow_dispatch:
 
 concurrency:

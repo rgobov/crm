@@ -30,7 +30,8 @@ public class UserConfigService {
 
         try {
             Map<String, Object> row = jdbcTemplate.queryForMap(
-                "SELECT api_key, llm_model FROM user_ai_config WHERE telegram_id = ?",
+                "SELECT c.api_key, c.llm_model FROM user_ai_config c " +
+                "JOIN users u ON u.id = c.user_id WHERE u.telegram_id = ?",
                 telegramId
             );
 
