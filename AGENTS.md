@@ -139,8 +139,11 @@ User → Telegram (bot_N) → bot-agent (Python, 1 process, 4 bots)
 |---|---|---|---|
 | `deploy-main.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths-ignore: 'ai-gateway/**'` | backend, notifications, frontend |
 | `deploy-ai-gateway.yml` | `feature/roles`, `fix/ios-final-attempt` | `paths: 'ai-gateway/**'` | bot-agent, mcp-crm |
+| `deploy-spring-ai.yml` | `feature/spring-ai` | `paths: 'ai-bot/**'` | spring-ai бот (tryneuro_spring_ai_bot) |
 
-Оба используют `concurrency.group: deploy-vps` → не выполняются одновременно.
+- `deploy-main.yml`, `deploy-ai-gateway.yml` — имеют `workflow_dispatch` (ручной запуск из GitHub UI)
+- Все три используют `concurrency.group: deploy-vps` → не выполняются одновременно.
+- `notifications-python` деплоится ТОЛЬКО через `deploy-main.yml` и никак не связан с ai-gateway/ai-bot.
 
 ## Database Schema (Flyway)
 
