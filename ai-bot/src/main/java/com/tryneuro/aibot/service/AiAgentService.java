@@ -1,26 +1,29 @@
 package com.tryneuro.aibot.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.model.function.FunctionCallbackWrapper;
+import org.springframework.ai.model.ModelResult;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 @Service
 public class AiAgentService {
@@ -32,8 +35,6 @@ public class AiAgentService {
     private final ObjectMapper mapper;
     private final MapResolverService actorResolver;
     private final RagService ragService;
-
-    private static final int MAX_RETRIES = 3;
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         Ты — AI-ассистент CRM системы TryNeuro.
@@ -60,6 +61,45 @@ public class AiAgentService {
         this.ragService = ragService;
     }
 
+    @PostConstruct
+    void configureProxy() {
+        String proxyUrl = System.getenv("OPENROUTER_PROXY");
+        if (proxyUrl == null || proxyUrl.isEmpty()) {
+            proxyUrl = System.getenv("TELEGRAM_PROXY");
+        }
+        if (proxyUrl != null && !proxyUrl.isEmpty()) {
+            try {
+                URI uri = URI.create(proxyUrl.startsWith("http") ? proxyUrl : "http://" + proxyUrl);
+                String host = uri.getHost();
+                int port = uri.getPort() > 0 ? uri.getPort() : 8888;
+                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port));
+                ProxySelector defaultSelector = ProxySelector.getDefault();
+
+                ProxySelector.setDefault(new ProxySelector() {
+                    @Override
+                    public List<Proxy> select(URI targetUri) {
+                        if (targetUri.getHost() != null && targetUri.getHost().contains("openrouter.ai")) {
+                            return List.of(proxy);
+                        }
+                        return defaultSelector != null
+                            ? defaultSelector.select(targetUri)
+                            : List.of(Proxy.NO_PROXY);
+                    }
+
+                    @Override
+                    public void connectFailed(URI targetUri, SocketAddress sa, IOException ioe) {
+                        log.warn("Proxy connect failed to {}: {}", targetUri, ioe.getMessage());
+                    }
+                });
+
+                log.info("OpenRouter proxy enabled: {}:{}", host, port);
+            } catch (Exception e) {
+                log.warn("Failed to parse proxy {}: {}", proxyUrl, e.getMessage());
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     public String processMessage(List<Map<String, String>> history, long chatId) {
         UserConfigService.UserConfig cfg = userConfigService.getConfig(chatId);
         if (cfg == null || cfg.apiKey() == null || cfg.apiKey().isEmpty()) {
@@ -82,51 +122,45 @@ public class AiAgentService {
             systemPrompt += ragContext;
         }
 
-        List<Message> messages = buildMessages(systemPrompt, history);
+        List<Message> historyMessages = buildHistoryMessages(history);
 
-        OpenAiApi openAiApi = new OpenAiApi("https://openrouter.ai/api/v1", cfg.apiKey());
+        try {
+            OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .options(OpenAiChatOptions.builder()
+                    .baseUrl("https://openrouter.ai/api/v1")
+                    .apiKey(cfg.apiKey())
+                    .model(modelName)
+                    .build())
+                .build();
 
-        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
-            try {
-                List<FunctionCallbackWrapper<String, String>> toolCallbacks = buildCallbacks(tenantId, actor);
+            ChatClient chatClient = ChatClient.builder(chatModel).build();
 
-                OpenAiChatOptions options = OpenAiChatOptions.builder()
-                    .withModel(modelName)
-                    .withFunctionCallbacks(new ArrayList<>(toolCallbacks))
-                    .build();
+            List<FunctionToolCallback<Map<String, Object>, String>> callbacks = buildCallbacks(tenantId, actor);
 
-                OpenAiChatModel model = new OpenAiChatModel(openAiApi, options);
-                Prompt prompt = new Prompt(messages, options);
-                ChatResponse response = model.call(prompt);
+            ChatClient.ChatClientRequestSpec request = chatClient.prompt()
+                .system(systemPrompt)
+                .messages(historyMessages)
+                .tools(callbacks.toArray());
 
-                Generation gen = response.getResult();
-                String content = gen.getOutput().getContent();
-                return content != null ? content : "";
-            } catch (Exception e) {
-                String errMsg = e.getMessage() != null ? e.getMessage() : "";
-                boolean retryable = errMsg.contains("502") || errMsg.contains("503")
-                    || errMsg.contains("500") || errMsg.contains("429");
-                if (attempt < MAX_RETRIES - 1 && retryable) {
-                    log.warn("Retry {}/{} model={} chat_id={}: {}",
-                        attempt + 1, MAX_RETRIES, modelName, chatId, errMsg);
-                    try { Thread.sleep(2000L * (attempt + 1)); } catch (InterruptedException ignored) {}
-                    continue;
-                }
-                log.error("Error model={} chat_id={}: {}", modelName, chatId, errMsg);
-                if (errMsg.contains("403")) {
-                    return "Модель \"" + modelName + "\" недоступна. Проверьте API-ключ и баланс на OpenRouter.\n"
-                        + "Сменить модель можно в CRM → AI Настройки.";
-                }
-                if (errMsg.contains("429")) {
-                    return "Слишком много запросов к нейросети. Попробуйте через минуту.";
-                }
-                if (retryable) {
-                    return "Сервер ИИ временно недоступен. Повторите попытку позже.";
-                }
-                return "Ошибка нейросети: " + e.getMessage();
+            String content = request.call().content();
+            return content != null ? content : "";
+
+        } catch (Exception e) {
+            String errMsg = e.getMessage() != null ? e.getMessage() : "";
+            log.error("Error model={} chat_id={}: {}", modelName, chatId, errMsg);
+
+            if (errMsg.contains("403")) {
+                return "Модель \"" + modelName + "\" недоступна. Проверьте API-ключ и баланс на OpenRouter.\n"
+                    + "Сменить модель можно в CRM → AI Настройки.";
             }
+            if (errMsg.contains("429")) {
+                return "Слишком много запросов к нейросети. Попробуйте через минуту.";
+            }
+            if (errMsg.contains("502") || errMsg.contains("503") || errMsg.contains("500")) {
+                return "Сервер ИИ временно недоступен. Повторите попытку позже.";
+            }
+            return "Ошибка нейросети: " + e.getMessage();
         }
-        return "Сервер ИИ временно недоступен. Повторите попытку позже.";
     }
 
     private String buildSystemPrompt(String role) {
@@ -144,9 +178,8 @@ public class AiAgentService {
         return prompt;
     }
 
-    private List<Message> buildMessages(String systemPrompt, List<Map<String, String>> history) {
+    private List<Message> buildHistoryMessages(List<Map<String, String>> history) {
         List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(systemPrompt));
         for (Map<String, String> msg : history) {
             String role = msg.getOrDefault("role", "user");
             String content = msg.getOrDefault("content", "");
@@ -159,32 +192,16 @@ public class AiAgentService {
         return messages;
     }
 
-    private List<FunctionCallbackWrapper<String, String>> buildCallbacks(
+    private List<FunctionToolCallback<Map<String, Object>, String>> buildCallbacks(
             String tenantId, Map<String, String> actor) {
-        List<FunctionCallbackWrapper<String, String>> callbacks = new ArrayList<>();
-        for (Map<String, Object> schema : toolService.getToolSchemas()) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> function = (Map<String, Object>) schema.get("function");
-            String name = (String) function.get("name");
-            String description = (String) function.get("description");
-
-            FunctionCallbackWrapper<String, String> cb = FunctionCallbackWrapper
-                .<String, String>builder(jsonArgs -> {
-                    try {
-                        Map<String, Object> args = mapper.readValue(jsonArgs,
-                            new TypeReference<Map<String, Object>>() {});
-                        return toolService.executeTool(name, args, tenantId, actor);
-                    } catch (Exception e) {
-                        log.error("Tool {} error: {}", name, e.getMessage());
-                        return "{\"error\":\"" + e.getMessage() + "\"}";
-                    }
-                })
-                .withName(name)
-                .withDescription(description)
-                .withInputType(String.class)
-                .withResponseConverter(Function.identity())
+        List<FunctionToolCallback<Map<String, Object>, String>> callbacks = new ArrayList<>();
+        for (CrmToolService.ToolDef def : toolService.getToolDefinitions()) {
+            FunctionToolCallback<Map<String, Object>, String> cb = FunctionToolCallback
+                .builder(def.name(), (Map<String, Object> args) ->
+                    toolService.executeTool(def.name(), args, tenantId, actor))
+                .description(def.description())
+                .inputType((Class<Map<String, Object>>) (Class<?>) Map.class)
                 .build();
-
             callbacks.add(cb);
         }
         return callbacks;

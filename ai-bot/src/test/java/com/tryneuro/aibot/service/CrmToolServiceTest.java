@@ -67,4 +67,37 @@ class CrmToolServiceTest {
             .count();
         assertEquals(24, distinctCount);
     }
+
+    @Test
+    @DisplayName("getToolDefinitions возвращает 24 определения")
+    void getToolDefinitionsReturns24Defs() {
+        List<CrmToolService.ToolDef> defs = crmToolService.getToolDefinitions();
+        assertEquals(24, defs.size());
+    }
+
+    @Test
+    @DisplayName("Все ToolDef имеют name, description и parameters")
+    void allToolDefsHaveRequiredFields() {
+        List<CrmToolService.ToolDef> defs = crmToolService.getToolDefinitions();
+        for (CrmToolService.ToolDef def : defs) {
+            assertNotNull(def.name(), "name is required");
+            assertNotNull(def.description(), "description is required");
+            assertNotNull(def.parameters(), "parameters is required");
+            assertEquals("object", def.parameters().get("type"));
+            assertNotNull(def.parameters().get("properties"));
+            assertNotNull(def.parameters().get("required"));
+        }
+    }
+
+    @Test
+    @DisplayName("ToolDef имена совпадают со схемами")
+    void toolDefNamesMatchSchemas() {
+        List<CrmToolService.ToolDef> defs = crmToolService.getToolDefinitions();
+        List<Map<String, Object>> schemas = crmToolService.getToolSchemas();
+        List<String> defNames = defs.stream().map(CrmToolService.ToolDef::name).toList();
+        for (Map<String, Object> schema : schemas) {
+            String name = (String) ((Map<String, Object>) schema.get("function")).get("name");
+            assertTrue(defNames.contains(name), "ToolDef missing: " + name);
+        }
+    }
 }

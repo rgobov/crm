@@ -4,9 +4,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -20,8 +24,29 @@ public class EmbeddingService {
     public EmbeddingService(
             @Value("${openrouter.api.key:}") String apiKey,
             @Value("${internal.api.secret:try-neuro-internal-secret-2026}") String internalSecret) {
-        this.rest = new RestTemplate();
+        this.rest = buildRestTemplate();
         this.apiKey = apiKey != null && !apiKey.isEmpty() ? apiKey : internalSecret;
+    }
+
+    private static RestTemplate buildRestTemplate() {
+        String proxyUrl = System.getenv("OPENROUTER_PROXY");
+        if (proxyUrl == null || proxyUrl.isEmpty()) {
+            proxyUrl = System.getenv("TELEGRAM_PROXY");
+        }
+        if (proxyUrl != null && !proxyUrl.isEmpty()) {
+            try {
+                URI uri = URI.create(proxyUrl.startsWith("http") ? proxyUrl : "http://" + proxyUrl);
+                String host = uri.getHost();
+                int port = uri.getPort() > 0 ? uri.getPort() : 8888;
+                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port));
+                SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+                factory.setProxy(proxy);
+                return new RestTemplate(factory);
+            } catch (Exception e) {
+                // fallback to default
+            }
+        }
+        return new RestTemplate();
     }
 
     @SuppressWarnings("unchecked")

@@ -12,7 +12,6 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 @Service
 public class CrmToolService {
@@ -195,6 +194,18 @@ public class CrmToolService {
         }
         var entity = new HttpEntity<>(headers);
         return rest.exchange(uri, HttpMethod.DELETE, entity, String.class).getBody();
+    }
+
+    public record ToolDef(String name, String description, Map<String, Object> parameters) {}
+
+    public List<ToolDef> getToolDefinitions() {
+        return getToolSchemas().stream().map(schema -> {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> func = (Map<String, Object>) schema.get("function");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> params = (Map<String, Object>) func.get("parameters");
+            return new ToolDef((String) func.get("name"), (String) func.get("description"), params);
+        }).toList();
     }
 
     public List<Map<String, Object>> getToolSchemas() {
