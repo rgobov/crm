@@ -3,7 +3,7 @@ name: Deploy Spring AI Bot
 on:
   push:
     branches:
-      - fix/ios-final-attempt
+      - feature/spring-ai
     paths:
       - 'ai-bot/**'
       - '.github/workflows/deploy-spring-ai.yml'
