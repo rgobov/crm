@@ -34,10 +34,6 @@ public class AiAgentService {
     private final RagService ragService;
 
     private static final int MAX_RETRIES = 3;
-    private static final List<String> FALLBACK_MODELS = List.of(
-        "openai/gpt-oss-120b:free",
-        "liquid/lfm-2.5-1.2b-thinking:free"
-    );
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         Ты — AI-ассистент CRM системы TryNeuro.
@@ -88,51 +84,49 @@ public class AiAgentService {
 
         List<Message> messages = buildMessages(systemPrompt, history);
 
-        List<String> modelsToTry = new ArrayList<>();
-        modelsToTry.add(modelName);
-        for (String fb : FALLBACK_MODELS) {
-            if (!fb.equals(modelName)) modelsToTry.add(fb);
-        }
-
         OpenAiApi openAiApi = new OpenAiApi("https://openrouter.ai/api/v1", cfg.apiKey());
 
-        for (String tryModel : modelsToTry) {
-            for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
-                try {
-                    List<FunctionCallbackWrapper<String, String>> toolCallbacks = buildCallbacks(tenantId, actor);
+        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                List<FunctionCallbackWrapper<String, String>> toolCallbacks = buildCallbacks(tenantId, actor);
 
-                    OpenAiChatOptions options = OpenAiChatOptions.builder()
-                        .withModel(tryModel)
-                        .withFunctionCallbacks(new ArrayList<>(toolCallbacks))
-                        .build();
+                OpenAiChatOptions options = OpenAiChatOptions.builder()
+                    .withModel(modelName)
+                    .withFunctionCallbacks(new ArrayList<>(toolCallbacks))
+                    .build();
 
-                    OpenAiChatModel model = new OpenAiChatModel(openAiApi, options);
-                    Prompt prompt = new Prompt(messages, options);
-                    ChatResponse response = model.call(prompt);
+                OpenAiChatModel model = new OpenAiChatModel(openAiApi, options);
+                Prompt prompt = new Prompt(messages, options);
+                ChatResponse response = model.call(prompt);
 
-                    Generation gen = response.getResult();
-                    String content = gen.getOutput().getContent();
-                    return content != null ? content : "";
-                } catch (Exception e) {
-                    String errMsg = e.getMessage() != null ? e.getMessage() : "";
-                    boolean retryable = errMsg.contains("502") || errMsg.contains("503")
-                        || errMsg.contains("500") || errMsg.contains("429");
-                    if (attempt < MAX_RETRIES - 1 && retryable) {
-                        log.warn("Retry {}/{} model={} chat_id={}: {}",
-                            attempt + 1, MAX_RETRIES, tryModel, chatId, errMsg);
-                        try { Thread.sleep(2000L * (attempt + 1)); } catch (InterruptedException ignored) {}
-                        continue;
-                    }
-                    if (retryable) {
-                        log.warn("Exhausted retries model={} chat_id={}, trying next", tryModel, chatId);
-                        break;
-                    }
-                    log.error("Non-retryable error model={} chat_id={}: {}", tryModel, chatId, errMsg);
-                    return "Ошибка при обращении к нейросети: " + e.getMessage();
+                Generation gen = response.getResult();
+                String content = gen.getOutput().getContent();
+                return content != null ? content : "";
+            } catch (Exception e) {
+                String errMsg = e.getMessage() != null ? e.getMessage() : "";
+                boolean retryable = errMsg.contains("502") || errMsg.contains("503")
+                    || errMsg.contains("500") || errMsg.contains("429");
+                if (attempt < MAX_RETRIES - 1 && retryable) {
+                    log.warn("Retry {}/{} model={} chat_id={}: {}",
+                        attempt + 1, MAX_RETRIES, modelName, chatId, errMsg);
+                    try { Thread.sleep(2000L * (attempt + 1)); } catch (InterruptedException ignored) {}
+                    continue;
                 }
+                log.error("Error model={} chat_id={}: {}", modelName, chatId, errMsg);
+                if (errMsg.contains("403")) {
+                    return "Модель \"" + modelName + "\" недоступна. Проверьте API-ключ и баланс на OpenRouter.\n"
+                        + "Сменить модель можно в CRM → AI Настройки.";
+                }
+                if (errMsg.contains("429")) {
+                    return "Слишком много запросов к нейросети. Попробуйте через минуту.";
+                }
+                if (retryable) {
+                    return "Сервер ИИ временно недоступен. Повторите попытку позже.";
+                }
+                return "Ошибка нейросети: " + e.getMessage();
             }
         }
-        return "Ошибка при обращении к нейросети: все провайдеры недоступны";
+        return "Сервер ИИ временно недоступен. Повторите попытку позже.";
     }
 
     private String buildSystemPrompt(String role) {

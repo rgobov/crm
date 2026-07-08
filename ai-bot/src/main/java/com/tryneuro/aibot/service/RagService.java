@@ -25,8 +25,10 @@ public class RagService {
     public RagService(RestTemplate rest, ObjectMapper mapper) {
         this.rest = rest;
         this.mapper = mapper;
-        this.backendUrl = System.getenv().getOrDefault("CRM_BACKEND_URL", "http://backend:8080");
-        this.internalSecret = System.getenv().getOrDefault("INTERNAL_SECRET", "try-neuro-internal-secret-2026");
+        String url = System.getenv("CRM_BACKEND_URL");
+        this.backendUrl = (url != null && !url.isEmpty()) ? url : "http://backend:8080";
+        String secret = System.getenv("INTERNAL_SECRET");
+        this.internalSecret = (secret != null && !secret.isEmpty()) ? secret : "try-neuro-internal-secret-2026";
     }
 
     public String enhancePrompt(String tenantId, String query) {
