@@ -449,7 +449,7 @@ public class CrmToolService {
                     "duration", Map.of("type", "integer", "description", "Appointment duration in minutes (default 60)")
                 ), "required", List.of("staff_id", "date")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "get_branch_staff_slots", "description", "Get ALL staff members of a branch with their free slots in ONE call. Returns {branchId, branchName, timezone, date, staff:[{staffId, staffName, slots:[{startTime,endTime}]}]}. date may be ISO OR keyword (today, tomorrow, понедельник, next_friday, на_следующей_неделе, через_N_дней, 15_июля) — backend resolves it in the BRANCH timezone. USE THIS for 'when are masters free tomorrow in branch X' instead of calling get_available_slots for each master.",
+                "name", "get_branch_staff_slots", "description", "Get ALL staff members of a branch with their free slots in ONE call. Response has: 'hasAvailability' (true/false), 'summary' (ready-to-use Russian text explaining the situation, READ IT to the user), 'staff' array where each has 'staffId', 'staffName', 'slots', 'reason' (free/day_off/fully_booked/no_shifts), 'hasAvailability'. If slots:[] it means NO free time. If reason=day_off or no_shifts the master does NOT work that day. Never invent slots — read hasAvailability and summary fields.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
                     "branch_id", Map.of("type", "string", "description", "Branch ID obtained from get_branches"),
                     "date", Map.of("type", "string", "description", "Date ISO (YYYY-MM-DD) OR keyword: today, tomorrow, понедельник, next_friday, на_следующей_неделе, через_N_дней, 15_июля"),

@@ -707,8 +707,8 @@ public class AiInternalController {
             return ResponseEntity.badRequest().body("Invalid date: " + e.getMessage());
         }
 
-        List<Map<String, String>> slots = scheduleService.getAvailableSlotsForBranch(tId, req.getStaffId(), branchId, date, duration);
-        return ResponseEntity.ok(Map.of("slots", slots));
+        ScheduleService.StaffSlotInfo slotInfo = scheduleService.getAvailableSlotsForBranch(tId, req.getStaffId(), branchId, date, duration);
+        return ResponseEntity.ok(Map.of("slots", slotInfo.slots(), "reason", slotInfo.reason(), "hasAvailability", slotInfo.hasAvailability()));
     }
 
     @PostMapping("/availability/branch-slots")
@@ -741,20 +741,45 @@ public class AiInternalController {
 
         List<StaffMember> staff = staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tId, req.getBranchId());
         List<Map<String, Object>> result = new java.util.ArrayList<>();
+        StringBuilder summary = new StringBuilder();
+        boolean anyAvailable = false;
+
         for (StaffMember s : staff) {
             if (!s.isActive()) continue;
-            List<Map<String, String>> slots = scheduleService.getAvailableSlotsForBranch(tId, s.getId(), branch.getId(), date, duration);
+            ScheduleService.StaffSlotInfo info = scheduleService.getAvailableSlotsForBranch(tId, s.getId(), branch.getId(), date, duration);
+            boolean hasSlots = info.hasAvailability();
+            if (hasSlots) anyAvailable = true;
             result.add(Map.of(
                     "staffId", s.getId(),
                     "staffName", s.getName() != null ? s.getName() : "",
-                    "slots", slots
+                    "slots", info.slots(),
+                    "reason", info.reason(),
+                    "hasAvailability", hasSlots
             ));
+
+            String name = s.getName() != null ? s.getName() : "Мастер";
+            if (summary.length() > 0) summary.append(" ");
+            switch (info.reason()) {
+                case "free" -> summary.append(name).append(": свободных слотов ").append(info.slots().size()).append(".");
+                case "day_off" -> summary.append(name).append(": выходной день.");
+                case "fully_booked" -> summary.append(name).append(": всё занято.");
+                default -> summary.append(name).append(": нет рабочих смен.");
+            }
         }
+
+        if (result.isEmpty()) {
+            summary = new StringBuilder("В филиале нет активных мастеров.");
+        } else if (summary.length() == 0) {
+            summary = new StringBuilder("Нет данных о мастерах филиала.");
+        }
+
         return ResponseEntity.ok(Map.of(
                 "branchId", branch.getId(),
                 "branchName", branch.getName() != null ? branch.getName() : "",
                 "timezone", branch.getTimezone(),
                 "date", date.toString(),
+                "hasAvailability", anyAvailable,
+                "summary", summary.toString(),
                 "staff", result
         ));
     }

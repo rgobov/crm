@@ -60,6 +60,8 @@ public class AiAgentService {
         - Просмотр всех филиалов: get_branches (без query или с query для фильтрации). Ответ {branches:[{id,name,address,timezone}], ambiguous}.
         - Если get_branches вернул "ambiguous":true или в "timezones" больше одного значения — филиалы в разных городах. Спроси пользователя какой город он имеет в виду. НЕ угадывай.
         - Все мастера филиала: resolve_branch(name) -> возьми branchId -> get_branch_staff_slots(branch_id, date). ОДИН вызов вместо N.
+        - В ответе get_branch_staff_slots ПОЛЕ 'hasAvailability' (true=есть слоты, false=нет). Если false — прочитай поле 'summary' и скажи пользователю коротко. Поле 'summary' уже содержит готовый текст на русском — можешь его пересказать.
+        - Если reason у мастера = 'day_off' — у него выходной. Если 'no_shifts' — нет смены. Если 'fully_booked' — всё занято. Если slots:[] — свободного времени нет, НЕ выдумывай слоты.
         - Свободное время ОДНОГО мастера: get_available_slots(staff_id, date, branch_id). Для относительной даты (tomorrow/понедельник) branch_id обязателен.
         - Запись: resolve_branch(name) -> search_services(query) -> если нет -> add_service(name, duration_minutes) -> get_branch_staff_slots(branch_id, date) -> выбери слот -> create_appointment(clientName, serviceName, branch_id, date, time, staffId).
         - Все *_id и Id параметры — это ID полученный из search/get_branches, НЕ имена и НЕ названия. Никогда не подставляй текст в поля с суффиксом _id или Id.

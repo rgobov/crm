@@ -379,11 +379,14 @@ public class ScheduleService {
         return true;
     }
 
+    public record StaffSlotInfo(java.util.List<java.util.Map<String, String>> slots, String reason, boolean hasAvailability) {}
+
     public java.util.List<java.util.Map<String, String>> getAvailableSlots(String tenantId, String staffId, LocalDate date, int duration) {
-        return getAvailableSlotsForBranch(tenantId, staffId, null, date, duration);
+        StaffSlotInfo info = getAvailableSlotsForBranch(tenantId, staffId, null, date, duration);
+        return info.slots();
     }
 
-    public java.util.List<java.util.Map<String, String>> getAvailableSlotsForBranch(String tenantId, String staffId, String branchId, LocalDate date, int duration) {
+    public StaffSlotInfo getAvailableSlotsForBranch(String tenantId, String staffId, String branchId, LocalDate date, int duration) {
         java.util.Optional<StaffShift> shiftOpt;
         if (branchId != null && !branchId.isBlank()) {
             shiftOpt = staffShiftRepository.findByStaffIdAndDateAndBranchId(staffId, date, branchId);
@@ -392,16 +395,16 @@ public class ScheduleService {
             shiftOpt = shifts.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(shifts.get(0));
         }
         if (shiftOpt.isEmpty()) {
-            return List.of();
+            return new StaffSlotInfo(List.of(), "no_shifts", false);
         }
         StaffShift shift = shiftOpt.get();
         if (shift.isDayOff()) {
-            return List.of();
+            return new StaffSlotInfo(List.of(), "day_off", false);
         }
         LocalTime workStart = shift.getWorkStartTime();
         LocalTime workEnd = shift.getWorkEndTime();
         if (workStart == null || workEnd == null) {
-            return List.of();
+            return new StaffSlotInfo(List.of(), "no_shifts", false);
         }
         int ws = workStart.toSecondOfDay() / 60;
         int we = workEnd.toSecondOfDay() / 60;
@@ -447,7 +450,9 @@ public class ScheduleService {
                     "endTime", LocalTime.of(e / 60, e % 60).toString()
             ));
         }
-        return slots;
+        boolean hasAvailability = !slots.isEmpty();
+        String reason = hasAvailability ? "free" : "fully_booked";
+        return new StaffSlotInfo(slots, reason, hasAvailability);
     }
 
     public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {

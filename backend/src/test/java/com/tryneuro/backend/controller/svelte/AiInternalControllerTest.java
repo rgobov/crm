@@ -168,10 +168,10 @@ public class AiInternalControllerTest {
     @DisplayName("POST /availability/slots возвращает массив слотов")
     void availabilitySlotsReturnsSlotsList() throws Exception {
         when(scheduleService.getAvailableSlotsForBranch(eq(tenantId), eq("s1"), org.mockito.ArgumentMatchers.isNull(), any(LocalDate.class), eq(60)))
-            .thenReturn(List.of(
+            .thenReturn(new ScheduleService.StaffSlotInfo(List.of(
                 Map.of("startTime", "09:00", "endTime", "10:00"),
                 Map.of("startTime", "10:00", "endTime", "11:00")
-            ));
+            ), "free", true));
 
         String body = objectMapper.writeValueAsString(Map.of(
             "tenantId", tenantId, "staffId", "s1", "date", "2026-07-10", "duration", 60));
@@ -245,7 +245,9 @@ public class AiInternalControllerTest {
         when(staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tenantId, "b1"))
             .thenReturn(List.of(s));
         when(scheduleService.getAvailableSlotsForBranch(eq(tenantId), eq("s1"), eq("b1"), any(LocalDate.class), eq(60)))
-            .thenReturn(List.of(Map.of("startTime", "09:00", "endTime", "10:00")));
+            .thenReturn(new ScheduleService.StaffSlotInfo(List.of(
+                Map.of("startTime", "09:00", "endTime", "10:00")
+            ), "free", true));
 
         String body = objectMapper.writeValueAsString(Map.of(
             "tenantId", tenantId, "branchId", "b1", "date", "2026-07-10", "duration", 60));
@@ -270,7 +272,7 @@ public class AiInternalControllerTest {
         when(staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tenantId, "b1"))
             .thenReturn(List.of());
         when(scheduleService.getAvailableSlotsForBranch(eq(tenantId), anyString(), eq("b1"), any(LocalDate.class), eq(60)))
-            .thenReturn(List.of());
+            .thenReturn(new ScheduleService.StaffSlotInfo(List.of(), "no_shifts", false));
 
         String body = objectMapper.writeValueAsString(Map.of(
             "tenantId", tenantId, "branchId", "b1", "date", "tomorrow"));
