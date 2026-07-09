@@ -76,6 +76,7 @@ public class AiAgentService {
                     .withOAuth(AuthClientBuilder.OAuthBuilder.builder()
                         .scope(Scope.valueOf(scopeString))
                         .authKey(key)
+                        .verifySslCerts(false)
                         .build())
                     .build())
                 .build()
@@ -135,9 +136,7 @@ public class AiAgentService {
             try {
                 CompletionRequest request = CompletionRequest.builder()
                         .model(modelName)
-                        .messages(systemPrompt != null && iter == 0
-                                ? prependSystem(systemPrompt, messages)
-                                : messages)
+                        .messages(prependSystem(systemPrompt, messages))
                         .functions(functions)
                         .functionCall("auto")
                         .build();
@@ -157,6 +156,8 @@ public class AiAgentService {
                         responseMsg.functionCall() != null);
 
                 if (responseMsg.functionCall() != null) {
+                    messages.add(responseMsg);
+
                     String toolName = responseMsg.functionCall().name();
                     Map<String, Object> toolArgs = responseMsg.functionCall().arguments();
                     log.info("processMessage chat_id={}: tool call: name={}, args={}", chatId, toolName, toolArgs);
