@@ -62,9 +62,15 @@ public class BotInitializer {
 
         try {
             api = new TelegramBotsApi(DefaultBotSession.class);
-            for (int i = 0; i < tokens.size(); i++) {
-                String username = "NineCRM_AI_" + (i + 1) + "_bot";
-                TryNeuroBot bot = new TryNeuroBot(tokens.get(i), username, i + 1, options, aiAgent);
+        } catch (TelegramApiException e) {
+            log.error("Failed to initialize TelegramBotsApi", e);
+            return;
+        }
+
+        for (int i = 0; i < tokens.size(); i++) {
+            String username = "NineCRM_AI_" + (i + 1) + "_bot";
+            TryNeuroBot bot = new TryNeuroBot(tokens.get(i), username, i + 1, options, aiAgent);
+            try {
                 api.registerBot(bot);
                 bots.add(bot);
 
@@ -82,12 +88,11 @@ public class BotInitializer {
                 }
 
                 log.info("Bot {} registered as {}", i + 1, username);
+            } catch (TelegramApiException e) {
+                log.error("Bot {} failed to register: {}", i + 1, e.getMessage());
             }
-            log.info("All {} bots registered successfully", bots.size());
-        } catch (TelegramApiException e) {
-            log.error("Failed to register bots: {}", e.getMessage());
-            throw new RuntimeException(e);
         }
+        log.info("Bot registration complete: {} of {} bots registered", bots.size(), tokens.size());
     }
 
     @PreDestroy
