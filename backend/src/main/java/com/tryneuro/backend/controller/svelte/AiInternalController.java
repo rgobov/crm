@@ -75,6 +75,22 @@ public class AiInternalController {
         return actorContactId;
     }
 
+    private void assertActorBelongsToTenant(String actorRole, String actorStaffId,
+                                            String actorContactId, String tId) {
+        if ("EMPLOYEE".equalsIgnoreCase(actorRole) && actorStaffId != null && !actorStaffId.isBlank()) {
+            Optional<StaffMember> s = staffMemberService.getStaffMemberById(actorStaffId);
+            if (s.isEmpty() || !tId.equals(s.get().getTenantId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff does not belong to this tenant");
+            }
+        }
+        if ("CLIENT".equalsIgnoreCase(actorRole) && actorContactId != null && !actorContactId.isBlank()) {
+            Optional<Contact> c = contactService.getContactById(actorContactId);
+            if (c.isEmpty() || !tId.equals(c.get().getTenantId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Contact does not belong to this tenant");
+            }
+        }
+    }
+
     @PostMapping("/contacts/search")
     public ResponseEntity<?> searchContact(
             @RequestBody AiSearchRequest req,
@@ -180,10 +196,12 @@ public class AiInternalController {
             @RequestBody AiCreateAppointmentRequest req,
             @RequestHeader("X-Internal-Secret") String secret,
             @RequestHeader("X-Actor-Role") String actorRole,
-            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId) {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
         String tId = getRequiredTenantId(req.getTenantId());
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
 
         if (req.getClientName() == null || req.getClientName().isBlank()) {
             return ResponseEntity.badRequest().body("Client name is required");
@@ -294,6 +312,7 @@ public class AiInternalController {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
         String tId = getRequiredTenantId(tenantId);
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
 
         Optional<Appointment> opt = scheduleService.getAppointmentById(id);
         if (opt.isEmpty()) {
@@ -334,6 +353,7 @@ public class AiInternalController {
             @RequestHeader("X-Tenant-Id") String tenantId) {
         validateSecret(secret);
         String tId = getRequiredTenantId(tenantId);
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
 
         List<Appointment> apps;
         if ("CLIENT".equalsIgnoreCase(actorRole)) {
@@ -409,6 +429,7 @@ public class AiInternalController {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
         String tId = getRequiredTenantId(tenantId);
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
 
         Optional<Appointment> opt = scheduleService.getAppointmentById(id);
         if (opt.isEmpty()) {
@@ -450,6 +471,7 @@ public class AiInternalController {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE", "CLIENT");
         String tId = getRequiredTenantId(req.getTenantId());
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
 
         Optional<Appointment> existingOpt = scheduleService.getAppointmentById(id);
         if (existingOpt.isEmpty()) {
@@ -598,6 +620,9 @@ public class AiInternalController {
             if (staffOpt.isEmpty()) {
                 return ResponseEntity.notFound().build();
             }
+            if (!tId.equals(staffOpt.get().getTenantId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Staff does not belong to this tenant");
+            }
             return ResponseEntity.ok(DtoMapper.toScheduleDto(staffOpt.get()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Invalid date format: " + e.getMessage());
@@ -608,13 +633,20 @@ public class AiInternalController {
     public ResponseEntity<?> getContact(
             @PathVariable String id,
             @RequestHeader("X-Internal-Secret") String secret,
-            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER", "EMPLOYEE");
 
         Optional<Contact> opt = contactService.getContactById(id);
         if (opt.isEmpty()) {
             return ResponseEntity.notFound().build();
+        }
+        String tId = getRequiredTenantId(opt.get().getTenantId());
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
+        if (!tId.equals(opt.get().getTenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Contact does not belong to this tenant");
         }
         return ResponseEntity.ok(DtoMapper.toDto(opt.get()));
     }
@@ -625,10 +657,21 @@ public class AiInternalController {
             @RequestBody ContactDto req,
             @RequestHeader("X-Internal-Secret") String secret,
             @RequestHeader("X-Tenant-Id") String tenantId,
-            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER");
         String tId = getRequiredTenantId(tenantId);
+
+        Optional<Contact> existing = contactService.getContactById(id);
+        if (existing.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
+        if (!tId.equals(existing.get().getTenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Contact does not belong to this tenant");
+        }
 
         try {
             Contact updated = contactService.updateContact(id, DtoMapper.toEntity(req, tId), tId);
@@ -643,9 +686,21 @@ public class AiInternalController {
     public ResponseEntity<?> deleteContact(
             @PathVariable String id,
             @RequestHeader("X-Internal-Secret") String secret,
-            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER");
+
+        Optional<Contact> existing = contactService.getContactById(id);
+        if (existing.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        String tId = getRequiredTenantId(existing.get().getTenantId());
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
+        if (!tId.equals(existing.get().getTenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Contact does not belong to this tenant");
+        }
 
         try {
             contactService.deleteContact(id);
@@ -717,9 +772,21 @@ public class AiInternalController {
     public ResponseEntity<?> deleteService(
             @PathVariable String id,
             @RequestHeader("X-Internal-Secret") String secret,
-            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole) {
+            @RequestHeader(value = "X-Actor-Role", defaultValue = "ADMIN") String actorRole,
+            @RequestHeader(value = "X-Actor-Staff-Id", required = false) String actorStaffId,
+            @RequestHeader(value = "X-Actor-Contact-Id", required = false) String actorContactId) {
         validateSecret(secret);
         checkRole(actorRole, "ADMIN", "MANAGER");
+
+        Optional<Service> existing = appServiceService.getServiceById(id);
+        if (existing.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        String tId = getRequiredTenantId(existing.get().getTenantId());
+        assertActorBelongsToTenant(actorRole, actorStaffId, actorContactId, tId);
+        if (!tId.equals(existing.get().getTenantId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Service does not belong to this tenant");
+        }
 
         try {
             appServiceService.deleteService(id);

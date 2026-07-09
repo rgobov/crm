@@ -22,6 +22,7 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -125,6 +126,12 @@ public class AiAgentService {
             ? cfg.llmModel() : "openrouter/auto";
         log.info("processMessage chat_id={}: role={}, tenantId={}, model={}", chatId, role, tenantId, modelName);
 
+        // Мапа с ключами-заголовками для executeTool (CrmToolService ждёт X-Actor-*)
+        Map<String, String> actorHeaders = new LinkedHashMap<>();
+        actorHeaders.put("X-Actor-Role", role);
+        actorHeaders.put("X-Actor-Contact-Id", actor.getOrDefault("contact_id", ""));
+        actorHeaders.put("X-Actor-Staff-Id", actor.getOrDefault("staff_id", ""));
+
         String systemPrompt = buildSystemPrompt(role);
 
         String lastUserQuery = history.isEmpty() ? "" :
@@ -153,7 +160,7 @@ public class AiAgentService {
 
             ChatClient chatClient = ChatClient.builder(chatModel).build();
 
-            List<FunctionToolCallback<Map<String, Object>, String>> callbacks = buildCallbacks(tenantId, actor);
+            List<FunctionToolCallback<Map<String, Object>, String>> callbacks = buildCallbacks(tenantId, actorHeaders);
             log.info("processMessage chat_id={}: {} tool callbacks registered", chatId, callbacks.size());
 
             ChatClient.ChatClientRequestSpec request = chatClient.prompt()

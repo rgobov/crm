@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AppServiceService {
@@ -39,5 +40,9 @@ public class AppServiceService {
 
     public void deleteService(String id) {
         serviceRepository.deleteById(id);
+    }
+
+    public Optional<com.tryneuro.backend.model.Service> getServiceById(String id) {
+        return serviceRepository.findById(id);
     }
 }
