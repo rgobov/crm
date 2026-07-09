@@ -47,6 +47,7 @@ jobs:
             SPRING_DATASOURCE_URL=jdbc:postgresql://tryneuro_db:5432/tryneuro_db
             SPRING_DATASOURCE_USERNAME=postgres
             SPRING_DATASOURCE_PASSWORD=${{ secrets.DB_PASSWORD }}
+            GIGACHAT_SCOPE=GIGACHAT_API_PERS
             EOF
 
             echo "--- FORCE REMOVE STALE CONTAINERS ---"

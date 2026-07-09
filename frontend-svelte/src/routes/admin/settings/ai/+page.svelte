@@ -4,14 +4,12 @@
     import { goto } from '$app/navigation';
 
     let config = {
-        llm_provider: 'openrouter',
-        llm_model: 'openrouter/auto',
+        llm_provider: 'gigachat',
+        llm_model: 'GigaChat',
         api_key: '',
         stt_provider: 'vosk',
         telegram_id: null
     };
-
-    let customModel = '';
 
     let knowledge = [];
     let newEntry = { question: '', answer: '', category: 'FAQ' };
@@ -19,8 +17,6 @@
     let isSaving = false;
     let showAddForm = false;
     let error = '';
-
-    $: if (customModel) config.llm_model = customModel;
 
     onMount(async () => {
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
@@ -119,38 +115,22 @@
                 <div class="field">
                     <label>Провайдер</label>
                     <select bind:value={config.llm_provider} disabled>
-                        <option value="openrouter">OpenRouter</option>
+                        <option value="gigachat">GigaChat</option>
                     </select>
-                    <p class="hint">Используется только OpenRouter — доступ к 200+ моделям одним ключом</p>
+                    <p class="hint">Используется GigaChat от Сбера — российская нейросеть, работает без VPN</p>
                 </div>
                 <div class="field">
                     <label>Модель</label>
                     <select bind:value={config.llm_model}>
-                        <option value="openrouter/auto">🤖 OpenRouter Auto (авто-выбор)</option>
-                        <optgroup label="🆓 Бесплатные">
-                            <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B (free)</option>
-                            <option value="google/gemma-2-9b-it:free">Gemma 2 9B (free)</option>
-                            <option value="mistralai/mistral-7b-instruct:free">Mistral 7B (free)</option>
-                            <option value="microsoft/phi-3-mini-128k-instruct:free">Phi-3 Mini (free)</option>
-                            <option value="qwen/qwen-2-7b-instruct:free">Qwen 2 7B (free)</option>
-                        </optgroup>
-                        <optgroup label="💎 Популярные платные">
-                            <option value="openai/gpt-4o">GPT-4o</option>
-                            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                            <option value="google/gemini-pro-1.5">Gemini 1.5 Pro</option>
-                            <option value="meta-llama/llama-3.1-405b-instruct">Llama 3.1 405B</option>
-                        </optgroup>
+                        <option value="GigaChat">GigaChat (базовая, дешевле)</option>
+                        <option value="GigaChat-Pro">GigaChat-Pro</option>
+                        <option value="GigaChat-Max">GigaChat-Max</option>
                     </select>
                 </div>
                 <div class="field">
-                    <label>Или ввести свой ID модели</label>
-                    <input type="text" bind:value={customModel} placeholder="напр. meta-llama/llama-3.1-70b-instruct" autocomplete="off" />
-                    <p class="hint">Полный каталог — <a href="https://openrouter.ai/models" target="_blank">openrouter.ai/models</a>. Бесплатные модели имеют суффикс <code>:free</code></p>
-                </div>
-                <div class="field">
-                    <label>API-ключ</label>
-                    <input type="password" bind:value={config.api_key} placeholder="Ваш API-ключ" autocomplete="new-password" />
-                    <p class="hint">Каждый тенант использует свой ключ. Ключ хранится зашифрованным.</p>
+                    <label>API-ключ (Authorization Key)</label>
+                    <input type="password" bind:value={config.api_key} placeholder="Ваш Authorization Key (Client_ID:Secret в Base64)" autocomplete="new-password" />
+                    <p class="hint">Получите ключ в личном кабинете GigaChat API → Разработчикам → Ключи API. Скопируйте Authorization Key. Каждый тенант использует свой ключ.</p>
                 </div>
                 <div class="field">
                     <label>Распознавание речи (STT)</label>

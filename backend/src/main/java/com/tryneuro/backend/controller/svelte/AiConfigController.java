@@ -44,8 +44,8 @@ public class AiConfigController {
         if (user == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
         }
-        String llmProvider = (String) config.getOrDefault("llm_provider", "openrouter");
-        String llmModel = (String) config.getOrDefault("llm_model", "openrouter/auto");
+        String llmProvider = (String) config.getOrDefault("llm_provider", "gigachat");
+        String llmModel = (String) config.getOrDefault("llm_model", "GigaChat");
         String apiKey = (String) config.getOrDefault("api_key", "");
         String sttProvider = (String) config.getOrDefault("stt_provider", "vosk");
         

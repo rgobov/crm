@@ -1,30 +1,28 @@
 package com.tryneuro.aibot.service;
 
+import chat.giga.client.GigaChatClient;
+import chat.giga.client.auth.AuthClient;
+import chat.giga.client.auth.AuthClientBuilder;
+import chat.giga.model.Scope;
+import chat.giga.model.completion.ChatFunction;
+import chat.giga.model.completion.ChatFunctionParameters;
+import chat.giga.model.completion.ChatFunctionParametersProperty;
+import chat.giga.model.completion.ChatMessage;
+import chat.giga.model.completion.ChatMessageRole;
+import chat.giga.model.completion.CompletionRequest;
+import chat.giga.model.completion.CompletionResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.model.ModelResult;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.tool.function.FunctionToolCallback;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Proxy;
-import java.net.ProxySelector;
-import java.net.SocketAddress;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AiAgentService {
@@ -36,6 +34,12 @@ public class AiAgentService {
     private final ObjectMapper mapper;
     private final MapResolverService actorResolver;
     private final RagService ragService;
+    private final String scopeString;
+
+    private final ConcurrentHashMap<String, GigaChatClient> clientCache = new ConcurrentHashMap<>();
+
+    private static final int MAX_REACT_ITERATIONS = 8;
+    private static final long REACT_TIMEOUT_MS = 30_000;
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         Ты — AI-ассистент CRM системы TryNeuro.
@@ -54,56 +58,28 @@ public class AiAgentService {
 
     public AiAgentService(CrmToolService toolService, UserConfigService userConfigService,
                           ObjectMapper mapper, MapResolverService actorResolver,
-                          RagService ragService) {
+                          RagService ragService,
+                          @Value("${gigachat.scope:GIGACHAT_API_PERS}") String scopeString) {
         this.toolService = toolService;
         this.userConfigService = userConfigService;
         this.mapper = mapper;
         this.actorResolver = actorResolver;
         this.ragService = ragService;
+        this.scopeString = scopeString;
     }
 
-    @PostConstruct
-    void configureProxy() {
-        String proxyUrl = System.getenv("OPENROUTER_PROXY");
-        if (proxyUrl == null || proxyUrl.isEmpty()) {
-            proxyUrl = System.getenv("TELEGRAM_PROXY");
-        }
-        if (proxyUrl != null && !proxyUrl.isEmpty()) {
-            try {
-                URI uri = URI.create(proxyUrl.startsWith("http") ? proxyUrl : "http://" + proxyUrl);
-                String host = uri.getHost();
-                int port = uri.getPort() > 0 ? uri.getPort() : 8888;
-                Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port));
-                ProxySelector defaultSelector = ProxySelector.getDefault();
-
-                ProxySelector.setDefault(new ProxySelector() {
-                    @Override
-                    public List<Proxy> select(URI targetUri) {
-                        if (targetUri.getHost() != null && targetUri.getHost().contains("openrouter.ai")) {
-                            log.debug("Proxy routing {} via {}:{}", targetUri, host, port);
-                            return List.of(proxy);
-                        }
-                        return defaultSelector != null
-                            ? defaultSelector.select(targetUri)
-                            : List.of(Proxy.NO_PROXY);
-                    }
-
-                    @Override
-                    public void connectFailed(URI targetUri, SocketAddress sa, IOException ioe) {
-                        log.warn("Proxy connect failed to {}: {}", targetUri, ioe.getMessage());
-                    }
-                });
-
-                log.info("OpenRouter proxy enabled: {}:{} (env: OPENROUTER_PROXY={}, TELEGRAM_PROXY={})",
-                    host, port,
-                    System.getenv("OPENROUTER_PROXY") != null ? "set" : "not set",
-                    System.getenv("TELEGRAM_PROXY") != null ? "set" : "not set");
-            } catch (Exception e) {
-                log.warn("Failed to parse proxy {}: {}", proxyUrl, e.getMessage());
-            }
-        } else {
-            log.info("No proxy configured for OpenRouter — direct connection");
-        }
+    private GigaChatClient getOrCreateClient(String authKey) {
+        return clientCache.computeIfAbsent(authKey, key ->
+            GigaChatClient.builder()
+                .verifySslCerts(false)
+                .authClient(AuthClientBuilder.builder()
+                    .withOAuth(AuthClientBuilder.OAuthBuilder.builder()
+                        .scope(Scope.valueOf(scopeString))
+                        .authKey(key)
+                        .build())
+                    .build())
+                .build()
+        );
     }
 
     @SuppressWarnings("unchecked")
@@ -111,10 +87,9 @@ public class AiAgentService {
         log.info("processMessage chat_id={}, history_size={}", chatId, history.size());
 
         UserConfigService.UserConfig cfg = userConfigService.getConfig(chatId);
-        if (cfg == null || cfg.apiKey() == null || cfg.apiKey().isEmpty()) {
+        if (cfg == null || cfg.apiKey() == null || cfg.apiKey().isBlank()) {
             log.warn("processMessage chat_id={}: no API key configured", chatId);
-            return "У вас не настроен API ключ для нейросети.\n"
-                + "Перейдите в CRM → AI Настройки, сохраните ваш OpenRouter API key и Telegram ID.";
+            return "⚠️ Не настроен API-ключ GigaChat. Укажите его в CRM → AI Настройки.";
         }
         log.info("processMessage chat_id={}: apiKey={}..., model={}",
             chatId, cfg.apiKey().substring(0, Math.min(8, cfg.apiKey().length())), cfg.llmModel());
@@ -123,10 +98,9 @@ public class AiAgentService {
         String tenantId = actor.get("tenant_id");
         String role = actor.getOrDefault("role", "CLIENT");
         String modelName = cfg.llmModel() != null && !cfg.llmModel().isEmpty()
-            ? cfg.llmModel() : "openrouter/auto";
+                ? cfg.llmModel() : "GigaChat";
         log.info("processMessage chat_id={}: role={}, tenantId={}, model={}", chatId, role, tenantId, modelName);
 
-        // Мапа с ключами-заголовками для executeTool (CrmToolService ждёт X-Actor-*)
         Map<String, String> actorHeaders = new LinkedHashMap<>();
         actorHeaders.put("X-Actor-Role", role);
         actorHeaders.put("X-Actor-Contact-Id", actor.getOrDefault("contact_id", ""));
@@ -135,8 +109,7 @@ public class AiAgentService {
         String systemPrompt = buildSystemPrompt(role);
 
         String lastUserQuery = history.isEmpty() ? "" :
-            history.get(history.size() - 1).getOrDefault("content", "");
-        log.info("processMessage chat_id={}: calling RAG with query=\"{}\"", chatId, lastUserQuery);
+                history.get(history.size() - 1).getOrDefault("content", "");
         String ragContext = ragService.enhancePrompt(tenantId, lastUserQuery);
         if (!ragContext.isEmpty()) {
             systemPrompt += ragContext;
@@ -145,57 +118,155 @@ public class AiAgentService {
             log.info("processMessage chat_id={}: no RAG context", chatId);
         }
 
-        List<Message> historyMessages = buildHistoryMessages(history);
-        log.info("processMessage chat_id={}: calling OpenRouter model={}, messages_count={}",
-            chatId, modelName, historyMessages.size());
+        List<ChatMessage> messages = buildGigaChatMessages(history);
+        List<ChatFunction> functions = buildGigaChatFunctions(tenantId, actorHeaders);
+        log.info("processMessage chat_id={}: {} chat functions registered", chatId, functions.size());
 
-        try {
-            OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                .options(OpenAiChatOptions.builder()
-                    .baseUrl("https://openrouter.ai/api/v1")
-                    .apiKey(cfg.apiKey())
-                    .model(modelName)
-                    .build())
-                .build();
+        GigaChatClient client = getOrCreateClient(cfg.apiKey());
 
-            ChatClient chatClient = ChatClient.builder(chatModel).build();
+        long startTime = System.currentTimeMillis();
 
-            List<FunctionToolCallback<Map<String, Object>, String>> callbacks = buildCallbacks(tenantId, actorHeaders);
-            log.info("processMessage chat_id={}: {} tool callbacks registered", chatId, callbacks.size());
-
-            ChatClient.ChatClientRequestSpec request = chatClient.prompt()
-                .system(systemPrompt)
-                .messages(historyMessages)
-                .tools(callbacks.toArray());
-
-            long openrouterStart = System.currentTimeMillis();
-            String content = request.call().content();
-            long openrouterElapsed = System.currentTimeMillis() - openrouterStart;
-
-            log.info("processMessage chat_id={}: OpenRouter responded in {}ms, content len={}",
-                chatId, openrouterElapsed, content != null ? content.length() : 0);
-            if (content != null && !content.isEmpty()) {
-                log.debug("processMessage chat_id={}: response preview: {}", chatId,
-                    content.substring(0, Math.min(200, content.length())));
+        for (int iter = 0; iter < MAX_REACT_ITERATIONS; iter++) {
+            if (System.currentTimeMillis() - startTime > REACT_TIMEOUT_MS) {
+                log.warn("processMessage chat_id={}: ReAct timeout after {} iterations", chatId, iter);
+                return "⚠️ Превышено время ожидания ответа. Попробуйте упростить запрос.";
             }
-            return content != null ? content : "";
 
-        } catch (Exception e) {
-            String errMsg = e.getMessage() != null ? e.getMessage() : "";
-            log.error("processMessage chat_id={} model={}: exception: {}", chatId, modelName, errMsg, e);
+            try {
+                CompletionRequest request = CompletionRequest.builder()
+                        .model(modelName)
+                        .messages(systemPrompt != null && iter == 0
+                                ? prependSystem(systemPrompt, messages)
+                                : messages)
+                        .functions(functions)
+                        .functionCall("auto")
+                        .build();
 
-            if (errMsg.contains("403")) {
-                return "Модель \"" + modelName + "\" недоступна. Проверьте API-ключ и баланс на OpenRouter.\n"
-                    + "Сменить модель можно в CRM → AI Настройки.";
+                long gigaStart = System.currentTimeMillis();
+                CompletionResponse response = client.completions(request);
+                long gigaElapsed = System.currentTimeMillis() - gigaStart;
+
+                if (response.choices() == null || response.choices().isEmpty()) {
+                    log.warn("processMessage chat_id={}: empty choices", chatId);
+                    return "⚠️ Пустой ответ от модели GigaChat.";
+                }
+
+                ChatMessage responseMsg = ChatMessage.of(response.choices().get(0).message());
+                log.info("processMessage chat_id={}: GigaChat responded in {}ms, role={}, hasFunctionCall={}",
+                        chatId, gigaElapsed, responseMsg.role(),
+                        responseMsg.functionCall() != null);
+
+                if (responseMsg.functionCall() != null) {
+                    String toolName = responseMsg.functionCall().name();
+                    Map<String, Object> toolArgs = responseMsg.functionCall().arguments();
+                    log.info("processMessage chat_id={}: tool call: name={}, args={}", chatId, toolName, toolArgs);
+
+                    String toolResult = toolService.executeTool(toolName, toolArgs, tenantId, actorHeaders);
+                    log.info("processMessage chat_id={}: tool result len={}", chatId, toolResult != null ? toolResult.length() : 0);
+
+                    messages.add(ChatMessage.builder()
+                            .role(ChatMessageRole.FUNCTION)
+                            .name(toolName)
+                            .content(toolResult != null ? toolResult : "{}")
+                            .build());
+                } else {
+                    String content = responseMsg.content();
+                    log.info("processMessage chat_id={}: final response, len={}", chatId, content != null ? content.length() : 0);
+                    return content != null ? content : "";
+                }
+            } catch (Exception e) {
+                String errMsg = e.getMessage() != null ? e.getMessage() : "";
+                log.error("processMessage chat_id={} model={}: exception at iter {}: {}", chatId, modelName, iter, errMsg, e);
+
+                if (errMsg.contains("401") || errMsg.contains("Unauthorized")) {
+                    return "⚠️ Неверный API-ключ GigaChat. Проверьте ключ в CRM → AI Настройки.";
+                }
+                if (errMsg.contains("429") || errMsg.contains("Too Many Requests")) {
+                    return "⚠️ Слишком много запросов к GigaChat. Попробуйте через минуту.";
+                }
+                if (errMsg.contains("5") && (errMsg.contains("500") || errMsg.contains("502") || errMsg.contains("503"))) {
+                    return "⚠️ Сервер GigaChat временно недоступен. Повторите попытку позже.";
+                }
+                return "⚠️ Ошибка нейросети: " + e.getMessage();
             }
-            if (errMsg.contains("429")) {
-                return "Слишком много запросов к нейросети. Попробуйте через минуту.";
-            }
-            if (errMsg.contains("502") || errMsg.contains("503") || errMsg.contains("500")) {
-                return "Сервер ИИ временно недоступен. Повторите попытку позже.";
-            }
-            return "Ошибка нейросети: " + e.getMessage();
         }
+
+        log.warn("processMessage chat_id={}: ReAct loop exhausted", chatId);
+        return "⚠️ Не удалось получить ответ за допустимое количество шагов.";
+    }
+
+    private List<ChatMessage> buildGigaChatMessages(List<Map<String, String>> history) {
+        List<ChatMessage> messages = new ArrayList<>();
+        for (Map<String, String> msg : history) {
+            String role = msg.getOrDefault("role", "user");
+            String content = msg.getOrDefault("content", "");
+            if ("user".equals(role)) {
+                messages.add(ChatMessage.builder()
+                        .role(ChatMessageRole.USER)
+                        .content(content)
+                        .build());
+            } else if ("assistant".equals(role)) {
+                messages.add(ChatMessage.builder()
+                        .role(ChatMessageRole.ASSISTANT)
+                        .content(content)
+                        .build());
+            }
+        }
+        return messages;
+    }
+
+    private List<ChatMessage> prependSystem(String systemPrompt, List<ChatMessage> messages) {
+        if (systemPrompt == null || systemPrompt.isEmpty()) return messages;
+        List<ChatMessage> result = new ArrayList<>();
+        result.add(ChatMessage.builder()
+                .role(ChatMessageRole.SYSTEM)
+                .content(systemPrompt)
+                .build());
+        result.addAll(messages);
+        return result;
+    }
+
+    private List<ChatFunction> buildGigaChatFunctions(String tenantId, Map<String, String> actorHeaders) {
+        List<ChatFunction> functions = new ArrayList<>();
+        for (CrmToolService.ToolDef def : toolService.getToolDefinitions()) {
+            functions.add(toChatFunction(def));
+        }
+        return functions;
+    }
+
+    ChatFunction toChatFunction(CrmToolService.ToolDef def) {
+        ChatFunction.ChatFunctionBuilder builder = ChatFunction.builder()
+                .name(def.name())
+                .description(def.description());
+
+        Map<String, Object> paramSchema = def.parameters();
+        if (paramSchema != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> properties = (Map<String, Object>) paramSchema.get("properties");
+            @SuppressWarnings("unchecked")
+            List<String> required = (List<String>) paramSchema.get("required");
+
+            ChatFunctionParameters.ChatFunctionParametersBuilder paramsBuilder = ChatFunctionParameters.builder();
+            if (properties != null) {
+                for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                    String propName = entry.getKey();
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> propDef = (Map<String, Object>) entry.getValue();
+                    String type = (String) propDef.get("type");
+                    String description = (String) propDef.get("description");
+                    paramsBuilder.property(propName, ChatFunctionParametersProperty.builder()
+                            .type(type)
+                            .description(description)
+                            .build());
+                }
+            }
+            if (required != null) {
+                paramsBuilder.required(required);
+            }
+            builder.parameters(paramsBuilder.build());
+        }
+
+        return builder.build();
     }
 
     private String buildSystemPrompt(String role) {
@@ -204,41 +275,12 @@ public class AiAgentService {
             prompt += "\nТвоя роль: " + role + ". У тебя полный доступ ко всем функциям CRM.";
         } else if ("EMPLOYEE".equals(role)) {
             prompt += "\nТвоя роль: " + role
-                + ". Ты можешь создавать записи для любых клиентов, "
-                + "искать контакты, просматривать расписание и филиалы, "
-                + "но отменять можешь только свои записи.";
+                    + ". Ты можешь создавать записи для любых клиентов, "
+                    + "искать контакты, просматривать расписание и филиалы, "
+                    + "но отменять можешь только свои записи.";
         } else {
             prompt += "\nТвоя роль: " + role + ". Ты можешь управлять только своими данными.";
         }
         return prompt;
-    }
-
-    private List<Message> buildHistoryMessages(List<Map<String, String>> history) {
-        List<Message> messages = new ArrayList<>();
-        for (Map<String, String> msg : history) {
-            String role = msg.getOrDefault("role", "user");
-            String content = msg.getOrDefault("content", "");
-            if ("user".equals(role)) {
-                messages.add(new UserMessage(content));
-            } else if ("assistant".equals(role)) {
-                messages.add(new AssistantMessage(content));
-            }
-        }
-        return messages;
-    }
-
-    private List<FunctionToolCallback<Map<String, Object>, String>> buildCallbacks(
-            String tenantId, Map<String, String> actor) {
-        List<FunctionToolCallback<Map<String, Object>, String>> callbacks = new ArrayList<>();
-        for (CrmToolService.ToolDef def : toolService.getToolDefinitions()) {
-            FunctionToolCallback<Map<String, Object>, String> cb = FunctionToolCallback
-                .builder(def.name(), (Map<String, Object> args) ->
-                    toolService.executeTool(def.name(), args, tenantId, actor))
-                .description(def.description())
-                .inputType((Class<Map<String, Object>>) (Class<?>) Map.class)
-                .build();
-            callbacks.add(cb);
-        }
-        return callbacks;
     }
 }

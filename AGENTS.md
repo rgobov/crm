@@ -1,11 +1,11 @@
-# CRM Project — Spring AI Bot (Java Telegram AI Gateway)
+# CRM Project — GigaChat Bot (Java Telegram AI Gateway)
 
 ## Project Overview
 - **Stack**: Spring Boot (Java) + PostgreSQL (pgvector) + Svelte (Node) + Python (FastAPI/Pyrogram for notifications)
-- **AI Bot**: Spring AI (ai-bot — **Java 21**, backend — **Java 17**, 4 Telegram бота) — замена Python bot-agent
+- **AI Bot**: GigaChat SDK (ai-bot — **Java 21**, backend — **Java 17**, 4 Telegram бота) — замена Python bot-agent. **Spring AI удалён** (не OpenAI-совместимый API)
 - **Build**: Maven (`mvn package`), Python 3.13+, Node for Svelte
 - **Deploy**: GitHub Actions → VPS via SSH, docker-compose (push в `feature/spring-ai`, `feature/roles` или `fix/ios-final-attempt`)
-- **Proxy**: HTTP CONNECT `87.121.86.253:8888` — опционально
+- **Proxy**: HTTP CONNECT `87.121.86.253:8888` — только для Telegram (GigaChat напрямую)
 - **Network**: `tryneuro_network` (external)
 
 ## Language Policy
@@ -17,31 +17,32 @@
 | Подключение | Тип | Отвечает за |
 |---|---|---|
 | `notifications-python` (Pyrogram) | **User client** | Отправка уведомлений, авторизация по phone |
-| Spring AI ai-bot (`@NineCRM_AI_1_bot` … `_4`) | **4 бота (Java)** | AI чат, CRM tools, RAG |
+| AI-бот (`@NineCRM_AI_1_bot` … `_4`) | **4 бота (Java)** | AI чат, CRM tools, RAG |
 
 - Pyrogram — **не бот**, а user session (авторизация по phone + code)
-- Spring AI ai-bot — один Java-процесс на 4 ботов, **основной AI-бот**
+- AI-бот — один Java-процесс на 4 ботов, **основной AI-бот**
 - Python bot-agent (`ai-gateway/bot-agent`) — **DEPRECATED**, пока работает на сервере, но не деплоится
 
 ## Architecture
 
 ```
-User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бота)
+User → Telegram (bot_N) → GigaChat Bot (Java, 1 процесс, 4 бота)
                                 │
                       Per-user api_key lookup
                       (PostgreSQL user_ai_config, без кеша — читается на каждый запрос)
                                 │
                                 ▼
-                        OpenRouter (ключ + модель пользователя)
+                     GigaChat (ключ + модель пользователя)
+                     (через GigaChatClient SDK, verifySslCerts=false)
                                 │
                      ┌──────────┴──────────┐
                      ▼                      ▼
-              Backend API             PGvector RAG
+                  Backend API             PGvector RAG
          (AiInternalController)   (ai_knowledge_chunks)
 ```
 
-- **Per-user auth**: `OpenAiChatModel.builder().apiKey(user_cfg.apiKey())` из `user_ai_config`
-- **ReAct loop** (внутри Spring AI): `ChatClient` + `FunctionToolCallback` → LLM → tool call (function calling) → Backend API → continue → ответ
+- **Per-user auth**: `GigaChatClient.builder().authClient(AuthClient.builder().withOAuth(scope, authKey))` из `user_ai_config.api_key`
+- **ReAct loop** (ручной): `GigaChatClient.completions(...)` → LLM → function_call → `CrmToolService.executeTool()` → continue → ответ (до 8 итераций, таймаут 30 сек)
 - **Auto-RAG**: перед каждым LLM вызовом в system prompt добавляется контекст из PGvector поиска
 - **keep_typing**: фоновая задача `chat_action="typing"` каждые 4 сек
 - **resolve_actor**: `GET /users/by-telegram/{chatId}` → role, tenant_id, contact_id, staff_id
@@ -133,14 +134,14 @@ User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бот
 | Backend (RAG) | `.../service/RagSearchService.java` | PGvector cosine similarity search |
 | Backend (RAG) | `.../service/KnowledgeIngestService.java` | Chunking (512/50 токенов) + вставка |
 | Backend (Flyway) | `.../V40__pgvector.sql` | pgvector extension + ai_knowledge_chunks |
-| Bot Agent (Spring AI) | `ai-bot/.../CrmToolService.java` | 24 tool definitions (getToolDefinitions) + executeTool |
-| Bot Agent (Spring AI) | `ai-bot/.../AiAgentService.java` | ChatClient + FunctionToolCallback + auto-RAG |
-| Bot Agent (Spring AI) | `ai-bot/.../RagService.java` | RAG search call to backend |
-| Bot Agent (Spring AI) | `ai-bot/.../UserConfigService.java` | PostgreSQL lookup (без кеша) |
-| Bot Agent (Spring AI) | `ai-bot/.../MapResolverService.java` | resolve actor by telegramId |
-| Bot Agent (Spring AI) | `ai-bot/.../TryNeuroBot.java` | 4 TelegramLongPollingBot + команды |
-| Bot Agent (Spring AI) | `ai-bot/.../BotInitializer.java` | Регистрация 4 ботов + proxy |
-| Bot Agent (Spring AI) | `ai-bot/.../AppConfig.java` | RestTemplate + JdbcTemplate бины |
+| Bot Agent (GigaChat) | `ai-bot/.../CrmToolService.java` | 24 tool definitions (getToolDefinitions) + executeTool |
+| Bot Agent (GigaChat) | `ai-bot/.../AiAgentService.java` | GigaChatClient + ручной ReAct + auto-RAG |
+| Bot Agent (GigaChat) | `ai-bot/.../RagService.java` | RAG search call to backend |
+| Bot Agent (GigaChat) | `ai-bot/.../UserConfigService.java` | PostgreSQL lookup (без кеша) |
+| Bot Agent (GigaChat) | `ai-bot/.../MapResolverService.java` | resolve actor by telegramId |
+| Bot Agent (GigaChat) | `ai-bot/.../TryNeuroBot.java` | 4 TelegramLongPollingBot + команды |
+| Bot Agent (GigaChat) | `ai-bot/.../BotInitializer.java` | Регистрация 4 ботов + proxy |
+| Bot Agent (GigaChat) | `ai-bot/.../AppConfig.java` | RestTemplate + JdbcTemplate бины |
 | Bot Agent (Python) | `ai-gateway/bot-agent/*` | **DEPRECATED** (не деплоится) |
 | Notifications | `notifications-python/main.py` | Telegram notifications (Pyrogram) |
 
@@ -149,9 +150,9 @@ User → Telegram (bot_N) → Spring AI ai-bot (Java, 1 процесс, 4 бот
 - `BOT_TOKEN_1` … `BOT_TOKEN_4` — Telegram bot tokens
 - `SPRING_DATASOURCE_URL` — PostgreSQL JDBC URL (`jdbc:postgresql://tryneuro_db:5432/tryneuro_db`)
 - `TELEGRAM_PROXY` — HTTP CONNECT proxy (обязателен на VPS в РФ), также используется для OpenRouter
-- `OPENROUTER_PROXY` — опциональный отдельный прокси для OpenRouter (fallback на `TELEGRAM_PROXY`)
 - `INTERNAL_SECRET` — shared secret для backend ↔ bot
 - `CRM_BACKEND_URL` — URL backend для ai-bot (`http://backend:8080`)
+- `GIGACHAT_SCOPE` — скоуп GigaChat OAuth (`GIGACHAT_API_PERS` по умолчанию)
 - Новые env var добавляются в **нужные** workflow: deploy-main.yml / deploy-spring-ai.yml
 
 ## Deploy Workflows
@@ -221,4 +222,4 @@ cat ~/crm/backups/db-2026-06-26_2200.sql | docker exec -i tryneuro_db psql -U po
 - **Streaming** — ответ чанками через `editMessageText`
 - **Redis** — для session state и персистентности диалогов
 - **MAX Messenger** — интеграция уведомлений (ждёт верифицированное юрлицо РФ)
-- **Удаление Python bot-agent** — после стабилизации Spring AI ai-bot
+- **Удаление Python bot-agent** — после стабилизации GigaChat ai-bot

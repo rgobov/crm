@@ -19,10 +19,10 @@ public class UserAiConfig {
     private String userId;
 
     @Column(name = "llm_provider", nullable = false)
-    private String llmProvider = "openrouter";
+    private String llmProvider = "gigachat";
 
     @Column(name = "llm_model", nullable = false)
-    private String llmModel = "openrouter/auto";
+    private String llmModel = "GigaChat";
 
     @Column(name = "api_key")
     private String apiKey;

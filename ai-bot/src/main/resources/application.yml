@@ -8,11 +8,6 @@ management:
         include: health
 
 spring:
-  autoconfigure:
-    exclude:
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration
-      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://tryneuro_db:5432/tryneuro_db}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
@@ -20,19 +15,10 @@ spring:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5
-  ai:
-    openai:
-      api-key: ${SPRING_AI_OPENAI_API_KEY:placeholder}
-    retry:
-      max-attempts: 3
-      backoff:
-        initial-interval: 2s
-        multiplier: 2
-      on-http-codes: 429,500,502,503
-      exclude-on-http-codes: 401,403
+
+gigachat:
+  scope: ${GIGACHAT_SCOPE:GIGACHAT_API_PERS}
 
 logging:
   level:
     com.tryneuro: DEBUG
-    org.springframework.ai: DEBUG
-    org.springframework.web.client: TRACE
