@@ -290,7 +290,7 @@ class CrmToolServiceTest {
         when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn("{\"staff\":[]}");
 
-        Map<String, Object> args = Map.of("branch_id", "b1b2c3d4-e5f6-7890-abcd-ef1234567891", "date", "tomorrow", "duration", 60);
+        Map<String, Object> args = Map.of("branch_name", "виртуальный", "date", "tomorrow", "duration", 60);
         crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
 
         ArgumentCaptor<String> urlCap = ArgumentCaptor.forClass(String.class);
@@ -299,19 +299,19 @@ class CrmToolServiceTest {
     }
 
     @Test
-    @DisplayName("executeTool get_branch_staff_slots передаёт branchId/date/duration в body")
+    @DisplayName("executeTool get_branch_staff_slots передаёт branchName/date/duration в body")
     void getBranchStaffSlotsSendsBody() {
         when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn("{}");
 
-        Map<String, Object> args = Map.of("branch_id", "b1b2c3d4-e5f6-7890-abcd-ef1234567891", "date", "tomorrow");
+        Map<String, Object> args = Map.of("branch_name", "виртуальный", "date", "tomorrow");
         crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
 
         ArgumentCaptor<HttpEntity<String>> entityCap = ArgumentCaptor.forClass(HttpEntity.class);
         verify(rest).postForObject(anyString(), entityCap.capture(), eq(String.class));
         String body = entityCap.getValue().getBody();
         assertNotNull(body);
-        assertTrue(body.contains("\"branchId\":\"b1b2c3d4-e5f6-7890-abcd-ef1234567891\""));
+        assertTrue(body.contains("\"branchName\":\"виртуальный\""));
         assertTrue(body.contains("\"date\":\"tomorrow\""));
         assertTrue(body.contains("\"duration\":60"));
     }

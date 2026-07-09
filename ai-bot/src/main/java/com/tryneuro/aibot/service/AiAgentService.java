@@ -56,14 +56,12 @@ public class AiAgentService {
 
         Строгие правила использования инструментов:
         - Дату всегда передавай tool'ам КАК ЕСТЬ: ISO (YYYY-MM-DD) ИЛИ ключевое слово (today, tomorrow, послезавтра, понедельник..воскресенье / пн..вс, next_monday, на_следующей_неделе, через_N_дней, 15_июля). Бэкенд сам вычислит дату по часовому поясу ФИЛИАЛА. НЕ считай даты сам.
-        - Поиск филиала по имени: resolve_branch(name="виртуальный") -> если {matched:true, ambiguous:false} просто возьми branchId. Если {ambiguous:true} -> спроси пользователя какой город. Если {matched:false} -> скажи что филиал не найден.
-        - Просмотр всех филиалов: get_branches (без query или с query для фильтрации). Ответ {branches:[{id,name,address,timezone}], ambiguous}.
-        - Если get_branches вернул "ambiguous":true или в "timezones" больше одного значения — филиалы в разных городах. Спроси пользователя какой город он имеет в виду. НЕ угадывай.
-        - Все мастера филиала: resolve_branch(name) -> возьми branchId -> get_branch_staff_slots(branch_id, date). ОДИН вызов вместо N.
-        - В ответе get_branch_staff_slots ПОЛЕ 'hasAvailability' (true=есть слоты, false=нет). Если false — прочитай поле 'summary' и скажи пользователю коротко. Поле 'summary' уже содержит готовый текст на русском — можешь его пересказать.
-        - Если reason у мастера = 'day_off' — у него выходной. Если 'no_shifts' — нет смены. Если 'fully_booked' — всё занято. Если slots:[] — свободного времени нет, НЕ выдумывай слоты.
-        - Свободное время ОДНОГО мастера: get_available_slots(staff_id, date, branch_id). Для относительной даты (tomorrow/понедельник) branch_id обязателен.
-        - Запись: resolve_branch(name) -> search_services(query) -> если нет -> add_service(name, duration_minutes) -> get_branch_staff_slots(branch_id, date) -> выбери слот -> create_appointment(clientName, serviceName, branch_id, date, time, staffId).
+- Поиск по филиалу: передавай branch_name (то же имя/город что сказал пользователь: виртуальный, москва, центр). Бэкенд сам найдёт филиал по name и address. НЕ используй branch_id — бэкенд делает lookup.
+        - Просмотр всех филиалов: get_branches (без query или с query для фильтрации).
+        - Если get_branch_staff_slots или create_appointment вернул ambiguous:true — филиал есть в разных городах. Спроси пользователя какой город. Поле 'branches' содержит варианты.
+        - Все мастера филиала: get_branch_staff_slots(branch_name="виртуальный", date="tomorrow"). ОДИН вызов.
+        - В ответе get_branch_staff_slots ПОЛЕ 'hasAvailability'. Если false — прочитай 'summary' и скажи пользователю.
+        - Запись: get_branch_staff_slots(branch_name, date) -> выбери слот -> search_services(query) -> если нет -> add_service(name, duration_minutes) -> create_appointment(clientName, serviceName, branch_name, date, time, staffId). БЕЗ branch_id.
         - Все *_id и Id параметры — это ID полученный из search/get_branches, НЕ имена и НЕ названия. Никогда не подставляй текст в поля с суффиксом _id или Id.
         - Если филиал не найден через get_branches -> скажи пользователю что такой филиал не найден, не угадывай.
         - Все действия — по часовому поясу филиала.

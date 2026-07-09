@@ -225,11 +225,13 @@ public class AiInternalController {
             return ResponseEntity.badRequest().body("Client name is required");
         }
         boolean hasDateTime = req.getDateTime() != null && !req.getDateTime().isBlank();
-        boolean hasAlt = req.getBranchId() != null && !req.getBranchId().isBlank()
-                && req.getDate() != null && !req.getDate().isBlank()
+        boolean hasBranchId = req.getBranchId() != null && !req.getBranchId().isBlank();
+        boolean hasBranchName = req.getBranchName() != null && !req.getBranchName().isBlank();
+        boolean hasDateAndTime = req.getDate() != null && !req.getDate().isBlank()
                 && req.getTime() != null && !req.getTime().isBlank();
+        boolean hasAlt = (hasBranchId || hasBranchName) && hasDateAndTime;
         if (!hasDateTime && !hasAlt) {
-            return ResponseEntity.badRequest().body("dateTime (ISO) OR (branchId + date + time) is required");
+            return ResponseEntity.badRequest().body("dateTime (ISO) OR (branchId/branchName + date + time) is required");
         }
 
         String contactId = req.getContactId();
@@ -293,14 +295,31 @@ public class AiInternalController {
         try {
             if (req.getDateTime() != null && !req.getDateTime().isBlank()) {
                 startTime = OffsetDateTime.parse(req.getDateTime());
-            } else if (req.getBranchId() != null && !req.getBranchId().isBlank()
-                    && req.getDate() != null && !req.getDate().isBlank()
-                    && req.getTime() != null && !req.getTime().isBlank()) {
-                Optional<Branch> branchOpt = branchRepository.findById(req.getBranchId());
-                if (branchOpt.isEmpty() || !tId.equals(branchOpt.get().getTenantId())) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Branch not found: " + req.getBranchId());
+            } else if (hasAlt) {
+                Branch branch;
+                if (hasBranchId) {
+                    Optional<Branch> branchOpt = branchRepository.findById(req.getBranchId());
+                    if (branchOpt.isEmpty() || !tId.equals(branchOpt.get().getTenantId())) {
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Branch not found: " + req.getBranchId());
+                    }
+                    branch = branchOpt.get();
+                } else {
+                    List<Branch> all = branchService.getBranches(tId);
+                    String q = req.getBranchName().toLowerCase();
+                    List<Branch> matches = all.stream()
+                            .filter(b -> (b.getName() != null && b.getName().toLowerCase().contains(q))
+                                    || (b.getAddress() != null && b.getAddress().toLowerCase().contains(q)))
+                            .toList();
+                    if (matches.isEmpty()) {
+                        return ResponseEntity.badRequest().body("Branch not found: " + req.getBranchName());
+                    }
+                    List<String> tzs = matches.stream().map(Branch::getTimezone).distinct().toList();
+                    if (tzs.size() > 1) {
+                        return ResponseEntity.badRequest().body("Ambiguous branch name '" + req.getBranchName()
+                                + "'. Found in multiple cities. Specify a city or the exact branch name.");
+                    }
+                    branch = matches.get(0);
                 }
-                Branch branch = branchOpt.get();
                 LocalDate localDate = dateResolver.resolve(branch, req.getDate());
                 LocalTime localTime = LocalTime.parse(req.getTime());
                 java.time.ZoneId zoneId;
@@ -718,19 +737,58 @@ public class AiInternalController {
         validateSecret(secret);
         String tId = getRequiredTenantId(req.getTenantId());
 
-        if (req.getBranchId() == null || req.getBranchId().isBlank()) {
-            return ResponseEntity.badRequest().body("branchId is required");
+        boolean hasBranchId = req.getBranchId() != null && !req.getBranchId().isBlank();
+        boolean hasBranchName = req.getBranchName() != null && !req.getBranchName().isBlank();
+        if (!hasBranchId && !hasBranchName) {
+            return ResponseEntity.badRequest().body("branchId or branchName is required");
         }
         if (req.getDate() == null || req.getDate().isBlank()) {
             return ResponseEntity.badRequest().body("date is required");
         }
         int duration = (req.getDuration() != null && req.getDuration() > 0) ? req.getDuration() : 60;
 
-        Optional<Branch> branchOpt = branchRepository.findById(req.getBranchId());
-        if (branchOpt.isEmpty() || !tId.equals(branchOpt.get().getTenantId())) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Branch not found: " + req.getBranchId());
+        Branch branch;
+        if (hasBranchId) {
+            Optional<Branch> branchOpt = branchRepository.findById(req.getBranchId());
+            if (branchOpt.isEmpty() || !tId.equals(branchOpt.get().getTenantId())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Branch not found: " + req.getBranchId());
+            }
+            branch = branchOpt.get();
+        } else {
+            List<Branch> all = branchService.getBranches(tId);
+            String q = req.getBranchName().toLowerCase();
+            List<Branch> matches = all.stream()
+                    .filter(b -> (b.getName() != null && b.getName().toLowerCase().contains(q))
+                            || (b.getAddress() != null && b.getAddress().toLowerCase().contains(q)))
+                    .toList();
+
+            if (matches.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "matched", false,
+                        "hasAvailability", false,
+                        "summary", "Филиал '" + req.getBranchName() + "' не найден. Уточните название или город.",
+                        "staff", List.of()
+                ));
+            }
+
+            List<String> tzs = matches.stream().map(Branch::getTimezone).distinct().toList();
+            if (tzs.size() > 1) {
+                List<Map<String, String>> branchList = matches.stream().map(b -> Map.of(
+                        "branchId", b.getId(), "branchName", b.getName() != null ? b.getName() : "",
+                        "timezone", b.getTimezone() != null ? b.getTimezone() : "",
+                        "address", b.getAddress() != null ? b.getAddress() : ""
+                )).toList();
+                return ResponseEntity.ok(Map.of(
+                        "ambiguous", true,
+                        "hasAvailability", false,
+                        "summary", "Филиалы с названием '" + req.getBranchName() + "' есть в разных городах. Уточните какой город?",
+                        "branches", branchList,
+                        "staff", List.of()
+                ));
+            }
+
+            branch = matches.get(0);
         }
-        Branch branch = branchOpt.get();
 
         LocalDate date;
         try {

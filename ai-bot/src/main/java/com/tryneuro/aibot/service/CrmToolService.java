@@ -149,7 +149,11 @@ public class CrmToolService {
                 case "get_branch_staff_slots" -> {
                     Map<String, Object> bsBody = new java.util.LinkedHashMap<>();
                     bsBody.put("tenantId", tenantId);
-                    bsBody.put("branchId", validateIdArg("branch_id", args.get("branch_id")));
+                    if (args.get("branch_id") != null && !String.valueOf(args.get("branch_id")).isBlank()) {
+                        bsBody.put("branchId", validateIdArg("branch_id", args.get("branch_id")));
+                    } else {
+                        bsBody.put("branchName", args.get("branch_name"));
+                    }
                     bsBody.put("date", args.get("date"));
                     Object bdur = args.get("duration");
                     bsBody.put("duration", bdur != null ? bdur : 60);
@@ -196,6 +200,8 @@ public class CrmToolService {
                     }
                     if (args.get("branch_id") != null && !String.valueOf(args.get("branch_id")).isBlank()) {
                         aptBody.put("branchId", validateIdArg("branch_id", args.get("branch_id")));
+                    } else if (args.get("branch_name") != null && !String.valueOf(args.get("branch_name")).isBlank()) {
+                        aptBody.put("branchName", args.get("branch_name"));
                     }
                     aptBody.put("dateTime", args.get("dateTime"));
                     aptBody.put("date", args.get("date"));
@@ -449,22 +455,22 @@ public class CrmToolService {
                     "duration", Map.of("type", "integer", "description", "Appointment duration in minutes (default 60)")
                 ), "required", List.of("staff_id", "date")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "get_branch_staff_slots", "description", "Get ALL staff members of a branch with their free slots in ONE call. Response has: 'hasAvailability' (true/false), 'summary' (ready-to-use Russian text explaining the situation, READ IT to the user), 'staff' array where each has 'staffId', 'staffName', 'slots', 'reason' (free/day_off/fully_booked/no_shifts), 'hasAvailability'. If slots:[] it means NO free time. If reason=day_off or no_shifts the master does NOT work that day. Never invent slots — read hasAvailability and summary fields.",
+                "name", "get_branch_staff_slots", "description", "Get ALL staff members of a branch with their free slots in ONE call. Pass branch_name (the name/city the user said) and date. Backend finds the branch by name, resolves date in its timezone. Response: 'hasAvailability' (true/false), 'summary' (ready-to-use Russian text — read it to the user), 'staff' array [staffId, staffName, slots, reason, hasAvailability]. If hasAvailability=false or slots:[] it means NO free time. If ambiguous response (ambiguous:true) — branches in different cities, ask user which city.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
-                    "branch_id", Map.of("type", "string", "description", "Branch ID obtained from get_branches"),
+                    "branch_name", Map.of("type", "string", "description", "Branch name or city the user mentioned (e.g. виртуальный, москва, центр). Backend does contains-search by name and address."),
                     "date", Map.of("type", "string", "description", "Date ISO (YYYY-MM-DD) OR keyword: today, tomorrow, понедельник, next_friday, на_следующей_неделе, через_N_дней, 15_июля"),
                     "duration", Map.of("type", "integer", "description", "Appointment duration in minutes (default 60)")
-                ), "required", List.of("branch_id", "date")))),
+                ), "required", List.of("branch_name", "date")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "create_appointment", "description", "Create an appointment. serviceName and staffName are matched by contains; for exact match use staffId. PREFERRED way to set the time: pass branch_id + date (ISO OR keyword like tomorrow/понедельник) + time (HH:mm from a slot) — the backend assembles the datetime in the BRANCH timezone, so you do NOT compute offsets. Alternative: dateTime as ISO with offset, e.g. 2026-07-10T14:00:00+03:00.",
+                "name", "create_appointment", "description", "Create an appointment. Pass branch_name (same name/city user said) and backend finds the branch. Use branch_name+date+time (NOT dateTime ISO) for reliable timezone handling.",
                 "parameters", Map.of("type", "object", "properties", java.util.Map.ofEntries(
                     java.util.Map.entry("clientName", Map.of("type", "string", "description", "Client name")),
                     java.util.Map.entry("clientPhone", Map.of("type", "string", "description", "Client phone")),
                     java.util.Map.entry("serviceName", Map.of("type", "string", "description", "Service name (matched by contains)")),
-                    java.util.Map.entry("dateTime", Map.of("type", "string", "description", "ISO datetime e.g. 2026-06-20T14:00:00+03:00 (alternative to branch_id+date+time)")),
-                    java.util.Map.entry("branch_id", Map.of("type", "string", "description", "Branch ID obtained from get_branches. Use with date+time for reliable timezone.")),
-                    java.util.Map.entry("date", Map.of("type", "string", "description", "Date ISO (YYYY-MM-DD) OR keyword (today, tomorrow, понедельник, next_friday). Use with branch_id+time.")),
-                    java.util.Map.entry("time", Map.of("type", "string", "description", "Start time HH:mm (e.g. 14:00). Use with branch_id+date.")),
+                    java.util.Map.entry("dateTime", Map.of("type", "string", "description", "ISO datetime e.g. 2026-06-20T14:00:00+03:00 (alternative to branch_name+date+time)")),
+                    java.util.Map.entry("branch_name", Map.of("type", "string", "description", "Branch name or city the user mentioned. Backend does contains-search.")),
+                    java.util.Map.entry("date", Map.of("type", "string", "description", "Date ISO (YYYY-MM-DD) OR keyword (today, tomorrow, понедельник). Use with branch_name+time.")),
+                    java.util.Map.entry("time", Map.of("type", "string", "description", "Start time HH:mm (e.g. 14:00). Use with branch_name+date.")),
                     java.util.Map.entry("staffName", Map.of("type", "string", "description", "Staff name (optional, matched by contains)")),
                     java.util.Map.entry("staffId", Map.of("type", "string", "description", "Staff ID for exact match (recommended over staffName)")),
                     java.util.Map.entry("resourceId", Map.of("type", "string", "description", "Resource ID (optional)")),
