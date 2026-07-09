@@ -26,6 +26,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -376,6 +377,67 @@ public class ScheduleService {
             if (start.isBefore(eEnd) && end.isAfter(eStart)) return false;
         }
         return true;
+    }
+
+    public java.util.List<java.util.Map<String, String>> getAvailableSlots(String tenantId, String staffId, LocalDate date, int duration) {
+        List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staffId, date);
+        if (shifts.isEmpty()) {
+            return List.of();
+        }
+        StaffShift shift = shifts.stream().filter(s -> !s.isDayOff()).findFirst().orElse(null);
+        if (shift == null) {
+            return List.of();
+        }
+        LocalTime workStart = shift.getWorkStartTime();
+        LocalTime workEnd = shift.getWorkEndTime();
+        if (workStart == null || workEnd == null) {
+            return List.of();
+        }
+        int ws = workStart.toSecondOfDay() / 60;
+        int we = workEnd.toSecondOfDay() / 60;
+        int dayEnd = 24 * 60;
+        if (we <= ws) {
+            we = dayEnd;
+        }
+        int bs = shift.getBreakStartTime() != null ? shift.getBreakStartTime().toSecondOfDay() / 60 : -1;
+        int be = shift.getBreakEndTime() != null ? shift.getBreakEndTime().toSecondOfDay() / 60 : -1;
+        List<Appointment> existing = getAppointmentsForStaff(tenantId, staffId, date);
+        List<int[]> busy = new ArrayList<>();
+        for (Appointment a : existing) {
+            if (a.getStatus() == AppointmentStatus.CANCELLED) {
+                continue;
+            }
+            int es = a.getTime().toSecondOfDay() / 60;
+            int ee = es + a.getDurationInMinutes();
+            busy.add(new int[]{es, ee});
+        }
+        int step = 15;
+        List<Map<String, String>> slots = new ArrayList<>();
+        for (int s = ws; s + duration <= we; s += step) {
+            int e = s + duration;
+            if (e > dayEnd) {
+                break;
+            }
+            boolean overlapsBreak = bs >= 0 && s < be && e > bs;
+            if (overlapsBreak) {
+                continue;
+            }
+            boolean overlapsExisting = false;
+            for (int[] b : busy) {
+                if (s < b[1] && e > b[0]) {
+                    overlapsExisting = true;
+                    break;
+                }
+            }
+            if (overlapsExisting) {
+                continue;
+            }
+            slots.add(Map.of(
+                    "startTime", LocalTime.of(s / 60, s % 60).toString(),
+                    "endTime", LocalTime.of(e / 60, e % 60).toString()
+            ));
+        }
+        return slots;
     }
 
     public List<Appointment> getAppointmentsForStaff(String tenantId, String staffId, LocalDate date) {

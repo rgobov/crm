@@ -101,8 +101,9 @@ public class AiInternalController {
         String tId = getRequiredTenantId(req.getTenantId());
         String query = req.getQuery();
 
-        if (query == null || query.isEmpty()) {
-            return ResponseEntity.badRequest().body("Query is required");
+        if (query == null || query.isBlank()) {
+            var page = contactService.getContactsPaged(tId, "", true, 0, 50);
+            return ResponseEntity.ok(page.getContent().stream().map(DtoMapper::toDto).toList());
         }
 
         String cleanQuery = query.replaceAll("[^0-9]", "");
@@ -144,15 +145,16 @@ public class AiInternalController {
         String tId = getRequiredTenantId(req.getTenantId());
         String query = req.getQuery();
 
-        if (query == null || query.isEmpty()) {
-            return ResponseEntity.badRequest().body("Query is required");
-        }
-
         List<Service> all = appServiceService.getAllServices(tId);
-        List<Service> matches = all.stream()
-                .filter(s -> s.getName().toLowerCase().contains(query.toLowerCase()))
-                .limit(10)
-                .toList();
+        List<Service> matches;
+        if (query == null || query.isBlank()) {
+            matches = all.stream().limit(50).toList();
+        } else {
+            matches = all.stream()
+                    .filter(s -> s.getName().toLowerCase().contains(query.toLowerCase()))
+                    .limit(50)
+                    .toList();
+        }
 
         return ResponseEntity.ok(matches.stream().map(DtoMapper::toDto).toList());
     }
@@ -182,13 +184,26 @@ public class AiInternalController {
         validateSecret(secret);
         String tId = getRequiredTenantId(req.getTenantId());
         String query = req.getQuery();
+        String branchId = req.getBranchId();
 
-        if (query == null || query.isEmpty()) {
-            return ResponseEntity.badRequest().body("Query is required");
+        List<StaffMember> staff;
+        if (branchId != null && !branchId.isBlank()) {
+            staff = staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tId, branchId);
+        } else {
+            var page = staffMemberService.getStaffPaged(tId, query != null ? query : "", true, 0, 50);
+            staff = page.getContent();
         }
 
-        var page = staffMemberService.getStaffPaged(tId, query, true, 0, 10);
-        return ResponseEntity.ok(page.getContent().stream().map(DtoMapper::toDto).toList());
+        if (query != null && !query.isBlank()) {
+            String q = query.toLowerCase();
+            staff = staff.stream()
+                    .filter(s -> (s.getName() != null && s.getName().toLowerCase().contains(q))
+                            || (s.getSpecialty() != null && s.getSpecialty().toLowerCase().contains(q))
+                            || (s.getPhone() != null && s.getPhone().contains(q)))
+                    .toList();
+        }
+
+        return ResponseEntity.ok(staff.stream().map(DtoMapper::toDto).toList());
     }
 
     @PostMapping("/appointments")
@@ -254,7 +269,13 @@ public class AiInternalController {
         }
 
         StaffMember staff = null;
-        if (req.getStaffName() != null && !req.getStaffName().isBlank()) {
+        if (req.getStaffId() != null && !req.getStaffId().isBlank()) {
+            Optional<StaffMember> byId = staffMemberService.getStaffMemberById(req.getStaffId());
+            if (byId.isPresent() && tId.equals(byId.get().getTenantId())) {
+                staff = byId.get();
+            }
+        }
+        if (staff == null && req.getStaffName() != null && !req.getStaffName().isBlank()) {
             var page = staffMemberService.getStaffPaged(tId, req.getStaffName(), true, 0, 5);
             if (!page.isEmpty()) {
                 staff = page.getContent().get(0);
@@ -550,13 +571,45 @@ public class AiInternalController {
 
     @GetMapping("/branches")
     public ResponseEntity<?> getBranches(
+            @RequestParam(value = "query", required = false) String query,
             @RequestHeader("X-Internal-Secret") String secret,
             @RequestHeader("X-Tenant-Id") String tenantId) {
         validateSecret(secret);
         String tId = getRequiredTenantId(tenantId);
 
         List<Branch> branches = branchService.getBranches(tId);
+        if (query != null && !query.isBlank()) {
+            String q = query.toLowerCase();
+            branches = branches.stream()
+                    .filter(b -> (b.getName() != null && b.getName().toLowerCase().contains(q))
+                            || (b.getAddress() != null && b.getAddress().toLowerCase().contains(q)))
+                    .toList();
+        }
         return ResponseEntity.ok(branches.stream().map(DtoMapper::toDto).toList());
+    }
+
+    @PostMapping("/availability/slots")
+    public ResponseEntity<?> getAvailableSlots(
+            @RequestBody AiSlotsRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        if (req.getStaffId() == null || req.getStaffId().isBlank()) {
+            return ResponseEntity.badRequest().body("staffId is required");
+        }
+        if (req.getDate() == null || req.getDate().isBlank()) {
+            return ResponseEntity.badRequest().body("date is required");
+        }
+        int duration = (req.getDuration() != null && req.getDuration() > 0) ? req.getDuration() : 60;
+
+        try {
+            LocalDate date = LocalDate.parse(req.getDate());
+            List<Map<String, String>> slots = scheduleService.getAvailableSlots(tId, req.getStaffId(), date, duration);
+            return ResponseEntity.ok(Map.of("slots", slots));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid date format: " + e.getMessage());
+        }
     }
 
     @PostMapping("/availability")

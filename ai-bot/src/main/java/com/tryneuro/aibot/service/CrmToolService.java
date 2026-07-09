@@ -30,6 +30,22 @@ public class CrmToolService {
         "add_service", "update_service", "delete_service"
     );
 
+    private static final java.util.regex.Pattern ID_FIELD_PATTERN =
+            java.util.regex.Pattern.compile(".*(_id|Id)$");
+    private static final java.util.regex.Pattern INVALID_ID_PATTERN =
+            java.util.regex.Pattern.compile("[\\s\\p{IsCyrillic}]");
+
+    private static String validateIdArg(String fieldName, Object value) {
+        if (value == null) return null;
+        String s = String.valueOf(value);
+        if (INVALID_ID_PATTERN.matcher(s).find()) {
+            throw new IllegalArgumentException(
+                    "Поле '" + fieldName + "' должно быть ID из search/get tools, а получено значение '" + s
+                            + "'. Сначала вызови get_branches/search_staff/search_services и возьми из ответа поле id.");
+        }
+        return s;
+    }
+
     public CrmToolService(RestTemplate rest, ObjectMapper mapper) {
         this.rest = rest;
         this.mapper = mapper;
@@ -66,7 +82,7 @@ public class CrmToolService {
 
             String result = switch (name) {
                 case "search_contacts" -> post("/api/admin/ai/internal/contacts/search", entity);
-                case "get_contact" -> get("/api/admin/ai/internal/contacts/" + args.get("contact_id"), Map.of("tenantId", tenantId), headers);
+                case "get_contact" -> get("/api/admin/ai/internal/contacts/" + validateIdArg("contact_id", args.get("contact_id")), Map.of("tenantId", tenantId), headers);
                 case "create_contact" -> post("/api/admin/ai/internal/contacts", entity);
                 case "update_contact" -> {
                     Map<String, Object> contactBody = new java.util.LinkedHashMap<>();
@@ -77,9 +93,9 @@ public class CrmToolService {
                     String contactJson = mapper.writeValueAsString(contactBody);
                     HttpEntity<String> contactEntity = new HttpEntity<>(contactJson, headers);
                     headers.set("X-Tenant-Id", tenantId);
-                    yield put("/api/admin/ai/internal/contacts/" + args.get("contact_id"), contactEntity);
+                    yield put("/api/admin/ai/internal/contacts/" + validateIdArg("contact_id", args.get("contact_id")), contactEntity);
                 }
-                case "delete_contact" -> delete("/api/admin/ai/internal/contacts/" + args.get("contact_id"), Map.of("tenantId", tenantId), headers);
+                case "delete_contact" -> delete("/api/admin/ai/internal/contacts/" + validateIdArg("contact_id", args.get("contact_id")), Map.of("tenantId", tenantId), headers);
                 case "search_services" -> post("/api/admin/ai/internal/services/search", entity);
                 case "add_service" -> {
                     Map<String, Object> svcBody = new java.util.LinkedHashMap<>();
@@ -99,28 +115,50 @@ public class CrmToolService {
                     svcBody.put("priceMin", args.get("price_min"));
                     svcBody.put("priceMax", args.get("price_max"));
                     String svcJson = mapper.writeValueAsString(svcBody);
-                    yield put("/api/admin/ai/internal/services/" + args.get("service_id"), new HttpEntity<>(svcJson, headers));
+                    yield put("/api/admin/ai/internal/services/" + validateIdArg("service_id", args.get("service_id")), new HttpEntity<>(svcJson, headers));
                 }
-                case "delete_service" -> delete("/api/admin/ai/internal/services/" + args.get("service_id"), Map.of("tenantId", tenantId), headers);
-                case "search_staff" -> post("/api/admin/ai/internal/staff/search", entity);
+                case "delete_service" -> delete("/api/admin/ai/internal/services/" + validateIdArg("service_id", args.get("service_id")), Map.of("tenantId", tenantId), headers);
                 case "get_staff_schedule" -> {
                     Map<String, Object> schedBody = new java.util.LinkedHashMap<>();
                     schedBody.put("tenantId", tenantId);
-                    schedBody.put("staffId", args.get("staff_id"));
+                    schedBody.put("staffId", validateIdArg("staff_id", args.get("staff_id")));
                     schedBody.put("date", args.get("date"));
                     String schedJson = mapper.writeValueAsString(schedBody);
                     yield post("/api/admin/ai/internal/staff/schedule", new HttpEntity<>(schedJson, headers));
                 }
+                case "search_staff" -> {
+                    Map<String, Object> staffBody = new java.util.LinkedHashMap<>();
+                    staffBody.put("tenantId", tenantId);
+                    staffBody.put("query", args.getOrDefault("query", ""));
+                    if (args.get("branch_id") != null && !String.valueOf(args.get("branch_id")).isBlank()) {
+                        staffBody.put("branchId", validateIdArg("branch_id", args.get("branch_id")));
+                    }
+                    String staffJson = mapper.writeValueAsString(staffBody);
+                    yield post("/api/admin/ai/internal/staff/search", new HttpEntity<>(staffJson, headers));
+                }
+                case "get_available_slots" -> {
+                    Map<String, Object> slotsBody = new java.util.LinkedHashMap<>();
+                    slotsBody.put("tenantId", tenantId);
+                    slotsBody.put("staffId", validateIdArg("staff_id", args.get("staff_id")));
+                    slotsBody.put("date", args.get("date"));
+                    Object dur = args.get("duration");
+                    slotsBody.put("duration", dur != null ? dur : 60);
+                    String slotsJson = mapper.writeValueAsString(slotsBody);
+                    yield post("/api/admin/ai/internal/availability/slots", new HttpEntity<>(slotsJson, headers));
+                }
                 case "search_resources" -> post("/api/admin/ai/internal/resources/search", entity);
                 case "get_branches" -> {
                     headers.set("X-Tenant-Id", tenantId);
-                    yield get("/api/admin/ai/internal/branches", Map.of(), headers);
+                    Object bq = args.get("query");
+                    yield get("/api/admin/ai/internal/branches",
+                            bq != null && !String.valueOf(bq).isBlank() ? Map.of("query", bq) : Map.of(),
+                            headers);
                 }
                 case "get_instructions" -> get("/api/admin/ai/internal/instructions", Map.of(), headers);
                 case "check_availability" -> {
                     Map<String, Object> availBody = new java.util.LinkedHashMap<>();
                     availBody.put("tenantId", tenantId);
-                    availBody.put("staffId", args.get("staff_id"));
+                    availBody.put("staffId", validateIdArg("staff_id", args.get("staff_id")));
                     availBody.put("date", args.get("date"));
                     availBody.put("time", args.get("time"));
                     availBody.put("duration", args.get("duration"));
@@ -128,24 +166,34 @@ public class CrmToolService {
                     String availJson = mapper.writeValueAsString(availBody);
                     yield post("/api/admin/ai/internal/availability", new HttpEntity<>(availJson, headers));
                 }
-                case "create_appointment" -> post("/api/admin/ai/internal/appointments", entity);
+                case "create_appointment" -> {
+                    Map<String, Object> aptBody = new java.util.LinkedHashMap<>(args);
+                    aptBody.put("tenantId", tenantId);
+                    if (args.get("staffId") != null && !String.valueOf(args.get("staffId")).isBlank()) {
+                        aptBody.put("staffId", validateIdArg("staffId", args.get("staffId")));
+                    }
+                    String aptJson = mapper.writeValueAsString(aptBody);
+                    yield post("/api/admin/ai/internal/appointments", new HttpEntity<>(aptJson, headers));
+                }
                 case "get_appointment" -> {
                     headers.set("X-Tenant-Id", tenantId);
-                    yield get("/api/admin/ai/internal/appointments/" + args.get("appointment_id"), Map.of(), headers);
+                    yield get("/api/admin/ai/internal/appointments/" + validateIdArg("appointment_id", args.get("appointment_id")), Map.of(), headers);
                 }
                 case "update_appointment" -> {
                     Map<String, Object> aptBody = new java.util.LinkedHashMap<>();
                     aptBody.put("tenantId", tenantId);
-                    aptBody.put("dateTime", args.get("dateTime"));
-                    aptBody.put("serviceName", args.get("serviceName"));
-                    aptBody.put("staffName", args.get("staffName"));
-                    aptBody.put("durationMinutes", args.get("durationMinutes"));
+                    if (args.get("date_time") != null) aptBody.put("dateTime", args.get("date_time"));
+                    if (args.get("service_name") != null) aptBody.put("serviceName", args.get("service_name"));
+                    if (args.get("staff_name") != null) aptBody.put("staffName", args.get("staff_name"));
+                    if (args.get("staff_id") != null && !String.valueOf(args.get("staff_id")).isBlank())
+                        aptBody.put("staffId", validateIdArg("staff_id", args.get("staff_id")));
+                    if (args.get("duration_minutes") != null) aptBody.put("durationMinutes", args.get("duration_minutes"));
                     String aptJson = mapper.writeValueAsString(aptBody);
-                    yield put("/api/admin/ai/internal/appointments/" + args.get("appointment_id"), new HttpEntity<>(aptJson, headers));
+                    yield put("/api/admin/ai/internal/appointments/" + validateIdArg("appointment_id", args.get("appointment_id")), new HttpEntity<>(aptJson, headers));
                 }
                 case "cancel_appointment" -> {
                     headers.set("X-Tenant-Id", tenantId);
-                    yield delete("/api/admin/ai/internal/appointments/" + args.get("appointment_id"), Map.of(), headers);
+                    yield delete("/api/admin/ai/internal/appointments/" + validateIdArg("appointment_id", args.get("appointment_id")), Map.of(), headers);
                 }
                 case "get_my_appointments" -> get("/api/admin/ai/internal/appointments/my", Map.of("tenantId", tenantId), headers);
                 case "manage_notifications" -> put("/api/admin/ai/internal/notifications/preferences", entity);
@@ -224,9 +272,9 @@ public class CrmToolService {
                     "query", Map.of("type", "string", "description", "Search query (name or phone). Empty string returns all.")
                 ), "required", List.of("query")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "get_contact", "description", "Get contact details by ID",
+                "name", "get_contact", "description", "Get CRM contact (client) details by numeric ID. NOT for branches or services.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
-                    "contact_id", Map.of("type", "string", "description", "Contact ID")
+                    "contact_id", Map.of("type", "string", "description", "Contact ID obtained from search_contacts, NOT a name")
                 ), "required", List.of("contact_id")))),
             Map.of("type", "function", "function", Map.of(
                 "name", "create_contact", "description", "Create a new contact",
@@ -278,9 +326,10 @@ public class CrmToolService {
                     "service_id", Map.of("type", "string", "description", "Service ID")
                 ), "required", List.of("service_id")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "search_staff", "description", "Search staff members by name or get all",
+                "name", "search_staff", "description", "Search staff members by name or by branch. Response contains 'id' (staff ID) and 'branchIds' (list of branches where this staff works).",
                 "parameters", Map.of("type", "object", "properties", Map.of(
-                    "query", Map.of("type", "string", "description", "Staff name or empty for all")
+                    "query", Map.of("type", "string", "description", "Staff name or empty for all"),
+                    "branch_id", Map.of("type", "string", "description", "Branch ID to filter staff working in this branch (optional)")
                 ), "required", List.of("query")))),
             Map.of("type", "function", "function", Map.of(
                 "name", "get_staff_schedule", "description", "Get staff schedule for a date",
@@ -294,8 +343,9 @@ public class CrmToolService {
                     "query", Map.of("type", "string", "description", "Resource name query or empty for all")
                 ), "required", List.of("query")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "get_branches", "description", "Get list of branches",
+                "name", "get_branches", "description", "Search branches by name (substring). Returns list of {id, name, address}. Use the 'id' field (NOT the name) as branchId for search_staff and create_appointment.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
+                    "query", Map.of("type", "string", "description", "Branch name substring (optional, empty returns all)")
                 ), "required", List.of()))),
             Map.of("type", "function", "function", Map.of(
                 "name", "get_instructions", "description", "Get step-by-step instructions for complex tasks",
@@ -303,23 +353,31 @@ public class CrmToolService {
                     "task", Map.of("type", "string", "description", "Task name e.g. create_appointment")
                 ), "required", List.of("task")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "check_availability", "description", "Check available time slots",
+                "name", "check_availability", "description", "Check if one specific time slot is available for a staff member. For finding free slots on a day use get_available_slots instead.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
-                    "staff_id", Map.of("type", "string", "description", "Staff ID"),
+                    "staff_id", Map.of("type", "string", "description", "Staff ID obtained from search_staff"),
                     "date", Map.of("type", "string", "description", "Date YYYY-MM-DD"),
                     "time", Map.of("type", "string", "description", "Start time HH:MM"),
                     "duration", Map.of("type", "integer", "description", "Duration in minutes"),
                     "resource_id", Map.of("type", "string", "description", "Resource ID (optional)")
+                ), "required", List.of("staff_id", "date", "time", "duration")))),
+            Map.of("type", "function", "function", Map.of(
+                "name", "get_available_slots", "description", "Get free time slots for a staff member on a given day. Returns array of {startTime, endTime} in HH:mm format. USE THIS tool for questions like 'when is the staff free', do NOT call check_availability for each hour separately.",
+                "parameters", Map.of("type", "object", "properties", Map.of(
+                    "staff_id", Map.of("type", "string", "description", "Staff ID obtained from search_staff"),
+                    "date", Map.of("type", "string", "description", "Date YYYY-MM-DD"),
+                    "duration", Map.of("type", "integer", "description", "Appointment duration in minutes (default 60)")
                 ), "required", List.of("staff_id", "date")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "create_appointment", "description", "Create an appointment",
+                "name", "create_appointment", "description", "Create an appointment. serviceName and staffName are matched by contains; for exact match use staffId.dateTime must be ISO with offset, e.g. 2026-07-10T14:00:00+03:00.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
                     "clientName", Map.of("type", "string", "description", "Client name"),
                     "clientPhone", Map.of("type", "string", "description", "Client phone"),
-                    "serviceName", Map.of("type", "string", "description", "Service name"),
+                    "serviceName", Map.of("type", "string", "description", "Service name (matched by contains)"),
                     "dateTime", Map.of("type", "string", "description", "ISO datetime e.g. 2026-06-20T14:00:00+03:00"),
-                    "staffName", Map.of("type", "string", "description", "Staff name (optional)"),
-                    "branchId", Map.of("type", "string", "description", "Branch ID (optional)"),
+                    "staffName", Map.of("type", "string", "description", "Staff name (optional, matched by contains)"),
+                    "staffId", Map.of("type", "string", "description", "Staff ID for exact match (recommended over staffName)"),
+                    "branchId", Map.of("type", "string", "description", "Branch ID obtained from get_branches (optional)"),
                     "resourceId", Map.of("type", "string", "description", "Resource ID (optional)"),
                     "durationMinutes", Map.of("type", "integer", "description", "Duration in minutes (default 60)")
                 ), "required", List.of("clientName", "serviceName", "dateTime")))),
@@ -329,13 +387,14 @@ public class CrmToolService {
                     "appointment_id", Map.of("type", "string", "description", "Appointment ID")
                 ), "required", List.of("appointment_id")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "update_appointment", "description", "Update appointment details",
+                "name", "update_appointment", "description", "Update appointment details.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
                     "appointment_id", Map.of("type", "string", "description", "Appointment ID"),
-                    "dateTime", Map.of("type", "string", "description", "New ISO datetime (optional)"),
-                    "serviceName", Map.of("type", "string", "description", "New service name (optional)"),
-                    "staffName", Map.of("type", "string", "description", "New staff name (optional)"),
-                    "durationMinutes", Map.of("type", "integer", "description", "New duration (optional)")
+                    "date_time", Map.of("type", "string", "description", "New ISO datetime (optional)"),
+                    "service_name", Map.of("type", "string", "description", "New service name (optional)"),
+                    "staff_name", Map.of("type", "string", "description", "New staff name (optional)"),
+                    "staff_id", Map.of("type", "string", "description", "New staff ID for exact match (optional)"),
+                    "duration_minutes", Map.of("type", "integer", "description", "New duration (optional)")
                 ), "required", List.of("appointment_id")))),
             Map.of("type", "function", "function", Map.of(
                 "name", "cancel_appointment", "description", "Cancel an appointment",

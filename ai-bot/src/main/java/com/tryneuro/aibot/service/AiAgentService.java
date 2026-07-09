@@ -54,6 +54,14 @@ public class AiAgentService {
         - Если что-то не найдено — ищи шире (пустой query) или предложи создать (если есть права)
         - После получения результатов инструментов — проанализируй и реши, нужны ли ещё шаги
         - Когда задача выполнена — дай ответ пользователю
+
+        Строгие правила использования инструментов:
+        - Поиск филиала по имени: get_branches(query="имя") -> возьми поле "id" из ответа (НЕ name).
+        - Мастера филиала: search_staff(query="", branch_id=<id>) -> возьми "id" мастера. В ответе также есть "branchIds" мастера.
+        - Свободное время мастера на день: get_available_slots(staff_id=<id>, date="YYYY-MM-DD") -> массив {startTime,endTime}. НЕ вызывай check_availability по каждому часу.
+        - Запись к мастеру: search_services(query="услуга") -> если нет -> add_service(name, duration_minutes) -> get_available_slots(staff_id, date) -> выбери слот -> create_appointment(clientName, serviceName, dateTime, staffId или staffName, branchId). dateTime в формате ISO с offset, например "2026-07-10T14:00:00+03:00".
+        - Все *_id и Id параметры — это ID полученный из search/get/get_branches, НЕ имена и НЕ названия. Никогда не подставляй текст в поля с суффиксом _id или Id.
+        - Если филиал не найден через get_branches -> скажи пользователю что такой филиал не найден, не угадывай.
         """;
 
     public AiAgentService(CrmToolService toolService, UserConfigService userConfigService,
