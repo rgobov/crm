@@ -7,6 +7,7 @@ import com.tryneuro.backend.service.*;
 import com.tryneuro.backend.repository.ContactRepository;
 import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.UserRepository;
+import com.tryneuro.backend.repository.BranchRepository;
 import com.tryneuro.backend.dto.DtoMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,8 @@ public class AiInternalController {
     private final ResourceService resourceService;
     private final RagSearchService ragSearchService;
     private final KnowledgeIngestService knowledgeIngestService;
+    private final BranchRepository branchRepository;
+    private final DateResolver dateResolver;
 
     @Value("${internal.api.secret:try-neuro-internal-secret-2026}")
     private String internalSecret;
@@ -221,8 +224,12 @@ public class AiInternalController {
         if (req.getClientName() == null || req.getClientName().isBlank()) {
             return ResponseEntity.badRequest().body("Client name is required");
         }
-        if (req.getDateTime() == null || req.getDateTime().isBlank()) {
-            return ResponseEntity.badRequest().body("Date time is required");
+        boolean hasDateTime = req.getDateTime() != null && !req.getDateTime().isBlank();
+        boolean hasAlt = req.getBranchId() != null && !req.getBranchId().isBlank()
+                && req.getDate() != null && !req.getDate().isBlank()
+                && req.getTime() != null && !req.getTime().isBlank();
+        if (!hasDateTime && !hasAlt) {
+            return ResponseEntity.badRequest().body("dateTime (ISO) OR (branchId + date + time) is required");
         }
 
         String contactId = req.getContactId();
@@ -284,9 +291,30 @@ public class AiInternalController {
 
         OffsetDateTime startTime;
         try {
-            startTime = OffsetDateTime.parse(req.getDateTime());
+            if (req.getDateTime() != null && !req.getDateTime().isBlank()) {
+                startTime = OffsetDateTime.parse(req.getDateTime());
+            } else if (req.getBranchId() != null && !req.getBranchId().isBlank()
+                    && req.getDate() != null && !req.getDate().isBlank()
+                    && req.getTime() != null && !req.getTime().isBlank()) {
+                Optional<Branch> branchOpt = branchRepository.findById(req.getBranchId());
+                if (branchOpt.isEmpty() || !tId.equals(branchOpt.get().getTenantId())) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Branch not found: " + req.getBranchId());
+                }
+                Branch branch = branchOpt.get();
+                LocalDate localDate = dateResolver.resolve(branch, req.getDate());
+                LocalTime localTime = LocalTime.parse(req.getTime());
+                java.time.ZoneId zoneId;
+                try {
+                    zoneId = java.time.ZoneId.of(branch.getTimezone());
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body("Invalid branch timezone: " + branch.getTimezone());
+                }
+                startTime = java.time.ZonedDateTime.of(localDate, localTime, zoneId).toOffsetDateTime();
+            } else {
+                return ResponseEntity.badRequest().body("dateTime (ISO) OR (branchId + date + time) is required");
+            }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid date time format: " + req.getDateTime());
+            return ResponseEntity.badRequest().body("Invalid date/time format: " + e.getMessage());
         }
 
         Integer duration = req.getDurationMinutes();
@@ -585,7 +613,14 @@ public class AiInternalController {
                             || (b.getAddress() != null && b.getAddress().toLowerCase().contains(q)))
                     .toList();
         }
-        return ResponseEntity.ok(branches.stream().map(DtoMapper::toDto).toList());
+        List<BranchDto> dtos = branches.stream().map(DtoMapper::toDto).toList();
+        List<String> timezones = dtos.stream().map(BranchDto::getTimezone).distinct().toList();
+        boolean ambiguous = timezones.size() > 1;
+        return ResponseEntity.ok(Map.of(
+                "branches", dtos,
+                "ambiguous", ambiguous,
+                "timezones", timezones
+        ));
     }
 
     @PostMapping("/availability/slots")
@@ -602,14 +637,81 @@ public class AiInternalController {
             return ResponseEntity.badRequest().body("date is required");
         }
         int duration = (req.getDuration() != null && req.getDuration() > 0) ? req.getDuration() : 60;
+        String branchId = req.getBranchId();
 
+        LocalDate date;
         try {
-            LocalDate date = LocalDate.parse(req.getDate());
-            List<Map<String, String>> slots = scheduleService.getAvailableSlots(tId, req.getStaffId(), date, duration);
-            return ResponseEntity.ok(Map.of("slots", slots));
+            if (isRelativeDate(req.getDate())) {
+                if (branchId == null || branchId.isBlank()) {
+                    return ResponseEntity.badRequest().body("branchId is required for relative date '" + req.getDate() + "'");
+                }
+                Optional<Branch> branchOpt = branchRepository.findById(branchId);
+                if (branchOpt.isEmpty() || !tId.equals(branchOpt.get().getTenantId())) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Branch not found: " + branchId);
+                }
+                date = dateResolver.resolve(branchOpt.get(), req.getDate());
+            } else {
+                date = LocalDate.parse(req.getDate());
+            }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid date format: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Invalid date: " + e.getMessage());
         }
+
+        List<Map<String, String>> slots = scheduleService.getAvailableSlotsForBranch(tId, req.getStaffId(), branchId, date, duration);
+        return ResponseEntity.ok(Map.of("slots", slots));
+    }
+
+    @PostMapping("/availability/branch-slots")
+    public ResponseEntity<?> getBranchStaffSlots(
+            @RequestBody AiBranchSlotsRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+
+        if (req.getBranchId() == null || req.getBranchId().isBlank()) {
+            return ResponseEntity.badRequest().body("branchId is required");
+        }
+        if (req.getDate() == null || req.getDate().isBlank()) {
+            return ResponseEntity.badRequest().body("date is required");
+        }
+        int duration = (req.getDuration() != null && req.getDuration() > 0) ? req.getDuration() : 60;
+
+        Optional<Branch> branchOpt = branchRepository.findById(req.getBranchId());
+        if (branchOpt.isEmpty() || !tId.equals(branchOpt.get().getTenantId())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Branch not found: " + req.getBranchId());
+        }
+        Branch branch = branchOpt.get();
+
+        LocalDate date;
+        try {
+            date = dateResolver.resolve(branch, req.getDate());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid date: " + e.getMessage());
+        }
+
+        List<StaffMember> staff = staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tId, req.getBranchId());
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        for (StaffMember s : staff) {
+            if (!s.isActive()) continue;
+            List<Map<String, String>> slots = scheduleService.getAvailableSlotsForBranch(tId, s.getId(), branch.getId(), date, duration);
+            result.add(Map.of(
+                    "staffId", s.getId(),
+                    "staffName", s.getName() != null ? s.getName() : "",
+                    "slots", slots
+            ));
+        }
+        return ResponseEntity.ok(Map.of(
+                "branchId", branch.getId(),
+                "branchName", branch.getName() != null ? branch.getName() : "",
+                "timezone", branch.getTimezone(),
+                "date", date.toString(),
+                "staff", result
+        ));
+    }
+
+    private boolean isRelativeDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) return false;
+        return !dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
     }
 
     @PostMapping("/availability")

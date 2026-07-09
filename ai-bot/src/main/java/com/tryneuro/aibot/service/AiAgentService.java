@@ -35,11 +35,10 @@ public class AiAgentService {
     private final MapResolverService actorResolver;
     private final RagService ragService;
     private final String scopeString;
+    private final int maxReactIterations;
+    private final long reactTimeoutMs;
 
     private final ConcurrentHashMap<String, GigaChatClient> clientCache = new ConcurrentHashMap<>();
-
-    private static final int MAX_REACT_ITERATIONS = 8;
-    private static final long REACT_TIMEOUT_MS = 30_000;
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         Ты — AI-ассистент CRM системы TryNeuro.
@@ -56,24 +55,31 @@ public class AiAgentService {
         - Когда задача выполнена — дай ответ пользователю
 
         Строгие правила использования инструментов:
-        - Поиск филиала по имени: get_branches(query="имя") -> возьми поле "id" из ответа (НЕ name).
-        - Мастера филиала: search_staff(query="", branch_id=<id>) -> возьми "id" мастера. В ответе также есть "branchIds" мастера.
-        - Свободное время мастера на день: get_available_slots(staff_id=<id>, date="YYYY-MM-DD") -> массив {startTime,endTime}. НЕ вызывай check_availability по каждому часу.
-        - Запись к мастеру: search_services(query="услуга") -> если нет -> add_service(name, duration_minutes) -> get_available_slots(staff_id, date) -> выбери слот -> create_appointment(clientName, serviceName, dateTime, staffId или staffName, branchId). dateTime в формате ISO с offset, например "2026-07-10T14:00:00+03:00".
-        - Все *_id и Id параметры — это ID полученный из search/get/get_branches, НЕ имена и НЕ названия. Никогда не подставляй текст в поля с суффиксом _id или Id.
+        - Дату всегда передавай tool'ам КАК ЕСТЬ: ISO (YYYY-MM-DD) ИЛИ ключевое слово (today, tomorrow, послезавтра, понедельник..воскресенье / пн..вс, next_monday, на_следующей_неделе, через_N_дней, 15_июля). Бэкенд сам вычислит дату по часовому поясу ФИЛИАЛА. НЕ считай даты сам.
+        - Поиск филиала по имени: get_branches(query="имя") -> возьми поле "id" (НЕ name) из массива branches.
+        - Если get_branches вернул "ambiguous":true или в "timezones" больше одного значения — филиалы в разных городах. Спроси пользователя какой город он имеет в виду. НЕ угадывай.
+        - Все мастера филиала и их свободное время ОДНИМ вызовом: get_branch_staff_slots(branch_id, date). НЕ вызывай get_available_slots для каждого мастера по отдельности.
+        - Свободное время ОДНОГО мастера: get_available_slots(staff_id, date, branch_id). Для относительной даты (tomorrow/понедельник) branch_id обязателен.
+        - Запись: search_services(query="услуга") -> если нет -> add_service(name, duration_minutes) -> get_branch_staff_slots или get_available_slots -> выбери слот -> create_appointment(clientName, serviceName, branch_id, date, time, staffId). ПРЕДПОЧТИТЕЛЬНО передавать branch_id+date+time (бэкенд соберёт datetime в tz филиала), а НЕ dateTime ISO.
+        - Все *_id и Id параметры — это ID полученный из search/get_branches, НЕ имена и НЕ названия. Никогда не подставляй текст в поля с суффиксом _id или Id.
         - Если филиал не найден через get_branches -> скажи пользователю что такой филиал не найден, не угадывай.
+        - Все действия — по часовому поясу филиала.
         """;
 
     public AiAgentService(CrmToolService toolService, UserConfigService userConfigService,
                           ObjectMapper mapper, MapResolverService actorResolver,
                           RagService ragService,
-                          @Value("${gigachat.scope:GIGACHAT_API_PERS}") String scopeString) {
+                          @Value("${gigachat.scope:GIGACHAT_API_PERS}") String scopeString,
+                          @Value("${react.max.iterations:15}") int maxReactIterations,
+                          @Value("${react.timeout.ms:90000}") long reactTimeoutMs) {
         this.toolService = toolService;
         this.userConfigService = userConfigService;
         this.mapper = mapper;
         this.actorResolver = actorResolver;
         this.ragService = ragService;
         this.scopeString = scopeString;
+        this.maxReactIterations = maxReactIterations;
+        this.reactTimeoutMs = reactTimeoutMs;
     }
 
     private GigaChatClient getOrCreateClient(String authKey) {
@@ -128,17 +134,17 @@ public class AiAgentService {
         }
 
         List<ChatMessage> messages = buildGigaChatMessages(history);
-        List<ChatFunction> functions = buildGigaChatFunctions(tenantId, actorHeaders);
-        log.info("processMessage chat_id={}: {} chat functions registered", chatId, functions.size());
+        List<ChatFunction> functions = buildGigaChatFunctions(role);
+        log.info("processMessage chat_id={}: role={}, {} chat functions registered", chatId, role, functions.size());
 
         GigaChatClient client = getOrCreateClient(cfg.apiKey());
 
         long startTime = System.currentTimeMillis();
 
-        for (int iter = 0; iter < MAX_REACT_ITERATIONS; iter++) {
-            if (System.currentTimeMillis() - startTime > REACT_TIMEOUT_MS) {
+        for (int iter = 0; iter < maxReactIterations; iter++) {
+            if (System.currentTimeMillis() - startTime > reactTimeoutMs) {
                 log.warn("processMessage chat_id={}: ReAct timeout after {} iterations", chatId, iter);
-                return "⚠️ Превышено время ожидания ответа. Попробуйте упростить запрос.";
+                break;
             }
 
             try {
@@ -173,10 +179,14 @@ public class AiAgentService {
                     String toolResult = toolService.executeTool(toolName, toolArgs, tenantId, actorHeaders);
                     log.info("processMessage chat_id={}: tool result len={}", chatId, toolResult != null ? toolResult.length() : 0);
 
+                    String functionContent = toolResult != null ? toolResult : "{}";
+                    if (toolResult != null && toolResult.contains("\"error\"")) {
+                        functionContent = functionContent + "\n\nПодсказка: проверь аргументы, особенно *_id — нужны ID полученные из search/get_branches tools, а не имена. Не повторяй вызов с теми же аргументами. Если нужна дата — передавай ключевое слово (tomorrow/понедельник) или ISO.";
+                    }
                     messages.add(ChatMessage.builder()
                             .role(ChatMessageRole.FUNCTION)
                             .name(toolName)
-                            .content(toolResult != null ? toolResult : "{}")
+                            .content(functionContent)
                             .build());
                 } else {
                     String content = responseMsg.content();
@@ -200,8 +210,34 @@ public class AiAgentService {
             }
         }
 
-        log.warn("processMessage chat_id={}: ReAct loop exhausted", chatId);
-        return "⚠️ Не удалось получить ответ за допустимое количество шагов.";
+        log.warn("processMessage chat_id={}: ReAct loop exhausted after {} iterations, attempting partial fallback", chatId, maxReactIterations);
+        String partial = tryPartialFallback(client, modelName, systemPrompt, messages, chatId);
+        return partial != null ? partial : "⚠️ Не удалось получить ответ за допустимое количество шагов. Уточните запрос или спросите позже.";
+    }
+
+    String tryPartialFallback(GigaChatClient client, String modelName, String systemPrompt,
+                                      List<ChatMessage> messages, long chatId) {
+        if (messages.size() <= 1) return null;
+        try {
+            List<ChatMessage> fallbackMessages = new ArrayList<>(messages);
+            fallbackMessages.add(ChatMessage.builder()
+                    .role(ChatMessageRole.USER)
+                    .content("Сформулируй краткий ответ пользователю на русском на основе найденных данных из инструментов выше. Без извинений и без упоминания инструментов. Если данных недостаточно — кратко скажи что именно не удалось найти.")
+                    .build());
+            CompletionRequest request = CompletionRequest.builder()
+                    .model(modelName)
+                    .messages(prependSystem(systemPrompt, fallbackMessages))
+                    .functionCall("none")
+                    .build();
+            CompletionResponse response = client.completions(request);
+            if (response.choices() == null || response.choices().isEmpty()) return null;
+            String content = response.choices().get(0).message().content();
+            log.info("processMessage chat_id={}: partial fallback produced len={}", chatId, content != null ? content.length() : 0);
+            return content;
+        } catch (Exception e) {
+            log.warn("processMessage chat_id={}: partial fallback failed: {}", chatId, e.getMessage());
+            return null;
+        }
     }
 
     private List<ChatMessage> buildGigaChatMessages(List<Map<String, String>> history) {
@@ -235,9 +271,11 @@ public class AiAgentService {
         return result;
     }
 
-    private List<ChatFunction> buildGigaChatFunctions(String tenantId, Map<String, String> actorHeaders) {
+    List<ChatFunction> buildGigaChatFunctions(String role) {
+        java.util.Set<String> allowed = toolService.toolsForRole(role);
         List<ChatFunction> functions = new ArrayList<>();
         for (CrmToolService.ToolDef def : toolService.getToolDefinitions()) {
+            if (!allowed.contains(def.name())) continue;
             functions.add(toChatFunction(def));
         }
         return functions;

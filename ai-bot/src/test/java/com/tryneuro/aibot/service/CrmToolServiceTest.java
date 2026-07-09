@@ -32,10 +32,10 @@ class CrmToolServiceTest {
     }
 
     @Test
-    @DisplayName("getToolSchemas возвращает 25 схем инструментов")
-    void getToolSchemasReturns25Schemas() {
+    @DisplayName("getToolSchemas возвращает 26 схем инструментов")
+    void getToolSchemasReturns26Schemas() {
         List<Map<String, Object>> schemas = crmToolService.getToolSchemas();
-        assertEquals(25, schemas.size());
+        assertEquals(26, schemas.size());
     }
 
     @Test
@@ -70,14 +70,14 @@ class CrmToolServiceTest {
             .map(f -> (String) f.get("name"))
             .distinct()
             .count();
-        assertEquals(25, distinctCount);
+        assertEquals(26, distinctCount);
     }
 
     @Test
-    @DisplayName("getToolDefinitions возвращает 25 определений")
-    void getToolDefinitionsReturns25Defs() {
+    @DisplayName("getToolDefinitions возвращает 26 определений")
+    void getToolDefinitionsReturns26Defs() {
         List<CrmToolService.ToolDef> defs = crmToolService.getToolDefinitions();
-        assertEquals(25, defs.size());
+        assertEquals(26, defs.size());
     }
 
     @Test
@@ -273,5 +273,98 @@ class CrmToolServiceTest {
         verifyNoInteractions(rest);
         assertNotNull(result);
         assertTrue(result.contains("error"));
+    }
+
+    @Test
+    @DisplayName("get_branch_staff_slots присутствует в схемах")
+    void toolSchemaGetBranchStaffSlotsExists() {
+        boolean found = crmToolService.getToolSchemas().stream()
+            .map(s -> (Map<String, Object>) s.get("function"))
+            .anyMatch(f -> "get_branch_staff_slots".equals(f.get("name")));
+        assertTrue(found, "get_branch_staff_slots tool should be present");
+    }
+
+    @Test
+    @DisplayName("executeTool get_branch_staff_slots вызывает POST /availability/branch-slots")
+    void getBranchStaffSlotsPostsToBranchSlotsEndpoint() {
+        when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+            .thenReturn("{\"staff\":[]}");
+
+        Map<String, Object> args = Map.of("branch_id", "b1", "date", "tomorrow", "duration", 60);
+        crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
+
+        ArgumentCaptor<String> urlCap = ArgumentCaptor.forClass(String.class);
+        verify(rest).postForObject(urlCap.capture(), any(HttpEntity.class), eq(String.class));
+        assertTrue(urlCap.getValue().endsWith("/availability/branch-slots"));
+    }
+
+    @Test
+    @DisplayName("executeTool get_branch_staff_slots передаёт branchId/date/duration в body")
+    void getBranchStaffSlotsSendsBody() {
+        when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+            .thenReturn("{}");
+
+        Map<String, Object> args = Map.of("branch_id", "b1", "date", "tomorrow");
+        crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
+
+        ArgumentCaptor<HttpEntity<String>> entityCap = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(rest).postForObject(anyString(), entityCap.capture(), eq(String.class));
+        String body = entityCap.getValue().getBody();
+        assertNotNull(body);
+        assertTrue(body.contains("\"branchId\":\"b1\""));
+        assertTrue(body.contains("\"date\":\"tomorrow\""));
+        assertTrue(body.contains("\"duration\":60"));
+    }
+
+    @Test
+    @DisplayName("toolsForRole(CLIENT) не содержит create_contact и содержит manage_notifications")
+    void toolsForRoleClientExcludesContactManagement() {
+        java.util.Set<String> clientTools = crmToolService.toolsForRole("CLIENT");
+        assertFalse(clientTools.contains("create_contact"));
+        assertFalse(clientTools.contains("update_contact"));
+        assertFalse(clientTools.contains("delete_contact"));
+        assertFalse(clientTools.contains("add_service"));
+        assertFalse(clientTools.contains("delete_service"));
+        assertFalse(clientTools.contains("get_report"));
+        assertTrue(clientTools.contains("manage_notifications"));
+        assertTrue(clientTools.contains("create_appointment"));
+        assertTrue(clientTools.contains("get_branch_staff_slots"));
+    }
+
+    @Test
+    @DisplayName("toolsForRole(EMPLOYEE) не содержит add_service/get_report но содержит create_appointment")
+    void toolsForRoleEmployeeExcludesServiceManagement() {
+        java.util.Set<String> empTools = crmToolService.toolsForRole("EMPLOYEE");
+        assertFalse(empTools.contains("add_service"));
+        assertFalse(empTools.contains("update_service"));
+        assertFalse(empTools.contains("delete_service"));
+        assertFalse(empTools.contains("get_report"));
+        assertFalse(empTools.contains("create_contact"));
+        assertTrue(empTools.contains("create_appointment"));
+        assertTrue(empTools.contains("get_contact"));
+        assertTrue(empTools.contains("get_branch_staff_slots"));
+    }
+
+    @Test
+    @DisplayName("toolsForRole(ADMIN) и (MANAGER) содержат 25 tools (все кроме manage_notifications) включая create_contact и get_report")
+    void toolsForRoleAdminManagerAllTools() {
+        java.util.Set<String> adminTools = crmToolService.toolsForRole("ADMIN");
+        java.util.Set<String> managerTools = crmToolService.toolsForRole("MANAGER");
+        assertEquals(25, adminTools.size());
+        assertEquals(25, managerTools.size());
+        assertTrue(adminTools.contains("create_contact"));
+        assertTrue(adminTools.contains("get_report"));
+        assertTrue(adminTools.contains("get_branch_staff_slots"));
+        assertFalse(adminTools.contains("manage_notifications"));
+        assertTrue(managerTools.contains("delete_contact"));
+        assertFalse(managerTools.contains("manage_notifications"));
+    }
+
+    @Test
+    @DisplayName("toolsForRole(null) возвращает CLIENT набор")
+    void toolsForRoleNullReturnsClient() {
+        java.util.Set<String> tools = crmToolService.toolsForRole(null);
+        assertFalse(tools.contains("create_contact"));
+        assertTrue(tools.contains("get_branch_staff_slots"));
     }
 }

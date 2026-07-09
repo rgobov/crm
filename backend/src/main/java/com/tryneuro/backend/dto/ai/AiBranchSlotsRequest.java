@@ -7,10 +7,9 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class AiSlotsRequest {
+public class AiBranchSlotsRequest {
     private String tenantId;
-    private String staffId;
+    private String branchId;
     private String date;
     private Integer duration;
-    private String branchId;
 }

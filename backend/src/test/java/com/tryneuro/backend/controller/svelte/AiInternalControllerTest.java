@@ -37,6 +37,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.hamcrest.Matchers;
+
 @SpringBootTest
 @AutoConfigureWebMvc
 @ActiveProfiles("test")
@@ -50,6 +52,7 @@ public class AiInternalControllerTest {
     @MockBean private StaffMemberRepository staffMemberRepository;
     @MockBean private AppServiceService appServiceService;
     @MockBean private ScheduleService scheduleService;
+    @MockBean private com.tryneuro.backend.repository.BranchRepository branchRepository;
 
     private MockMvc mockMvc;
     private final String testSecret = "test-secret-key";
@@ -82,9 +85,9 @@ public class AiInternalControllerTest {
                 .header("X-Internal-Secret", testSecret)
                 .header("X-Tenant-Id", tenantId))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].id").value("b1"))
-            .andExpect(jsonPath("$[0].name").value("Виртуальный"));
+            .andExpect(jsonPath("$.branches.length()").value(1))
+            .andExpect(jsonPath("$.branches[0].id").value("b1"))
+            .andExpect(jsonPath("$.branches[0].name").value("Виртуальный"));
     }
 
     @Test
@@ -97,7 +100,7 @@ public class AiInternalControllerTest {
                 .header("X-Internal-Secret", testSecret)
                 .header("X-Tenant-Id", tenantId))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2));
+            .andExpect(jsonPath("$.branches.length()").value(2));
     }
 
     @Test
@@ -164,7 +167,7 @@ public class AiInternalControllerTest {
     @Test
     @DisplayName("POST /availability/slots возвращает массив слотов")
     void availabilitySlotsReturnsSlotsList() throws Exception {
-        when(scheduleService.getAvailableSlots(eq(tenantId), eq("s1"), any(LocalDate.class), eq(60)))
+        when(scheduleService.getAvailableSlotsForBranch(eq(tenantId), eq("s1"), org.mockito.ArgumentMatchers.isNull(), any(LocalDate.class), eq(60)))
             .thenReturn(List.of(
                 Map.of("startTime", "09:00", "endTime", "10:00"),
                 Map.of("startTime", "10:00", "endTime", "11:00")
@@ -227,5 +230,142 @@ public class AiInternalControllerTest {
             .andExpect(status().isBadRequest());
 
         verify(staffMemberService).getStaffMemberById("s1");
+    }
+
+    @Test
+    @DisplayName("POST /availability/branch-slots возвращает мастеров со слотами (abs date)")
+    void branchSlotsReturnsStaffWithSlots() throws Exception {
+        com.tryneuro.backend.model.Branch branch = branch("b1", "Виртуальный");
+        when(branchRepository.findById("b1")).thenReturn(Optional.of(branch));
+        StaffMember s = new StaffMember();
+        s.setId("s1");
+        s.setName("Маша");
+        s.setTenantId(tenantId);
+        s.setActive(true);
+        when(staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tenantId, "b1"))
+            .thenReturn(List.of(s));
+        when(scheduleService.getAvailableSlotsForBranch(eq(tenantId), eq("s1"), eq("b1"), any(LocalDate.class), eq(60)))
+            .thenReturn(List.of(Map.of("startTime", "09:00", "endTime", "10:00")));
+
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "branchId", "b1", "date", "2026-07-10", "duration", 60));
+
+        mockMvc.perform(post("/api/admin/ai/internal/availability/branch-slots")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.branchId").value("b1"))
+            .andExpect(jsonPath("$.timezone").value("Europe/Moscow"))
+            .andExpect(jsonPath("$.staff[0].staffId").value("s1"))
+            .andExpect(jsonPath("$.staff[0].staffName").value("Маша"))
+            .andExpect(jsonPath("$.staff[0].slots[0].startTime").value("09:00"));
+    }
+
+    @Test
+    @DisplayName("POST /availability/branch-slots с relative date 'tomorrow' резолвится через tz филиала")
+    void branchSlotsRelativeDateResolved() throws Exception {
+        com.tryneuro.backend.model.Branch branch = branch("b1", "Виртуальный");
+        when(branchRepository.findById("b1")).thenReturn(Optional.of(branch));
+        when(staffMemberRepository.findByTenantIdAndBranchIdWithBranches(tenantId, "b1"))
+            .thenReturn(List.of());
+        when(scheduleService.getAvailableSlotsForBranch(eq(tenantId), anyString(), eq("b1"), any(LocalDate.class), eq(60)))
+            .thenReturn(List.of());
+
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "branchId", "b1", "date", "tomorrow"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/availability/branch-slots")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.date").exists());
+    }
+
+    @Test
+    @DisplayName("POST /availability/branch-slots без branchId возвращает 400")
+    void branchSlotsRejectMissingBranchId() throws Exception {
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "date", "2026-07-10"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/availability/branch-slots")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /availability/branch-slots с несуществующим branchId возвращает 404")
+    void branchSlotsUnknownBranchReturns404() throws Exception {
+        when(branchRepository.findById("unknown")).thenReturn(Optional.empty());
+
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "branchId", "unknown", "date", "2026-07-10"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/availability/branch-slots")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("POST /availability/slots с relative date и без branchId возвращает 400")
+    void slotsRelativeDateWithoutBranchIdReturns400() throws Exception {
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "staffId", "s1", "date", "tomorrow"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/availability/slots")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("POST /appointments с branchId+date+time собирает OffsetDateTime в tz филиала")
+    void createAppointmentWithBranchDateAndTime() throws Exception {
+        com.tryneuro.backend.model.Branch branch = branch("b1", "Виртуальный");
+        Service svc = new Service();
+        svc.setId("svc1");
+        svc.setName("Стрижка");
+        svc.setDurationInMinutes(30);
+        svc.setTenantId(tenantId);
+
+        when(branchRepository.findById("b1")).thenReturn(Optional.of(branch));
+        when(appServiceService.getAllServices(tenantId)).thenReturn(List.of(svc));
+        when(scheduleService.addAppointment(any(), any(), anyBoolean()))
+            .thenThrow(new RuntimeException("simulated"));
+
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "clientName", "Иван", "serviceName", "Стрижка",
+            "branchId", "b1", "date", "2026-07-10", "time", "14:00"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/appointments")
+                .header("X-Internal-Secret", testSecret)
+                .header("X-Actor-Role", "ADMIN")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest());
+
+        verify(branchRepository).findById("b1");
+    }
+
+    @Test
+    @DisplayName("GET /branches с разными timezone возвращает ambiguous=true")
+    void getBranchesWithDifferentTimezonesIsAmbiguous() throws Exception {
+        com.tryneuro.backend.model.Branch b1 = branch("b1", "Москва");
+        com.tryneuro.backend.model.Branch b2 = branch("b2", "Владивосток");
+        b2.setTimezone("Asia/Vladivostok");
+        when(branchService.getBranches(tenantId)).thenReturn(List.of(b1, b2));
+
+        mockMvc.perform(get("/api/admin/ai/internal/branches")
+                .header("X-Internal-Secret", testSecret)
+                .header("X-Tenant-Id", tenantId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.ambiguous").value(true))
+            .andExpect(jsonPath("$.timezones.length()").value(2));
     }
 }

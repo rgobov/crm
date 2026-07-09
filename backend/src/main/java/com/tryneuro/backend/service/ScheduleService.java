@@ -380,12 +380,22 @@ public class ScheduleService {
     }
 
     public java.util.List<java.util.Map<String, String>> getAvailableSlots(String tenantId, String staffId, LocalDate date, int duration) {
-        List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staffId, date);
-        if (shifts.isEmpty()) {
+        return getAvailableSlotsForBranch(tenantId, staffId, null, date, duration);
+    }
+
+    public java.util.List<java.util.Map<String, String>> getAvailableSlotsForBranch(String tenantId, String staffId, String branchId, LocalDate date, int duration) {
+        java.util.Optional<StaffShift> shiftOpt;
+        if (branchId != null && !branchId.isBlank()) {
+            shiftOpt = staffShiftRepository.findByStaffIdAndDateAndBranchId(staffId, date, branchId);
+        } else {
+            List<StaffShift> shifts = staffShiftRepository.findByStaffIdAndDate(staffId, date);
+            shiftOpt = shifts.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(shifts.get(0));
+        }
+        if (shiftOpt.isEmpty()) {
             return List.of();
         }
-        StaffShift shift = shifts.stream().filter(s -> !s.isDayOff()).findFirst().orElse(null);
-        if (shift == null) {
+        StaffShift shift = shiftOpt.get();
+        if (shift.isDayOff()) {
             return List.of();
         }
         LocalTime workStart = shift.getWorkStartTime();

@@ -17,6 +17,8 @@ public class AiCreateAppointmentRequest {
     private String staffId;
     private String branchId;
     private String dateTime;
+    private String date;
+    private String time;
     private Integer durationMinutes;
     private String resourceId;
 }

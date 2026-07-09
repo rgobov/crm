@@ -143,8 +143,21 @@ public class CrmToolService {
                     slotsBody.put("date", args.get("date"));
                     Object dur = args.get("duration");
                     slotsBody.put("duration", dur != null ? dur : 60);
+                    if (args.get("branch_id") != null && !String.valueOf(args.get("branch_id")).isBlank()) {
+                        slotsBody.put("branchId", validateIdArg("branch_id", args.get("branch_id")));
+                    }
                     String slotsJson = mapper.writeValueAsString(slotsBody);
                     yield post("/api/admin/ai/internal/availability/slots", new HttpEntity<>(slotsJson, headers));
+                }
+                case "get_branch_staff_slots" -> {
+                    Map<String, Object> bsBody = new java.util.LinkedHashMap<>();
+                    bsBody.put("tenantId", tenantId);
+                    bsBody.put("branchId", validateIdArg("branch_id", args.get("branch_id")));
+                    bsBody.put("date", args.get("date"));
+                    Object bdur = args.get("duration");
+                    bsBody.put("duration", bdur != null ? bdur : 60);
+                    String bsJson = mapper.writeValueAsString(bsBody);
+                    yield post("/api/admin/ai/internal/availability/branch-slots", new HttpEntity<>(bsJson, headers));
                 }
                 case "search_resources" -> post("/api/admin/ai/internal/resources/search", entity);
                 case "get_branches" -> {
@@ -167,11 +180,24 @@ public class CrmToolService {
                     yield post("/api/admin/ai/internal/availability", new HttpEntity<>(availJson, headers));
                 }
                 case "create_appointment" -> {
-                    Map<String, Object> aptBody = new java.util.LinkedHashMap<>(args);
+                    Map<String, Object> aptBody = new java.util.LinkedHashMap<>();
                     aptBody.put("tenantId", tenantId);
+                    aptBody.put("clientName", args.get("clientName"));
+                    aptBody.put("clientPhone", args.get("clientPhone"));
+                    aptBody.put("contactId", args.get("contactId"));
+                    aptBody.put("serviceName", args.get("serviceName"));
+                    aptBody.put("staffName", args.get("staffName"));
                     if (args.get("staffId") != null && !String.valueOf(args.get("staffId")).isBlank()) {
                         aptBody.put("staffId", validateIdArg("staffId", args.get("staffId")));
                     }
+                    if (args.get("branch_id") != null && !String.valueOf(args.get("branch_id")).isBlank()) {
+                        aptBody.put("branchId", validateIdArg("branch_id", args.get("branch_id")));
+                    }
+                    aptBody.put("dateTime", args.get("dateTime"));
+                    aptBody.put("date", args.get("date"));
+                    aptBody.put("time", args.get("time"));
+                    aptBody.put("resourceId", args.get("resourceId"));
+                    aptBody.put("durationMinutes", args.get("durationMinutes"));
                     String aptJson = mapper.writeValueAsString(aptBody);
                     yield post("/api/admin/ai/internal/appointments", new HttpEntity<>(aptJson, headers));
                 }
@@ -264,6 +290,42 @@ public class CrmToolService {
         }).toList();
     }
 
+    private static final java.util.Set<String> ADMIN_MANAGER_TOOLS = java.util.Set.of(
+        "search_contacts", "get_contact", "create_contact", "update_contact", "delete_contact",
+        "search_services", "add_service", "update_service", "delete_service",
+        "search_staff", "get_staff_schedule", "search_resources",
+        "get_branches", "get_instructions", "check_availability", "get_available_slots",
+        "get_branch_staff_slots", "create_appointment", "get_appointment", "update_appointment",
+        "cancel_appointment", "get_my_appointments", "get_report",
+        "search_knowledge", "search_knowledge_rag"
+    );
+
+    private static final java.util.Set<String> EMPLOYEE_TOOLS = java.util.Set.of(
+        "search_contacts", "get_contact",
+        "search_services", "search_staff", "get_staff_schedule", "search_resources",
+        "get_branches", "get_instructions", "check_availability", "get_available_slots",
+        "get_branch_staff_slots", "create_appointment", "get_appointment", "update_appointment",
+        "cancel_appointment", "get_my_appointments",
+        "search_knowledge", "search_knowledge_rag"
+    );
+
+    private static final java.util.Set<String> CLIENT_TOOLS = java.util.Set.of(
+        "search_services", "search_staff", "get_staff_schedule",
+        "get_branches", "get_instructions", "check_availability", "get_available_slots",
+        "get_branch_staff_slots", "create_appointment", "get_appointment", "update_appointment",
+        "cancel_appointment", "get_my_appointments", "manage_notifications",
+        "search_knowledge", "search_knowledge_rag"
+    );
+
+    public java.util.Set<String> toolsForRole(String role) {
+        if (role == null) return CLIENT_TOOLS;
+        return switch (role.toUpperCase(java.util.Locale.ROOT)) {
+            case "ADMIN", "MANAGER" -> ADMIN_MANAGER_TOOLS;
+            case "EMPLOYEE" -> EMPLOYEE_TOOLS;
+            default -> CLIENT_TOOLS;
+        };
+    }
+
     public List<Map<String, Object>> getToolSchemas() {
         return List.of(
             Map.of("type", "function", "function", Map.of(
@@ -343,7 +405,7 @@ public class CrmToolService {
                     "query", Map.of("type", "string", "description", "Resource name query or empty for all")
                 ), "required", List.of("query")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "get_branches", "description", "Search branches by name (substring). Returns list of {id, name, address}. Use the 'id' field (NOT the name) as branchId for search_staff and create_appointment.",
+                "name", "get_branches", "description", "Search branches by name (substring). Response: {branches:[{id,name,address,timezone}], ambiguous, timezones}. If ambiguous=true there are branches in different cities/timezones. Use the 'id' field (NOT the name) as branch_id. If ambiguous — ask the user which city they mean, do not guess.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
                     "query", Map.of("type", "string", "description", "Branch name substring (optional, empty returns all)")
                 ), "required", List.of()))),
@@ -362,25 +424,35 @@ public class CrmToolService {
                     "resource_id", Map.of("type", "string", "description", "Resource ID (optional)")
                 ), "required", List.of("staff_id", "date", "time", "duration")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "get_available_slots", "description", "Get free time slots for a staff member on a given day. Returns array of {startTime, endTime} in HH:mm format. USE THIS tool for questions like 'when is the staff free', do NOT call check_availability for each hour separately.",
+                "name", "get_available_slots", "description", "Get free time slots for a staff member on a given day. Returns {slots:[{startTime, endTime}]} in HH:mm format. date may be ISO (YYYY-MM-DD) OR a keyword (today, tomorrow, понедельник, next_friday, на_следующей_неделе, через_N_дней, 15_июля). For relative dates branch_id is required so the backend computes the date in the BRANCH timezone. Do NOT call check_availability for each hour.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
                     "staff_id", Map.of("type", "string", "description", "Staff ID obtained from search_staff"),
-                    "date", Map.of("type", "string", "description", "Date YYYY-MM-DD"),
+                    "date", Map.of("type", "string", "description", "Date ISO (YYYY-MM-DD) OR keyword: today, tomorrow, понедельник, next_friday, на_следующей_неделе, через_N_дней, 15_июля"),
+                    "branch_id", Map.of("type", "string", "description", "Branch ID. Required for relative date keywords (branch timezone)."),
                     "duration", Map.of("type", "integer", "description", "Appointment duration in minutes (default 60)")
                 ), "required", List.of("staff_id", "date")))),
             Map.of("type", "function", "function", Map.of(
-                "name", "create_appointment", "description", "Create an appointment. serviceName and staffName are matched by contains; for exact match use staffId.dateTime must be ISO with offset, e.g. 2026-07-10T14:00:00+03:00.",
+                "name", "get_branch_staff_slots", "description", "Get ALL staff members of a branch with their free slots in ONE call. Returns {branchId, branchName, timezone, date, staff:[{staffId, staffName, slots:[{startTime,endTime}]}]}. date may be ISO OR keyword (today, tomorrow, понедельник, next_friday, на_следующей_неделе, через_N_дней, 15_июля) — backend resolves it in the BRANCH timezone. USE THIS for 'when are masters free tomorrow in branch X' instead of calling get_available_slots for each master.",
                 "parameters", Map.of("type", "object", "properties", Map.of(
-                    "clientName", Map.of("type", "string", "description", "Client name"),
-                    "clientPhone", Map.of("type", "string", "description", "Client phone"),
-                    "serviceName", Map.of("type", "string", "description", "Service name (matched by contains)"),
-                    "dateTime", Map.of("type", "string", "description", "ISO datetime e.g. 2026-06-20T14:00:00+03:00"),
-                    "staffName", Map.of("type", "string", "description", "Staff name (optional, matched by contains)"),
-                    "staffId", Map.of("type", "string", "description", "Staff ID for exact match (recommended over staffName)"),
-                    "branchId", Map.of("type", "string", "description", "Branch ID obtained from get_branches (optional)"),
-                    "resourceId", Map.of("type", "string", "description", "Resource ID (optional)"),
-                    "durationMinutes", Map.of("type", "integer", "description", "Duration in minutes (default 60)")
-                ), "required", List.of("clientName", "serviceName", "dateTime")))),
+                    "branch_id", Map.of("type", "string", "description", "Branch ID obtained from get_branches"),
+                    "date", Map.of("type", "string", "description", "Date ISO (YYYY-MM-DD) OR keyword: today, tomorrow, понедельник, next_friday, на_следующей_неделе, через_N_дней, 15_июля"),
+                    "duration", Map.of("type", "integer", "description", "Appointment duration in minutes (default 60)")
+                ), "required", List.of("branch_id", "date")))),
+            Map.of("type", "function", "function", Map.of(
+                "name", "create_appointment", "description", "Create an appointment. serviceName and staffName are matched by contains; for exact match use staffId. PREFERRED way to set the time: pass branch_id + date (ISO OR keyword like tomorrow/понедельник) + time (HH:mm from a slot) — the backend assembles the datetime in the BRANCH timezone, so you do NOT compute offsets. Alternative: dateTime as ISO with offset, e.g. 2026-07-10T14:00:00+03:00.",
+                "parameters", Map.of("type", "object", "properties", java.util.Map.ofEntries(
+                    java.util.Map.entry("clientName", Map.of("type", "string", "description", "Client name")),
+                    java.util.Map.entry("clientPhone", Map.of("type", "string", "description", "Client phone")),
+                    java.util.Map.entry("serviceName", Map.of("type", "string", "description", "Service name (matched by contains)")),
+                    java.util.Map.entry("dateTime", Map.of("type", "string", "description", "ISO datetime e.g. 2026-06-20T14:00:00+03:00 (alternative to branch_id+date+time)")),
+                    java.util.Map.entry("branch_id", Map.of("type", "string", "description", "Branch ID obtained from get_branches. Use with date+time for reliable timezone.")),
+                    java.util.Map.entry("date", Map.of("type", "string", "description", "Date ISO (YYYY-MM-DD) OR keyword (today, tomorrow, понедельник, next_friday). Use with branch_id+time.")),
+                    java.util.Map.entry("time", Map.of("type", "string", "description", "Start time HH:mm (e.g. 14:00). Use with branch_id+date.")),
+                    java.util.Map.entry("staffName", Map.of("type", "string", "description", "Staff name (optional, matched by contains)")),
+                    java.util.Map.entry("staffId", Map.of("type", "string", "description", "Staff ID for exact match (recommended over staffName)")),
+                    java.util.Map.entry("resourceId", Map.of("type", "string", "description", "Resource ID (optional)")),
+                    java.util.Map.entry("durationMinutes", Map.of("type", "integer", "description", "Duration in minutes (default 60)"))
+                ), "required", List.of("clientName", "serviceName")))),
             Map.of("type", "function", "function", Map.of(
                 "name", "get_appointment", "description", "Get appointment details by ID",
                 "parameters", Map.of("type", "object", "properties", Map.of(
