@@ -368,4 +368,75 @@ public class AiInternalControllerTest {
             .andExpect(jsonPath("$.ambiguous").value(true))
             .andExpect(jsonPath("$.timezones.length()").value(2));
     }
+
+    @Test
+    @DisplayName("POST /branches/resolve находит филиал по имени и возвращает branchId")
+    void resolveBranchReturnsExactId() throws Exception {
+        when(branchService.getBranches(tenantId))
+            .thenReturn(List.of(branch("b1", "Виртуальный"), branch("b2", "Центр")));
+
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "query", "виртуальный"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/branches/resolve")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matched").value(true))
+            .andExpect(jsonPath("$.ambiguous").value(false))
+            .andExpect(jsonPath("$.branchId").value("b1"))
+            .andExpect(jsonPath("$.branchName").value("Виртуальный"))
+            .andExpect(jsonPath("$.timezone").value("Europe/Moscow"));
+    }
+
+    @Test
+    @DisplayName("POST /branches/resolve с разными tz возвращает ambiguous=true")
+    void resolveBranchAmbiguousReturnsBranches() throws Exception {
+        com.tryneuro.backend.model.Branch b1 = branch("b1", "Виртуальный");
+        com.tryneuro.backend.model.Branch b2 = branch("b2", "Вирт");
+        b2.setTimezone("Asia/Vladivostok");
+        when(branchService.getBranches(tenantId)).thenReturn(List.of(b1, b2));
+
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "query", "вирт"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/branches/resolve")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matched").value(true))
+            .andExpect(jsonPath("$.ambiguous").value(true))
+            .andExpect(jsonPath("$.branches.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("POST /branches/resolve без совпадений возвращает matched=false")
+    void resolveBranchNotFoundReturnsMatchedFalse() throws Exception {
+        when(branchService.getBranches(tenantId))
+            .thenReturn(List.of(branch("b1", "Центр")));
+
+        String body = objectMapper.writeValueAsString(Map.of(
+            "tenantId", tenantId, "query", "марс"));
+
+        mockMvc.perform(post("/api/admin/ai/internal/branches/resolve")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.matched").value(false));
+    }
+
+    @Test
+    @DisplayName("POST /branches/resolve без query возвращает 400")
+    void resolveBranchWithoutQueryReturns400() throws Exception {
+        String body = objectMapper.writeValueAsString(Map.of("tenantId", tenantId));
+
+        mockMvc.perform(post("/api/admin/ai/internal/branches/resolve")
+                .header("X-Internal-Secret", testSecret)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isBadRequest());
+    }
 }

@@ -623,6 +623,56 @@ public class AiInternalController {
         ));
     }
 
+    @PostMapping("/branches/resolve")
+    public ResponseEntity<?> resolveBranch(
+            @RequestBody AiBranchResolveRequest req,
+            @RequestHeader("X-Internal-Secret") String secret) {
+        validateSecret(secret);
+        String tId = getRequiredTenantId(req.getTenantId());
+        String query = req.getQuery();
+
+        if (query == null || query.isBlank()) {
+            return ResponseEntity.badRequest().body("query is required");
+        }
+
+        List<Branch> all = branchService.getBranches(tId);
+        String q = query.toLowerCase();
+        List<Branch> matches = all.stream()
+                .filter(b -> (b.getName() != null && b.getName().toLowerCase().contains(q))
+                        || (b.getAddress() != null && b.getAddress().toLowerCase().contains(q)))
+                .toList();
+
+        if (matches.isEmpty()) {
+            return ResponseEntity.ok(Map.of("matched", false));
+        }
+
+        List<Map<String, String>> branchList = matches.stream().map(b -> Map.of(
+                "branchId", b.getId(),
+                "branchName", b.getName() != null ? b.getName() : "",
+                "timezone", b.getTimezone() != null ? b.getTimezone() : ""
+        )).toList();
+
+        List<String> tzs = matches.stream().map(Branch::getTimezone).distinct().toList();
+        boolean ambiguous = tzs.size() > 1;
+
+        if (ambiguous) {
+            return ResponseEntity.ok(Map.of(
+                    "matched", true,
+                    "ambiguous", true,
+                    "branches", branchList
+            ));
+        }
+
+        Branch matched = matches.get(0);
+        return ResponseEntity.ok(Map.of(
+                "matched", true,
+                "ambiguous", false,
+                "branchId", matched.getId(),
+                "branchName", matched.getName() != null ? matched.getName() : "",
+                "timezone", matched.getTimezone() != null ? matched.getTimezone() : ""
+        ));
+    }
+
     @PostMapping("/availability/slots")
     public ResponseEntity<?> getAvailableSlots(
             @RequestBody AiSlotsRequest req,

@@ -56,11 +56,12 @@ public class AiAgentService {
 
         Строгие правила использования инструментов:
         - Дату всегда передавай tool'ам КАК ЕСТЬ: ISO (YYYY-MM-DD) ИЛИ ключевое слово (today, tomorrow, послезавтра, понедельник..воскресенье / пн..вс, next_monday, на_следующей_неделе, через_N_дней, 15_июля). Бэкенд сам вычислит дату по часовому поясу ФИЛИАЛА. НЕ считай даты сам.
-        - Поиск филиала по имени: get_branches(query="имя") -> возьми поле "id" (НЕ name) из массива branches.
+        - Поиск филиала по имени: resolve_branch(name="виртуальный") -> если {matched:true, ambiguous:false} просто возьми branchId. Если {ambiguous:true} -> спроси пользователя какой город. Если {matched:false} -> скажи что филиал не найден.
+        - Просмотр всех филиалов: get_branches (без query или с query для фильтрации). Ответ {branches:[{id,name,address,timezone}], ambiguous}.
         - Если get_branches вернул "ambiguous":true или в "timezones" больше одного значения — филиалы в разных городах. Спроси пользователя какой город он имеет в виду. НЕ угадывай.
-        - Все мастера филиала и их свободное время ОДНИМ вызовом: get_branch_staff_slots(branch_id, date). НЕ вызывай get_available_slots для каждого мастера по отдельности.
+        - Все мастера филиала: resolve_branch(name) -> возьми branchId -> get_branch_staff_slots(branch_id, date). ОДИН вызов вместо N.
         - Свободное время ОДНОГО мастера: get_available_slots(staff_id, date, branch_id). Для относительной даты (tomorrow/понедельник) branch_id обязателен.
-        - Запись: search_services(query="услуга") -> если нет -> add_service(name, duration_minutes) -> get_branch_staff_slots или get_available_slots -> выбери слот -> create_appointment(clientName, serviceName, branch_id, date, time, staffId). ПРЕДПОЧТИТЕЛЬНО передавать branch_id+date+time (бэкенд соберёт datetime в tz филиала), а НЕ dateTime ISO.
+        - Запись: resolve_branch(name) -> search_services(query) -> если нет -> add_service(name, duration_minutes) -> get_branch_staff_slots(branch_id, date) -> выбери слот -> create_appointment(clientName, serviceName, branch_id, date, time, staffId).
         - Все *_id и Id параметры — это ID полученный из search/get_branches, НЕ имена и НЕ названия. Никогда не подставляй текст в поля с суффиксом _id или Id.
         - Если филиал не найден через get_branches -> скажи пользователю что такой филиал не найден, не угадывай.
         - Все действия — по часовому поясу филиала.
@@ -180,9 +181,6 @@ public class AiAgentService {
                     log.info("processMessage chat_id={}: tool result len={}", chatId, toolResult != null ? toolResult.length() : 0);
 
                     String functionContent = toolResult != null ? toolResult : "{}";
-                    if (toolResult != null && toolResult.contains("\"error\"")) {
-                        functionContent = functionContent + "\n\nПодсказка: проверь аргументы, особенно *_id — нужны ID полученные из search/get_branches tools, а не имена. Не повторяй вызов с теми же аргументами. Если нужна дата — передавай ключевое слово (tomorrow/понедельник) или ISO.";
-                    }
                     messages.add(ChatMessage.builder()
                             .role(ChatMessageRole.FUNCTION)
                             .name(toolName)

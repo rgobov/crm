@@ -32,10 +32,10 @@ class CrmToolServiceTest {
     }
 
     @Test
-    @DisplayName("getToolSchemas возвращает 26 схем инструментов")
-    void getToolSchemasReturns26Schemas() {
+    @DisplayName("getToolSchemas возвращает 27 схем инструментов")
+    void getToolSchemasReturns27Schemas() {
         List<Map<String, Object>> schemas = crmToolService.getToolSchemas();
-        assertEquals(26, schemas.size());
+        assertEquals(27, schemas.size());
     }
 
     @Test
@@ -70,14 +70,14 @@ class CrmToolServiceTest {
             .map(f -> (String) f.get("name"))
             .distinct()
             .count();
-        assertEquals(26, distinctCount);
+        assertEquals(27, distinctCount);
     }
 
     @Test
-    @DisplayName("getToolDefinitions возвращает 26 определений")
-    void getToolDefinitionsReturns26Defs() {
+    @DisplayName("getToolDefinitions возвращает 27 определений")
+    void getToolDefinitionsReturns27Defs() {
         List<CrmToolService.ToolDef> defs = crmToolService.getToolDefinitions();
-        assertEquals(26, defs.size());
+        assertEquals(27, defs.size());
     }
 
     @Test
@@ -200,14 +200,14 @@ class CrmToolServiceTest {
         when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn("[]");
 
-        Map<String, Object> args = Map.of("query", "", "branch_id", "b1");
+        Map<String, Object> args = Map.of("query", "", "branch_id", "b1b2c3d4-e5f6-7890-abcd-ef1234567891");
         crmToolService.executeTool("search_staff", args, "t1", Map.of());
 
         ArgumentCaptor<HttpEntity<String>> entityCap = ArgumentCaptor.forClass(HttpEntity.class);
         verify(rest).postForObject(anyString(), entityCap.capture(), eq(String.class));
         String body = entityCap.getValue().getBody();
         assertNotNull(body);
-        assertTrue(body.contains("\"branchId\":\"b1\""));
+        assertTrue(body.contains("\"branchId\":\"b1b2c3d4-e5f6-7890-abcd-ef1234567891\""));
     }
 
     @Test
@@ -216,7 +216,7 @@ class CrmToolServiceTest {
         when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn("{\"slots\":[]}");
 
-        Map<String, Object> args = Map.of("staff_id", "s1", "date", "2026-07-10", "duration", 60);
+        Map<String, Object> args = Map.of("staff_id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "date", "2026-07-10", "duration", 60);
         crmToolService.executeTool("get_available_slots", args, "t1", Map.of());
 
         ArgumentCaptor<String> urlCap = ArgumentCaptor.forClass(String.class);
@@ -232,14 +232,14 @@ class CrmToolServiceTest {
 
         Map<String, Object> args = Map.of(
             "clientName", "Иван", "serviceName", "Стрижка", "dateTime", "2026-07-10T14:00:00+03:00",
-            "staffId", "s1", "branchId", "b1");
+            "staffId", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "branchId", "b1b2c3d4-e5f6-7890-abcd-ef1234567891");
         crmToolService.executeTool("create_appointment", args, "t1", Map.of());
 
         ArgumentCaptor<HttpEntity<String>> entityCap = ArgumentCaptor.forClass(HttpEntity.class);
         verify(rest).postForObject(anyString(), entityCap.capture(), eq(String.class));
         String body = entityCap.getValue().getBody();
         assertNotNull(body);
-        assertTrue(body.contains("\"staffId\":\"s1\""));
+        assertTrue(body.contains("\"staffId\":\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\""));
     }
 
     @Test
@@ -249,7 +249,7 @@ class CrmToolServiceTest {
             .thenReturn(new org.springframework.http.ResponseEntity<>("{}", org.springframework.http.HttpStatus.OK));
 
         Map<String, Object> args = Map.of(
-            "appointment_id", "a1", "duration_minutes", 30, "date_time", "2026-07-10T14:00:00+03:00",
+            "appointment_id", "c1b2c3d4-e5f6-7890-abcd-ef1234567892", "duration_minutes", 30, "date_time", "2026-07-10T14:00:00+03:00",
             "service_name", "Стрижка", "staff_name", "Маша");
         crmToolService.executeTool("update_appointment", args, "t1", Map.of());
 
@@ -290,7 +290,7 @@ class CrmToolServiceTest {
         when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn("{\"staff\":[]}");
 
-        Map<String, Object> args = Map.of("branch_id", "b1", "date", "tomorrow", "duration", 60);
+        Map<String, Object> args = Map.of("branch_id", "b1b2c3d4-e5f6-7890-abcd-ef1234567891", "date", "tomorrow", "duration", 60);
         crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
 
         ArgumentCaptor<String> urlCap = ArgumentCaptor.forClass(String.class);
@@ -304,14 +304,14 @@ class CrmToolServiceTest {
         when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
             .thenReturn("{}");
 
-        Map<String, Object> args = Map.of("branch_id", "b1", "date", "tomorrow");
+        Map<String, Object> args = Map.of("branch_id", "b1b2c3d4-e5f6-7890-abcd-ef1234567891", "date", "tomorrow");
         crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
 
         ArgumentCaptor<HttpEntity<String>> entityCap = ArgumentCaptor.forClass(HttpEntity.class);
         verify(rest).postForObject(anyString(), entityCap.capture(), eq(String.class));
         String body = entityCap.getValue().getBody();
         assertNotNull(body);
-        assertTrue(body.contains("\"branchId\":\"b1\""));
+        assertTrue(body.contains("\"branchId\":\"b1b2c3d4-e5f6-7890-abcd-ef1234567891\""));
         assertTrue(body.contains("\"date\":\"tomorrow\""));
         assertTrue(body.contains("\"duration\":60"));
     }
@@ -346,12 +346,12 @@ class CrmToolServiceTest {
     }
 
     @Test
-    @DisplayName("toolsForRole(ADMIN) и (MANAGER) содержат 25 tools (все кроме manage_notifications) включая create_contact и get_report")
+    @DisplayName("toolsForRole(ADMIN) и (MANAGER) содержат 26 tools (все кроме manage_notifications) включая create_contact, get_report и resolve_branch")
     void toolsForRoleAdminManagerAllTools() {
         java.util.Set<String> adminTools = crmToolService.toolsForRole("ADMIN");
         java.util.Set<String> managerTools = crmToolService.toolsForRole("MANAGER");
-        assertEquals(25, adminTools.size());
-        assertEquals(25, managerTools.size());
+        assertEquals(26, adminTools.size());
+        assertEquals(26, managerTools.size());
         assertTrue(adminTools.contains("create_contact"));
         assertTrue(adminTools.contains("get_report"));
         assertTrue(adminTools.contains("get_branch_staff_slots"));
@@ -366,5 +366,70 @@ class CrmToolServiceTest {
         java.util.Set<String> tools = crmToolService.toolsForRole(null);
         assertFalse(tools.contains("create_contact"));
         assertTrue(tools.contains("get_branch_staff_slots"));
+    }
+
+    @Test
+    @DisplayName("resolve_branch присутствует в схемах")
+    void toolSchemaResolveBranchExists() {
+        boolean found = crmToolService.getToolSchemas().stream()
+            .map(s -> (Map<String, Object>) s.get("function"))
+            .anyMatch(f -> "resolve_branch".equals(f.get("name")));
+        assertTrue(found, "resolve_branch tool should be present");
+    }
+
+    @Test
+    @DisplayName("executeTool resolve_branch вызывает POST /branches/resolve")
+    void resolveBranchPostsToResolveEndpoint() {
+        when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+            .thenReturn("{\"matched\":true,\"branchId\":\"abc-123\"}");
+
+        Map<String, Object> args = Map.of("name", "виртуальный");
+        String result = crmToolService.executeTool("resolve_branch", args, "t1", Map.of());
+
+        ArgumentCaptor<String> urlCap = ArgumentCaptor.forClass(String.class);
+        verify(rest).postForObject(urlCap.capture(), any(HttpEntity.class), eq(String.class));
+        assertTrue(urlCap.getValue().endsWith("/branches/resolve"));
+        assertNotNull(result);
+    }
+
+    @Test
+    @DisplayName("validateIdArg отклоняет 'virtual' (не UUID)")
+    void validateIdArgRejectsNonUuid() {
+        Map<String, Object> args = Map.of("branch_id", "virtual");
+        String result = crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
+        assertTrue(result.contains("error") && result.contains("UUID"));
+        verifyNoInteractions(rest);
+    }
+
+    @Test
+    @DisplayName("validateIdArg принимает валидный UUID")
+    void validateIdArgAcceptsUuid() {
+        String uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+        when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+            .thenReturn("{}");
+        Map<String, Object> args = Map.of("branch_id", uuid, "date", "tomorrow");
+        String result = crmToolService.executeTool("get_branch_staff_slots", args, "t1", Map.of());
+        verify(rest).postForObject(anyString(), any(HttpEntity.class), eq(String.class));
+    }
+
+    @Test
+    @DisplayName("catch returns valid JSON with hint and recoverable")
+    void catchReturnsValidJsonWithHint() {
+        Map<String, Object> args = Map.of("contact_id", "not-a-uuid-just-text");
+        String result = crmToolService.executeTool("get_contact", args, "t1", Map.of());
+        assertNotNull(result);
+        assertTrue(result.contains("\"error\""));
+        assertTrue(result.contains("\"hint\""));
+        assertTrue(result.contains("\"recoverable\""));
+        assertFalse(result.contains("\\n\\n"));
+    }
+
+    @Test
+    @DisplayName("resolve_branch matched:false возвращается как есть")
+    void resolveBranchMatchedFalse() {
+        when(rest.postForObject(anyString(), any(HttpEntity.class), eq(String.class)))
+            .thenReturn("{\"matched\":false}");
+        String result = crmToolService.executeTool("resolve_branch", Map.of("name", "xxx"), "t1", Map.of());
+        assertTrue(result.contains("\"matched\":false"));
     }
 }

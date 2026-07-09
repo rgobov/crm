@@ -30,18 +30,15 @@ public class CrmToolService {
         "add_service", "update_service", "delete_service"
     );
 
-    private static final java.util.regex.Pattern ID_FIELD_PATTERN =
-            java.util.regex.Pattern.compile(".*(_id|Id)$");
-    private static final java.util.regex.Pattern INVALID_ID_PATTERN =
-            java.util.regex.Pattern.compile("[\\s\\p{IsCyrillic}]");
+    private static final java.util.regex.Pattern UUID_PATTERN =
+            java.util.regex.Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
     private static String validateIdArg(String fieldName, Object value) {
         if (value == null) return null;
         String s = String.valueOf(value);
-        if (INVALID_ID_PATTERN.matcher(s).find()) {
+        if (!UUID_PATTERN.matcher(s).matches()) {
             throw new IllegalArgumentException(
-                    "Поле '" + fieldName + "' должно быть ID из search/get tools, а получено значение '" + s
-                            + "'. Сначала вызови get_branches/search_staff/search_services и возьми из ответа поле id.");
+                    "Поле '" + fieldName + "' должно быть UUID полученным из search/get_branches/resolve_branch, а получено '" + s + "'.");
         }
         return s;
     }
@@ -167,6 +164,13 @@ public class CrmToolService {
                             bq != null && !String.valueOf(bq).isBlank() ? Map.of("query", bq) : Map.of(),
                             headers);
                 }
+                case "resolve_branch" -> {
+                    Map<String, Object> rbBody = new java.util.LinkedHashMap<>();
+                    rbBody.put("tenantId", tenantId);
+                    rbBody.put("query", args.get("name"));
+                    String rbJson = mapper.writeValueAsString(rbBody);
+                    yield post("/api/admin/ai/internal/branches/resolve", new HttpEntity<>(rbJson, headers));
+                }
                 case "get_instructions" -> get("/api/admin/ai/internal/instructions", Map.of(), headers);
                 case "check_availability" -> {
                     Map<String, Object> availBody = new java.util.LinkedHashMap<>();
@@ -242,7 +246,15 @@ public class CrmToolService {
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startMs;
             log.error("executeTool failed: name={}, elapsed={}ms, error={}", name, elapsed, e.getMessage(), e);
-            return "{\"error\":\"" + e.getMessage() + "\"}";
+            try {
+                return mapper.writeValueAsString(Map.of(
+                        "error", e.getMessage() != null ? e.getMessage() : "Unknown error",
+                        "hint", "Проверь аргументы — все *_id должны быть UUID из search/get_branches/resolve_branch, не имена.",
+                        "recoverable", true
+                ));
+            } catch (Exception ex) {
+                return "{\"error\":\"internal error\"}";
+            }
         }
     }
 
@@ -294,7 +306,7 @@ public class CrmToolService {
         "search_contacts", "get_contact", "create_contact", "update_contact", "delete_contact",
         "search_services", "add_service", "update_service", "delete_service",
         "search_staff", "get_staff_schedule", "search_resources",
-        "get_branches", "get_instructions", "check_availability", "get_available_slots",
+        "get_branches", "resolve_branch", "get_instructions", "check_availability", "get_available_slots",
         "get_branch_staff_slots", "create_appointment", "get_appointment", "update_appointment",
         "cancel_appointment", "get_my_appointments", "get_report",
         "search_knowledge", "search_knowledge_rag"
@@ -303,7 +315,7 @@ public class CrmToolService {
     private static final java.util.Set<String> EMPLOYEE_TOOLS = java.util.Set.of(
         "search_contacts", "get_contact",
         "search_services", "search_staff", "get_staff_schedule", "search_resources",
-        "get_branches", "get_instructions", "check_availability", "get_available_slots",
+        "get_branches", "resolve_branch", "get_instructions", "check_availability", "get_available_slots",
         "get_branch_staff_slots", "create_appointment", "get_appointment", "update_appointment",
         "cancel_appointment", "get_my_appointments",
         "search_knowledge", "search_knowledge_rag"
@@ -311,7 +323,7 @@ public class CrmToolService {
 
     private static final java.util.Set<String> CLIENT_TOOLS = java.util.Set.of(
         "search_services", "search_staff", "get_staff_schedule",
-        "get_branches", "get_instructions", "check_availability", "get_available_slots",
+        "get_branches", "resolve_branch", "get_instructions", "check_availability", "get_available_slots",
         "get_branch_staff_slots", "create_appointment", "get_appointment", "update_appointment",
         "cancel_appointment", "get_my_appointments", "manage_notifications",
         "search_knowledge", "search_knowledge_rag"
@@ -409,6 +421,11 @@ public class CrmToolService {
                 "parameters", Map.of("type", "object", "properties", Map.of(
                     "query", Map.of("type", "string", "description", "Branch name substring (optional, empty returns all)")
                 ), "required", List.of()))),
+            Map.of("type", "function", "function", Map.of(
+                "name", "resolve_branch", "description", "Find a branch by name and get its ID directly. Response: {matched, branchId, branchName, timezone} OR {matched, ambiguous, branches:[...]} OR {matched:false}. USE THIS to resolve a branch name to its UUID before calling get_branch_staff_slots/get_available_slots/create_appointment. If matched=false — the branch does not exist, tell the user. If ambiguous=true — branches in different cities, ask the user which city. The returned branchId is already a UUID ready to use — just take it.",
+                "parameters", Map.of("type", "object", "properties", Map.of(
+                    "name", Map.of("type", "string", "description", "Branch name (substring, e.g. виртуальный, центр)")
+                ), "required", List.of("name")))),
             Map.of("type", "function", "function", Map.of(
                 "name", "get_instructions", "description", "Get step-by-step instructions for complex tasks",
                 "parameters", Map.of("type", "object", "properties", Map.of(
