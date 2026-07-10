@@ -7,6 +7,8 @@ services:
     env_file: .env
     networks:
       - tryneuro_network
+    volumes:
+      - /opt/whisper-host:/opt/whisper:ro
 
 networks:
   tryneuro_network:

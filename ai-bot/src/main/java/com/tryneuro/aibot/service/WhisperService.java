@@ -1,5 +1,6 @@
 package com.tryneuro.aibot.service;
 
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,31 @@ public class WhisperService {
     private static final String MODEL_PATH = "/opt/whisper/ggml-base.bin";
     private static final int TIMEOUT_SECONDS = 60;
 
+    private boolean available;
+
+    @PostConstruct
+    void init() {
+        boolean binExists = Files.exists(Path.of(WHISPER_BIN));
+        boolean modelExists = Files.exists(Path.of(MODEL_PATH));
+        available = binExists && modelExists;
+        if (available) {
+            log.info("Whisper service available: bin={}, model={}", WHISPER_BIN, MODEL_PATH);
+        } else {
+            log.warn("Whisper NOT available (bin={}, model={}) — voice messages will not work. "
+                    + "Place whisper-cli and ggml-base.bin on the host and mount /opt/whisper volume.",
+                    binExists ? "OK" : "missing", modelExists ? "OK" : "missing");
+        }
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
+
     public String transcribe(Path audioFile) {
+        if (!available) {
+            log.warn("Whisper not available, skipping transcription");
+            return null;
+        }
         if (audioFile == null || !Files.exists(audioFile)) {
             log.warn("Audio file not found: {}", audioFile);
             return null;
