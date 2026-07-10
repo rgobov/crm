@@ -1,6 +1,7 @@
 package com.tryneuro.aibot;
 
 import com.tryneuro.aibot.service.AiAgentService;
+import com.tryneuro.aibot.service.WhisperService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -25,10 +26,12 @@ public class BotInitializer {
 
     private final List<TryNeuroBot> bots = new ArrayList<>();
     private final AiAgentService aiAgent;
+    private final WhisperService whisperService;
     private TelegramBotsApi api;
 
-    public BotInitializer(AiAgentService aiAgent) {
+    public BotInitializer(AiAgentService aiAgent, WhisperService whisperService) {
         this.aiAgent = aiAgent;
+        this.whisperService = whisperService;
     }
 
     @PostConstruct
@@ -69,7 +72,7 @@ public class BotInitializer {
 
         for (int i = 0; i < tokens.size(); i++) {
             String username = "NineCRM_AI_" + (i + 1) + "_bot";
-            TryNeuroBot bot = new TryNeuroBot(tokens.get(i), username, i + 1, options, aiAgent);
+            TryNeuroBot bot = new TryNeuroBot(tokens.get(i), username, i + 1, options, aiAgent, whisperService);
             try {
                 api.registerBot(bot);
                 bots.add(bot);

@@ -1,15 +1,19 @@
 package com.tryneuro.aibot;
 
 import com.tryneuro.aibot.service.AiAgentService;
+import com.tryneuro.aibot.service.WhisperService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.Voice;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,31 +31,47 @@ public class TryNeuroBot extends TelegramLongPollingBot {
     private final String username;
     private final int index;
     private final AiAgentService aiAgent;
+    private final WhisperService whisperService;
 
     private final Map<Long, List<Map<String, String>>> conversations = new ConcurrentHashMap<>();
     private static final int MAX_HISTORY_EXCHANGES = 10;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
     public TryNeuroBot(String token, String username, int index, DefaultBotOptions options,
-                       AiAgentService aiAgent) {
+                       AiAgentService aiAgent, WhisperService whisperService) {
         super(options);
         this.token = token;
         this.username = username;
         this.index = index;
         this.aiAgent = aiAgent;
+        this.whisperService = whisperService;
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-        log.info("Bot {} received update: hasMessage={}, hasText={}", index,
-            update.hasMessage(), update.hasMessage() && update.getMessage().hasText());
+        log.info("Bot {} received update: hasMessage={}", index, update.hasMessage());
 
-        if (!update.hasMessage() || !update.getMessage().hasText()) return;
+        if (!update.hasMessage()) return;
 
         Long chatId = update.getMessage().getChatId();
-        String text = update.getMessage().getText().strip();
+        String text;
 
-        log.info("Bot {} received text from chat_id={}: \"{}\"", index, chatId, text);
+        if (update.getMessage().hasVoice()) {
+            Voice voice = update.getMessage().getVoice();
+            log.info("Bot {} received voice from chat_id={}, duration={}s, mimeType={}", index, chatId,
+                    voice.getDuration(), voice.getMimeType());
+            text = transcribeVoice(chatId, voice);
+            if (text == null || text.isBlank()) {
+                sendReply(chatId, "Не удалось распознать голосовое сообщение. Напишите текстом.");
+                return;
+            }
+        } else if (update.getMessage().hasText()) {
+            text = update.getMessage().getText().strip();
+        } else {
+            return;
+        }
+
+        log.info("Bot {} processing from chat_id={}: \"{}\"", index, chatId, text);
 
         if (text.isEmpty()) return;
 
@@ -106,6 +126,36 @@ public class TryNeuroBot extends TelegramLongPollingBot {
             log.info("Bot {} reply sent to {}", index, chatId);
         } catch (TelegramApiException e) {
             log.error("Bot {} failed to reply to {}: {}", index, chatId, e.getMessage(), e);
+        }
+    }
+
+    private String transcribeVoice(Long chatId, Voice voice) {
+        File oggFile = null;
+        try {
+            GetFile getFile = GetFile.builder().fileId(voice.getFileId()).build();
+            org.telegram.telegrambots.meta.api.objects.File tgFile = execute(getFile);
+            oggFile = downloadFile(tgFile);
+            log.info("Bot {} downloaded voice for chat_id={}: {} bytes", index, chatId, oggFile.length());
+            return whisperService.transcribe(oggFile.toPath());
+        } catch (Exception e) {
+            log.error("Bot {} voice transcription failed for chat_id={}: {}", index, chatId, e.getMessage(), e);
+            return null;
+        } finally {
+            if (oggFile != null && oggFile.exists()) {
+                oggFile.delete();
+            }
+        }
+    }
+
+    private void sendReply(Long chatId, String text) {
+        try {
+            SendMessage msg = SendMessage.builder()
+                    .chatId(chatId.toString())
+                    .text(text)
+                    .build();
+            execute(msg);
+        } catch (TelegramApiException e) {
+            log.error("Bot {} failed to reply to {}: {}", index, chatId, e.getMessage());
         }
     }
 
