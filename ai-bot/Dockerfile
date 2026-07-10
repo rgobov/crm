@@ -9,7 +9,7 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
-RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates tar \
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates tar libgomp1 \
     && echo "Downloading whisper.cpp binary..." \
     && ( for i in 1 2 3; do \
          wget -q https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-ubuntu-x64.tar.gz \
