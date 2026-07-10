@@ -9,6 +9,9 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
+ARG BUILD_PROXY
+ENV https_proxy=${BUILD_PROXY}
+
 RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates tar libgomp1 \
     && echo "Downloading whisper.cpp binary..." \
     && ( for i in 1 2 3; do \

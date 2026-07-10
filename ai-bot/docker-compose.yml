@@ -1,7 +1,10 @@
 services:
   spring-ai-bot:
     container_name: tryneuro_spring_ai_bot
-    build: .
+    build:
+      context: .
+      args:
+        - BUILD_PROXY=${TELEGRAM_PROXY:-}
     ports:
       - "8082:8082"
     env_file: .env
