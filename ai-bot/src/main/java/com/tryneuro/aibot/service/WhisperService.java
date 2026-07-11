@@ -54,6 +54,7 @@ public class WhisperService {
                     WHISPER_BIN,
                     "-m", MODEL_PATH,
                     "-l", "ru",
+                    "-ng",
                     "-f", audioFile.toAbsolutePath().toString(),
                     "-otxt"
             );
