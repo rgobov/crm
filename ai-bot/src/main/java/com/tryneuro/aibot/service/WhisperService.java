@@ -55,8 +55,10 @@ public class WhisperService {
                     "-m", MODEL_PATH,
                     "-l", "ru",
                     "-ng",
-                    "-f", audioFile.toAbsolutePath().toString()
+                    "-f", audioFile.toAbsolutePath().toString(),
+                    "-otxt"
             );
+            pb.redirectErrorStream(true);
 
             long startMs = System.currentTimeMillis();
             Process process = pb.start();
@@ -69,16 +71,23 @@ public class WhisperService {
                 return null;
             }
 
-            String stdout = new String(process.getInputStream().readAllBytes()).strip();
-            log.info("Whisper transcription done in {}ms, output_len={}", elapsed, stdout.length());
-            log.debug("Whisper output: {}", stdout);
+            String outputFile = audioFile.toAbsolutePath() + ".txt";
+            Path txtPath = Path.of(outputFile);
+            if (!Files.exists(txtPath)) {
+                log.warn("Whisper output file not found: {}", outputFile);
+                return null;
+            }
+            String text = Files.readString(txtPath).strip();
+            try { Files.delete(txtPath); } catch (Exception ignored) {}
+            log.info("Whisper transcription done in {}ms, text_len={}", elapsed, text != null ? text.length() : 0);
+            log.debug("Whisper output: {}", text);
 
-            if (stdout.isEmpty()) {
-                log.warn("Whisper returned empty output for {}", audioFile);
+            if (text == null || text.isEmpty()) {
+                log.warn("Whisper returned empty text for {}", audioFile);
                 return null;
             }
 
-            return stdout;
+            return text;
         } catch (IOException e) {
             log.error("Whisper process failed for {}: {}", audioFile, e.getMessage(), e);
             return null;
