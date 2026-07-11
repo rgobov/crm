@@ -55,10 +55,8 @@ public class WhisperService {
                     "-m", MODEL_PATH,
                     "-l", "ru",
                     "-ng",
-                    "-f", audioFile.toAbsolutePath().toString(),
-                    "-otxt"
+                    "-f", audioFile.toAbsolutePath().toString()
             );
-            pb.redirectErrorStream(true);
 
             long startMs = System.currentTimeMillis();
             Process process = pb.start();
