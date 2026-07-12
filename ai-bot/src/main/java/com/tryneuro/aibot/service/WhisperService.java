@@ -62,7 +62,7 @@ public class WhisperService {
                     "-ng",
                     "-f", wavPath.toAbsolutePath().toString(),
                     "-otxt",
-                    "--output-dir", wavPath.toAbsolutePath().getParent().toString()
+                    "-of", wavPath.toAbsolutePath().toString()
             );
             pb.redirectErrorStream(true);
 
@@ -75,6 +75,12 @@ public class WhisperService {
                 log.error("Whisper transcription timed out after {}ms", elapsed);
                 process.destroyForcibly();
                 return null;
+            }
+
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                String stderr = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
+                log.error("Whisper failed with exit code {}: {}", exitCode, stderr);
             }
 
             String outputFile = wavPath.toAbsolutePath() + ".txt";
