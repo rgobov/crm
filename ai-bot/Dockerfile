@@ -20,7 +20,7 @@ COPY --from=build /app/target/*.jar app.jar
 COPY --from=whisper-build /whisper/build/bin/whisper-cli /usr/local/bin/
 ARG BUILD_PROXY
 ENV https_proxy=${BUILD_PROXY}
-RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 wget ca-certificates && \
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 wget ca-certificates ffmpeg && \
     mkdir -p /opt/whisper && \
     echo "Downloading whisper base model..." && \
     ( for i in 1 2 3; do \

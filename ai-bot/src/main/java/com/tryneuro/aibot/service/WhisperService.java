@@ -17,7 +17,7 @@ public class WhisperService {
 
     private static final String WHISPER_BIN = "/usr/local/bin/whisper-cli";
     private static final String MODEL_PATH = "/opt/whisper/ggml-base.bin";
-    private static final int TIMEOUT_SECONDS = 60;
+    private static final int TIMEOUT_SECONDS = 120;
 
     private boolean available;
 
@@ -49,15 +49,20 @@ public class WhisperService {
             return null;
         }
 
+        Path wavPath = Path.of(audioFile.toAbsolutePath() + ".wav");
         try {
+            if (!convertToWav(audioFile, wavPath)) {
+                return null;
+            }
+
             ProcessBuilder pb = new ProcessBuilder(
                     WHISPER_BIN,
                     "-m", MODEL_PATH,
                     "-l", "ru",
                     "-ng",
-                    "-f", audioFile.toAbsolutePath().toString(),
+                    "-f", wavPath.toAbsolutePath().toString(),
                     "-otxt",
-                    "--output-dir", audioFile.toAbsolutePath().getParent().toString()
+                    "--output-dir", wavPath.toAbsolutePath().getParent().toString()
             );
             pb.redirectErrorStream(true);
 
@@ -72,7 +77,7 @@ public class WhisperService {
                 return null;
             }
 
-            String outputFile = audioFile.toAbsolutePath() + ".txt";
+            String outputFile = wavPath.toAbsolutePath() + ".txt";
             Path txtPath = Path.of(outputFile);
             if (!Files.exists(txtPath)) {
                 log.warn("Whisper output file not found: {}", outputFile);
@@ -96,6 +101,42 @@ public class WhisperService {
             Thread.currentThread().interrupt();
             log.warn("Whisper transcription interrupted for {}", audioFile);
             return null;
+        } finally {
+            try { Files.deleteIfExists(wavPath); } catch (Exception ignored) {}
+        }
+    }
+
+    private boolean convertToWav(Path input, Path output) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    "ffmpeg", "-y",
+                    "-i", input.toAbsolutePath().toString(),
+                    "-ar", "16000",
+                    "-ac", "1",
+                    "-c:a", "pcm_s16le",
+                    output.toAbsolutePath().toString()
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+            if (!finished) {
+                log.warn("FFmpeg conversion timed out for {}", input);
+                process.destroyForcibly();
+                return false;
+            }
+            if (!Files.exists(output) || Files.size(output) == 0) {
+                log.warn("FFmpeg produced empty output for {}", input);
+                return false;
+            }
+            log.info("FFmpeg converted {} to {} (16kHz mono WAV)", input, output);
+            return true;
+        } catch (IOException e) {
+            log.warn("FFmpeg conversion failed for {}: {}", input, e.getMessage());
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("FFmpeg conversion interrupted for {}", input);
+            return false;
         }
     }
 }

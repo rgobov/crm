@@ -217,6 +217,20 @@ cat ~/crm/backups/db-2026-06-26_2200.sql | docker exec -i tryneuro_db psql -U po
   - `docker logs tryneuro_spring_ai_bot --tail 20`
   - `docker logs tryneuro_notifications_python --tail 20`
 
+## Voice Transcription (Whisper)
+
+- **STT**: `whisper-cli` (whisper.cpp v1.9.1) на CPU, модель `ggml-base.bin`
+- **Модель на VPS**: `/opt/whisper-host/ggml-base.bin` — смонтирована в контейнер как `/opt/whisper/ggml-base.bin:ro` (файл есть).
+- **Конвертация**: Telegram присылает voice в формате OGG/Opus → `WhisperService.java` сначала конвертирует через `ffmpeg` в 16kHz mono WAV, затем передаёт `whisper-cli`.
+- **Таймаут**: 120 секунд (задан в `WhisperService.TIMEOUT_SECONDS`).
+- **Отказ**: если whisper недоступен или ffmpeg не сработал — бот отвечает "Не удалось распознать голосовое сообщение. Напишите текстом."
+- **Dockerfile**: `ffmpeg` установлен в runtime-образе, wget удалён после скачивания модели.
+- **Логи** (проверка после деплоя):
+  ```
+  docker logs tryneuro_spring_ai_bot --tail 50 | grep -i whisper
+  ```
+  Ожидаемые строки: `Whisper service available: bin=OK, model=OK`, `FFmpeg converted`, `Whisper transcription done in Nms`.
+
 ## TODO (future)
 - **External MCP** — публичный MCP-сервер для сторонних разработчиков
 - **Streaming** — ответ чанками через `editMessageText`
