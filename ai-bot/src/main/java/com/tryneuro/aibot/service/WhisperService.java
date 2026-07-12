@@ -56,7 +56,8 @@ public class WhisperService {
                     "-l", "ru",
                     "-ng",
                     "-f", audioFile.toAbsolutePath().toString(),
-                    "-otxt"
+                    "-otxt",
+                    "--output-dir", audioFile.toAbsolutePath().getParent().toString()
             );
             pb.redirectErrorStream(true);
 
