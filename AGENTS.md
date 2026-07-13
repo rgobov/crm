@@ -226,7 +226,7 @@ cat ~/crm/backups/db-2026-06-26_2200.sql | docker exec -i tryneuro_db psql -U po
 
 ## Local LLM (Qwen 2.5 3B)
 
-- **Модель**: Qwen 2.5 3B, квантизация Q4_K_M, файл `/opt/llm-models/qwen-3b-q4.gguf` (2.0 GB)
+- **Модель**: Qwen 2.5 1.5B, квантизация Q4_K_M, файл `/opt/llm-models/qwen-1.5b-q4.gguf` (1.0 GB)
 - **Сервер**: llama.cpp server (`ghcr.io/ggml-org/llama.cpp:server`) в отдельном контейнере `tryneuro_llm_server`
 - **CPU only**: `-ngl 0` (на VPS нет GPU), `-c 2048` context window (уменьшено для скорости на 2 vCPU)
 - **CPU limit**: `cpus: '1.5'` в docker-compose (2 vCPU, оставляем 0.5 ядра для Telegram long-polling)
