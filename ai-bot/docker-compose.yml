@@ -20,7 +20,7 @@ services:
       - "8083:8083"
     volumes:
       - /opt/llm-models:/models:ro
-    command: -m /models/qwen-3b-q4.gguf -ngl 0 -c 2048 --host 0.0.0.0 --port 8083
+    command: -m /models/qwen-3b-q4.gguf -ngl 0 -c 4096 --host 0.0.0.0 --port 8083
     networks:
       - tryneuro_network
     restart: unless-stopped
