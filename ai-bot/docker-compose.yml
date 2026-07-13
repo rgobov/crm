@@ -14,7 +14,7 @@ services:
       - /opt/whisper-host:/opt/whisper:ro
 
   llm-server:
-    image: ghcr.io/ggerganov/llama.cpp:server
+    image: ghcr.io/ggml-org/llama.cpp:server
     container_name: tryneuro_llm_server
     ports:
       - "8083:8083"

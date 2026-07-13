@@ -227,7 +227,7 @@ cat ~/crm/backups/db-2026-06-26_2200.sql | docker exec -i tryneuro_db psql -U po
 ## Local LLM (Qwen 2.5 3B)
 
 - **Модель**: Qwen 2.5 3B, квантизация Q4_K_M, файл `/opt/llm-models/qwen-3b-q4.gguf` (2.0 GB)
-- **Сервер**: llama.cpp server (`ghcr.io/ggerganov/llama.cpp:server`) в отдельном контейнере `tryneuro_llm_server`
+- **Сервер**: llama.cpp server (`ghcr.io/ggml-org/llama.cpp:server`) в отдельном контейнере `tryneuro_llm_server`
 - **CPU only**: `-ngl 0` (на VPS нет GPU), `-c 4096` context window
 - **Порт**: `8083`, доступен другим контейнерам через `llm-server:8083`
 - **Выбор провайдера**: в CRM → AI Настройки → Провайдер (GigaChat / Локальная LLM)
