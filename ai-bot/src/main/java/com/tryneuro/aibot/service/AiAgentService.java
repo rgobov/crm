@@ -150,8 +150,7 @@ public class AiAgentService {
         }
 
         if (isLocal) {
-            String localModel = modelName.equals("GigaChat") ? "qwen" : modelName;
-            return processWithLocalLlm(systemPrompt, history, chatId, role, tenantId, actorHeaders, localModel);
+            return processWithLocalLlm(systemPrompt, history, chatId, role, tenantId, actorHeaders, cfg.llmModel());
         }
         return processWithGigaChat(cfg.apiKey(), systemPrompt, history, chatId, role, modelName, tenantId, actorHeaders);
     }
@@ -274,7 +273,9 @@ public class AiAgentService {
 
             try {
                 Map<String, Object> requestBody = new LinkedHashMap<>();
-                requestBody.put("model", modelName);
+                if (modelName != null && !modelName.isEmpty()) {
+                    requestBody.put("model", modelName);
+                }
                 requestBody.put("messages", messages);
                 requestBody.put("tools", tools);
                 requestBody.put("tool_choice", "auto");
