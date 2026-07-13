@@ -118,15 +118,20 @@
                         <option value="gigachat">GigaChat</option>
                         <option value="local">Локальная LLM (Qwen 2.5 3B)</option>
                     </select>
-                    <p class="hint">Используется GigaChat от Сбера — российская нейросеть, работает без VPN</p>
                 </div>
                 <div class="field">
                     <label>Модель</label>
-                    <select bind:value={config.llm_model}>
-                        <option value="GigaChat">GigaChat (базовая, дешевле)</option>
-                        <option value="GigaChat-Pro">GigaChat-Pro</option>
-                        <option value="GigaChat-Max">GigaChat-Max</option>
-                    </select>
+                    {#if config.llm_provider === 'local'}
+                        <select bind:value={config.llm_model}>
+                            <option value="qwen">Qwen 2.5 3B</option>
+                        </select>
+                    {:else}
+                        <select bind:value={config.llm_model}>
+                            <option value="GigaChat">GigaChat (базовая, дешевле)</option>
+                            <option value="GigaChat-Pro">GigaChat-Pro</option>
+                            <option value="GigaChat-Max">GigaChat-Max</option>
+                        </select>
+                    {/if}
                 </div>
                 <div class="field">
                     <label>API-ключ (Authorization Key)</label>
