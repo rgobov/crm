@@ -19,6 +19,10 @@ spring:
 gigachat:
   scope: ${GIGACHAT_SCOPE:GIGACHAT_API_PERS}
 
+llm:
+  local:
+    url: ${LLM_LOCAL_URL:http://localhost:8083}
+
 logging:
   level:
     com.tryneuro: DEBUG

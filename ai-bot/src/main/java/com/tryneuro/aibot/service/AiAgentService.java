@@ -1,7 +1,6 @@
 package com.tryneuro.aibot.service;
 
 import chat.giga.client.GigaChatClient;
-import chat.giga.client.auth.AuthClient;
 import chat.giga.client.auth.AuthClientBuilder;
 import chat.giga.model.Scope;
 import chat.giga.model.completion.ChatFunction;
@@ -16,7 +15,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,9 +35,11 @@ public class AiAgentService {
     private final ObjectMapper mapper;
     private final MapResolverService actorResolver;
     private final RagService ragService;
+    private final RestTemplate restTemplate;
     private final String scopeString;
     private final int maxReactIterations;
     private final long reactTimeoutMs;
+    private final String llmLocalUrl;
 
     private final ConcurrentHashMap<String, GigaChatClient> clientCache = new ConcurrentHashMap<>();
 
@@ -69,18 +72,21 @@ public class AiAgentService {
 
     public AiAgentService(CrmToolService toolService, UserConfigService userConfigService,
                           ObjectMapper mapper, MapResolverService actorResolver,
-                          RagService ragService,
+                          RagService ragService, RestTemplate restTemplate,
                           @Value("${gigachat.scope:GIGACHAT_API_PERS}") String scopeString,
                           @Value("${react.max.iterations:15}") int maxReactIterations,
-                          @Value("${react.timeout.ms:90000}") long reactTimeoutMs) {
+                          @Value("${react.timeout.ms:90000}") long reactTimeoutMs,
+                          @Value("${llm.local.url}") String llmLocalUrl) {
         this.toolService = toolService;
         this.userConfigService = userConfigService;
         this.mapper = mapper;
         this.actorResolver = actorResolver;
         this.ragService = ragService;
+        this.restTemplate = restTemplate;
         this.scopeString = scopeString;
         this.maxReactIterations = maxReactIterations;
         this.reactTimeoutMs = reactTimeoutMs;
+        this.llmLocalUrl = llmLocalUrl;
     }
 
     private GigaChatClient getOrCreateClient(String authKey) {
@@ -103,12 +109,21 @@ public class AiAgentService {
         log.info("processMessage chat_id={}, history_size={}", chatId, history.size());
 
         UserConfigService.UserConfig cfg = userConfigService.getConfig(chatId);
-        if (cfg == null || cfg.apiKey() == null || cfg.apiKey().isBlank()) {
+        if (cfg == null) {
+            log.warn("processMessage chat_id={}: no AI config found", chatId);
+            return "⚠️ Настройки AI не найдены. Укажите их в CRM → AI Настройки.";
+        }
+
+        boolean isLocal = "local".equals(cfg.llmProvider());
+        if (!isLocal && (cfg.apiKey() == null || cfg.apiKey().isBlank())) {
             log.warn("processMessage chat_id={}: no API key configured", chatId);
             return "⚠️ Не настроен API-ключ GigaChat. Укажите его в CRM → AI Настройки.";
         }
-        log.info("processMessage chat_id={}: apiKey={}..., model={}",
-            chatId, cfg.apiKey().substring(0, Math.min(8, cfg.apiKey().length())), cfg.llmModel());
+
+        log.info("processMessage chat_id={}: apiKey={}..., model={}, provider={}",
+            chatId,
+            cfg.apiKey() != null ? cfg.apiKey().substring(0, Math.min(8, cfg.apiKey().length())) : "none",
+            cfg.llmModel(), cfg.llmProvider());
 
         Map<String, String> actor = actorResolver.resolveActor(chatId);
         String tenantId = actor.get("tenant_id");
@@ -134,11 +149,21 @@ public class AiAgentService {
             log.info("processMessage chat_id={}: no RAG context", chatId);
         }
 
+        if (isLocal) {
+            return processWithLocalLlm(systemPrompt, history, chatId, role, tenantId, actorHeaders, modelName);
+        }
+        return processWithGigaChat(cfg.apiKey(), systemPrompt, history, chatId, role, modelName, tenantId, actorHeaders);
+    }
+
+    private String processWithGigaChat(String apiKey, String systemPrompt,
+                                       List<Map<String, String>> history, long chatId,
+                                       String role, String modelName, String tenantId,
+                                       Map<String, String> actorHeaders) {
         List<ChatMessage> messages = buildGigaChatMessages(history);
         List<ChatFunction> functions = buildGigaChatFunctions(role);
         log.info("processMessage chat_id={}: role={}, {} chat functions registered", chatId, role, functions.size());
 
-        GigaChatClient client = getOrCreateClient(cfg.apiKey());
+        GigaChatClient client = getOrCreateClient(apiKey);
 
         long startTime = System.currentTimeMillis();
 
@@ -213,8 +238,112 @@ public class AiAgentService {
         return partial != null ? partial : "⚠️ Не удалось получить ответ за допустимое количество шагов. Уточните запрос или спросите позже.";
     }
 
+    private String processWithLocalLlm(String systemPrompt, List<Map<String, String>> history,
+                                       long chatId, String role, String tenantId,
+                                       Map<String, String> actorHeaders, String modelName) {
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+        for (Map<String, String> msg : history) {
+            messages.add(Map.of(
+                    "role", msg.getOrDefault("role", "user"),
+                    "content", msg.getOrDefault("content", "")
+            ));
+        }
+
+        List<Map<String, Object>> tools = new ArrayList<>();
+        java.util.Set<String> allowed = toolService.toolsForRole(role);
+        for (CrmToolService.ToolDef def : toolService.getToolDefinitions()) {
+            if (!allowed.contains(def.name())) continue;
+            Map<String, Object> function = new LinkedHashMap<>();
+            function.put("name", def.name());
+            function.put("description", def.description());
+            function.put("parameters", def.parameters());
+            tools.add(Map.of("type", "function", "function", function));
+        }
+        log.info("processMessage chat_id={}: role={}, {} tools registered, local LLM at {}",
+                chatId, role, tools.size(), llmLocalUrl);
+
+        long startTime = System.currentTimeMillis();
+
+        for (int iter = 0; iter < maxReactIterations; iter++) {
+            if (System.currentTimeMillis() - startTime > reactTimeoutMs) {
+                log.warn("processMessage chat_id={}: Local LLM ReAct timeout after {} iterations", chatId, iter);
+                break;
+            }
+
+            try {
+                Map<String, Object> requestBody = new LinkedHashMap<>();
+                requestBody.put("model", "qwen");
+                requestBody.put("messages", messages);
+                requestBody.put("tools", tools);
+                requestBody.put("tool_choice", "auto");
+
+                long llmStart = System.currentTimeMillis();
+                ResponseEntity<Map> response = restTemplate.postForEntity(
+                        llmLocalUrl + "/v1/chat/completions", requestBody, Map.class);
+                long elapsed = System.currentTimeMillis() - llmStart;
+                log.info("processMessage chat_id={}: Local LLM responded in {}ms", chatId, elapsed);
+
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.getBody().get("choices");
+                if (choices == null || choices.isEmpty()) {
+                    log.warn("processMessage chat_id={}: empty choices from local LLM", chatId);
+                    return "⚠️ Пустой ответ от нейросети.";
+                }
+
+                @SuppressWarnings("unchecked")
+                Map<String, Object> responseMessage = (Map<String, Object>) choices.get(0).get("message");
+
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> toolCalls = (List<Map<String, Object>>) responseMessage.get("tool_calls");
+
+                if (toolCalls != null && !toolCalls.isEmpty()) {
+                    messages.add(responseMessage);
+
+                    for (Map<String, Object> tc : toolCalls) {
+                        String toolCallId = (String) tc.get("id");
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> function = (Map<String, Object>) tc.get("function");
+                        String toolName = (String) function.get("name");
+                        String argsJson = (String) function.get("arguments");
+
+                        log.info("processMessage chat_id={}: tool call: name={}, args={}", chatId, toolName, argsJson);
+
+                        Map<String, Object> toolArgs;
+                        try {
+                            toolArgs = mapper.readValue(argsJson, Map.class);
+                        } catch (JsonProcessingException e) {
+                            log.warn("processMessage chat_id={}: invalid JSON in tool args: {}", chatId, argsJson);
+                            continue;
+                        }
+
+                        String toolResult = toolService.executeTool(toolName, toolArgs, tenantId, actorHeaders);
+                        log.info("processMessage chat_id={}: tool result len={}", chatId, toolResult != null ? toolResult.length() : 0);
+
+                        Map<String, Object> toolMsg = new LinkedHashMap<>();
+                        toolMsg.put("role", "tool");
+                        toolMsg.put("tool_call_id", toolCallId);
+                        toolMsg.put("content", toolResult != null ? toolResult : "{}");
+                        messages.add(toolMsg);
+                    }
+                } else {
+                    String content = (String) responseMessage.get("content");
+                    log.info("processMessage chat_id={}: final response, len={}", chatId, content != null ? content.length() : 0);
+                    return content != null ? content : "";
+                }
+            } catch (Exception e) {
+                String errMsg = e.getMessage() != null ? e.getMessage() : "";
+                log.error("processMessage chat_id={}: Local LLM exception at iter {}: {}", chatId, iter, errMsg, e);
+                return "⚠️ Ошибка нейросети: " + e.getMessage();
+            }
+        }
+
+        log.warn("processMessage chat_id={}: Local LLM ReAct loop exhausted after {} iterations", chatId, maxReactIterations);
+        return "⚠️ Не удалось получить ответ за допустимое количество шагов. Уточните запрос.";
+    }
+
     String tryPartialFallback(GigaChatClient client, String modelName, String systemPrompt,
-                                      List<ChatMessage> messages, long chatId) {
+                              List<ChatMessage> messages, long chatId) {
         if (messages.size() <= 1) return null;
         try {
             List<ChatMessage> fallbackMessages = new ArrayList<>(messages);

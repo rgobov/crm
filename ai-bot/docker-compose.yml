@@ -13,6 +13,24 @@ services:
     volumes:
       - /opt/whisper-host:/opt/whisper:ro
 
+  llm-server:
+    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    container_name: tryneuro_llm_server
+    ports:
+      - "8083:8083"
+    volumes:
+      - /opt/llm-models:/models:ro
+    command: -m /models/qwen-3b-q4.gguf -ngl 0 -c 4096 --host 0.0.0.0 --port 8083
+    networks:
+      - tryneuro_network
+    restart: unless-stopped
+    healthcheck:
+      test: curl -f http://localhost:8083/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 networks:
   tryneuro_network:
     external: true

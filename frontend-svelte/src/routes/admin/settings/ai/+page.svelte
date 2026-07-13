@@ -114,8 +114,9 @@
                 <h3>🤖 AI Провайдер</h3>
                 <div class="field">
                     <label>Провайдер</label>
-                    <select bind:value={config.llm_provider} disabled>
+                    <select bind:value={config.llm_provider}>
                         <option value="gigachat">GigaChat</option>
+                        <option value="local">Локальная LLM (Qwen 2.5 3B)</option>
                     </select>
                     <p class="hint">Используется GigaChat от Сбера — российская нейросеть, работает без VPN</p>
                 </div>

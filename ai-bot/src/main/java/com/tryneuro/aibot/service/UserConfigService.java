@@ -23,14 +23,15 @@ public class UserConfigService {
 
         try {
             Map<String, Object> row = jdbcTemplate.queryForMap(
-                "SELECT c.api_key, c.llm_model FROM user_ai_config c " +
+                "SELECT c.api_key, c.llm_model, c.llm_provider FROM user_ai_config c " +
                 "JOIN users u ON u.id = c.user_id WHERE u.telegram_id = ?",
                 telegramId
             );
 
             UserConfig cfg = new UserConfig(
                 (String) row.get("api_key"),
-                (String) row.get("llm_model")
+                (String) row.get("llm_model"),
+                (String) row.get("llm_provider")
             );
 
             log.debug("Found config for telegram_id={}: apiKey={}, model={}",
@@ -49,5 +50,9 @@ public class UserConfigService {
         }
     }
 
-    public record UserConfig(String apiKey, String llmModel) {}
+    public record UserConfig(String apiKey, String llmModel, String llmProvider) {
+        public UserConfig {
+            if (llmProvider == null || llmProvider.isBlank()) llmProvider = "gigachat";
+        }
+    }
 }

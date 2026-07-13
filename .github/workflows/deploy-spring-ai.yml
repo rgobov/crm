@@ -48,6 +48,7 @@ jobs:
             SPRING_DATASOURCE_USERNAME=postgres
             SPRING_DATASOURCE_PASSWORD=${{ secrets.DB_PASSWORD }}
             GIGACHAT_SCOPE=GIGACHAT_API_PERS
+            LLM_LOCAL_URL=http://llm-server:8083
             EOF
 
             echo "--- FORCE REMOVE STALE CONTAINERS ---"
