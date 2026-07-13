@@ -24,6 +24,10 @@ services:
     networks:
       - tryneuro_network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
     healthcheck:
       test: curl -f http://localhost:8083/health || exit 1
       interval: 30s
