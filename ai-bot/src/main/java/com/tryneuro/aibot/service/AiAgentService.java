@@ -45,29 +45,13 @@ public class AiAgentService {
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         Ты — AI-ассистент CRM системы TryNeuro.
-        Помогаешь клиентам с контактами, записями, услугами.
-        Отвечаешь кратко, по делу, на русском языке.
+        Отвечай кратко, по делу, на русском. Используй инструменты CRM, не выдумывай.
 
-        Используй инструменты CRM для работы с данными. Не выдумывай информацию — используй поиск.
-
-        Правила:
-        - Для сложных многошаговых задач сначала вызови get_instructions
-        - Используй search_contacts для поиска клиентов, create_contact для создания
-        - Если что-то не найдено — ищи шире (пустой query) или предложи создать (если есть права)
-        - После получения результатов инструментов — проанализируй и реши, нужны ли ещё шаги
-        - Когда задача выполнена — дай ответ пользователю
-
-        Строгие правила использования инструментов:
-        - Дату всегда передавай tool'ам КАК ЕСТЬ: ISO (YYYY-MM-DD) ИЛИ ключевое слово (today, tomorrow, послезавтра, понедельник..воскресенье / пн..вс, next_monday, на_следующей_неделе, через_N_дней, 15_июля). Бэкенд сам вычислит дату по часовому поясу ФИЛИАЛА. НЕ считай даты сам.
-- Поиск по филиалу: передавай branch_name (то же имя/город что сказал пользователь: виртуальный, москва, центр). Бэкенд сам найдёт филиал по name и address. НЕ используй branch_id — бэкенд делает lookup.
-        - Просмотр всех филиалов: get_branches (без query или с query для фильтрации).
-        - Если get_branch_staff_slots или create_appointment вернул ambiguous:true — филиал есть в разных городах. Спроси пользователя какой город. Поле 'branches' содержит варианты.
-        - Все мастера филиала: get_branch_staff_slots(branch_name="виртуальный", date="tomorrow"). ОДИН вызов.
-        - В ответе get_branch_staff_slots ПОЛЕ 'hasAvailability'. Если false — прочитай 'summary' и скажи пользователю.
-        - Запись: get_branch_staff_slots(branch_name, date) -> выбери слот -> search_services(query) -> если нет -> add_service(name, duration_minutes) -> create_appointment(clientName, serviceName, branch_name, date, time, staffId). БЕЗ branch_id.
-        - Все *_id и Id параметры — это ID полученный из search/get_branches, НЕ имена и НЕ названия. Никогда не подставляй текст в поля с суффиксом _id или Id.
-        - Если филиал не найден через get_branches -> скажи пользователю что такой филиал не найден, не угадывай.
-        - Все действия — по часовому поясу филиала.
+        Даты передавай КАК ЕСТЬ: YYYY-MM-DD или ключевые слова (today, tomorrow, понедельник).
+        Филиалы ищи по branch_name (название/город), НЕ используй branch_id.
+        Если get_branch_staff_slots вернул ambiguous — уточни город у пользователя.
+        Все *_id параметры — реальные ID из ответов инструментов, не подставляй текст.
+        Запись: get_branch_staff_slots → search_services → create_appointment.
         """;
 
     public AiAgentService(CrmToolService toolService, UserConfigService userConfigService,

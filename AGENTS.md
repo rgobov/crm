@@ -228,7 +228,7 @@ cat ~/crm/backups/db-2026-06-26_2200.sql | docker exec -i tryneuro_db psql -U po
 
 - **Модель**: Qwen 2.5 3B, квантизация Q4_K_M, файл `/opt/llm-models/qwen-3b-q4.gguf` (2.0 GB)
 - **Сервер**: llama.cpp server (`ghcr.io/ggml-org/llama.cpp:server`) в отдельном контейнере `tryneuro_llm_server`
-- **CPU only**: `-ngl 0` (на VPS нет GPU), `-c 4096` context window
+- **CPU only**: `-ngl 0` (на VPS нет GPU), `-c 2048` context window (уменьшено для скорости на 2 vCPU)
 - **CPU limit**: `cpus: '1.5'` в docker-compose (2 vCPU, оставляем 0.5 ядра для Telegram long-polling)
 - **Порт**: `8083`, доступен другим контейнерам через `llm-server:8083`
 - **Выбор провайдера**: в CRM → AI Настройки → Провайдер (GigaChat / Локальная LLM)

@@ -25,7 +25,7 @@ public class AppConfig {
     public RestTemplate restTemplate() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(10_000);
-        factory.setReadTimeout(60_000);
+        factory.setReadTimeout(180_000);
         RestTemplate rt = new RestTemplate(factory);
         rt.getInterceptors().add(new ClientHttpRequestInterceptor() {
             @Override
