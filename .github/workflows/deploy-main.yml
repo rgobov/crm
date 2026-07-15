@@ -106,7 +106,7 @@ jobs:
             docker exec tryneuro_proxy nginx -s reload || true
 
             echo "--- ОЧИСТКА СТАРЫХ ОБРАЗОВ ---"
-            docker image prune -a --filter "until=24h" -f
+            docker image prune --filter "until=24h" -f
 
             echo "--- СТАТУС ---"
             docker-compose ps
