@@ -5,6 +5,7 @@ services:
       context: .
       args:
         - BUILD_PROXY=${TELEGRAM_PROXY:-}
+    restart: unless-stopped
     ports:
       - "8082:8082"
     env_file: .env
