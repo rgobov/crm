@@ -105,7 +105,35 @@ class TelegramClientWrapper:
         self.phone_code_hash = None
         self.phone_number = None
         self.auth_state = "DISCONNECTED"  # DISCONNECTED, WAITING_CODE, WAITING_PASSWORD, CONNECTED
-        
+
+    async def _delete_session(self, session_file: str = None):
+        """Delete expired session file and reset client"""
+        try:
+            if session_file and os.path.exists(session_file):
+                os.remove(session_file)
+                logger.info(f"Deleted expired session file: {session_file}")
+            elif not session_file and self.client:
+                # Try to find and delete session file from client
+                session_name = os.path.join(self.session_path, "tg_session")
+                sf = f"{session_name}.session"
+                if os.path.exists(sf):
+                    os.remove(sf)
+                    logger.info(f"Deleted expired session file: {sf}")
+            # Reset client to force fresh creation
+            if self.client:
+                try:
+                    if self.client.is_connected:
+                        await self.client.disconnect()
+                except:
+                    pass
+                self.client = None
+            self.is_ready = False
+            self.is_authorized = False
+            self.phone_code_hash = None
+            self.auth_state = "DISCONNECTED"
+        except Exception as e:
+            logger.error(f"Failed to delete session for {self.tenant_id}: {e}")
+
     async def start(self):
         os.makedirs(self.session_path, exist_ok=True)
         # Session name should not be the same as the directory path to avoid SQLite errors
@@ -175,13 +203,17 @@ class TelegramClientWrapper:
                         else:
                             logger.warning(f"Session exists but not authorized for {self.tenant_id}")
                             await self.client.disconnect()
+                            await self._delete_session(session_file)
                     except Exception as e:
                         logger.warning(f"Session exists but not authorized for {self.tenant_id}: {e}")
                         await self.client.disconnect()
+                        await self._delete_session(session_file)
                 else:
                     logger.warning(f"Session exists but not connected for {self.tenant_id}")
+                    await self._delete_session(session_file)
             except Exception as e:
                 logger.warning(f"Failed to start with existing session for {self.tenant_id}: {e}")
+                await self._delete_session(session_file)
 
         # New session needed - wait for phone number
         logger.info(f"New session needed for tenant {self.tenant_id}")
@@ -195,6 +227,13 @@ class TelegramClientWrapper:
             await self.start()
 
         self.phone_number = phone_number  # Save phone number for sign_in
+
+        # If client is still None after start(), recreate fresh
+        if not self.client:
+            logger.info(f"Recreating client for tenant {self.tenant_id} (session was deleted)")
+            await self.start()
+            if not self.client:
+                raise HTTPException(status_code=500, detail="Failed to create Telegram client")
 
         # Ensure client is connected before sending code
         try:
