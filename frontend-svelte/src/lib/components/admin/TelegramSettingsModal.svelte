@@ -279,6 +279,14 @@
                                 <button class="btn-primary" on:click={handleSignIn} disabled={isProcessing}>
                                     {#if isProcessing}{connectStep}{:else}ПОДТВЕРДИТЬ{/if}
                                 </button>
+                                <div class="code-actions">
+                                    <button class="btn-secondary" on:click={handleSendCode} disabled={isProcessing}>
+                                        Запросить новый код
+                                    </button>
+                                    <button class="btn-back" on:click={() => { status = 'DISCONNECTED'; userInitiated = false; errorMessage = ''; }}>
+                                        ← Назад
+                                    </button>
+                                </div>
                             </div>
                             {#if status === 'CODE_ERROR'}
                                 <p class="error-text">❌ Неверный код. Попробуйте еще раз.</p>
@@ -370,6 +378,9 @@
     .btn-secondary { background: #fdf6e3; color: #586e75; border: 1.5px solid #ddd6c1; padding: 12px 24px; border-radius: 14px; font-weight: 850; cursor: pointer; font-size: 13px; text-transform: uppercase; }
     .btn-danger { background: #dc322f; color: white; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 850; cursor: pointer; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
     .btn-danger:hover { background: #cb4b16; }
+    .code-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .code-actions .btn-secondary { flex: 1; padding: 12px 12px; border-radius: 14px; font-weight: 800; cursor: pointer; font-size: 12px; text-transform: uppercase; background: #fdf6e3; color: #586e75; border: 1.5px solid #ddd6c1; }
+    .btn-back { flex: 1; padding: 12px 12px; border-radius: 14px; font-weight: 800; cursor: pointer; font-size: 12px; text-transform: uppercase; background: none; color: #268bd2; border: 1.5px solid #268bd2; text-align: center; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
