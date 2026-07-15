@@ -84,7 +84,7 @@ services:
     image: 'jc21/nginx-proxy-manager:latest'
     container_name: tryneuro_proxy
     restart: always
-    entrypoint: sed -i '/^gzip on;/d' /etc/nginx/conf.d/gzip.conf; exec /init
+    entrypoint: /bin/sh -c "rm -f /etc/nginx/conf.d/gzip.conf 2>/dev/null; exec /init"
     logging: *default-logging
     ports:
       - '80:80'
