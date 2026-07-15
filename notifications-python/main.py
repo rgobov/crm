@@ -409,8 +409,8 @@ class TelegramClientWrapper:
             logger.error(f"Failed to bind telegram_id: {e}")
              
     async def send_message(self, phone: str, name: str, text: str):
-        if not self.client or not self.is_ready:
-            raise HTTPException(status_code=400, detail="Client not connected")
+        if not self.client or not self.is_ready or not self.is_authorized:
+            raise HTTPException(status_code=400, detail="Client not connected or not authorized")
             
         try:
             # Import contact using the proper type
@@ -433,6 +433,10 @@ class TelegramClientWrapper:
                 f"Message sent to {phone} (user_id={user.id}): "
                 f"msg_id={msg.id}, date={msg.date}, out={msg.outgoing}"
             )
+            
+            if not msg.outgoing:
+                logger.error(f"Message not marked as outgoing for {phone}, session might be invalid")
+                raise HTTPException(status_code=500, detail="Message not sent (session invalid)")
             
             return {"status": "sent", "msg_id": msg.id}
             
@@ -625,9 +629,10 @@ async def connect(
     if x_internal_secret != settings.internal_secret:
         logger.warning("Invalid secret in connect request")
         raise HTTPException(status_code=401, detail="Invalid secret")
-        
-    logger.info(f"Connect request processed for tenant: {tenantId}")
-    return {"status": "ok"}
+    
+    client_wrapper = await get_client(tenantId)
+    logger.info(f"Connect request processed for tenant: {tenantId}, authorized={client_wrapper.is_authorized if client_wrapper else False}")
+    return {"status": "ok", "authorized": client_wrapper.is_authorized if client_wrapper else False}
 
 @app.post("/api/telegram/send-code")
 async def send_code(
@@ -724,7 +729,11 @@ async def get_client(tenant_id: str) -> Optional[TelegramClientWrapper]:
             return None
             
         if tenant_id in active_clients:
-            return active_clients[tenant_id]
+            wrapper = active_clients[tenant_id]
+            if wrapper.client is not None and wrapper.is_authorized:
+                return wrapper
+            logger.info(f"Recreating client for {tenant_id} (was dead)")
+            del active_clients[tenant_id]
             
         client_wrapper = await create_new_client_instance(tenant_id)
         active_clients[tenant_id] = client_wrapper
