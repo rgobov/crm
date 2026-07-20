@@ -97,8 +97,7 @@ jobs:
             echo "--- ОТКЛЮЧЕНИЕ IPv6 И ОПТИМИЗАЦИЯ NGINX (GZIP) ---"
             docker exec tryneuro_proxy sh -c "
               sed -i 's/listen \[::\]/#listen [::]/g' /data/nginx/proxy_host/*.conf /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/production.conf
-              echo 'gzip on;
-              gzip_proxied any;
+              echo 'gzip_proxied any;
               gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
               gzip_vary on;
               gzip_comp_level 6;' > /etc/nginx/conf.d/gzip.conf
