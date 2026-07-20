@@ -58,5 +58,14 @@ export const adminService = {
             responseType: 'blob'
         });
         return response.data;
+    },
+
+    async getReturnReminderCandidates(days = 30) {
+        const response = await api.get('/admin/return-reminders', { params: { days } });
+        return response.data;
+    },
+
+    async sendReturnReminder(contactId, message) {
+        return await api.post('/admin/return-reminders/send', { contactId, message });
     }
 };

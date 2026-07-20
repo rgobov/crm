@@ -14,7 +14,8 @@ public class DashboardService {
     private final ContactService contactService;
     private final StaffMemberService staffMemberService;
     private final ScheduleService scheduleService;
-    private final ResourceService resourceService; // ДОБАВИЛИ
+    private final ResourceService resourceService;
+    private final ReturnReminderService returnReminderService;
 
     /**
      * Собирает общую статистику для дашборда
@@ -23,13 +24,16 @@ public class DashboardService {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalClients", contactService.countContacts(tenantId));
         stats.put("totalStaff", staffMemberService.getAllStaff(tenantId).size());
-        
+
         // Сегодняшние записи по всей компании
         stats.put("todayAppointments", scheduleService.getAppointmentsForDay(LocalDate.now(), tenantId, null).size());
-        
-        // НОВОЕ: Добавляем количество ресурсов
+
+        // Количество ресурсов
         stats.put("totalResources", resourceService.getResources(tenantId, null).size());
-        
+
+        // Клиенты, не бывшие 30+ дней
+        stats.put("returnReminderCount", returnReminderService.getCount(tenantId, 30));
+
         return stats;
     }
 }

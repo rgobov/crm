@@ -16,6 +16,7 @@
     const menuItems = [
         { id: 'management', label: 'Главная', icon: '📊' },
         { id: 'timeline', label: 'Таймлайн', icon: '🕒' },
+        { id: 'return-reminders', label: 'Возврат', icon: '📩' },
         { id: 'ai', label: 'AI', icon: '🤖' }
     ];
 
@@ -41,6 +42,10 @@
         if (id === 'ai') {
             activeTab.set('ai');
             goto('/admin/settings/ai');
+            return;
+        }
+        if (id === 'return-reminders') {
+            goto('/admin/return-reminders');
             return;
         }
         activeTab.set(id);

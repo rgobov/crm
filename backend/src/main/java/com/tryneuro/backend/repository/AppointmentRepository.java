@@ -93,4 +93,39 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
                                                  @Param("endDate") java.time.LocalDate endDate);
 
     List<Appointment> findByGroupId(String groupId);
+
+    @Query(value = """
+        SELECT c.id, c.name,
+               COALESCE(c.phones[1], '') as phone,
+               last_app.service, last_app.start_time
+        FROM contacts c
+        JOIN LATERAL (
+            SELECT a.service, a.start_time
+            FROM appointments a
+            WHERE a.contact_id = c.id AND a.status IN ('COMPLETED', 'ARRIVED')
+            ORDER BY a.start_time DESC
+            LIMIT 1
+        ) last_app ON true
+        WHERE c.tenant_id = :tenantId
+          AND last_app.start_time < :cutoffDate
+        ORDER BY last_app.start_time ASC
+        """, nativeQuery = true)
+    List<Object[]> findReturnReminderCandidates(@Param("tenantId") String tenantId,
+                                                @Param("cutoffDate") OffsetDateTime cutoffDate);
+
+    @Query(value = """
+        SELECT COUNT(*)
+        FROM contacts c
+        JOIN LATERAL (
+            SELECT a.start_time
+            FROM appointments a
+            WHERE a.contact_id = c.id AND a.status IN ('COMPLETED', 'ARRIVED')
+            ORDER BY a.start_time DESC
+            LIMIT 1
+        ) last_app ON true
+        WHERE c.tenant_id = :tenantId
+          AND last_app.start_time < :cutoffDate
+        """, nativeQuery = true)
+    long countReturnReminderCandidates(@Param("tenantId") String tenantId,
+                                       @Param("cutoffDate") OffsetDateTime cutoffDate);
 }

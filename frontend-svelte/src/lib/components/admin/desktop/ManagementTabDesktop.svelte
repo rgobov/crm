@@ -30,7 +30,7 @@
     export let forcedDate = null;
     export let branchId = null;
 
-    let stats = { totalClients: 0, todayAppointments: 0, totalResources: 0, totalStaff: 0 };
+    let stats = { totalClients: 0, todayAppointments: 0, totalResources: 0, totalStaff: 0, returnReminderCount: 0 };
     let isLoading = true;
     let error = null;
     let showTelegramModal = false;
@@ -50,7 +50,8 @@
         { id: 'staff', title: 'Персонал', desc: 'Сотрудники и роли', icon: '👤', link: '/admin/staff' },
         { id: 'resources', title: 'Ресурсы', desc: 'Оборудование и залы', icon: '⚒️', link: '/admin/resources' },
         { id: 'services', title: 'Услуги', desc: 'Ваш прайс-лист', icon: '⭐', link: '/admin/services' },
-        { id: 'clients', title: 'Клиенты', desc: 'База клиентов', icon: '💎', link: '/admin/clients' }
+        { id: 'clients', title: 'Клиенты', desc: 'База клиентов', icon: '💎', link: '/admin/clients' },
+        { id: 'return-reminders', title: 'Возврат клиентов', desc: 'Напомнить о визите', icon: '📩', link: '/admin/return-reminders' }
     ];
 
     let exportStartDate = (() => {
@@ -124,6 +125,12 @@
                 <div class="stat-content">
                     <span class="val">{stats.totalStaff}</span>
                     <span class="lbl">Мастера</span>
+                </div>
+            </div>
+            <div class="stat-card clickable" on:click={() => goto('/admin/return-reminders')}>
+                <div class="stat-content">
+                    <span class="val" style="color: #0088cc">{stats.returnReminderCount}</span>
+                    <span class="lbl">Возврат</span>
                 </div>
             </div>
         </div>
@@ -259,7 +266,7 @@
     }
 
     /* СЕТКА СТАТИСТИКИ С ЗОЛОТЫМ СЕЧЕНИЕМ */
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-bottom: 34px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-bottom: 34px; }
     .stat-card {
         background: #eee8d5;
         border: 1.5px solid #ddd6c1;
@@ -274,6 +281,9 @@
     .stat-content { text-align: center; }
     .stat-card .val { display: block; font-size: 28px; font-weight: 900; color: #268bd2; line-height: 1; margin-bottom: 4px; }
     .stat-card .lbl { font-size: 10px; font-weight: 850; color: #93a1a1; text-transform: uppercase; letter-spacing: 0.8px; }
+    .stat-card.clickable { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+    .stat-card.clickable:hover { transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    .stat-card.clickable:active { transform: scale(0.98); }
 
     .section-label { font-size: 11px; font-weight: 900; color: #93a1a1; letter-spacing: 1.6px; margin-bottom: 16px; text-transform: uppercase; padding-left: 8px; }
 

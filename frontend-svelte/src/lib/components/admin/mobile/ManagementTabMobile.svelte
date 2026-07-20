@@ -40,7 +40,8 @@
         totalClients: 0,
         todayAppointments: 0,
         totalResources: 0,
-        totalStaff: 0
+        totalStaff: 0,
+        returnReminderCount: 0
     };
     let isLoading = true;
 
@@ -165,6 +166,17 @@
                     </div>
                 </div>
                 <span class="story-label">Ресурсы</span>
+            </div>
+
+            <!-- СТОРИС: ВОЗВРАТ -->
+            <div class="story-item" on:click={() => safeGoto('/admin/return-reminders')}>
+                <div class="story-circle ring-teal">
+                    <div class="story-inner">
+                        <span class="s-icon">📩</span>
+                        <span class="s-val">{formatStat(stats.returnReminderCount)}</span>
+                    </div>
+                </div>
+                <span class="story-label">Возврат</span>
             </div>
 
         </div>
@@ -299,6 +311,7 @@
     .ring-magenta { background: linear-gradient(45deg, #d33682, #6c71c4); }
     .ring-green { background: linear-gradient(45deg, #859900, #2aa198); }
     .ring-orange { background: linear-gradient(45deg, #cb4b16, #b58900); }
+    .ring-teal { background: linear-gradient(45deg, #0088cc, #5bc0de); }
 
     .story-inner {
         width: 100%; height: 100%;

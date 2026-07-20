@@ -20,7 +20,8 @@ public class NotificationTemplateService {
     // ОБНОВЛЕННЫЕ ДЕФОЛТЫ (соответствуют новой логике)
     private static final Map<String, String> DEFAULT_TEMPLATES = Map.of(
         "REMINDER", "Здравствуйте, {client}! Напоминаем о вашей записи на {service}: {date} в {time}.",
-        "APPOINTMENT_CANCELLED", "Ваша запись на {date} в {time} ({service}) была отменена."
+        "APPOINTMENT_CANCELLED", "Ваша запись на {date} в {time} ({service}) была отменена.",
+        "RETURN_REMINDER", "Здравствуйте, {client}! Давно не видели вас. Приглашаем записаться на {last_service}."
     );
 
     public List<NotificationTemplate> getAllTemplates(String tenantId) {
