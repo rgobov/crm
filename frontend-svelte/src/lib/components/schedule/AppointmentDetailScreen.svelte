@@ -173,6 +173,10 @@
                 </div>
                 <div class="call-action">
                     <a href="tel:{appointment.clientPhone}" class="btn-call-action">ВЫЗОВ</a>
+                    <a href="tg://resolve?phone={appointment.clientPhone.replace(/\D/g, '')}" class="btn-tg-action" target="_blank">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="white"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.127-.007.352-.086.62-.272 1.063-1.444 5.147-1.444 5.147s-.187.58-.583.595c-.2.014-.465-.147-.59-.252-.13-.108-1.094-.768-1.414-.944-.31-.176-.666-.2-.95-.056-.58.297-1.17 1.147-1.526 1.487-.168.168-.344.26-.563.245-.396-.035-.56-.422-.56-.422s-.352-1.09-.622-2.01a3.9 3.9 0 01-.198-.618c-.11-.468.307-.68.495-.75l2.958-1.05c.165-.06.31-.022.414.076.083.078.12.194.104.31-.04.226-.26.78-.34 1.006-.08.226-.163.498-.05.698.072.13.235.178.384.13.226-.08 1.186-.656 1.78-1.098.35-.26.62-.392.77-.434.093-.026.2-.01.28.04z"/></svg>
+                        TG
+                    </a>
                 </div>
             </div>
         {/if}
@@ -316,6 +320,8 @@
     .tile-icon.phone { background: #dbeafe; color: #3b82f6; }
     .phone-link { color: #2563eb !important; text-decoration: none; font-size: 17px !important; }
     .btn-call-action { background: #3b82f6; color: white; padding: 6px 12px; border-radius: 10px; font-size: 10px; font-weight: 900; text-decoration: none; }
+    .call-action { display: flex; align-items: center; gap: 6px; }
+    .btn-tg-action { background: #0088cc; color: white; padding: 6px 10px; border-radius: 10px; font-size: 10px; font-weight: 900; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
 
     .reference-tile { background: #f0fdf4; border-color: #dcfce7; }
     .tile-icon.car { background: #dcfce7; color: #10b981; }
