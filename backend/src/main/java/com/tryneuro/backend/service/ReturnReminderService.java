@@ -10,14 +10,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,26 +33,43 @@ public class ReturnReminderService {
     public List<ReturnReminderCandidate> getCandidates(String tenantId, int daysThreshold) {
         OffsetDateTime cutoff = OffsetDateTime.now().minusDays(daysThreshold);
         List<Object[]> rows = appointmentRepository.findReturnReminderCandidates(tenantId, cutoff);
+        if (rows.isEmpty()) return List.of();
+
+        // Загружаем телефоны из контактов (native query не умеет phones[1])
+        Set<String> contactIds = rows.stream()
+                .map(r -> (String) r[0]).collect(Collectors.toSet());
+        Map<String, Contact> contactMap = contactRepository.findAllById(contactIds)
+                .stream().collect(Collectors.toMap(Contact::getId, c -> c));
+
         List<ReturnReminderCandidate> result = new ArrayList<>();
 
         for (Object[] row : rows) {
             String contactId = (String) row[0];
             String name = (String) row[1];
-            String phone = (String) row[2];
-            String lastService = (String) row[3];
-            Timestamp ts = (Timestamp) row[4];
-            LocalDateTime lastVisit = ts != null ? ts.toLocalDateTime() : null;
+            String lastService = (String) row[2];
+
+            OffsetDateTime lastVisit = null;
+            Object raw = row[3];
+            if (raw instanceof OffsetDateTime odt) {
+                lastVisit = odt;
+            } else if (raw instanceof Instant instant) {
+                lastVisit = instant.atOffset(ZoneOffset.UTC);
+            }
+
+            Contact contact = contactMap.get(contactId);
+            String phone = contact != null && contact.getPhones() != null && !contact.getPhones().isEmpty()
+                    ? contact.getPhones().get(0) : "";
 
             long daysSince = lastVisit != null
-                ? ChronoUnit.DAYS.between(lastVisit, LocalDateTime.now())
-                : 0;
+                    ? ChronoUnit.DAYS.between(lastVisit.toLocalDate(), LocalDate.now())
+                    : 0;
 
             result.add(ReturnReminderCandidate.builder()
                     .contactId(contactId)
                     .name(name)
                     .phone(phone)
                     .lastService(lastService)
-                    .lastVisit(lastVisit)
+                    .lastVisit(lastVisit != null ? lastVisit.toLocalDateTime() : null)
                     .daysSinceLastVisit(daysSince)
                     .build());
         }

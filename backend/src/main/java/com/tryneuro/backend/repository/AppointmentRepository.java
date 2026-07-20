@@ -96,7 +96,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
 
     @Query(value = """
         SELECT c.id, c.name,
-               COALESCE(c.phones[1], '') as phone,
                last_app.service, last_app.start_time
         FROM contacts c
         JOIN LATERAL (

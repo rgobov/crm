@@ -12,12 +12,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -39,13 +40,20 @@ class ReturnReminderServiceTest {
     }
 
     @Test
-    @DisplayName("getCandidates — маппинг Object[] в DTO")
+    @DisplayName("getCandidates — маппинг Object[] в DTO + телефон из ContactRepository")
     void testGetCandidates() {
-        Timestamp lastVisit = Timestamp.valueOf(LocalDateTime.now().minusDays(45));
-        Object[] row = {"contact-1", "Иван Петров", "+79991234567", "Замена масла", lastVisit};
+        OffsetDateTime lastVisit = OffsetDateTime.now().minusDays(45);
+        Object[] row = {"contact-1", "Иван Петров", "Замена масла", lastVisit};
         List<Object[]> rows = java.util.Collections.singletonList(row);
         when(appointmentRepository.findReturnReminderCandidates(eq("t-1"), any(OffsetDateTime.class)))
                 .thenReturn(rows);
+
+        Contact contact = new Contact();
+        contact.setId("contact-1");
+        contact.setName("Иван Петров");
+        contact.setPhones(List.of("+79991234567"));
+        when(contactRepository.findAllById(Set.of("contact-1")))
+                .thenReturn(List.of(contact));
 
         List<ReturnReminderCandidate> result = returnReminderService.getCandidates("t-1", 30);
 
@@ -63,6 +71,29 @@ class ReturnReminderServiceTest {
         when(appointmentRepository.findReturnReminderCandidates(anyString(), any(OffsetDateTime.class)))
                 .thenReturn(List.of());
         assertTrue(returnReminderService.getCandidates("t-1", 30).isEmpty());
+    }
+
+    @Test
+    @DisplayName("getCandidates — поддерживает Instant как тип даты из native query")
+    void testGetCandidatesWithInstant() {
+        Instant lastVisit = Instant.now().minusSeconds(45 * 86400);
+        Object[] row = {"c-2", "Мария", "Диагностика", lastVisit};
+        List<Object[]> rows = java.util.Collections.singletonList(row);
+        when(appointmentRepository.findReturnReminderCandidates(anyString(), any(OffsetDateTime.class)))
+                .thenReturn(rows);
+
+        Contact contact = new Contact();
+        contact.setId("c-2");
+        contact.setPhones(List.of("+79876543210"));
+        when(contactRepository.findAllById(Set.of("c-2")))
+                .thenReturn(List.of(contact));
+
+        List<ReturnReminderCandidate> result = returnReminderService.getCandidates("t-1", 30);
+
+        assertEquals(1, result.size());
+        assertEquals("Мария", result.get(0).getName());
+        assertEquals("Диагностика", result.get(0).getLastService());
+        assertEquals(45, result.get(0).getDaysSinceLastVisit());
     }
 
     @Test
