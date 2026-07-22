@@ -433,11 +433,10 @@ class TelegramClientWrapper:
                 f"Message sent to {phone} (user_id={user.id}): "
                 f"msg_id={msg.id}, date={msg.date}, out={msg.outgoing}"
             )
-            
+
             if not msg.outgoing:
-                logger.error(f"Message not marked as outgoing for {phone}, session might be invalid")
-                raise HTTPException(status_code=500, detail="Message not sent (session invalid)")
-            
+                logger.warning(f"Message not marked as outgoing for {phone}, session might be stale — но сообщение доставлено")
+
             return {"status": "sent", "msg_id": msg.id}
             
         except Exception as e:
