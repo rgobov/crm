@@ -58,9 +58,15 @@ public class Branch {
 
 
 
-    @Column(nullable = false, columnDefinition = "boolean default true")
+@Column(nullable = false, columnDefinition = "boolean default true")
 
     private boolean active = true;
+
+
+
+    @Column(nullable = false, columnDefinition = "varchar(20) default 'AUTO'")
+
+    private String niche = "AUTO";
 
 
 

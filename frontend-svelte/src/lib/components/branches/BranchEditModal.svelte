@@ -2,6 +2,7 @@
     import { createEventDispatcher } from 'svelte';
     import { branchService } from '$lib/services/branchService.js';
     import { branchStore } from '$lib/stores/branchStore.js';
+    import { NICHE_LIST } from '$lib/config/nicheConfig.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -11,6 +12,7 @@
     let name = branch?.name || '';
     let address = branch?.address || '';
     let timezone = branch?.timezone || 'Europe/Moscow';
+    let niche = branch?.niche || 'AUTO';
     let isSaving = false;
 
     const timezones = [
@@ -32,7 +34,7 @@
         if (!name) return alert('Укажите название филиала');
         isSaving = true;
         try {
-            const payload = { name, address, timezone };
+            const payload = { name, address, timezone, niche };
             if (branch) {
                 await branchService.updateBranch(branch.id, payload);
             } else {
@@ -65,6 +67,22 @@
             <div class="form-group">
                 <label>Адрес</label>
                 <input type="text" bind:value={address} placeholder="Улица, дом, офис..." />
+            </div>
+
+            <div class="form-group">
+                <label>Тип бизнеса (ниша)</label>
+                <div class="niche-tabs">
+                    {#each NICHE_LIST as n}
+                        <button type="button"
+                            class="niche-tab"
+                            class:active={niche === n.value}
+                            on:click={() => niche = n.value}>
+                            <span class="nt-icon">{n.icon}</span>
+                            <span class="nt-label">{n.label}</span>
+                        </button>
+                    {/each}
+                </div>
+                <p class="hint">Влияет на названия полей, иконки и вид таймлайна</p>
             </div>
 
             <div class="form-group">
@@ -117,4 +135,31 @@
     }
     .btn-save:active { transform: scale(0.98); }
     .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .niche-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    .niche-tab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 14px 8px;
+        background: white;
+        border: 2px solid #ddd6c1;
+        border-radius: 16px;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: inherit;
+    }
+    .niche-tab:hover { border-color: #268bd2; }
+    .niche-tab.active {
+        border-color: #268bd2;
+        background: #fdf6e3;
+        box-shadow: 0 0 0 3px rgba(38, 139, 210, 0.12);
+    }
+    .nt-icon { font-size: 24px; }
+    .nt-label { font-size: 12px; font-weight: 800; color: #073642; text-transform: none; }
 </style>

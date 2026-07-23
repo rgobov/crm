@@ -3,6 +3,7 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { serviceService } from '$lib/services/serviceService.js';
+    import { nicheSettings } from '$lib/stores/nicheStore.js';
     import { fade, scale, slide } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -183,9 +184,9 @@
 
         {#if appointment.referenceTag}
             <div class="info-tile reference-tile" in:slide>
-                <div class="tile-icon car">�</div>
+                <div class="tile-icon car">{$nicheSettings.refIcon}</div>
                 <div class="tile-body">
-                    <label>Объект визита</label>
+                    <label>{$nicheSettings.refDetailLabel}</label>
                     <p class="val">{appointment.referenceTag}</p>
                 </div>
             </div>

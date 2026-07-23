@@ -2,6 +2,7 @@
     import { createEventDispatcher } from 'svelte';
     import { scale, fade } from 'svelte/transition';
     import { timeUtils } from '$lib/utils/timeUtils.js';
+    import { nicheSettings } from '$lib/stores/nicheStore.js';
 
     export let appt;
     export let startHour;
@@ -79,7 +80,7 @@
             {#if !isUltraShort}
                 <div class="sub-details-stack">
                     {#if appt.referenceTag}
-                        <span class="ref-tag">🚗 {appt.referenceTag}</span>
+                        <span class="ref-tag">{$nicheSettings.refIcon} {appt.referenceTag}</span>
                     {/if}
                     <span class="sv">{appt.service}</span>
                 </div>

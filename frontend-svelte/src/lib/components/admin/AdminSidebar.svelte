@@ -3,6 +3,7 @@
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { logout } from '$lib/stores/auth.js';
     import { branchStore } from '$lib/stores/branchStore.js';
+    import { getNicheIcon } from '$lib/config/nicheConfig.js';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
     import { createEventDispatcher, onMount } from 'svelte';
@@ -83,7 +84,7 @@
                 {:else if branches && branches.length > 0}
                     <select class="branch-select" bind:value={$activeBranchId}>
                         {#each branches as b}
-                            <option value={b.id}>{b.name}</option>
+                            <option value={b.id}>{getNicheIcon(b.niche)} {b.name}</option>
                         {/each}
                     </select>
                 {:else}

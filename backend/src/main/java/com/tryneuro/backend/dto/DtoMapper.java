@@ -86,6 +86,7 @@ public class DtoMapper {
                 .name(entity.getName())
                 .address(entity.getAddress())
                 .timezone(entity.getTimezone())
+                .niche(entity.getNiche() != null ? entity.getNiche() : "AUTO")
                 .build();
     }
 
@@ -96,6 +97,7 @@ public class DtoMapper {
         entity.setName(dto.getName());
         entity.setAddress(dto.getAddress());
         entity.setTimezone(dto.getTimezone());
+        entity.setNiche(dto.getNiche() != null ? dto.getNiche() : "AUTO");
         entity.setTenantId(tenantId);
         return entity;
     }

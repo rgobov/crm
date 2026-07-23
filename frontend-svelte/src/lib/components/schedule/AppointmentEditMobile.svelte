@@ -3,9 +3,9 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { contactService } from '$lib/services/contactService.js';
-    import { serviceService } from '$lib/services/serviceService.js';
-    import { resourceService } from '$lib/services/resourceService.js';
     import { branchService } from '$lib/services/branchService.js';
+    import { nicheSettings } from '$lib/stores/nicheStore.js';
+    import { resourceService } from '$lib/services/resourceService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
     import SearchDropdownItem from './SearchDropdownItem.svelte';
@@ -354,7 +354,7 @@
                                     <button class="dropdown-action-btn" on:click={() => selectContact(c)} type="button" role="option" aria-selected="false">
                                         <SearchDropdownItem
                                             title={c.name}
-                                            subtitle={(c.tags && c.tags.length > 0) ? `🚗 ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
+                                            subtitle={(c.tags && c.tags.length > 0) ? `${$nicheSettings.assetIcon} ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
                                             type="client"
                                         />
                                     </button>
@@ -431,9 +431,9 @@
                 {/if}
 
                 <div class="tile-card reference-card">
-                    <label for="ref-tag-id">АВТОМОБИЛЬ / ОБЪЕКТ</label>
+                    <label for="ref-tag-id">{$nicheSettings.refLabel}</label>
                     <div class="tag-input-wrap">
-                        <input id="ref-tag-id" type="text" bind:value={formData.referenceTag} placeholder="Марка, модель, госномер..." />
+                        <input id="ref-tag-id" type="text" bind:value={formData.referenceTag} placeholder={$nicheSettings.refPlaceholder} />
                         {#if selectedContact?.tags?.length > 0}
                             <div class="quick-tags" in:slide>
                                 {#each selectedContact.tags as tag}

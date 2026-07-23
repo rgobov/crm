@@ -1,6 +1,7 @@
 <script>
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchStore } from '$lib/stores/branchStore.js';
+    import { getNicheIcon } from '$lib/config/nicheConfig.js';
     import { openModal } from '$lib/stores/modalStore.js';
     import { logout } from '$lib/stores/auth.js';
     import { goto } from '$app/navigation';
@@ -132,7 +133,7 @@
                                 class="branch-card"
                                 class:active={$activeBranchId === b.id}
                                 on:click={() => selectBranch(b.id)}>
-                                <span class="b-icon">🏢</span>
+                                <span class="b-icon">{getNicheIcon(b.niche)}</span>
                                 <span class="b-name">{b.name}</span>
                                 {#if $activeBranchId === b.id}
                                     <span class="active-dot">✓</span>

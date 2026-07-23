@@ -6,6 +6,7 @@
     import { resourceService } from '$lib/services/resourceService.js';
     import { branchService } from '$lib/services/branchService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { nicheSettings } from '$lib/stores/nicheStore.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
     import SearchDropdownItem from './SearchDropdownItem.svelte';
     import { fade, slide, scale } from 'svelte/transition';
@@ -334,7 +335,7 @@
                                 {#each searchResults as c}
                                     <SearchDropdownItem
                                         title={c.name}
-                                        subtitle={(c.tags && c.tags.length > 0) ? `🚗 ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
+                                        subtitle={(c.tags && c.tags.length > 0) ? `${$nicheSettings.assetIcon} ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
                                         type="client"
                                         on:select={() => selectContact(c)}
                                     />
@@ -374,9 +375,9 @@
 
             <div class="tiles-stack">
                 <div class="tile-card reference-card">
-                    <label>АВТОМОБИЛЬ / ОБЪЕКТ</label>
-                    <div class="tag-input-wrap">
-                        <input type="text" bind:value={formData.referenceTag} placeholder="Марка, модель, госномер..." />
+<label>{$nicheSettings.refLabel}</label>
+                        <div class="tag-input-wrap">
+                        <input type="text" bind:value={formData.referenceTag} placeholder={$nicheSettings.refPlaceholder} />
                         {#if selectedContact?.tags?.length > 0}
                             <div class="quick-tags" in:slide>
                                 {#each selectedContact.tags as tag}

@@ -14,6 +14,8 @@
 
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
 
+    import { nicheSettings } from '$lib/stores/nicheStore.js';
+
     import { timeUtils } from '$lib/utils/timeUtils.js';
 
     import SearchDropdownItem from '../SearchDropdownItem.svelte';
@@ -534,7 +536,7 @@
 
                                             title={c.name}
 
-                                            subtitle={(c.tags && c.tags.length > 0) ? `🚗 ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
+                                            subtitle={(c.tags && c.tags.length > 0) ? `${$nicheSettings.assetIcon} ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
 
                                             type="client"
 
@@ -576,11 +578,11 @@
 
                 <div class="tile-card reference-card">
 
-                    <label for="ref-tag-id">АВТОМОБИЛЬ / ОБЪЕКТ</label>
+                    <label for="ref-tag-id">{$nicheSettings.refLabel}</label>
 
                     <div class="tag-input-wrap">
 
-                        <input id="ref-tag-id" type="text" bind:value={formData.referenceTag} placeholder="Марка, модель, госномер..." />
+                        <input id="ref-tag-id" type="text" bind:value={formData.referenceTag} placeholder={$nicheSettings.refPlaceholder} />
 
                         {#if selectedContact?.tags?.length > 0}
 

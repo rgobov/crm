@@ -2,6 +2,7 @@
     import { createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { fade } from 'svelte/transition';
+    import { nicheSettings } from '$lib/stores/nicheStore.js';
 
     export let appointment;
     const dispatch = createEventDispatcher();
@@ -95,7 +96,7 @@
             </div>
             {#if appointment.referenceTag}
                 <div class="data-item highlight">
-                    <span class="icon">�</span>
+                    <span class="icon">{$nicheSettings.refIcon}</span>
                     <span>{appointment.referenceTag}</span>
                 </div>
             {/if}

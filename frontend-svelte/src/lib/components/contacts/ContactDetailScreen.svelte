@@ -3,6 +3,7 @@
     import api from '$lib/api.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
     import { adminService } from '$lib/services/adminService.js';
+    import { nicheSettings } from '$lib/stores/nicheStore.js';
     import { fade, slide, scale } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -12,10 +13,10 @@
     let contact = null;
     let isLoading = true;
 
-    // Константы для локализации (в будущем можно брать из настроек компании)
-    const ASSET_LABEL = "Связанные объекты";
-    const ASSET_ICON = "🚗";
-    const ASSET_PLACEHOLDER = "Марка, госномер, S/N...";
+    // Адаптивные лейблы/иконки под выбранную нишу филиала
+    $: ASSET_LABEL = $nicheSettings.assetLabel;
+    $: ASSET_ICON = $nicheSettings.assetIcon;
+    $: ASSET_PLACEHOLDER = $nicheSettings.assetPlaceholder;
 
     let editMode = { name: false, email: false, notes: false, phoneIdx: -1, isAddingPhone: false, isAddingTag: false };
     let tempValues = { name: '', phones: [], email: '', notes: '', tags: [], newPhone: '', newTag: '' };
@@ -162,12 +163,12 @@
                         <div class="tag-badge" in:scale>
                             <span class="tag-icon">{ASSET_ICON}</span>
                             <span class="tag-text">{tag}</span>
-                            <button class="tag-remove" on:click={() => removeTag(i)} type="button" aria-label="Удалить объект">✕</button>
+                            <button class="tag-remove" on:click={() => removeTag(i)} type="button" aria-label={$nicheSettings.assetAriaLabel}>✕</button>
                         </div>
                     {/each}
 
                     {#if !editMode.isAddingTag}
-                        <button class="btn-add-tag" on:click={() => editMode.isAddingTag = true} type="button">+ Объект</button>
+                        <button class="btn-add-tag" on:click={() => editMode.isAddingTag = true} type="button">{$nicheSettings.assetAddBtn}</button>
                     {:else}
                         <div class="tag-edit-inline" transition:slide={{axis:'x'}}>
                             <input id="new-tag-input" type="text" bind:value={tempValues.newTag} placeholder={ASSET_PLACEHOLDER} autofocus
