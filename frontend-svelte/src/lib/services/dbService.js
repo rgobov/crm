@@ -13,7 +13,8 @@ export const dbService = {
         if (!staffId) return null;
         try {
             return await db.staffPhotos.get(staffId);
-            // Возвращаем весь объект { staffId, photoData, updatedAt }
+            // Возвращаем весь объект { staffId, photoData, updatedAt, noPhoto }
+            // noPhoto=true — признак что фото точно нет (кэш отрицательного результата)
         } catch (e) {
             console.error('DB Error getting photo:', e);
             return null;
@@ -21,9 +22,12 @@ export const dbService = {
     },
 
     async savePhoto(staffId, photoData, updatedAt = Date.now()) {
-        if (!staffId || !photoData) return;
+        if (!staffId) return;
         try {
-            await db.staffPhotos.put({ staffId, photoData, updatedAt });
+            // Разрешаем сохранять пустой photoData с признаком noPhoto —
+            // чтобы кэшировать "фото точно нет" и не делать повторных API запросов
+            const noPhoto = !photoData;
+            await db.staffPhotos.put({ staffId, photoData: photoData || '', updatedAt, noPhoto });
         } catch (e) {
             console.error('DB Error saving photo:', e);
         }

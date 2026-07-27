@@ -482,45 +482,55 @@
                 </div>
 
                 <div class="tile-card staff-card">
-                    <label>ИСПОЛНИТЕЛИ ({formData.staffMemberIds.length})</label>
-                    
-                    <div class="selected-staff-container">
-                        {#each formData.staffMemberIds as id}
-                            {@const member = staffList.find(s => s.id === id)}
-                            {#if member}
-                                <div class="staff-badge" in:scale>
-                                    {#if member.photoData}
-                                        <img class="badge-avatar" src="data:image/jpeg;base64,{member.photoData}" alt={member.name} />
-                                    {:else}
-                                        <div class="badge-avatar-placeholder">{member.name.charAt(0)}</div>
-                                    {/if}
-                                    <div class="badge-info">
-                                        <span class="badge-name">{member.name}</span>
-                                        <span class="badge-spec">{member.specialty || 'Специалист'}</span>
+                    {#if $activeNiche !== 'RENT'}
+                        <label>ИСПОЛНИТЕЛИ ({formData.staffMemberIds.length})</label>
+                        
+                        <div class="selected-staff-container">
+                            {#each formData.staffMemberIds as id}
+                                {@const member = staffList.find(s => s.id === id)}
+                                {#if member}
+                                    <div class="staff-badge" in:scale>
+                                        {#if member.photoData}
+                                            <img class="badge-avatar" src="data:image/jpeg;base64,{member.photoData}" alt={member.name} />
+                                        {:else}
+                                            <div class="badge-avatar-placeholder">{member.name.charAt(0)}</div>
+                                        {/if}
+                                        <div class="badge-info">
+                                            <span class="badge-name">{member.name}</span>
+                                            <span class="badge-spec">{member.specialty || 'Специалист'}</span>
+                                        </div>
+                                        <button class="btn-remove-staff" type="button" on:click={() => removeStaff(id)}>✕</button>
                                     </div>
-                                    <button class="btn-remove-staff" type="button" on:click={() => removeStaff(id)}>✕</button>
-                                </div>
-                            {/if}
-                        {/each}
-                    </div>
-
-                    {#if staffList.filter(s => !formData.staffMemberIds.includes(s.id)).length > 0}
-                        <div class="add-staff-select-wrapper">
-                            <select on:change={addStaff} value="">
-                                <option value="" disabled selected>+ Добавить исполнителя...</option>
-                                {#each staffList.filter(s => !formData.staffMemberIds.includes(s.id)) as s}
-                                    <option value={s.id}>{s.name} ({s.specialty || 'Специалист'})</option>
-                                {/each}
-                            </select>
+                                {/if}
+                            {/each}
                         </div>
+
+                        {#if staffList.filter(s => !formData.staffMemberIds.includes(s.id)).length > 0}
+                            <div class="add-staff-select-wrapper">
+                                <select on:change={addStaff} value="">
+                                    <option value="" disabled selected>+ Добавить исполнителя...</option>
+                                    {#each staffList.filter(s => !formData.staffMemberIds.includes(s.id)) as s}
+                                        <option value={s.id}>{s.name} ({s.specialty || 'Специалист'})</option>
+                                    {/each}
+                                </select>
+                            </div>
+                        {/if}
+                    {:else}
+                        <label>ОБЪЕКТ АРЕНДЫ</label>
+                        <select bind:value={formData.resourceId}>
+                            <option value={null}>Выберите объект...</option>
+                            {#each resources as r}<option value={r.id}>{r.name}</option>{/each}
+                        </select>
                     {/if}
                 </div>
-                <div class="tile-card"><label>КАБИНЕТ / РЕСУРС</label>
-                    <select bind:value={formData.resourceId}>
-                        <option value={null}>Без ресурса</option>
-                        {#each resources as r}<option value={r.id}>{r.name}</option>{/each}
-                    </select>
-                </div>
+                {#if $activeNiche !== 'RENT'}
+                    <div class="tile-card"><label>КАБИНЕТ / РЕСУРС</label>
+                        <select bind:value={formData.resourceId}>
+                            <option value={null}>Без ресурса</option>
+                            {#each resources as r}<option value={r.id}>{r.name}</option>{/each}
+                        </select>
+                    </div>
+                {/if}
 
                 <div class="tile-card reminder-panel">
                     <div class="rem-main">

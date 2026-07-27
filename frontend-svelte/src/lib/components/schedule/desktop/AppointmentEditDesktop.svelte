@@ -707,15 +707,31 @@
 
                 <div class="tile-card">
 
-                    <label for="staff-select-id">ИСПОЛНИТЕЛЬ</label>
+                    {#if $activeNiche !== 'RENT'}
 
-                    <select id="staff-select-id" bind:value={formData.staffMemberId}>
+                        <label for="staff-select-id">ИСПОЛНИТЕЛЬ</label>
 
-                        <option value="">Не назначен</option>
+                        <select id="staff-select-id" bind:value={formData.staffMemberId}>
 
-                        {#each staffList as s}<option value={s.id}>{s.name}</option>{/each}
+                            <option value="">Не назначен</option>
 
-                    </select>
+                            {#each staffList as s}<option value={s.id}>{s.name}</option>{/each}
+
+                        </select>
+
+                    {:else}
+
+                        <label for="resource-select-desktop">ОБЪЕКТ АРЕНДЫ</label>
+
+                        <select id="resource-select-desktop" bind:value={formData.resourceId}>
+
+                            <option value="">Выберите объект...</option>
+
+                            {#each resources as r}<option value={r.id}>{r.name}</option>{/each}
+
+                        </select>
+
+                    {/if}
 
                 </div>
 

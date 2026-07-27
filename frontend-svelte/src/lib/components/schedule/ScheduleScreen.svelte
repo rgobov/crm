@@ -156,24 +156,25 @@
 
     async function loadResourcePhoto(resourceId, updatedAtOnServer) {
         if (!resourceId) return null;
+        // Нет даты обновления → сервер не сообщает о фото → не делаем API запрос.
+        // Защищает от N+1 запросов для ресурсов без photoUpdatedAt (существующие до V42).
+        if (!updatedAtOnServer) return null;
+
         const cachedRecord = await dbService.getPhoto(resourceId);
-        if (cachedRecord && cachedRecord.photoData && updatedAtOnServer) {
-            if (cachedRecord.updatedAt >= updatedAtOnServer) {
-                return cachedRecord.photoData;
-            }
+        if (cachedRecord && cachedRecord.updatedAt >= updatedAtOnServer) {
+            if (cachedRecord.noPhoto) return null;
+            if (cachedRecord.photoData) return cachedRecord.photoData;
         }
         try {
             const url = isClient ? `/client/resources/${resourceId}/photo` : `/admin/resources/${resourceId}/photo`;
             const response = await api.get(url);
             const photoData = response.data.photoData;
-            if (photoData) {
-                await dbService.savePhoto(resourceId, photoData, updatedAtOnServer || Date.now());
-                return photoData;
-            }
-            return cachedRecord ? cachedRecord.photoData : null;
+            // Кэшируем включая "фото нет" (пустая строка) — чтобы не повторять запросы
+            await dbService.savePhoto(resourceId, photoData || '', updatedAtOnServer);
+            return photoData || null;
         } catch (e) {
             console.error(`Error loading resource photo ${resourceId}:`, e);
-            return cachedRecord ? cachedRecord.photoData : null;
+            return cachedRecord && cachedRecord.photoData ? cachedRecord.photoData : null;
         }
     }
 
@@ -190,14 +191,16 @@
     async function loadStaffPhoto(staffId, updatedAtOnServer) {
         if (!staffId) return null;
 
-        // 1. Проверяем кэш в IndexedDB
-        const cachedRecord = await dbService.getPhoto(staffId);
+        // Нет даты обновления → сервер не сообщает о фото → не делаем API запрос.
+        // Защищает от N+1 запросов для сущностей без photoUpdatedAt.
+        if (!updatedAtOnServer) return null;
 
-        // 2. Если фото есть и оно актуальное
-        if (cachedRecord && cachedRecord.photoData && updatedAtOnServer) {
-            if (cachedRecord.updatedAt >= updatedAtOnServer) {
-                return cachedRecord.photoData;
-            }
+        // 1. Проверяем кэш в IndexedDB (включая кэш "фото точно нет")
+        const cachedRecord = await dbService.getPhoto(staffId);
+        if (cachedRecord && cachedRecord.updatedAt >= updatedAtOnServer) {
+            // noPhoto=true — кэшировали отрицательный результат
+            if (cachedRecord.noPhoto) return null;
+            if (cachedRecord.photoData) return cachedRecord.photoData;
         }
         
         try {
@@ -205,15 +208,12 @@
             const response = await api.get(photoUrl);
             const photoData = response.data.photoData;
 
-            if (photoData) {
-                // Сохраняем в кэш с новой датой
-                await dbService.savePhoto(staffId, photoData, updatedAtOnServer || Date.now());
-                return photoData;
-            }
-            return cachedRecord ? cachedRecord.photoData : null;
+            // Сохраняем в кэш (включая пустой результат — кэшируем "фото нет")
+            await dbService.savePhoto(staffId, photoData || '', updatedAtOnServer);
+            return photoData || null;
         } catch (e) {
             console.error(`Error loading photo for ${staffId}:`, e);
-            return cachedRecord ? cachedRecord.photoData : null;
+            return cachedRecord && cachedRecord.photoData ? cachedRecord.photoData : null;
         }
     }
 
@@ -241,18 +241,12 @@
 
     $: displayedColumns = isRentMode ? rentColumns : displayedStaff;
 
-    // РЕАКТИВНАЯ ЗАГРУЗКА ПРИ СМЕНЕ ДАТЫ ИЛИ ФИЛИАЛА
-    $: if (branchLocalDate && currentBranchId) {
+    // РЕАКТИВНАЯ ЗАГРУЗКА ПРИ СМЕНЕ ДАТЫ, ФИЛИАЛА ИЛИ НИШИ
+    // isRentMode зависит от activeNiche ← activeBranchId, поэтому смена филиала
+    // триггерит и branchLocalDate, и isRentMode — один блок заменяет два.
+    $: if (branchLocalDate && currentBranchId && typeof isRentMode !== 'undefined') {
         const now = Date.now();
         if (now - lastLoadTime > 800) {
-            lastLoadTime = now;
-            loadDayData(branchLocalDate, currentBranchId);
-        }
-    }
-    // Переключение ниши (например, смена филиала на RENT) требует перезагрузки колонок
-    $: if (typeof isRentMode !== 'undefined') {
-        const now = Date.now();
-        if (now - lastLoadTime > 800 && branchLocalDate && currentBranchId) {
             lastLoadTime = now;
             loadDayData(branchLocalDate, currentBranchId);
         }

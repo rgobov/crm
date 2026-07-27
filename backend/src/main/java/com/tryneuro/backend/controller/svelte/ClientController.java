@@ -2,6 +2,7 @@ package com.tryneuro.backend.controller.svelte;
 
 import com.tryneuro.backend.dto.*;
 import com.tryneuro.backend.model.*;
+import com.tryneuro.backend.repository.BranchRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import com.tryneuro.backend.service.*;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class ClientController {
     private final UserRepository userRepository;
     private final ContactService contactService;
     private final ResourceService resourceService;
+    private final BranchRepository branchRepository;
 
     private String getRequiredTenantId(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
@@ -52,10 +54,10 @@ public class ClientController {
         String tId = getRequiredTenantId(tenantId);
         String niche = null;
         if (branchId != null && !branchId.isEmpty()) {
-            niche = branchService.getBranches(tId).stream()
-                    .filter(b -> b.getId().equals(branchId))
+            // Прямой lookup филиала — один SQL вместо загрузки всех филиалов тенанта
+            niche = branchRepository.findById(branchId)
+                    .filter(b -> tId.equals(b.getTenantId()))
                     .map(Branch::getNiche)
-                    .findFirst()
                     .orElse(null);
         }
         return appServiceService.getServicesByNiche(tId, niche)
