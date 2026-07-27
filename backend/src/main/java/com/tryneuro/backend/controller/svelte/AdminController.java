@@ -195,6 +195,33 @@ public class AdminController {
         resourceService.deleteResource(id);
     }
 
+    @GetMapping("/resources/{id}/photo")
+    public ResponseEntity<Map<String, String>> getResourcePhoto(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        return resourceService.getAllResources(getRequiredTenantId(tenantId)).stream()
+                .filter(r -> r.getId().equals(id))
+                .findFirst()
+                .map(resource -> {
+                    String photoDataBase64 = null;
+                    if (resource.getPhotoData() != null && resource.getPhotoData().length > 0) {
+                        photoDataBase64 = Base64.getEncoder().encodeToString(resource.getPhotoData());
+                    }
+                    return ResponseEntity.ok(Map.of("photoData", photoDataBase64 != null ? photoDataBase64 : ""));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping(value = "/resources/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResourceDto uploadResourcePhoto(@RequestAttribute("tenantId") String tenantId,
+                                           @PathVariable String id,
+                                           @RequestParam("file") MultipartFile file) {
+        return DtoMapper.toDto(resourceService.updateResourcePhoto(id, file, getRequiredTenantId(tenantId)));
+    }
+
+    @DeleteMapping("/resources/{id}/photo")
+    public ResourceDto deleteResourcePhoto(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        return DtoMapper.toDto(resourceService.deleteResourcePhoto(id, getRequiredTenantId(tenantId)));
+    }
+
     // --- APPOINTMENTS & SCHEDULE ---
     @GetMapping("/workload")
     public List<WorkloadDto> getWorkload(

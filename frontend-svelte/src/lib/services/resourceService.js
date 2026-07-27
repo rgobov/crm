@@ -13,6 +13,25 @@ export const resourceService = {
         await api.post('/admin/resources', data);
     },
 
+    async getResourcePhoto(resourceId) {
+        const response = await api.get(`/admin/resources/${resourceId}/photo`);
+        return response.data;
+    },
+
+    async uploadResourcePhoto(resourceId, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await api.post(`/admin/resources/${resourceId}/photo`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+    },
+
+    async deleteResourcePhoto(resourceId) {
+        const response = await api.delete(`/admin/resources/${resourceId}/photo`);
+        return response.data;
+    },
+
     async updateResource(id, data) {
         await api.put(`/admin/resources/${id}`, data);
     },

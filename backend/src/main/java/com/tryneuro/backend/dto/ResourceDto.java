@@ -14,4 +14,5 @@ public class ResourceDto {
     private String name;
     private String description;
     private String branchId;
+    private Long photoUpdatedAt;
 }

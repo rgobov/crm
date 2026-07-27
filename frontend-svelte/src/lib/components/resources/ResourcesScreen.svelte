@@ -11,6 +11,7 @@
     let isLoading = true;
     let showModal = false;
     let selectedResource = null;
+    let photoCache = {};
 
     onMount(async () => {
         await Promise.all([
@@ -28,11 +29,28 @@
                 return;
             }
             resources = await resourceService.getResources($activeBranchId);
+            // Ленивая загрузка фото для карточек
+            resources.forEach(r => {
+                if (r.photoUpdatedAt && !photoCache[r.id]) {
+                    loadResourcePhoto(r.id);
+                }
+            });
         } catch (e) {
             console.error('Failed to load resources', e);
             resources = [];
         } finally {
             isLoading = false;
+        }
+    }
+
+    async function loadResourcePhoto(id) {
+        try {
+            const resp = await resourceService.getResourcePhoto(id);
+            if (resp && resp.photoData) {
+                photoCache = { ...photoCache, [id]: resp.photoData };
+            }
+        } catch (e) {
+            console.warn('Photo load failed for', id);
         }
     }
 
@@ -67,6 +85,12 @@
 
     function handleSuccess() {
         showModal = false;
+        photoCache = {};
+        loadResources();
+    }
+
+    function handlePhotoUpdated() {
+        photoCache = {};
         loadResources();
     }
 
@@ -110,7 +134,13 @@
                 <div class="tiles-grid">
                     {#each resources as resource}
                         <div class="resource-tile" on:click={() => openEdit(resource)}>
-                            <div class="icon-circle">📦</div>
+                            <div class="icon-circle">
+                                {#if photoCache[resource.id]}
+                                    <img src={"data:image/jpeg;base64," + photoCache[resource.id]} alt={resource.name} class="tile-avatar" />
+                                {:else}
+                                    📦
+                                {/if}
+                            </div>
                             <div class="info">
                                 <div class="name-row">
                                     <h3>{resource.name}</h3>
@@ -139,6 +169,7 @@
             resource={selectedResource}
             on:cancel={() => showModal = false}
             on:success={handleSuccess}
+            on:photoUpdated={handlePhotoUpdated}
         />
     {/if}
 </div>
@@ -162,7 +193,8 @@
     }
     .resource-tile:hover { transform: translateY(-2px); border-color: #268bd2; }
 
-    .icon-circle { width: 48px; height: 48px; background: #fdf6e3; color: #268bd2; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .icon-circle { width: 48px; height: 48px; background: #fdf6e3; color: #268bd2; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; overflow: hidden; }
+    .tile-avatar { width: 100%; height: 100%; object-fit: cover; }
 
     .info { flex: 1; }
     .name-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; gap: 10px; }

@@ -131,10 +131,48 @@
         if (!bId) return;
         try {
             const data = await resourceService.getResources(bId);
-            resources = Array.isArray(data) ? data : [];
+            const newResources = Array.isArray(data) ? data : [];
+            // Soft update: сохраняем фото если уже есть в памяти
+            resources = newResources.map(nr => {
+                const existing = resources.find(or => or.id === nr.id);
+                if (existing && existing.photoData) {
+                    return { ...nr, photoData: existing.photoData };
+                }
+                return nr;
+            });
+            // Ленивая загрузка недостающих фото
+            resources.forEach(r => {
+                loadResourcePhoto(r.id, r.photoUpdatedAt).then(photo => {
+                    if (photo && r.photoData !== photo) {
+                        resources = resources.map(x => x.id === r.id ? {...x, photoData: photo} : x);
+                    }
+                });
+            });
         } catch (e) {
             console.error('❌ Error loading resources:', e);
             resources = [];
+        }
+    }
+
+    async function loadResourcePhoto(resourceId, updatedAtOnServer) {
+        if (!resourceId) return null;
+        const cachedRecord = await dbService.getPhoto(resourceId);
+        if (cachedRecord && cachedRecord.photoData && updatedAtOnServer) {
+            if (cachedRecord.updatedAt >= updatedAtOnServer) {
+                return cachedRecord.photoData;
+            }
+        }
+        try {
+            const response = await api.get(`/admin/resources/${resourceId}/photo`);
+            const photoData = response.data.photoData;
+            if (photoData) {
+                await dbService.savePhoto(resourceId, photoData, updatedAtOnServer || Date.now());
+                return photoData;
+            }
+            return cachedRecord ? cachedRecord.photoData : null;
+        } catch (e) {
+            console.error(`Error loading resource photo ${resourceId}:`, e);
+            return cachedRecord ? cachedRecord.photoData : null;
         }
     }
 
@@ -194,7 +232,7 @@
         id: r.id,
         name: r.name,
         specialty: r.description || 'Объект',
-        photoData: null,
+        photoData: r.photoData || null,
         dayOff: false,
         workStartTime: '00:00',
         workEndTime: '23:59'

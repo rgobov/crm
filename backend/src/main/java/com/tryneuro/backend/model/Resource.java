@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "resources")
 @Data
@@ -32,4 +34,17 @@ public class Resource {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", insertable = false, updatable = false)
     private Branch branch;
+
+    @JsonIgnore
+    @Column(name = "photo_data")
+    private byte[] photoData;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @PreUpdate
+    @PrePersist
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

@@ -132,6 +132,7 @@ public class DtoMapper {
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .branchId(entity.getBranchId())
+                .photoUpdatedAt(entity.getUpdatedAt() != null ? entity.getUpdatedAt().toInstant(ZoneOffset.UTC).toEpochMilli() : null)
                 .build();
     }
 

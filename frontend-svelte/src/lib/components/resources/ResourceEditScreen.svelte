@@ -19,13 +19,24 @@
 
     let isSaving = false;
     let isLoading = true;
+    let photoData = null;
+    let isUploadingPhoto = false;
+    let photoFileInput = null;
 
     onMount(async () => {
         try {
             branches = await branchService.getBranches();
-            // Если филиал не задан (создание) и в сторе есть активный - подставляем
             if (!formData.branchId && $activeBranchId) {
                 formData.branchId = $activeBranchId;
+            }
+            // Загружаем фото если редактируем существующий ресурс
+            if (resource?.id) {
+                try {
+                    const resp = await resourceService.getResourcePhoto(resource.id);
+                    if (resp && resp.photoData) photoData = resp.photoData;
+                } catch (e) {
+                    console.warn('Resource photo load failed', e);
+                }
             }
         } catch (e) {
             console.error('Failed to load branches');
@@ -53,6 +64,44 @@
             isSaving = false;
         }
     }
+
+    async function handlePhotoSelect(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Пожалуйста, выберите изображение');
+            return;
+        }
+        if (!resource?.id) {
+            alert('Сначала сохраните ресурс, затем загрузите фото');
+            if (photoFileInput) photoFileInput.value = '';
+            return;
+        }
+        isUploadingPhoto = true;
+        try {
+            await resourceService.uploadResourcePhoto(resource.id, file);
+            const resp = await resourceService.getResourcePhoto(resource.id);
+            photoData = resp?.photoData || null;
+            dispatch('photoUpdated');
+        } catch (e) {
+            alert('Ошибка при загрузке фото: ' + (e.response?.data?.message || e.message));
+        } finally {
+            isUploadingPhoto = false;
+            if (photoFileInput) photoFileInput.value = '';
+        }
+    }
+
+    async function handlePhotoDelete() {
+        if (!resource?.id) return;
+        if (!confirm('Удалить фото ресурса?')) return;
+        try {
+            await resourceService.deleteResourcePhoto(resource.id);
+            photoData = null;
+            dispatch('photoUpdated');
+        } catch (e) {
+            alert('Ошибка при удалении фото');
+        }
+    }
 </script>
 
 <div class="modal-backdrop" use:portal on:click|self={() => dispatch('cancel')} transition:fade={{duration: 200}}>
@@ -71,6 +120,38 @@
             {#if isLoading}
                 <div class="loader-wrap"><span class="spinner"></span></div>
             {:else}
+                <!-- СЕКЦИЯ ФОТО -->
+                {#if resource?.id}
+                    <div class="photo-section">
+                        <label class="photo-box" for="resource-photo-upload">
+                            {#if isUploadingPhoto}
+                                <span class="spinner"></span>
+                            {:else if photoData}
+                                <img src={"data:image/jpeg;base64," + photoData} alt={formData.name} class="photo-preview" />
+                            {:else}
+                                <span class="photo-placeholder">📷</span>
+                                <span class="photo-hint">Загрузить фото</span>
+                            {/if}
+                        </label>
+                        <input
+                            bind:this={photoFileInput}
+                            id="resource-photo-upload"
+                            type="file"
+                            accept="image/*"
+                            on:change={handlePhotoSelect}
+                            style="display: none;"
+                        />
+                        <div class="photo-actions">
+                            <button class="btn-photo-upload" on:click={() => photoFileInput?.click()} disabled={isUploadingPhoto}>
+                                {photoData ? 'Заменить' : 'Загрузить'}
+                            </button>
+                            {#if photoData}
+                                <button class="btn-photo-delete" on:click={handlePhotoDelete} disabled={isUploadingPhoto}>Удалить</button>
+                            {/if}
+                        </div>
+                    </div>
+                {/if}
+
                 <div class="tiles-grid">
                     <!-- ПЛИТКА: ФИЛИАЛ (НОВОЕ) -->
                     <div class="input-tile accent">
@@ -134,6 +215,41 @@
 
     .modal-body { padding: 32px; flex: 1; overflow-y: auto; background: #fdf6e3; }
     .tiles-grid { display: flex; flex-direction: column; gap: 16px; }
+
+    .photo-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .photo-box {
+        width: 96px; height: 96px;
+        border-radius: 20px;
+        background: #eee8d5;
+        border: 2px dashed #ddd6c1;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        transition: border-color 0.2s;
+    }
+    .photo-box:hover { border-color: #268bd2; }
+    .photo-preview { width: 100%; height: 100%; object-fit: cover; border-radius: 18px; }
+    .photo-placeholder { font-size: 28px; }
+    .photo-hint { font-size: 9px; font-weight: 700; color: #93a1a1; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .photo-actions { display: flex; gap: 8px; }
+    .btn-photo-upload {
+        background: #268bd2; color: white; border: none;
+        padding: 6px 16px; border-radius: 12px;
+        font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .btn-photo-upload:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-photo-delete {
+        background: #fee2e2; color: #dc2626; border: none;
+        padding: 6px 16px; border-radius: 12px;
+        font-size: 11px; font-weight: 700; cursor: pointer;
+    }
 
     .input-tile {
         background: #eee8d5; padding: 16px 20px; border-radius: 20px;
