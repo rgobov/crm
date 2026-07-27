@@ -138,7 +138,10 @@ User → Telegram (bot_N) → AI Bot (Java, 1 процесс, 4 бота)
 | Backend (RAG) | `.../service/EmbeddingService.java` | OpenRouter text-embedding-ada-002 |
 | Backend (RAG) | `.../service/RagSearchService.java` | PGvector cosine similarity search |
 | Backend (RAG) | `.../service/KnowledgeIngestService.java` | Chunking (512/50 токенов) + вставка |
-| Backend (Flyway) | `.../V40__pgvector.sql` | pgvector extension + ai_knowledge_chunks |
+| Backend (Flyway) | `.../resources/db/migration/V40*.sql` | pgvector extension + ai_knowledge_chunks |
+| Backend (Flyway) | `.../V41__Branch_Niche.sql` | Branch.niche (AUTO/BEAUTY/RENT) |
+| Backend (Flyway) | `.../V42__Resource_Photo.sql` | Resource.photo_data + updated_at |
+| Backend (Flyway) | `.../V43__Service_Niche.sql` | Service.niche (NULL = все ниши) |
 | Bot Agent (GigaChat) | `ai-bot/.../CrmToolService.java` | 24 tool definitions (getToolDefinitions) + executeTool |
 | Bot Agent (GigaChat) | `ai-bot/.../AiAgentService.java` | GigaChatClient + ручной ReAct + auto-RAG + local LLM |
 | Bot Agent (GigaChat) | `ai-bot/.../RagService.java` | RAG search call to backend |
@@ -173,16 +176,59 @@ User → Telegram (bot_N) → AI Bot (Java, 1 процесс, 4 бота)
 - `notifications-python` деплоится ТОЛЬКО через `deploy-main.yml`.
 - `deploy-spring-ai.yml` запускается ТОЛЬКО при изменении `ai-bot/**` (не дублируется с deploy-main.yml).
 
-## Database Schema (Flyway)
+## Ниши (AUTO / BEAUTY / RENT)
 
-- **Tool**: Flyway (`spring.flyway.enabled=true`)
-- **Location**: `backend/src/main/resources/db/migration/V*__.sql`
-- **Table naming**: snake_case + plural
-- **pgvector**: образ БД `pgvector/pgvector:0.7.4-pg15` (PostgreSQL 15 + vector extension)
-- **Таблицы**: `users`, `staff_members`, `appointments`, `user_ai_config`, `ai_knowledge`, `ai_knowledge_chunks`
-- **ai_knowledge_chunks**: `id UUID`, `tenant_id VARCHAR(36)`, `knowledge_id VARCHAR(36)`, `chunk_index INT`, `content TEXT`, `embedding vector(1536)`, `metadata JSONB`
-- **Индекс**: ivfflat на `embedding` (vector_cosine_ops, lists=100)
-- **Роли**: `UserRole` enum — `ADMIN`, `MANAGER`, `EMPLOYEE`, `CLIENT`
+Каждый филиал (Branch) имеет нишу (`niche`), определяющую интерфейс и поведение:
+
+| Ниша | Назначение | Колонки таймлайна | Фото в колонках |
+|---|---|---|---|
+| `AUTO` | Автосервис (по умолчанию) | Сотрудники (мастера) | Фото мастеров |
+| `BEAUTY` | Бьюти-услуги | Сотрудники (мастера) | Фото мастеров |
+| `RENT` | Аренда объектов | Ресурсы (кабинеты, оборудование) | Фото ресурсов (с Фазы 3) |
+
+### Фазы внедрения
+
+| Фаза | Коммит | Что сделано |
+|---|---|---|
+| 1 | `6d5c6df` | Branch.niche + V41 миграция, nicheConfig/nicheStore, замена хардкода 🚗/«автомобиль» в 9 компонентах |
+| 2 | `53a50c2` | Таймлайн по ресурсам для RENT — колонки ресурсов, `columnKey`, `resourceId` в формах, исправлен `branch_id→branchId` |
+| 3 | `59aa919` | Фото ресурсов — V42 миграция, эндпоинты GET/POST/DELETE `/admin/resources/{id}/photo`, lazy-load через IndexedDB, UI загрузки в ResourceEditScreen, мини-аватар в списке |
+| 4a | `7f1bf49` | RENT-колонки для клиентов — `/client/resources` endpoint, `resourceId` в payload бронирования |
+| 4b | `fe89d55` | Фильтрация услуг по нише — V43 миграция, `services.niche`, select ниши в редакторе услуги, авто-фильтр по `activeNiche` в AppointmentEdit, перезагрузка услуг при смене филиала в `/client` |
+
+### Архитектура ниш
+
+```
+Branch.niche ──→ nicheConfig.js (лейблы/иконки/плейсхолдеры)
+       │               │
+       │         nicheStore.js (activeNiche, nicheSettings — derived)
+       ▼
+ScheduleScreen.svelte ←── isRentMode = $activeNiche === 'RENT'
+       │
+       ├── auto/beauty → fetchStaff → staff columns (DayTimeline)
+       └── rent        → fetchResources → resource columns (DayTimeline)
+                          ↓
+                    rentColumns: [{id, name, specialty, photoData, workStartTime: '00:00', workEndTime: '23:59'}]
+                    columnKey: 'resourceId'
+```
+
+### Ключевые файлы
+
+| Файл | Назначение |
+|---|---|
+| `nicheConfig.js` | Конфиг: метки, иконки, плейсхолдеры для каждой ниши |
+| `nicheStore.js` | Реактивный стор: `activeNiche` (из `activeBranchId` + `branchStore`), `nicheSettings` (текущий конфиг) |
+| `ScheduleScreen.svelte` | Авто-переключение: `isRentMode`, `fetchResources`, `rentColumns`, `loadResourcePhoto` |
+| `DayTimelineDesktop/Mobile.svelte` | Универсальные колонки (`columns` + `columnKey`), рендерят `photoData` через base64 |
+| `ResourceEditScreen.svelte` | UI загрузки/удаления фото ресурса (multipart) |
+| `ResourcesScreen.svelte` | Мини-аватар ресурса в карточке |
+
+### Поведение
+
+- **NULL-услуги** (`services.niche IS NULL`) — видны в филиалах любой ниши. Существующие услуги не затрагиваются.
+- **Клиент в RENT-филиале** → видит только RENT-услуги + общие (NULL). Колонки — ресурсы, не сотрудники.
+- **Админ в AppointmentEdit** → список услуг фильтруется по `$activeNiche`.
+- **Редактор услуги** → select «Все ниши / AUTO / BEAUTY / RENT» (через `NICHE_LIST`).
 
 ## Pyrogram-specific rules (notifications-python/main.py)
 
