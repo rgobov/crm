@@ -35,6 +35,7 @@ jobs:
             cd ~/crm
 
             echo "--- ПЕРЕКЛЮЧЕНИЕ НА ВЕТКУ ${{ github.ref_name }} ---"
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             git fetch origin ${{ github.ref_name }}
             git checkout ${{ github.ref_name }} || git checkout -b ${{ github.ref_name }} origin/${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
