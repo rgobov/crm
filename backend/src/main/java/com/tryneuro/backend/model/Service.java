@@ -29,4 +29,7 @@ public class Service {
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
+
+    // NULL = услуга доступна для всех ниш; AUTO/BEAUTY/RENT = только для этой ниши
+    private String niche;
 }

@@ -14,7 +14,7 @@
 
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
 
-    import { nicheSettings } from '$lib/stores/nicheStore.js';
+    import { nicheSettings, activeNiche } from '$lib/stores/nicheStore.js';
 
     import { timeUtils } from '$lib/utils/timeUtils.js';
 
@@ -146,7 +146,7 @@
 
             const [servicesData, resourcesData, staffData] = await Promise.all([
 
-                serviceService.getServices(),
+                serviceService.getServices($activeNiche),
 
                 resourceService.getResources($activeBranchId),
 

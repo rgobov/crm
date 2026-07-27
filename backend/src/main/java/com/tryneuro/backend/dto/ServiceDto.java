@@ -15,4 +15,5 @@ public class ServiceDto {
     private Integer durationInMinutes;
     private Integer priceMin;
     private Integer priceMax;
+    private String niche;
 }

@@ -47,8 +47,18 @@ public class ClientController {
     }
 
     @GetMapping("/services")
-    public List<ServiceDto> getAllServices(@RequestAttribute("tenantId") String tenantId) {
-        return appServiceService.getAllServices(getRequiredTenantId(tenantId))
+    public List<ServiceDto> getAllServices(@RequestAttribute("tenantId") String tenantId,
+                                           @RequestParam(value = "branchId", required = false) String branchId) {
+        String tId = getRequiredTenantId(tenantId);
+        String niche = null;
+        if (branchId != null && !branchId.isEmpty()) {
+            niche = branchService.getBranches(tId).stream()
+                    .filter(b -> b.getId().equals(branchId))
+                    .map(Branch::getNiche)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return appServiceService.getServicesByNiche(tId, niche)
                 .stream().map(DtoMapper::toDto).collect(Collectors.toList());
     }
 

@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { serviceService } from '$lib/services/serviceService.js';
     import { goto } from '$app/navigation';
+    import { NICHE_LIST } from '$lib/config/nicheConfig.js';
 
     export let serviceId = null;
     const isEditing = !!serviceId;
@@ -10,7 +11,8 @@
         name: '',
         durationInMinutes: 30,
         priceMin: null,
-        priceMax: null
+        priceMax: null,
+        niche: null
     };
 
     let priceType = 'none';
@@ -110,6 +112,16 @@
             <div class="field">
                 <label for="name">Название услуги</label>
                 <input type="text" id="name" bind:value={formData.name} placeholder="Напр: Стрижка" />
+            </div>
+
+            <div class="field">
+                <label for="niche">Ниша (для каких филиалов)</label>
+                <select id="niche" bind:value={formData.niche}>
+                    <option value={null}>Все ниши (общая услуга)</option>
+                    {#each NICHE_LIST as n}
+                        <option value={n.value}>{n.icon} {n.label}</option>
+                    {/each}
+                </select>
             </div>
 
             <div class="field">

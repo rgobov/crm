@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface ServiceRepository extends JpaRepository<Service, String> {
     List<Service> findByTenantId(String tenantId);
+    List<Service> findByTenantIdAndNiche(String tenantId, String niche);
+    List<Service> findByTenantIdAndNicheIsNull(String tenantId);
 }

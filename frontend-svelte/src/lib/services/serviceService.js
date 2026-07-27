@@ -1,8 +1,9 @@
 import api from '$lib/api.js';
 
 export const serviceService = {
-    async getServices() {
-        const response = await api.get('/services');
+    async getServices(niche = null) {
+        const params = niche ? { niche } : {};
+        const response = await api.get('/services', { params });
         return response.data;
     },
 

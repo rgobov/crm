@@ -6,7 +6,7 @@
     import { resourceService } from '$lib/services/resourceService.js';
     import { branchService } from '$lib/services/branchService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
-    import { nicheSettings } from '$lib/stores/nicheStore.js';
+    import { nicheSettings, activeNiche } from '$lib/stores/nicheStore.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
     import SearchDropdownItem from './SearchDropdownItem.svelte';
     import { fade, slide, scale } from 'svelte/transition';
@@ -78,7 +78,7 @@
             currentBranchData = allBranches.find(b => b.id === $activeBranchId);
 
             const [servicesData, resourcesData, staffData] = await Promise.all([
-                serviceService.getServices(),
+                serviceService.getServices($activeNiche),
                 resourceService.getResources($activeBranchId),
                 service.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId)
             ]);

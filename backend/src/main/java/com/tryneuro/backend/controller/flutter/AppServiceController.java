@@ -19,7 +19,11 @@ public class AppServiceController {
     }
 
     @GetMapping
-    public List<Service> getAllServices(@RequestAttribute("tenantId") String tenantId) {
+    public List<Service> getAllServices(@RequestAttribute("tenantId") String tenantId,
+                                        @RequestParam(value = "niche", required = false) String niche) {
+        if (niche != null && !niche.isEmpty()) {
+            return appServiceService.getServicesByNiche(tenantId, niche);
+        }
         return appServiceService.getAllServices(tenantId);
     }
 

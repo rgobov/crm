@@ -110,6 +110,7 @@ public class DtoMapper {
                 .durationInMinutes(entity.getDurationInMinutes())
                 .priceMin(entity.getPriceMin())
                 .priceMax(entity.getPriceMax())
+                .niche(entity.getNiche())
                 .build();
     }
 
@@ -122,6 +123,7 @@ public class DtoMapper {
         entity.setPriceMin(dto.getPriceMin());
         entity.setPriceMax(dto.getPriceMax());
         entity.setTenantId(tenantId);
+        entity.setNiche(dto.getNiche());
         return entity;
     }
 

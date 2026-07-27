@@ -3,6 +3,7 @@
     import { serviceService } from '$lib/services/serviceService.js';
     import { goto } from '$app/navigation';
     import { fade } from 'svelte/transition';
+    import { getNicheIcon } from '$lib/config/nicheConfig.js';
 
     let services = [];
     let isLoading = true;
@@ -86,6 +87,7 @@
                                         • {service.priceMax !== null && service.priceMax !== undefined ? `от ${service.priceMin} до ${service.priceMax}` : service.priceMin} руб.
                                     {/if}
                                 </p>
+                                <span class="niche-tag">{service.niche ? `${getNicheIcon(service.niche)} ${service.niche}` : '🌐 Все ниши'}</span>
                             </div>
                             <button class="btn-del" on:click|stopPropagation={() => handleDelete(service.id, service.name)}>
                                 🗑
@@ -148,6 +150,7 @@
     .info { flex: 1; }
     .info h3 { margin: 0; font-size: 16px; font-weight: 800; color: #073642; }
     .info p { margin: 4px 0 0 0; font-size: 13px; color: #586e75; font-weight: 500; }
+    .niche-tag { display: inline-block; margin-top: 6px; font-size: 9px; font-weight: 800; color: #268bd2; background: #fdf6e3; border: 1px solid #ddd6c1; padding: 3px 8px; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
 
     .btn-del { background: #fdf6e3; color: #dc322f; border: none; width: 36px; height: 36px; border-radius: 10px; cursor: pointer; opacity: 0; transition: 0.2s; }
     .service-tile:hover .btn-del { opacity: 1; }

@@ -52,18 +52,27 @@
 			if (branches.length > 0) {
 				selectedBranchId = branches[0].id;
 				activeBranchId.set(selectedBranchId);
+				// Загружаем услуги для первого филиала (с фильтром по нише)
+				services = await clientService.getServices(selectedBranchId);
 			}
-
-			// Загружаем услуги
-			services = await clientService.getServices();
 		} catch (e) {
 			console.error('Ошибка при инициализации личного кабинета', e);
 		}
 	});
 
-	// При смене филиала обновляем стор
+	// При смене филиала обновляем стор и перезагружаем услуги (фильтр по нише филиала)
 	$: if (selectedBranchId) {
 		activeBranchId.set(selectedBranchId);
+		loadServicesForBranch(selectedBranchId);
+	}
+
+	async function loadServicesForBranch(branchId) {
+		try {
+			services = await clientService.getServices(branchId);
+		} catch (e) {
+			console.error('Ошибка загрузки услуг для филиала', e);
+			services = [];
+		}
 	}
 
 	function handlePrevDay() {

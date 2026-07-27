@@ -16,8 +16,9 @@ export const clientService = {
         return response.data;
     },
 
-    async getServices() {
-        const response = await api.get('/client/services');
+    async getServices(branchId = null) {
+        const params = branchId ? { branchId } : {};
+        const response = await api.get('/client/services', { params });
         return response.data;
     },
 

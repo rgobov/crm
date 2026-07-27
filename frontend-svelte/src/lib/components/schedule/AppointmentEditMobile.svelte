@@ -4,7 +4,7 @@
     import { adminService } from '$lib/services/adminService.js';
     import { contactService } from '$lib/services/contactService.js';
     import { branchService } from '$lib/services/branchService.js';
-    import { nicheSettings } from '$lib/stores/nicheStore.js';
+    import { nicheSettings, activeNiche } from '$lib/stores/nicheStore.js';
     import { resourceService } from '$lib/services/resourceService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
@@ -77,7 +77,7 @@
             currentBranchData = allBranches.find(b => b.id === $activeBranchId);
 
             const [servicesData, resourcesData, staffData] = await Promise.all([
-                serviceService.getServices().catch(e => { console.error('Services load failed:', e); return []; }),
+                serviceService.getServices($activeNiche).catch(e => { console.error('Services load failed:', e); return []; }),
                 resourceService.getResources($activeBranchId).catch(e => { console.error('Resources load failed:', e); return []; }),
                 service.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId).catch(e => { console.error('Staff load failed:', e); return []; })
             ]);
