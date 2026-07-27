@@ -48,7 +48,8 @@
             date: $selectedDate,
             hour: event?.detail?.hour || 10,
             min: event?.detail?.min || 0,
-            staffId: event?.detail?.staffId || null
+            staffId: event?.detail?.staffId || null,
+            resourceId: event?.detail?.resourceId || null
         };
         currentAppointment = null;
         showModal = 'edit';

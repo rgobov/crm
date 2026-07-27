@@ -12,7 +12,8 @@
 
     export let day = new Date();
     export let appointments = [];
-    export let staff = [];
+    export let columns = [];
+    export let columnKey = 'staffMemberId';
 
     let TIME_COL_WIDTH = 0;
     let HOUR_HEIGHT = 72;
@@ -26,14 +27,16 @@
 
     $: apptsByStaff = (() => {
         const map = { 'unassigned': [] };
-        staff.forEach(s => map[s.id] = []);
+        columns.forEach(s => map[s.id] = []);
         appointments.forEach(a => {
-            const sid = a.staffMemberId;
+            const sid = a[columnKey];
             if (sid && map[sid]) map[sid].push(a);
             else map['unassigned'].push(a);
         });
         return map;
     })();
+
+    $: isResourceMode = columnKey === 'resourceId';
 
     // РЕАКТИВНЫЙ РАСЧЕТ ВЕРСТКИ (Золотое сечение 1.618)
     $: {
@@ -43,7 +46,7 @@
         TIME_COL_WIDTH = Math.floor(width * 0.09);
 
         const availableWidth = width - TIME_COL_WIDTH;
-        const totalCols = staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
+        const totalCols = columns.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
 
         if (totalCols <= 1) {
             STAFF_WIDTH = availableWidth;
@@ -119,7 +122,7 @@
             minH = Math.min(minH, h);
             maxH = Math.max(maxH, h + 1);
         });
-        staff.forEach(s => {
+        columns.forEach(s => {
             if (s.workStartTime) minH = Math.min(minH, parseInt(s.workStartTime.split(':')[0]));
             if (s.workEndTime) maxH = Math.max(maxH, parseInt(s.workEndTime.split(':')[0]));
         });
@@ -150,9 +153,9 @@
     <header class="staff-header-fixed">
         <div class="time-corner-fixed" style="width: {TIME_COL_WIDTH}px">🕒</div>
         <div class="staff-scroll-area" bind:this={scrollHeader} on:scroll={syncHeaderScroll}>
-            <div class="staff-row" style="width: {(staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
-                {#each staff as s (s.id)}
-                    <button class="staff-cell btn-reset" class:is-off={s.dayOff} style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
+            <div class="staff-row" style="width: {(columns.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
+                {#each columns as s (s.id)}
+                    <button class="staff-cell btn-reset" class:is-off={s.dayOff} style="width: {STAFF_WIDTH}px" on:click={() => { if (!isResourceMode) dispatch('staffTap', s); }}>
                         <div class="avatar-wrap">
                             {#if s.photoData}
                                 <img class="avatar" class:is-off={s.dayOff} src="data:image/jpeg;base64,{s.photoData}" alt={s.name} />
@@ -177,7 +180,7 @@
     </header>
 
     <div class="timeline-body-scroll" bind:this={scrollBody} on:scroll={syncScroll}>
-        <div class="body-layout-wrapper" style="width: {(staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
+        <div class="body-layout-wrapper" style="width: {(columns.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH + TIME_COL_WIDTH}px">
             <aside class="time-axis-col" style="width: {TIME_COL_WIDTH}px">
                 {#each hours as h (h)}
                     <div class="hour-cell" style="height: {HOUR_HEIGHT}px">
@@ -189,7 +192,7 @@
 
             <main class="grid-canvas">
                 <div class="cols-container">
-                    {#each [...staff, ...(apptsByStaff['unassigned']?.length > 0 ? [{id: null}] : [])] as s ( (s.id || 'unassigned') )}
+                    {#each [...columns, ...(apptsByStaff['unassigned']?.length > 0 ? [{id: null}] : [])] as s ( (s.id || 'unassigned') )}
                         <div class="staff-col" style="width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
                                 {@const h = hours[Math.floor(i/4)]}

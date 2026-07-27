@@ -2,10 +2,12 @@
     import { onMount, onDestroy, createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { clientService } from '$lib/services/clientService.js';
+    import { resourceService } from '$lib/services/resourceService.js';
     import { scheduleRefreshSignal } from '$lib/services/websocketService.js';
     import { dbService } from '$lib/services/dbService.js';
     import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchStore } from '$lib/stores/branchStore.js';
+    import { activeNiche } from '$lib/stores/nicheStore.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
     import DayTimeline from './DayTimeline.svelte';
     import api from '$lib/api.js';
@@ -16,15 +18,18 @@
     export let isClient = false;
 
     $: service = isClient ? clientService : adminService;
+    $: isRentMode = !isClient && $activeNiche === 'RENT';
+    $: columnKey = isRentMode ? 'resourceId' : 'staffMemberId';
 
     const dispatch = createEventDispatcher();
 
     let appointments = [];
     let staff = [];
+    let resources = [];
     let isLoading = false;
     let lastLoadTime = 0;
     let refreshTimeout;
-    let staffRefreshTimeout = null; // Дебаунсинг для обновления сотрудников
+    let staffRefreshTimeout = null;
 
     // ПРИОРИТЕТ: Проп, если он есть, иначе Стор.
     $: currentBranchId = branchId || $activeBranchId;
@@ -117,9 +122,20 @@
         if (!silent) isLoading = true;
         await Promise.all([
             fetchAppointments(date, bId, true),
-            fetchStaff(date, bId, true)
+            isRentMode ? fetchResources(bId) : fetchStaff(date, bId, true)
         ]);
         isLoading = false;
+    }
+
+    async function fetchResources(bId) {
+        if (!bId) return;
+        try {
+            const data = await resourceService.getResources(bId);
+            resources = Array.isArray(data) ? data : [];
+        } catch (e) {
+            console.error('❌ Error loading resources:', e);
+            resources = [];
+        }
     }
 
     function debouncedRefresh() {
@@ -172,10 +188,32 @@
         return result;
     })();
 
+    // В режиме Аренды колонки — это ресурсы (маппинг в fake-staff для DayTimeline).
+    // Рабочие часы 00:00–23:59 чтобы все слоты были кликабельны (нет выходных у ресурсов).
+    $: rentColumns = resources.map(r => ({
+        id: r.id,
+        name: r.name,
+        specialty: r.description || 'Объект',
+        photoData: null,
+        dayOff: false,
+        workStartTime: '00:00',
+        workEndTime: '23:59'
+    }));
+
+    $: displayedColumns = isRentMode ? rentColumns : displayedStaff;
+
     // РЕАКТИВНАЯ ЗАГРУЗКА ПРИ СМЕНЕ ДАТЫ ИЛИ ФИЛИАЛА
     $: if (branchLocalDate && currentBranchId) {
         const now = Date.now();
         if (now - lastLoadTime > 800) {
+            lastLoadTime = now;
+            loadDayData(branchLocalDate, currentBranchId);
+        }
+    }
+    // Переключение ниши (например, смена филиала на RENT) требует перезагрузки колонок
+    $: if (typeof isRentMode !== 'undefined') {
+        const now = Date.now();
+        if (now - lastLoadTime > 800 && branchLocalDate && currentBranchId) {
             lastLoadTime = now;
             loadDayData(branchLocalDate, currentBranchId);
         }
@@ -244,7 +282,19 @@
         clearTimeout(staffRefreshTimeout);
     });
 
-    function handleEmptySlot(event) { dispatch('emptySlotTap', event.detail); }
+    function handleEmptySlot(event) {
+        // В режиме Аренды staffId в событии — это id ресурса. Переводим в resourceId.
+        if (isRentMode) {
+            dispatch('emptySlotTap', {
+                hour: event.detail.hour,
+                min: event.detail.min,
+                staffId: null,
+                resourceId: event.detail.staffId
+            });
+        } else {
+            dispatch('emptySlotTap', event.detail);
+        }
+    }
     function handleAppointment(event) { dispatch('appointmentTap', event.detail); }
     function handleStaffTap(event) { dispatch('staffTap', event.detail); }
     export function handleRefresh() {
@@ -257,7 +307,7 @@
 
 <div class="schedule-screen">
     <div class="timeline-body">
-        {#if isLoading && staff.length === 0}
+        {#if isLoading && displayedColumns.length === 0}
             <div class="center-box">
                 <span class="spinner"></span>
                 <p style="margin-top: 12px; font-size: 12px; color: #94a3b8;">Загрузка расписания...</p>
@@ -268,16 +318,17 @@
                 <p>Выберите филиал в меню сверху</p>
                 <button on:click={() => branchStore.refresh()} style="margin-top: 10px; font-size: 10px;">Обновить список филиалов</button>
             </div>
-        {:else if staff.length === 0 && !isLoading}
+        {:else if displayedColumns.length === 0 && !isLoading}
             <div class="empty-state-msg">
-                <span class="icon">👥</span>
-                <p>В этом филиале нет сотрудников на выбранную дату</p>
+                <span class="icon">{isRentMode ? '🏠' : '👥'}</span>
+                <p>{isRentMode ? 'В этом филиале нет объектов аренды' : 'В этом филиале нет сотрудников на выбранную дату'}</p>
             </div>
         {:else}
             <DayTimeline
                 day={$selectedDate}
                 {appointments}
-                staff={displayedStaff}
+                columns={displayedColumns}
+                {columnKey}
                 on:appointmentTap={handleAppointment}
                 on:emptySlotTap={handleEmptySlot}
                 on:staffTap={handleStaffTap}

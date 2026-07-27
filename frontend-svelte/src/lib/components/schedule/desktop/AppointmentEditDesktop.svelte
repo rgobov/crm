@@ -209,6 +209,7 @@
             } else {
 
                 formData.staffMemberId = preselected.staffId || '';
+                formData.resourceId = preselected.resourceId ? String(preselected.resourceId) : null;
 
                 formData.branchId = $activeBranchId;
 

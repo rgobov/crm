@@ -4,7 +4,7 @@ export const resourceService = {
     // ИЗМЕНЕНО: Добавлен параметр branchId и переход на админский эндпоинт
     async getResources(branchId = null) {
         const response = await api.get('/admin/resources', {
-            params: { branch_id: branchId }
+            params: { branchId: branchId }
         });
         return response.data;
     },

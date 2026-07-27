@@ -9,7 +9,8 @@
     // Прокидываем пропсы
     export let day = new Date();
     export let appointments = [];
-    export let staff = [];
+    export let columns = [];
+    export let columnKey = 'staffMemberId';
 
     // Универсальный проброс событий (bubbling)
     function forward(event) {
@@ -22,7 +23,8 @@
     <DayTimelineMobile
         {day}
         {appointments}
-        {staff}
+        {columns}
+        {columnKey}
         on:appointmentTap={forward}
         on:emptySlotTap={forward}
         on:staffTap={forward}
@@ -33,7 +35,8 @@
     <DayTimelineDesktop
         {day}
         {appointments}
-        {staff}
+        {columns}
+        {columnKey}
         on:appointmentTap={forward}
         on:emptySlotTap={forward}
         on:staffTap={forward}

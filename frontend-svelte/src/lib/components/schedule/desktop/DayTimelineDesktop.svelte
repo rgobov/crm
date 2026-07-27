@@ -27,7 +27,8 @@ const dispatch = createEventDispatcher();
 
     export let day = new Date();
     export let appointments = [];
-    export let staff = [];
+    export let columns = [];
+    export let columnKey = 'staffMemberId';
 
     let HOUR_HEIGHT = 124;
     let STAFF_WIDTH = 200;
@@ -49,18 +50,20 @@ const dispatch = createEventDispatcher();
 
     $: apptsByStaff = (() => {
         const map = { 'unassigned': [] };
-        staff.forEach(s => map[s.id] = []);
+        columns.forEach(s => map[s.id] = []);
         appointments.forEach(a => {
-            const sid = a.staffMemberId;
+            const sid = a[columnKey];
             if (sid && map[sid]) map[sid].push(a);
             else map['unassigned'].push(a);
         });
         return map;
     })();
 
+    $: isResourceMode = columnKey === 'resourceId';
+
     $: STAFF_WIDTH = 200;
     $: maxCols = Math.floor((containerWidth - TIME_COL_WIDTH) / STAFF_WIDTH);
-    $: actualCols = staff.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
+    $: actualCols = columns.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0);
     $: placeholderColsCount = actualCols < maxCols ? (maxCols - actualCols + 1) : 0;
     $: totalColsCount = actualCols + placeholderColsCount;
 
@@ -184,7 +187,7 @@ const dispatch = createEventDispatcher();
             minH = Math.min(minH, h);
             maxH = Math.max(maxH, h + 1);
         });
-        staff.forEach(s => {
+        columns.forEach(s => {
             if (s.workStartTime) minH = Math.min(minH, parseInt(s.workStartTime.split(':')[0]));
             if (s.workEndTime) maxH = Math.max(maxH, parseInt(s.workEndTime.split(':')[0]));
         });
@@ -204,8 +207,8 @@ const dispatch = createEventDispatcher();
         <div class="time-corner-fixed" style="width: {TIME_COL_WIDTH}px">🕒</div>
         <div class="staff-scroll-area" bind:this={scrollHeader} on:scroll={syncHeaderScroll}>
             <div class="staff-inner-row" style="width: {totalColsCount * STAFF_WIDTH}px">
-                {#each staff as s (s.id + refreshKey)}
-                    <button class="staff-cell btn-reset" style="width: {STAFF_WIDTH}px" on:click={() => dispatch('staffTap', s)}>
+                {#each columns as s (s.id + refreshKey)}
+                    <button class="staff-cell btn-reset" style="width: {STAFF_WIDTH}px" on:click={() => { if (!isResourceMode) dispatch('staffTap', s); }}>
                         <div class="avatar-box">
                             {#if s.photoData}
                                 <img class="avatar" class:is-off={s.dayOff} src="data:image/jpeg;base64,{s.photoData}" alt={s.name} />
@@ -247,7 +250,7 @@ const dispatch = createEventDispatcher();
             </div>
             <div class="grid-canvas" bind:this={gridCanvas}>
                 <div class="columns-container">
-                    {#each [...staff, ...(apptsByStaff['unassigned'].length > 0 ? [{id: null}] : [])] as s ( (s.id || 'unassigned') + refreshKey )}
+                    {#each [...columns, ...(apptsByStaff['unassigned'].length > 0 ? [{id: null}] : [])] as s ( (s.id || 'unassigned') + refreshKey )}
                         <div class="staff-col" style="width: {STAFF_WIDTH}px">
                             {#each Array(hours.length * 4) as _, i}
                                 {@const h = hours[Math.floor(i/4)]}

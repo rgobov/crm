@@ -120,6 +120,7 @@
                 const initialStaff = preselected.staffId ? [String(preselected.staffId)] : [];
                 formData.staffMemberId = preselected.staffId ? String(preselected.staffId) : null;
                 formData.staffMemberIds = initialStaff;
+                formData.resourceId = preselected.resourceId ? String(preselected.resourceId) : null;
                 formData.branchId = $activeBranchId;
                 const pad = n => n < 10 ? '0'+n : n;
                 const dateStr = timeUtils.toBranchLocalDateStr(preselected.date, currentBranchData?.timezone);
