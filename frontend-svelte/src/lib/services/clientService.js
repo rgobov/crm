@@ -37,6 +37,18 @@ export const clientService = {
         })).data;
     },
 
+    async getResources(branchId, options = {}) {
+        return (await api.get('/client/resources', {
+            params: { branchId: branchId },
+            ...options
+        })).data;
+    },
+
+    async getResourcePhoto(resourceId) {
+        const response = await api.get(`/client/resources/${resourceId}/photo`);
+        return response.data;
+    },
+
     async createAppointment(data) {
         const response = await api.post('/client/appointments', data);
         return response.data;

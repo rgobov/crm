@@ -31,6 +31,7 @@ public class ClientController {
     private final ScheduleService scheduleService;
     private final UserRepository userRepository;
     private final ContactService contactService;
+    private final ResourceService resourceService;
 
     private String getRequiredTenantId(String tenantId) {
         if (tenantId == null || tenantId.isEmpty()) {
@@ -68,6 +69,28 @@ public class ClientController {
                     String photoDataBase64 = null;
                     if (staff.getPhotoData() != null && staff.getPhotoData().length > 0) {
                         photoDataBase64 = Base64.getEncoder().encodeToString(staff.getPhotoData());
+                    }
+                    return ResponseEntity.ok(Map.of("photoData", photoDataBase64 != null ? photoDataBase64 : ""));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/resources")
+    public List<ResourceDto> getResources(@RequestAttribute("tenantId") String tenantId,
+                                          @RequestParam(value = "branchId", required = false) String branchId) {
+        return resourceService.getResources(getRequiredTenantId(tenantId), branchId)
+                .stream().map(DtoMapper::toDto).collect(Collectors.toList());
+    }
+
+    @GetMapping("/resources/{id}/photo")
+    public ResponseEntity<Map<String, String>> getResourcePhoto(@RequestAttribute("tenantId") String tenantId, @PathVariable String id) {
+        return resourceService.getAllResources(getRequiredTenantId(tenantId)).stream()
+                .filter(r -> r.getId().equals(id))
+                .findFirst()
+                .map(resource -> {
+                    String photoDataBase64 = null;
+                    if (resource.getPhotoData() != null && resource.getPhotoData().length > 0) {
+                        photoDataBase64 = Base64.getEncoder().encodeToString(resource.getPhotoData());
                     }
                     return ResponseEntity.ok(Map.of("photoData", photoDataBase64 != null ? photoDataBase64 : ""));
                 })

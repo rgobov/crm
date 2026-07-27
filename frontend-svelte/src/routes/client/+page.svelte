@@ -20,7 +20,8 @@
 		comment: '',
 		hour: 10,
 		min: 0,
-		staffId: ''
+		staffId: '',
+		resourceId: null
 	};
 
 	let isSubmitting = false;
@@ -114,7 +115,8 @@
 			comment: '',
 			hour: detail.hour,
 			min: detail.min,
-			staffId: detail.staffId
+			staffId: detail.staffId,
+			resourceId: detail.resourceId || null
 		};
 
 		// Получаем актуальный список мастеров для правильного отображения имени
@@ -155,6 +157,7 @@
 			durationInMinutes: duration,
 			service: bookingForm.service,
 			staffMemberId: bookingForm.staffId,
+			resourceId: bookingForm.resourceId,
 			branchId: selectedBranchId,
 			comment: bookingForm.comment
 		};

@@ -18,7 +18,7 @@
     export let isClient = false;
 
     $: service = isClient ? clientService : adminService;
-    $: isRentMode = !isClient && $activeNiche === 'RENT';
+    $: isRentMode = $activeNiche === 'RENT';
     $: columnKey = isRentMode ? 'resourceId' : 'staffMemberId';
 
     const dispatch = createEventDispatcher();
@@ -130,7 +130,7 @@
     async function fetchResources(bId) {
         if (!bId) return;
         try {
-            const data = await resourceService.getResources(bId);
+            const data = isClient ? await clientService.getResources(bId) : await resourceService.getResources(bId);
             const newResources = Array.isArray(data) ? data : [];
             // Soft update: сохраняем фото если уже есть в памяти
             resources = newResources.map(nr => {
@@ -163,7 +163,8 @@
             }
         }
         try {
-            const response = await api.get(`/admin/resources/${resourceId}/photo`);
+            const url = isClient ? `/client/resources/${resourceId}/photo` : `/admin/resources/${resourceId}/photo`;
+            const response = await api.get(url);
             const photoData = response.data.photoData;
             if (photoData) {
                 await dbService.savePhoto(resourceId, photoData, updatedAtOnServer || Date.now());
