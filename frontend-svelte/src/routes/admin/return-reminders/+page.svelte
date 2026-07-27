@@ -104,11 +104,11 @@
     .screen-wrapper { min-height: 100vh; background: #fdf6e3; }
     .page-header {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 16px 20px; background: white; border-bottom: 1px solid #f1f5f9;
+        padding: 16px 20px; background: #eee8d5; border-bottom: 1px solid #ddd6c1;
         position: sticky; top: 0; z-index: 10;
     }
     .back-btn { background: none; border: none; color: #268bd2; font-size: 20px; cursor: pointer; font-weight: 700; }
-    h1 { font-size: 18px; font-weight: 800; margin: 0; color: #0f172a; }
+    h1 { font-size: 18px; font-weight: 800; margin: 0; color: #073642; }
 
     .filter-bar {
         display: flex; align-items: center; gap: 8px;

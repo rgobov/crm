@@ -46,6 +46,7 @@
             return;
         }
         if (id === 'return-reminders') {
+            activeTab.set('return-reminders');
             goto('/admin/return-reminders');
             return;
         }
@@ -63,6 +64,16 @@
     function handleLogout() {
         logout();
         goto('/');
+    }
+
+    // Синхронизация activeTab с URL при прямом переходе (например, по ссылке из ManagementTab)
+    $: {
+        const path = $page.url.pathname;
+        if (path === '/admin/return-reminders') {
+            activeTab.set('return-reminders');
+        } else if (path === '/admin/settings/ai') {
+            activeTab.set('ai');
+        }
     }
 </script>
 
