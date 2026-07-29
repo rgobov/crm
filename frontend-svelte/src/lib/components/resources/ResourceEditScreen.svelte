@@ -2,6 +2,7 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import { resourceService } from '$lib/services/resourceService.js';
     import { branchService } from '$lib/services/branchService.js';
+    import { ensureJpeg } from '$lib/utils/heicUtils.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { fade, scale } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
@@ -79,7 +80,8 @@
         }
         isUploadingPhoto = true;
         try {
-            await resourceService.uploadResourcePhoto(resource.id, file);
+            const jpegFile = await ensureJpeg(file);
+            await resourceService.uploadResourcePhoto(resource.id, jpegFile);
             const resp = await resourceService.getResourcePhoto(resource.id);
             photoData = resp?.photoData || null;
             dispatch('photoUpdated');

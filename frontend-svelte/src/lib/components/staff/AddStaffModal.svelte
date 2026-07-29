@@ -2,6 +2,7 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import { staffService } from '$lib/services/staffService.js';
     import { branchService } from '$lib/services/branchService.js';
+    import { ensureJpeg } from '$lib/utils/heicUtils.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -23,22 +24,29 @@
     let photoPreview = null;
     let isUploadingPhoto = false;
 
-    function handlePhotoSelect(event) {
-        const file = event.target.files[0];
+    async function handlePhotoSelect(event) {
+        let file = event.target.files[0];
         if (!file) return;
         if (!file.type.startsWith('image/')) {
             alert('Пожалуйста, выберите изображение');
             return;
         }
         isUploadingPhoto = true;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            photoPreview = e.target.result;
-            // Извлекаем base64 из data URL
-            formData.photoData = photoPreview.split(',')[1];
+        try {
+            file = await ensureJpeg(file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                photoPreview = e.target.result;
+                // Извлекаем base64 из data URL
+                formData.photoData = photoPreview.split(',')[1];
+                isUploadingPhoto = false;
+            };
+            reader.onerror = () => { isUploadingPhoto = false; };
+            reader.readAsDataURL(file);
+        } catch (e) {
             isUploadingPhoto = false;
-        };
-        reader.readAsDataURL(file);
+            alert('Ошибка при обработке фото');
+        }
     }
 
     function clearPhoto() {

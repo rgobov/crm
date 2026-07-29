@@ -2,6 +2,7 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import { staffService } from '$lib/services/staffService.js';
     import { branchService } from '$lib/services/branchService.js';
+    import { ensureJpeg } from '$lib/utils/heicUtils.js';
     import { phoneUtils } from '$lib/utils/phoneUtils.js';
     import { fade, scale, slide } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
@@ -79,7 +80,8 @@
         }
         isUploadingPhoto = true;
         try {
-            const result = await staffService.uploadStaffPhoto(staffId, file);
+            const jpegFile = await ensureJpeg(file);
+            const result = await staffService.uploadStaffPhoto(staffId, jpegFile);
             staff = result;
             syncTemp();
             dispatch('updated', staff);
