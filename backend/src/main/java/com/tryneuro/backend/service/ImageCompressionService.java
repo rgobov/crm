@@ -7,18 +7,13 @@ import com.drew.metadata.exif.ExifIFD0Directory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.*;
-import javax.imageio.metadata.IIOMetadata;
-import javax.imageio.stream.ImageInputStream;
+import javax.imageio.ImageIO;
 import java.awt.*;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Base64;
-import java.util.Iterator;
 
 @Service
 public class ImageCompressionService {
@@ -28,22 +23,19 @@ public class ImageCompressionService {
 
     /**
      * Сжимает изображение до 300x300 и конвертирует в JPEG.
-     * EXIF orientation сохраняется в метаданных JPEG — браузер применяет поворот через CSS.
+     * EXIF orientation внедряется в JPEG — браузер применяет поворот через CSS.
      */
     public byte[] compressImage(byte[] imageData) throws IOException {
-        // Читаем оригинальные метаданные JPEG (сохраняем EXIF orientation для браузера)
-        IIOMetadata srcMetadata = null;
+        // Читаем EXIF orientation из сырых байтов (metadata-extractor)
+        int exifOrientation = 1;
         try {
-            ImageInputStream iis = ImageIO.createImageInputStream(new ByteArrayInputStream(imageData));
-            Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
-            if (readers.hasNext()) {
-                ImageReader reader = readers.next();
-                reader.setInput(iis);
-                srcMetadata = reader.getImageMetadata(0);
-                reader.dispose();
+            Metadata metadata = ImageMetadataReader.readMetadata(new ByteArrayInputStream(imageData));
+            ExifIFD0Directory exifDir = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+            if (exifDir != null && exifDir.containsTag(ExifDirectoryBase.TAG_ORIENTATION)) {
+                exifOrientation = exifDir.getInt(ExifDirectoryBase.TAG_ORIENTATION);
             }
         } catch (Exception e) {
-            // метаданные опциональны — без них фото будет в ориентации пикселей
+            // если EXIF не читается — считаем orientation = 1 (normal)
         }
 
         BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(imageData));
@@ -51,8 +43,8 @@ public class ImageCompressionService {
             throw new IOException("Unsupported image format");
         }
 
-        // НЕ применяем EXIF rotation — браузер сам повернёт через image-orientation: from-image
-        // image-orientation читает EXIF Orientation tag, который мы сохранили в metadata выше
+        // НЕ поворачиваем пиксели — браузер сам повернёт через image-orientation: from-image
+        // EXIF Orientation tag внедряется в JPEG на шаге записи
 
         // Рассчитываем новые размеры с сохранением пропорций
         int newWidth = originalImage.getWidth();
@@ -78,88 +70,61 @@ public class ImageCompressionService {
         g2d.drawImage(originalImage, 0, 0, newWidth, newHeight, null);
         g2d.dispose();
 
-        // Сжимаем в JPEG с сохранением EXIF метаданных (браузер применит image-orientation)
+        // Сжимаем в JPEG через ImageIO.write (надёжно, без исключений)
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageWriter writer = null;
-        try {
-            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
-            if (writers.hasNext()) {
-                writer = writers.next();
-                ImageWriteParam writeParam = writer.getDefaultWriteParam();
-                writer.setOutput(ImageIO.createImageOutputStream(baos));
+        ImageIO.write(resizedImage, "jpg", baos);
+        byte[] jpegBytes = baos.toByteArray();
 
-                IIOImage iioImage = srcMetadata != null
-                        ? new IIOImage(resizedImage, null, srcMetadata)
-                        : new IIOImage(resizedImage, null, null);
-                writer.write(null, iioImage, writeParam);
-            } else {
-                // fallback — без метаданных, EXIF будет 1 (normal)
-                ImageIO.write(resizedImage, "jpg", baos);
-            }
-        } finally {
-            if (writer != null) writer.dispose();
+        // Внедряем EXIF Orientation tag в JPEG
+        if (exifOrientation != 1) {
+            jpegBytes = injectExifApp1(jpegBytes, exifOrientation);
         }
 
-        return baos.toByteArray();
+        return jpegBytes;
     }
 
     /**
-     * Читает EXIF orientation и применяет соответствующее преобразование.
-     * Телефоны (особенно iPhone) хранят фото в ландшафтной ориентации,
-     * а поворот указывают в EXIF теге Orientation.
+     * Внедряет EXIF APP1-маркер с тегом Orientation в JPEG-поток перед SOS-маркером.
+     * Браузер через CSS image-orientation: from-image прочитает тег и повернёт фото.
      */
-    private BufferedImage applyExifOrientation(BufferedImage image, byte[] imageData) {
-        try {
-            Metadata metadata = ImageMetadataReader.readMetadata(new ByteArrayInputStream(imageData));
-            ExifIFD0Directory exifDir = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
-            if (exifDir == null || !exifDir.containsTag(ExifDirectoryBase.TAG_ORIENTATION)) {
-                return image;
+    private byte[] injectExifApp1(byte[] jpegData, int orientation) throws IOException {
+        int sosIdx = -1;
+        for (int i = 0; i < jpegData.length - 1; i++) {
+            if ((jpegData[i] & 0xFF) == 0xFF && (jpegData[i + 1] & 0xFF) == 0xDA) {
+                sosIdx = i;
+                break;
             }
-
-            int orientation = exifDir.getInt(ExifDirectoryBase.TAG_ORIENTATION);
-            AffineTransform transform = orientationToTransform(orientation, image.getWidth(), image.getHeight());
-            if (transform == null) {
-                return image;
-            }
-
-            AffineTransformOp op = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
-            BufferedImage rotated = new BufferedImage(
-                    orientation == 5 || orientation == 6 || orientation == 7 || orientation == 8
-                            ? image.getHeight() : image.getWidth(),
-                    orientation == 5 || orientation == 6 || orientation == 7 || orientation == 8
-                            ? image.getWidth() : image.getHeight(),
-                    BufferedImage.TYPE_INT_RGB);
-            op.filter(image, rotated);
-            return rotated;
-        } catch (Exception e) {
-            // Если не удалось прочитать EXIF — возвращаем как есть
-            return image;
         }
-    }
 
-    /**
-     * Преобразует EXIF orientation (1-8) в AffineTransform.
-     * См. http://sylvana.net/jpegcrop/exif_orientation.html
-     */
-    private AffineTransform orientationToTransform(int orientation, int width, int height) {
-        switch (orientation) {
-            case 2: // Flip X
-                return AffineTransform.getScaleInstance(-1, 1);
-            case 3: // Rotate 180
-                return AffineTransform.getQuadrantRotateInstance(2, width / 2.0, height / 2.0);
-            case 4: // Flip Y
-                return AffineTransform.getScaleInstance(1, -1);
-            case 5: // Transpose (flip X + rotate 90 CW)
-                return new AffineTransform(0, 1, 1, 0, 0, 0);
-            case 6: // Rotate 90 CW
-                return new AffineTransform(0, 1, -1, 0, height, 0);
-            case 7: // Transverse (flip X + rotate 90 CCW)
-                return new AffineTransform(0, -1, -1, 0, height, width);
-            case 8: // Rotate 90 CCW
-                return new AffineTransform(0, -1, 1, 0, 0, width);
-            default: // 1 (normal) or unknown
-                return null;
+        ByteArrayOutputStream app1 = new ByteArrayOutputStream();
+        ByteArrayOutputStream exif = new ByteArrayOutputStream();
+        // "Exif\0\0" идентификатор
+        exif.write(new byte[]{0x45, 0x78, 0x69, 0x66, 0x00, 0x00});
+        // TIFF header (big-endian, offset to IFD0 = 8)
+        exif.write(new byte[]{0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08});
+        // IFD0: 1 entry (Orientation tag 0x0112, type SHORT, value = orientation)
+        exif.write(0x00); exif.write(0x01); // 1 entry
+        exif.write(0x01); exif.write(0x12); // tag = Orientation (0x0112)
+        exif.write(0x00); exif.write(0x03); // type = SHORT
+        exif.write(0x00); exif.write(0x00); exif.write(0x00); exif.write(0x01); // count = 1
+        exif.write(0x00); exif.write((byte) orientation); // value
+        exif.write(0x00); exif.write(0x00); // padding to 4 bytes
+        exif.write(0x00); exif.write(0x00); exif.write(0x00); exif.write(0x00); // next IFD = 0
+
+        int app1Len = 2 + exif.size();
+        app1.write(0xFF); app1.write(0xE1); // APP1 marker
+        app1.write((app1Len >> 8) & 0xFF); app1.write(app1Len & 0xFF);
+        app1.write(exif.toByteArray());
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        if (sosIdx >= 0) {
+            out.write(jpegData, 0, sosIdx);
+            out.write(app1.toByteArray());
+            out.write(jpegData, sosIdx, jpegData.length - sosIdx);
+        } else {
+            out.write(jpegData);
         }
+        return out.toByteArray();
     }
 
     /**
