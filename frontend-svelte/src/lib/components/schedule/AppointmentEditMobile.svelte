@@ -243,7 +243,7 @@
         let finalPhone = isNewClientMode ? newClientPhone.trim() : formData.clientPhone;
         if (!finalPhone) return alert('Укажите номер телефона');
         if (!currentBranchData) return alert('Данные филиала еще загружаются...');
-        if (formData.staffMemberIds.length === 0) return alert('Выберите хотя бы одного исполнителя');
+        if ($activeNiche !== 'RENT' && formData.staffMemberIds.length === 0) return alert('Выберите хотя бы одного исполнителя');
 
         isSaving = true;
         try {
@@ -444,6 +444,7 @@
                     </div>
                 {/if}
 
+                {#if $activeNiche !== 'RENT'}
                 <div class="tile-card reference-card">
                     <label for="ref-tag-id">{$nicheSettings.refLabel}</label>
                     <div class="tag-input-wrap">
@@ -459,6 +460,7 @@
                         {/if}
                     </div>
                 </div>
+                {/if}
 
                 <div class="tile-card rel-pos" role="presentation">
                     <label for="service-search-id">УСЛУГА</label>

@@ -577,6 +577,7 @@
 
             <div class="tiles-stack">
 
+                {#if $activeNiche !== 'RENT'}
                 <div class="tile-card reference-card">
 
                     <label for="ref-tag-id">{$nicheSettings.refLabel}</label>
@@ -606,6 +607,7 @@
                     </div>
 
                 </div>
+                {/if}
 
 
 

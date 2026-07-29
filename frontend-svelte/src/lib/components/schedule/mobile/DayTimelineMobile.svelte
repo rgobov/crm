@@ -240,7 +240,7 @@
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }
     .staff-cell.is-off { opacity: 0.5; background: #eee8d5; }
     .staff-cell.is-off .n, .staff-cell.is-off .s { color: #93a1a1; }
-    .avatar { width: 32px; height: 32px; background: var(--primary-gradient); color: white; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 13px; object-fit: cover; }
+    .avatar { width: 32px; height: 32px; background: var(--primary-gradient); color: white; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 13px; object-fit: cover; image-orientation: from-image; }
     img.avatar { background: #ddd; }
     .avatar.is-off { background: #93a1a1; }
     .meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }

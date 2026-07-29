@@ -375,6 +375,7 @@
             </section>
 
             <div class="tiles-stack">
+                {#if $activeNiche !== 'RENT'}
                 <div class="tile-card reference-card">
 <label>{$nicheSettings.refLabel}</label>
                         <div class="tag-input-wrap">
@@ -390,6 +391,7 @@
                         {/if}
                     </div>
                 </div>
+                {/if}
 
                 <div class="tile-card rel-pos" on:click|stopPropagation>
                     <label>УСЛУГА</label>
