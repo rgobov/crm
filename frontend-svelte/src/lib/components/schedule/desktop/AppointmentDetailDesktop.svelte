@@ -2,18 +2,27 @@
     import { createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { fade } from 'svelte/transition';
-    import { nicheSettings } from '$lib/stores/nicheStore.js';
+    import { activeNiche, nicheSettings } from '$lib/stores/nicheStore.js';
 
     export let appointment;
     const dispatch = createEventDispatcher();
 
-    const STATUSES = [
-        { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
-        { id: 'CONFIRMED', label: 'Подтвержден', color: '#0891b2' },
-        { id: 'ARRIVED', label: 'Пришёл', color: '#7c3aed' },
-        { id: 'COMPLETED', label: 'Завершен', color: '#16a34a' },
-        { id: 'CANCELLED', label: 'Отменен', color: '#dc2626' }
-    ];
+    $: isRentMode = $activeNiche === 'RENT';
+
+    $: STATUSES = isRentMode
+        ? [
+            { id: 'SCHEDULED', label: 'Забронировано', color: '#64748b' },
+            { id: 'CONFIRMED', label: 'Подтверждено', color: '#0891b2' },
+            { id: 'COMPLETED', label: 'Арендовано', color: '#16a34a' },
+            { id: 'CANCELLED', label: 'Отменено', color: '#dc2626' }
+        ]
+        : [
+            { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
+            { id: 'CONFIRMED', label: 'Подтвержден', color: '#0891b2' },
+            { id: 'ARRIVED', label: 'Пришёл', color: '#7c3aed' },
+            { id: 'COMPLETED', label: 'Завершен', color: '#16a34a' },
+            { id: 'CANCELLED', label: 'Отменен', color: '#dc2626' }
+        ];
 
     async function updateStatus(newStatus) {
         try {
@@ -90,10 +99,12 @@
                 <span class="icon">🕒</span>
                 <span>{new Date(appointment.startTime).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})} ({appointment.durationInMinutes} мин)</span>
             </div>
+            {#if !isRentMode}
             <div class="data-item">
                 <span class="icon">👤</span>
                 <span>{appointment.staffName || 'Не назначен'}</span>
             </div>
+            {/if}
             {#if appointment.referenceTag}
                 <div class="data-item highlight">
                     <span class="icon">{$nicheSettings.refIcon}</span>
@@ -109,7 +120,7 @@
         </div>
 
         <div class="status-side">
-            <label>СТАТУС ВИЗИТА</label>
+            <label>{isRentMode ? 'СТАТУС АРЕНДЫ' : 'СТАТУС ВИЗИТА'}</label>
             <div class="status-list">
                 {#each STATUSES as st}
                     <button

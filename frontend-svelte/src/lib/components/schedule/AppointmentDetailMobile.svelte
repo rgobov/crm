@@ -3,7 +3,7 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { serviceService } from '$lib/services/serviceService.js';
-    import { nicheSettings } from '$lib/stores/nicheStore.js';
+    import { activeNiche, nicheSettings } from '$lib/stores/nicheStore.js';
     import { fade, scale, slide } from 'svelte/transition';
     import { quintOut } from 'svelte/easing';
 
@@ -16,6 +16,8 @@
     let isSaving = false;
     let services = [];
 
+    $: isRentMode = $activeNiche === 'RENT';
+
     onMount(async () => {
         try {
             services = await serviceService.getServices();
@@ -24,13 +26,20 @@
         }
     });
 
-    const STATUSES = [
-        { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
-        { id: 'CONFIRMED', label: 'Подтвержден', color: '#0891b2' },
-        { id: 'ARRIVED', label: 'Пришёл', color: '#7c3aed' },
-        { id: 'COMPLETED', label: 'Завершен', color: '#16a34a' },
-        { id: 'CANCELLED', label: 'Отменен', color: '#dc2626' }
-    ];
+    $: STATUSES = isRentMode
+        ? [
+            { id: 'SCHEDULED', label: 'Забронировано', color: '#64748b' },
+            { id: 'CONFIRMED', label: 'Подтверждено', color: '#0891b2' },
+            { id: 'COMPLETED', label: 'Арендовано', color: '#16a34a' },
+            { id: 'CANCELLED', label: 'Отменено', color: '#dc2626' }
+        ]
+        : [
+            { id: 'SCHEDULED', label: 'Ожидается', color: '#64748b' },
+            { id: 'CONFIRMED', label: 'Подтвержден', color: '#0891b2' },
+            { id: 'ARRIVED', label: 'Пришёл', color: '#7c3aed' },
+            { id: 'COMPLETED', label: 'Завершен', color: '#16a34a' },
+            { id: 'CANCELLED', label: 'Отменен', color: '#dc2626' }
+        ];
 
     async function updateStatus(newStatus) {
         try {
@@ -115,7 +124,7 @@
     <header class="hero-card">
         <div class="avatar-big">{appointment.clientName?.charAt(0) || '?'}</div>
         <div class="hero-info">
-            <label>Карточка визита</label>
+            <label>{isRentMode ? 'Карточка аренды' : 'Карточка визита'}</label>
             <button class="client-link-btn" on:click={handleClientClick}>
                 <h2>{appointment.clientName} <span>›</span></h2>
             </button>
@@ -172,7 +181,7 @@
                 <label>Внутренняя заметка</label>
                 {#if isEditingComment}
                     <div class="inline-editor" in:fade>
-                        <textarea bind:value={tempComment} placeholder="Детали визита..." autofocus></textarea>
+                        <textarea bind:value={tempComment} placeholder={isRentMode ? "Детали аренды..." : "Детали визита..."} autofocus></textarea>
                         <div class="editor-actions">
                             <button class="btn-save-mini" on:click={saveInlineComment} disabled={isSaving}>
                                 {isSaving ? '...' : 'СОХРАНИТЬ ✓'}

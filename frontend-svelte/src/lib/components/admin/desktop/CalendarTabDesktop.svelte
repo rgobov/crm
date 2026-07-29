@@ -8,6 +8,7 @@
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchStore } from '$lib/stores/branchStore.js';
+    import { activeNiche } from '$lib/stores/nicheStore.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -201,7 +202,7 @@
                     <h3>
                         {#if showModal === 'edit'}
                             {currentAppointment ? 'Редактирование записи' : 'Создание записи'}
-                        {:else if showModal === 'detail'} Детали визита
+                        {:else if showModal === 'detail'} {$activeNiche === 'RENT' ? 'Детали аренды' : 'Детали визита'}
                         {:else if showModal === 'client-profile'} Карточка клиента
                         {:else if showModal === 'shift'} График работы {/if}
                     </h3>

@@ -9,6 +9,7 @@
     import AppointmentDetailMobile from '$lib/components/schedule/AppointmentDetailMobile.svelte';
     import { isMobile } from '$lib/stores/ui.js';
     import { selectedDate } from '$lib/stores/dashboardStore.js';
+    import { activeNiche } from '$lib/stores/nicheStore.js';
     import { managerService } from '$lib/services/managerService.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
@@ -89,7 +90,7 @@
                 <h3>
                     {#if showModal === 'edit'}
                         {currentAppointment ? 'Редактирование записи' : 'Создание записи'}
-                    {:else if showModal === 'detail'} Детали визита
+                    {:else if showModal === 'detail'} {$activeNiche === 'RENT' ? 'Детали аренды' : 'Детали визита'}
                     {/if}
                 </h3>
                 <button class="close-btn" on:click={closeModal}>✕</button>
