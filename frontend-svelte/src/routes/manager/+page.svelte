@@ -7,15 +7,18 @@
     import AppointmentEditMobile from '$lib/components/schedule/AppointmentEditMobile.svelte';
     import AppointmentDetailScreen from '$lib/components/schedule/AppointmentDetailScreen.svelte';
     import AppointmentDetailMobile from '$lib/components/schedule/AppointmentDetailMobile.svelte';
+    import ResourceEditScreen from '$lib/components/resources/ResourceEditScreen.svelte';
     import { isMobile } from '$lib/stores/ui.js';
     import { selectedDate } from '$lib/stores/dashboardStore.js';
     import { activeNiche } from '$lib/stores/nicheStore.js';
     import { managerService } from '$lib/services/managerService.js';
+    import { resourceService } from '$lib/services/resourceService.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
     let showModal = null;
     let currentAppointment = null;
+    let selectedResource = null;
     let preselectedData = null;
     let appointmentEditRef;
     let scheduleScreenRef;
@@ -46,8 +49,17 @@
         showModal = 'detail';
     }
 
+    async function handleResourceTap(event) {
+        const resource = await resourceService.getResourceById(event.detail.id);
+        if (resource) {
+            selectedResource = resource;
+            showModal = 'resource';
+        }
+    }
+
     function closeModal() {
         showModal = null;
+        selectedResource = null;
         if (scheduleScreenRef && typeof scheduleScreenRef.handleRefresh === 'function') {
             scheduleScreenRef.handleRefresh();
         }
@@ -79,6 +91,7 @@
             bind:this={scheduleScreenRef}
             on:emptySlotTap={openNewAppointment}
             on:appointmentTap={openDetail}
+            on:resourceTap={handleResourceTap}
         />
     </main>
 </div>
@@ -91,6 +104,7 @@
                     {#if showModal === 'edit'}
                         {currentAppointment ? 'Редактирование записи' : 'Создание записи'}
                     {:else if showModal === 'detail'} {$activeNiche === 'RENT' ? 'Детали аренды' : 'Детали визита'}
+                    {:else if showModal === 'resource'} Объект аренды
                     {/if}
                 </h3>
                 <button class="close-btn" on:click={closeModal}>✕</button>
@@ -108,11 +122,13 @@
                     {:else}
                         <AppointmentDetailScreen appointment={currentAppointment} service={managerService} on:edit={(e) => { currentAppointment = e.detail; showModal = 'edit'; }} on:deleted={closeModal} />
                     {/if}
-                {/if}
+                    {:else if showModal === 'resource'}
+                        <ResourceEditScreen resource={selectedResource} on:cancel={closeModal} on:success={closeModal} on:photoUpdated={closeModal} />
+                    {/if}
+                </div>
             </div>
         </div>
-    </div>
-{/if}
+    {/if}
 
 <style>
     .manager-shell { display: flex; flex-direction: column; min-height: 100vh; background: #fdf6e3; }

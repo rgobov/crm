@@ -6,9 +6,11 @@
     import AddContactModal from '$lib/components/admin/AddContactModal.svelte';
     import ContactDetailScreen from '$lib/components/contacts/ContactDetailScreen.svelte';
     import ShiftEditScreen from '$lib/components/employee/ShiftEditScreen.svelte';
+    import ResourceEditScreen from '$lib/components/resources/ResourceEditScreen.svelte';
     import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchStore } from '$lib/stores/branchStore.js';
     import { activeNiche } from '$lib/stores/nicheStore.js';
+    import { resourceService } from '$lib/services/resourceService.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -21,6 +23,7 @@
     let selectedStaffForShift = null;
 
     let currentAppointment = null;
+    let selectedResource = null;
     let preselectedData = null;
     let appointmentEditRef;
     let scheduleScreenRef;
@@ -61,6 +64,14 @@
         showModal = 'shift';
     }
 
+    async function handleResourceTap(event) {
+        const resource = await resourceService.getResourceById(event.detail.id);
+        if (resource) {
+            selectedResource = resource;
+            showModal = 'resource';
+        }
+    }
+
     function openDetail(event) {
         currentAppointment = event.detail;
         showModal = 'detail';
@@ -71,6 +82,7 @@
         showNestedAddContact = false;
         selectedClientId = null;
         selectedStaffForShift = null;
+        selectedResource = null;
         if (scheduleScreenRef && typeof scheduleScreenRef.handleRefresh === 'function') {
             scheduleScreenRef.handleRefresh();
         }
@@ -190,6 +202,7 @@
                     on:emptySlotTap={openNewAppointment}
                     on:appointmentTap={openDetail}
                     on:staffTap={handleStaffTap}
+                    on:resourceTap={handleResourceTap}
                 />
             </div>
         </div>
@@ -204,7 +217,8 @@
                             {currentAppointment ? 'Редактирование записи' : 'Создание записи'}
                         {:else if showModal === 'detail'} {$activeNiche === 'RENT' ? 'Детали аренды' : 'Детали визита'}
                         {:else if showModal === 'client-profile'} Карточка клиента
-                        {:else if showModal === 'shift'} График работы {/if}
+                        {:else if showModal === 'shift'} График работы
+                        {:else if showModal === 'resource'} Объект аренды {/if}
                     </h3>
                     <button class="close-btn" on:click={closeModal}>✕</button>
                 </header>
@@ -217,6 +231,8 @@
                         <ContactDetailScreen contactId={selectedClientId} on:updated={closeModal} />
                     {:else if showModal === 'shift'}
                         <ShiftEditScreen staff={selectedStaffForShift} date={$selectedDate} on:success={closeModal} />
+                    {:else if showModal === 'resource'}
+                        <ResourceEditScreen resource={selectedResource} on:cancel={closeModal} on:success={closeModal} on:photoUpdated={closeModal} />
                     {/if}
                 </div>
             </div>

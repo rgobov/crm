@@ -155,7 +155,7 @@
         <div class="staff-scroll-area" bind:this={scrollHeader} on:scroll={syncHeaderScroll}>
             <div class="staff-row" style="width: {(columns.length + (apptsByStaff['unassigned']?.length > 0 ? 1 : 0)) * STAFF_WIDTH}px">
                 {#each columns as s (s.id)}
-                    <button class="staff-cell btn-reset" class:is-off={s.dayOff} style="width: {STAFF_WIDTH}px" on:click={() => { if (!isResourceMode) dispatch('staffTap', s); }}>
+                    <button class="staff-cell btn-reset" class:is-off={s.dayOff} style="width: {STAFF_WIDTH}px" on:click={() => { isResourceMode ? dispatch('resourceTap', s) : dispatch('staffTap', s); }}>
                         <div class="avatar-wrap">
                             {#if s.photoData}
                                 <img class="avatar" class:is-off={s.dayOff} src="data:image/jpeg;base64,{s.photoData}" alt={s.name} />
@@ -240,7 +240,7 @@
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 8px; gap: 8px; border-right: 1px solid #ddd6c1; overflow: hidden; transition: opacity 0.2s; }
     .staff-cell.is-off { opacity: 0.5; background: #eee8d5; }
     .staff-cell.is-off .n, .staff-cell.is-off .s { color: #93a1a1; }
-    .avatar { width: 32px; height: 32px; background: var(--primary-gradient); color: white; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 13px; object-fit: cover; image-orientation: from-image; }
+    .avatar { width: 32px; height: 32px; background: var(--primary-gradient); color: white; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 13px; object-fit: cover; }
     img.avatar { background: #ddd; }
     .avatar.is-off { background: #93a1a1; }
     .meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }

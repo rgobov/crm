@@ -330,6 +330,7 @@
     }
     function handleAppointment(event) { dispatch('appointmentTap', event.detail); }
     function handleStaffTap(event) { dispatch('staffTap', event.detail); }
+    function handleResourceTap(event) { dispatch('resourceTap', event.detail); }
     export function handleRefresh() {
         console.log('🔄 Refresh triggered from timeline component');
         if (branchLocalDate && currentBranchId) {
@@ -365,6 +366,7 @@
                 on:appointmentTap={handleAppointment}
                 on:emptySlotTap={handleEmptySlot}
                 on:staffTap={handleStaffTap}
+                on:resourceTap={handleResourceTap}
                 on:refresh={handleRefresh}
             />
         {/if}

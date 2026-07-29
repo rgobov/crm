@@ -28,6 +28,7 @@
         on:appointmentTap={forward}
         on:emptySlotTap={forward}
         on:staffTap={forward}
+        on:resourceTap={forward}
         on:refresh={forward}
     />
 {:else}
@@ -40,6 +41,7 @@
         on:appointmentTap={forward}
         on:emptySlotTap={forward}
         on:staffTap={forward}
+        on:resourceTap={forward}
         on:refresh={forward}
     />
 {/if}

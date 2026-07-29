@@ -208,7 +208,7 @@ const dispatch = createEventDispatcher();
         <div class="staff-scroll-area" bind:this={scrollHeader} on:scroll={syncHeaderScroll}>
             <div class="staff-inner-row" style="width: {totalColsCount * STAFF_WIDTH}px">
                 {#each columns as s (s.id + refreshKey)}
-                    <button class="staff-cell btn-reset" style="width: {STAFF_WIDTH}px" on:click={() => { if (!isResourceMode) dispatch('staffTap', s); }}>
+                    <button class="staff-cell btn-reset" style="width: {STAFF_WIDTH}px" on:click={() => { isResourceMode ? dispatch('resourceTap', s) : dispatch('staffTap', s); }}>
                         <div class="avatar-box">
                             {#if s.photoData}
                                 <img class="avatar" class:is-off={s.dayOff} src="data:image/jpeg;base64,{s.photoData}" alt={s.name} />
@@ -303,7 +303,7 @@ const dispatch = createEventDispatcher();
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 12px; border-right: 1px solid #ddd6c1; overflow: hidden; }
 
     .avatar-box { flex-shrink: 0; }
-    .avatar { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; object-fit: cover; image-orientation: from-image; }
+    .avatar { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; object-fit: cover; }
     img.avatar { background: #ddd; }
     .avatar.is-off { background: #93a1a1; }
 
