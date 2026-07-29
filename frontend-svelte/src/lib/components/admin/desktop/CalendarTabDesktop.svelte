@@ -217,8 +217,7 @@
                             {currentAppointment ? 'Редактирование записи' : 'Создание записи'}
                         {:else if showModal === 'detail'} {$activeNiche === 'RENT' ? 'Детали аренды' : 'Детали визита'}
                         {:else if showModal === 'client-profile'} Карточка клиента
-                        {:else if showModal === 'shift'} График работы
-                        {:else if showModal === 'resource'} Объект аренды {/if}
+                        {:else if showModal === 'shift'} График работы {/if}
                     </h3>
                     <button class="close-btn" on:click={closeModal}>✕</button>
                 </header>
@@ -231,11 +230,15 @@
                         <ContactDetailScreen contactId={selectedClientId} on:updated={closeModal} />
                     {:else if showModal === 'shift'}
                         <ShiftEditScreen staff={selectedStaffForShift} date={$selectedDate} on:success={closeModal} />
-                    {:else if showModal === 'resource'}
-                        <ResourceEditScreen resource={selectedResource} on:cancel={closeModal} on:success={closeModal} on:photoUpdated={closeModal} />
                     {/if}
                 </div>
             </div>
+        </div>
+    {/if}
+
+    {#if showModal === 'resource'}
+        <div use:portal>
+            <ResourceEditScreen resource={selectedResource} on:cancel={closeModal} on:success={closeModal} on:photoUpdated={closeModal} />
         </div>
     {/if}
 

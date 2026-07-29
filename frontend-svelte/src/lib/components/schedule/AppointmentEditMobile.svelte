@@ -3,6 +3,7 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import { adminService } from '$lib/services/adminService.js';
     import { contactService } from '$lib/services/contactService.js';
+    import { serviceService } from '$lib/services/serviceService.js';
     import { branchService } from '$lib/services/branchService.js';
     import { nicheSettings, activeNiche } from '$lib/stores/nicheStore.js';
     import { resourceService } from '$lib/services/resourceService.js';

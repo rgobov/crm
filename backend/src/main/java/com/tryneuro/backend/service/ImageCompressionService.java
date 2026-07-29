@@ -7,7 +7,9 @@ import com.drew.metadata.exif.ExifIFD0Directory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
+import javax.imageio.*;
+import javax.imageio.metadata.IIOMetadata;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
@@ -16,6 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Base64;
+import java.util.Iterator;
 
 @Service
 public class ImageCompressionService {
@@ -25,16 +28,31 @@ public class ImageCompressionService {
 
     /**
      * Сжимает изображение до 300x300 и конвертирует в JPEG.
-     * Учитывает EXIF orientation (исправляет поворот фото с телефона).
+     * EXIF orientation сохраняется в метаданных JPEG — браузер применяет поворот через CSS.
      */
     public byte[] compressImage(byte[] imageData) throws IOException {
+        // Читаем оригинальные метаданные JPEG (сохраняем EXIF orientation для браузера)
+        IIOMetadata srcMetadata = null;
+        try {
+            ImageInputStream iis = ImageIO.createImageInputStream(new ByteArrayInputStream(imageData));
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
+            if (readers.hasNext()) {
+                ImageReader reader = readers.next();
+                reader.setInput(iis);
+                srcMetadata = reader.getImageMetadata(0);
+                reader.dispose();
+            }
+        } catch (Exception e) {
+            // метаданные опциональны — без них фото будет в ориентации пикселей
+        }
+
         BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(imageData));
         if (originalImage == null) {
             throw new IOException("Unsupported image format");
         }
 
-        // Применяем EXIF orientation (телефоны пишут поворот в метаданных)
-        originalImage = applyExifOrientation(originalImage, imageData);
+        // НЕ применяем EXIF rotation — браузер сам повернёт через image-orientation: from-image
+        // image-orientation читает EXIF Orientation tag, который мы сохранили в metadata выше
 
         // Рассчитываем новые размеры с сохранением пропорций
         int newWidth = originalImage.getWidth();
@@ -60,9 +78,27 @@ public class ImageCompressionService {
         g2d.drawImage(originalImage, 0, 0, newWidth, newHeight, null);
         g2d.dispose();
 
-        // Сжимаем в JPEG
+        // Сжимаем в JPEG с сохранением EXIF метаданных (браузер применит image-orientation)
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(resizedImage, "jpg", baos);
+        ImageWriter writer = null;
+        try {
+            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+            if (writers.hasNext()) {
+                writer = writers.next();
+                ImageWriteParam writeParam = writer.getDefaultWriteParam();
+                writer.setOutput(ImageIO.createImageOutputStream(baos));
+
+                IIOImage iioImage = srcMetadata != null
+                        ? new IIOImage(resizedImage, null, srcMetadata)
+                        : new IIOImage(resizedImage, null, null);
+                writer.write(null, iioImage, writeParam);
+            } else {
+                // fallback — без метаданных, EXIF будет 1 (normal)
+                ImageIO.write(resizedImage, "jpg", baos);
+            }
+        } finally {
+            if (writer != null) writer.dispose();
+        }
 
         return baos.toByteArray();
     }

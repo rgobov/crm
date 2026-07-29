@@ -303,7 +303,7 @@ const dispatch = createEventDispatcher();
     .staff-cell { flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 12px; border-right: 1px solid #ddd6c1; overflow: hidden; }
 
     .avatar-box { flex-shrink: 0; }
-    .avatar { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; object-fit: cover; }
+    .avatar { width: 40px; height: 40px; background: var(--primary-gradient); color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; object-fit: cover; image-orientation: from-image; }
     img.avatar { background: #ddd; }
     .avatar.is-off { background: #93a1a1; }
 

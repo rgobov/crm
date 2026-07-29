@@ -104,7 +104,6 @@
                     {#if showModal === 'edit'}
                         {currentAppointment ? 'Редактирование записи' : 'Создание записи'}
                     {:else if showModal === 'detail'} {$activeNiche === 'RENT' ? 'Детали аренды' : 'Детали визита'}
-                    {:else if showModal === 'resource'} Объект аренды
                     {/if}
                 </h3>
                 <button class="close-btn" on:click={closeModal}>✕</button>
@@ -122,11 +121,15 @@
                     {:else}
                         <AppointmentDetailScreen appointment={currentAppointment} service={managerService} on:edit={(e) => { currentAppointment = e.detail; showModal = 'edit'; }} on:deleted={closeModal} />
                     {/if}
-                    {:else if showModal === 'resource'}
-                        <ResourceEditScreen resource={selectedResource} on:cancel={closeModal} on:success={closeModal} on:photoUpdated={closeModal} />
-                    {/if}
-                </div>
+                {/if}
             </div>
+            </div>
+        </div>
+    {/if}
+
+    {#if showModal === 'resource'}
+        <div use:portal>
+            <ResourceEditScreen resource={selectedResource} on:cancel={closeModal} on:success={closeModal} on:photoUpdated={closeModal} />
         </div>
     {/if}
 
