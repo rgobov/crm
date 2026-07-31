@@ -483,7 +483,7 @@
 
             }
 
-            dispatch('saved', { startTime: correctedStartTime });
+            dispatch('saved', { startTime: correctedStartTime, branchDate: formData.startTime.slice(0, 10) });
 
         } catch (e) {
 

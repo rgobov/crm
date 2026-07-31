@@ -30,6 +30,7 @@
     let lastLoadTime = 0;
     let lastLoadedDate = null;
     let lastLoadedBranch = null;
+    let appointmentsLoadSeq = 0;
     let refreshTimeout;
     let staffRefreshTimeout = null;
 
@@ -42,11 +43,18 @@
     async function fetchAppointments(date, bId, silent = false) {
         if (!date || !bId) return;
         if (!silent) isLoading = true;
+        // sequence-guard: если появился более новый запрос (смена даты/WS), устаревший ответ
+        // не должен затирать актуальные записи (гонка параллельных loadDayData).
+        const seq = ++appointmentsLoadSeq;
         try {
             console.log(`📡 Fetching appointments for date: ${date}, branch: ${bId}`);
             // Используем bypassCache для обновлений по сигналу или смене даты,
             // чтобы точно получить актуальные данные из БД
             const apptsData = await service.getAppointmentsForDay(date, bId, { bypassCache: true });
+            if (seq !== appointmentsLoadSeq) {
+                console.log('⏭️ Stale appointments response ignored (superseded by newer load)');
+                return;
+            }
             appointments = apptsData || [];
         } catch (e) {
             console.error('❌ Error loading appointments:', e);

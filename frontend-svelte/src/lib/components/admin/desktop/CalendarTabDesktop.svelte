@@ -12,6 +12,7 @@
     import { activeNiche } from '$lib/stores/nicheStore.js';
     import { resourceService } from '$lib/services/resourceService.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
+    import { tick } from 'svelte';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -89,15 +90,22 @@
         }
     }
 
-    // RENT: после сохранения с изменённой датой «перепрыгиваем» на дату записи,
-    // чтобы таймлайн показал запись на новом дне (и WS-сигнал стал релевантным).
-    function handleSaved(event) {
-        const startTime = event?.detail?.startTime;
-        if ($activeNiche === 'RENT' && startTime) {
-            const branch = $branchStore.find(b => b.id === $activeBranchId);
-            const dayStr = timeUtils.toBranchLocalDateStr(startTime, branch?.timezone);
-            if (dayStr) selectedDate.set(new Date(dayStr + 'T12:00:00'));
+    // RENT: после сохранения «перепрыгиваем» на дату записи, чтобы таймлайн показал её.
+    // await tick() ДО closeModal() гарантирует, что handleRefresh (handleRefresh → loadDayData)
+    // прочитает уже актуальную branchLocalDate, а не устаревшую (иначе гонка загрузок затирает записи).
+    async function handleSaved(event) {
+        const branchDate = event?.detail?.branchDate;
+        if ($activeNiche === 'RENT' && branchDate) {
+            selectedDate.set(new Date(branchDate + 'T12:00:00'));
+        } else {
+            const startTime = event?.detail?.startTime;
+            if ($activeNiche === 'RENT' && startTime) {
+                const branch = $branchStore.find(b => b.id === $activeBranchId);
+                const dayStr = timeUtils.toBranchLocalDateStr(startTime, branch?.timezone);
+                if (dayStr) selectedDate.set(new Date(dayStr + 'T12:00:00'));
+            }
         }
+        await tick();
         closeModal();
     }
 

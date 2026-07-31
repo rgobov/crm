@@ -329,7 +329,7 @@
                     throw err;
                 }
             }
-            dispatch('saved', { startTime: correctedStartTime });
+            dispatch('saved', { startTime: correctedStartTime, branchDate: formData.startTime.slice(0, 10) });
         } catch (e) {
             console.error('Save failed', e);
             alert('Ошибка сохранения');

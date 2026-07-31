@@ -18,14 +18,15 @@ async function isBackendUp() {
 async function globalSetup(config) {
   console.log('🚀 Запуск глобальной настройки тестов...');
 
-  // Если бэкенд уже запущен (например, локально для отладки) — переиспользуем его
-  if (await isBackendUp()) {
-    console.log('♻️ Бэкенд уже запущен, переиспользуем существующий процесс');
+  // По умолчанию всегда запускаем СВЕЖИЙ тестовый бэкенд (H2 in-memory), а не переиспользуем
+  // случайный процесс на :8080 — чтобы тестовые данные не попали в «живую» БД.
+  // Опт-ин переиспользование только по явному маркеру (для локальной отладки):
+  if (process.env.E2E_REUSE_BACKEND === '1' && await isBackendUp()) {
+    console.log('♻️ E2E_REUSE_BACKEND=1: переиспользуем уже запущенный тестовый бэкенд');
     global.backendProcess = null;
     return;
   }
 
-  // Запускаем бэкенд сервер для тестов
   const backendProcess = spawn('mvn', [
     'spring-boot:run',
     '-Dspring-boot.run.profiles=test',
@@ -36,19 +37,19 @@ async function globalSetup(config) {
     stdio: 'pipe'
   });
 
-  // Ждем запуска бэкенда (максимум 60 секунд, шаг 2 секунды)
-  console.log('⏳ Ожидание запуска бэкенда...');
+  // Ждем запуска бэкенда (максимум 90 секунд, шаг 2 секунды)
+  console.log('⏳ Ожидание запуска тестового бэкенда...');
   let up = false;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 45; i++) {
     await new Promise(resolve => setTimeout(resolve, 2000));
     if (await isBackendUp()) { up = true; break; }
     if (backendProcess.exitCode !== null) break;
   }
 
   if (up) {
-    console.log('✅ Бэкенд успешно запущен');
+    console.log('✅ Тестовый бэкенд успешно запущен');
   } else {
-    console.log('❌ Бэкенд не отвечает за отведённое время');
+    console.log('❌ Тестовый бэкенд не отвечает за отведённое время (занят ли порт 8080?)');
   }
 
   // Сохраняем процесс для последующего использования

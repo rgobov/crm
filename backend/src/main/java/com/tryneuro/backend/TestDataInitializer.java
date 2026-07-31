@@ -1,7 +1,9 @@
 package com.tryneuro.backend;
 
+import com.tryneuro.backend.model.StaffMember;
 import com.tryneuro.backend.model.User;
 import com.tryneuro.backend.model.UserRole;
+import com.tryneuro.backend.repository.StaffMemberRepository;
 import com.tryneuro.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,13 +27,13 @@ public class TestDataInitializer {
     private final PasswordEncoder passwordEncoder;
 
     @Bean
-    CommandLineRunner initTestData(UserRepository userRepository) {
+    CommandLineRunner initTestData(UserRepository userRepository, StaffMemberRepository staffMemberRepository) {
         return args -> {
             log.info("🚀 Инициализация тестовых данных...");
 
             // Создаем тестовых пользователей если их нет
             if (userRepository.count() == 0) {
-                createTestUsers(userRepository);
+                createTestUsers(userRepository, staffMemberRepository);
                 log.info("✅ Тестовые данные успешно созданы");
             } else {
                 log.info("ℹ️ Тестовые данные уже существуют");
@@ -39,7 +41,7 @@ public class TestDataInitializer {
         };
     }
 
-    private void createTestUsers(UserRepository userRepository) {
+    private void createTestUsers(UserRepository userRepository, StaffMemberRepository staffMemberRepository) {
         // Создаем админа
         User admin = createTestUser(
             "admin@test.com",
@@ -60,7 +62,7 @@ public class TestDataInitializer {
         userRepository.save(manager);
         log.info("✅ Создан менеджер: manager@test.com");
 
-        // Создаем сотрудника
+        // Создаем сотрудника и привязываем к нему профиль (иначе /api/employee/** отдаёт 403)
         User employee = createTestUser(
             "employee@test.com",
             "password",
@@ -68,7 +70,19 @@ public class TestDataInitializer {
             "test-tenant"
         );
         userRepository.save(employee);
-        log.info("✅ Создан сотрудник: employee@test.com");
+
+        StaffMember staff = new StaffMember();
+        staff.setName("Тестовый сотрудник");
+        staff.setTenantId("test-tenant");
+        staff.setUserId(employee.getId());
+        staff.setRole("EMPLOYEE");
+        staff.setActive(true);
+        staff.setEmail(employee.getEmail());
+        staff = staffMemberRepository.save(staff);
+
+        employee.setStaffId(staff.getId());
+        userRepository.save(employee);
+        log.info("✅ Создан сотрудник: employee@test.com (staffId={})", staff.getId());
 
         log.info("✅ Все тестовые пользователи созданы");
     }

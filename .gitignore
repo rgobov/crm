@@ -76,6 +76,10 @@ analysis_options.yaml.lock
 .npm
 .eslintcache
 
+# --- E2E (Playwright) артефакты ---
+**/test-results/
+**/playwright-report/
+
 # --- Secrets and Local Env ---
 .env
 .env.*
