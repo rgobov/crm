@@ -358,4 +358,48 @@ class ScheduleServiceTest {
 
         verify(appointmentRepository, never()).delete(any(Appointment.class));
     }
+
+    @Test
+    @DisplayName("AUTO: промоушен одиночной записи в группу (2 мастера, updateMode=all) сохранён")
+    void testUpdateAppointment_AutoSingleWithUpdateModeAll_PreservesGroupPromotion() {
+        String branchId = "auto-branch";
+        Branch branch = new Branch();
+        branch.setId(branchId);
+        branch.setTimezone("UTC");
+        branch.setNiche("AUTO");
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(branch));
+
+        Appointment existing = new Appointment();
+        existing.setId("a1");
+        existing.setTenantId("t1");
+        existing.setBranchId(branchId);
+        existing.setStaffMemberId("s1");
+        existing.setGroupId(null);
+        existing.setStartTime(OffsetDateTime.parse("2026-02-21T09:00:00Z"));
+        existing.setDurationInMinutes(60);
+        existing.setService("Test Service");
+        existing.setClientName("Client");
+        existing.setClientPhone("123");
+        existing.setStatus(AppointmentStatus.SCHEDULED);
+        when(appointmentRepository.findById("a1")).thenReturn(Optional.of(existing));
+        when(appointmentRepository.findByGroupId(anyString())).thenReturn(List.of(existing));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment details = new Appointment();
+        details.setTenantId("t1");
+        details.setBranchId(branchId);
+        details.setStaffMemberId("s1");
+        details.setStartTime(OffsetDateTime.parse("2026-02-21T10:00:00Z"));
+        details.setDurationInMinutes(60);
+        details.setService("Test Service");
+        details.setClientName("Client");
+        details.setClientPhone("123");
+        details.setStatus(AppointmentStatus.SCHEDULED);
+
+        Appointment result = scheduleService.updateAppointment("a1", details, java.util.List.of("s1", "s2"), "all", true);
+
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+        verify(appointmentRepository, org.mockito.Mockito.atLeast(2)).save(any(Appointment.class));
+        org.junit.jupiter.api.Assertions.assertNotNull(result.getGroupId(), "Промоушен в группу должен назначить groupId");
+    }
 }
