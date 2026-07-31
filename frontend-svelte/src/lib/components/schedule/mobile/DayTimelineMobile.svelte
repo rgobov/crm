@@ -206,7 +206,7 @@
                                 </button>
                             {/each}
                             {#each apptsByStaff[s.id || 'unassigned'] || [] as appt (appt.id)}
-                                <TimelineAppointment {appt} {startHour} hourHeight={HOUR_HEIGHT} timezone={currentBranch?.timezone} on:click={(e) => dispatch('appointmentTap', e.detail)} />
+                                <TimelineAppointment {appt} {day} {startHour} hourHeight={HOUR_HEIGHT} timezone={currentBranch?.timezone} on:click={(e) => dispatch('appointmentTap', e.detail)} />
                             {/each}
                         </div>
                     {/each}

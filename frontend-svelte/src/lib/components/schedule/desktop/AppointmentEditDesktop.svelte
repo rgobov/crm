@@ -80,11 +80,43 @@
 
     let showDurationPicker = false;
 
+    let rentEndTime = '';
+
+
+
+    $: isRentMode = $activeNiche === 'RENT';
+
 
 
     const HOURS_OPTIONS = Array.from({length: 13}, (_, i) => i);
 
     const MINS_OPTIONS = [0, 5, 10, 15, 20, 30, 45];
+
+
+
+    function addMinutesToLocal(localStr, minutes) {
+
+        if (!localStr) return '';
+
+        const d = new Date(localStr);
+
+        d.setMinutes(d.getMinutes() + minutes);
+
+        const pad = n => n < 10 ? '0'+n : n;
+
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+    }
+
+
+
+    function minutesBetween(startStr, endStr) {
+
+        if (!startStr || !endStr) return 0;
+
+        return Math.round((new Date(endStr) - new Date(startStr)) / 60000);
+
+    }
 
 
 
@@ -194,6 +226,8 @@
 
                 formData.startTime = timeUtils.toBranchLocalISO(appointment.startTime, currentBranchData?.timezone);
 
+                rentEndTime = addMinutesToLocal(formData.startTime, formData.durationInMinutes);
+
                 serviceSearchInput = appointment.service;
 
 
@@ -220,6 +254,8 @@
                 const pad = n => n < 10 ? '0'+n : n;
 
                 formData.startTime = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+                rentEndTime = addMinutesToLocal(formData.startTime, 60);
 
             }
 
@@ -357,6 +393,22 @@
 
 
 
+        let finalDuration = formData.durationInMinutes;
+
+        if (isRentMode) {
+
+            const dur = minutesBetween(formData.startTime, rentEndTime);
+
+            if (dur < 15) return alert('Окончание аренды должно быть позже начала (минимум 15 минут)');
+
+            if (dur > 43200) return alert('Максимальная длительность аренды — 30 дней');
+
+            finalDuration = dur;
+
+        }
+
+
+
         isSaving = true;
 
         try {
@@ -405,6 +457,8 @@
 
                 ...formData,
 
+                durationInMinutes: finalDuration,
+
                 service: sName,
 
                 clientName: clientName,
@@ -429,7 +483,7 @@
 
             }
 
-            dispatch('saved');
+            dispatch('saved', { startTime: correctedStartTime });
 
         } catch (e) {
 
@@ -651,57 +705,83 @@
 
 
 
-                <div class="tile-card dual">
+                <div class="tile-card" class:dual={!isRentMode}>
 
-                    <div class="part date-part">
+                    {#if isRentMode}
 
-                        <label for="start-time-id">ВРЕМЯ ФИЛИАЛА</label>
+                        <div class="rent-period">
 
-                        <input id="start-time-id" type="datetime-local" bind:value={formData.startTime} />
+                            <div class="part">
 
-                    </div>
+                                <label for="rent-start-id">НАЧАЛО АРЕНДЫ (ВРЕМЯ ФИЛИАЛА)</label>
 
-                    <div class="part duration-part" role="presentation">
+                                <input id="rent-start-id" type="datetime-local" bind:value={formData.startTime} />
 
-                        <label>ДЛИТЕЛЬНОСТЬ</label>
+                            </div>
 
-                        <button class="duration-v2-trigger" on:click={() => showDurationPicker = !showDurationPicker} type="button">
+                            <div class="part">
 
-                            <span class="val">{durationHours}ч {durationMinutes}м</span>
+                                <label for="rent-end-id">ОКОНЧАНИЕ АРЕНДЫ</label>
 
-                            <span class="chevron" aria-hidden="true">▼</span>
+                                <input id="rent-end-id" type="datetime-local" bind:value={rentEndTime} />
 
-                        </button>
+                            </div>
 
-                        {#if showDurationPicker}
+                        </div>
 
-                            <div class="duration-v2-popover">
+                    {:else}
 
-                                <div class="duration-v2-cols">
+                        <div class="part date-part">
 
-                                    <div class="duration-v2-col">
+                            <label for="start-time-id">ВРЕМЯ ФИЛИАЛА</label>
 
-                                        <div class="duration-v2-col-label">ЧАСЫ</div>
+                            <input id="start-time-id" type="datetime-local" bind:value={formData.startTime} />
 
-                                        <div class="duration-v2-col-list">{#each HOURS_OPTIONS as h}<button type="button" class:active={durationHours===h} on:click={() => durationHours=h}>{h}</button>{/each}</div>
+                        </div>
 
-                                    </div>
+                        <div class="part duration-part" role="presentation">
 
-                                    <div class="duration-v2-col border-l">
+                            <label>ДЛИТЕЛЬНОСТЬ</label>
 
-                                        <div class="duration-v2-col-label">МИНУТЫ</div>
+                            <button class="duration-v2-trigger" on:click={() => showDurationPicker = !showDurationPicker} type="button">
 
-                                        <div class="duration-v2-col-list">{#each MINS_OPTIONS as m}<button type="button" class:active={durationMinutes===m} on:click={() => {durationMinutes=m; showDurationPicker=false;}}>{m.toString().padStart(2, '0')}</button>{/each}</div>
+                                <span class="val">{durationHours}ч {durationMinutes}м</span>
+
+                                <span class="chevron" aria-hidden="true">▼</span>
+
+                            </button>
+
+                            {#if showDurationPicker}
+
+                                <div class="duration-v2-popover">
+
+                                    <div class="duration-v2-cols">
+
+                                        <div class="duration-v2-col">
+
+                                            <div class="duration-v2-col-label">ЧАСЫ</div>
+
+                                            <div class="duration-v2-col-list">{#each HOURS_OPTIONS as h}<button type="button" class:active={durationHours===h} on:click={() => durationHours=h}>{h}</button>{/each}</div>
+
+                                        </div>
+
+                                        <div class="duration-v2-col border-l">
+
+                                            <div class="duration-v2-col-label">МИНУТЫ</div>
+
+                                            <div class="duration-v2-col-list">{#each MINS_OPTIONS as m}<button type="button" class:active={durationMinutes===m} on:click={() => {durationMinutes=m; showDurationPicker=false;}}>{m.toString().padStart(2, '0')}</button>{/each}</div>
+
+                                        </div>
 
                                     </div>
 
                                 </div>
 
-                            </div>
+                            {/if}
 
-                        {/if}
+                        </div>
 
-                    </div>
+                    {/if}
 
                 </div>
 
@@ -894,6 +974,10 @@
 
 
     .dual { display: grid; grid-template-columns: 1fr 140px; padding: 0; overflow: hidden; }
+
+    .rent-period { display: flex; flex-direction: column; gap: 14px; padding: 0; overflow: visible; }
+
+    .rent-period .part { display: flex; flex-direction: column; gap: 4px; }
 
     .date-part { padding: 14px 18px; border-right: 1.5px solid #ddd6c1; }
 

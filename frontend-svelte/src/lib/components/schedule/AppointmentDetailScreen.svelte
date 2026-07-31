@@ -53,6 +53,25 @@
 
     $: isRentMode = $activeNiche === 'RENT';
 
+    $: rentInfo = (() => {
+        const dur = appointment.durationInMinutes || 0;
+        const endMs = new Date(appointment.startTime).getTime() + dur * 60000;
+        const days = Math.floor(dur / 1440);
+        const hours = Math.floor((dur % 1440) / 60);
+        const minutes = dur % 60;
+        let durLabel;
+        if (days > 0) {
+            durLabel = `${days} дн.`;
+            if (hours > 0 || minutes > 0) durLabel += ` ${hours} ч.`;
+        } else if (hours > 0) {
+            durLabel = `${hours} ч.`;
+            if (minutes > 0) durLabel += ` ${minutes} мин.`;
+        } else {
+            durLabel = `${minutes} мин.`;
+        }
+        return { endMs, durLabel };
+    })();
+
     $: STATUSES = isRentMode
         ? [
             { id: 'SCHEDULED', label: 'Забронировано', color: '#64748b' },
@@ -251,11 +270,22 @@
             <div class="tile-icon">🕒</div>
             <div class="tile-body">
                 <label>Дата и время</label>
-                <p class="val">
-                    {new Date(appointment.startTime).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}
-                    в {new Date(appointment.startTime).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}
-                </p>
-                <small>{appointment.durationInMinutes} мин. длительность</small>
+                {#if isRentMode}
+                    <p class="val">
+                        {new Date(appointment.startTime).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}
+                        в {new Date(appointment.startTime).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}
+                    </p>
+                    <small>
+                        до {new Date(rentInfo.endMs).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}
+                        в {new Date(rentInfo.endMs).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})} • {rentInfo.durLabel}
+                    </small>
+                {:else}
+                    <p class="val">
+                        {new Date(appointment.startTime).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})}
+                        в {new Date(appointment.startTime).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}
+                    </p>
+                    <small>{appointment.durationInMinutes} мин. длительность</small>
+                {/if}
             </div>
         </div>
 

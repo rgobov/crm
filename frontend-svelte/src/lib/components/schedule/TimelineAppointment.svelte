@@ -8,14 +8,42 @@
     export let startHour;
     export let hourHeight;
     export let timezone = 'Europe/Moscow';
+    export let day = null;
 
     const dispatch = createEventDispatcher();
 
-    $: apptStyle = (() => {
-        const top = timeUtils.getTimeOffset(appt.startTime, startHour, hourHeight, timezone);
-        const actualHeight = appt.durationInMinutes * (hourHeight / 60);
-        return `top: ${top}px; height: ${actualHeight - 2}px;`;
+    // Клиппинг блока к конкретному дню: многодневная аренда рисуется на каждом покрытом дне
+    // (стартовый день — от начала аренды до 24:00, средние — весь день, последний — с 00:00 до конца).
+    $: render = (() => {
+        const startMs = new Date(appt.startTime).getTime();
+        const duration = appt.durationInMinutes || 0;
+        const endMs = startMs + duration * 60000;
+
+        let visibleStart = startMs;
+        let visibleEnd = endMs;
+        if (day) {
+            const dayStr = timeUtils.toBranchLocalDateStr(day, timezone);
+            const dayStartUtc = timeUtils.fromBranchLocalToUTC(`${dayStr}T00:00`, timezone);
+            if (dayStartUtc) {
+                const dayStartMs = new Date(dayStartUtc).getTime();
+                const dayEndMs = dayStartMs + 86400000;
+                visibleStart = Math.max(startMs, dayStartMs);
+                visibleEnd = Math.min(endMs, dayEndMs);
+            }
+        }
+
+        const visible = visibleEnd - visibleStart;
+        const hidden = visible <= 0;
+        const top = hidden ? 0 : timeUtils.getTimeOffset(new Date(visibleStart).toISOString(), startHour, hourHeight, timezone);
+        const renderHeight = hidden ? 0 : (visible / 60000) * (hourHeight / 60);
+        const spansDays = timeUtils.toBranchLocalDateStr(appt.startTime, timezone) !==
+            timeUtils.toBranchLocalDateStr(new Date(endMs).toISOString(), timezone);
+        const daysCount = spansDays ? Math.floor((endMs - startMs) / 86400000) + 1 : 0;
+
+        return { top, renderHeight, hidden, spansDays, daysCount };
     })();
+
+    $: apptStyle = `top: ${render.top}px; height: ${Math.max(0, render.renderHeight - 2)}px;${render.hidden ? ' display: none;' : ''}`;
 
     const statusColors = {
         'SCHEDULED': '#64748b',   // Slate Gray (нейтральный)
@@ -39,11 +67,21 @@
     $: color = statusColors[appt.status] || statusColors['SCHEDULED'];
     $: bgColor = backgroundColors[appt.status] || '#fdf6e3';
 
-    $: actualHeight = appt.durationInMinutes * (hourHeight / 60);
+    $: actualHeight = render.renderHeight;
     $: isShort = appt.durationInMinutes < 30 || actualHeight < 55;
     $: isUltraShort = actualHeight < 50;
     $: isTiny = actualHeight < 32;
     $: showComment = appt.comment && !isShort && actualHeight > 80;
+
+    $: endTimeLabel = render.spansDays ? `${render.daysCount} дн.` : timeUtils.getEndTime(appt.startTime, appt.durationInMinutes, timezone);
+
+    $: rentEndLabel = (() => {
+        const endMs = new Date(appt.startTime).getTime() + (appt.durationInMinutes || 0) * 60000;
+        const d = new Date(endMs);
+        const date = d.toLocaleDateString('ru-RU', { timeZone: timezone, day: 'numeric', month: 'short' });
+        const time = d.toLocaleTimeString('ru-RU', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
+        return `${date} ${time}`;
+    })();
 </script>
 
 <button class="appt-box btn-reset"
@@ -60,7 +98,7 @@
                 <span class="tm">
                     {timeUtils.formatTime(appt.startTime, timezone)}
                     {#if !isUltraShort}
-                        — {timeUtils.getEndTime(appt.startTime, appt.durationInMinutes, timezone)}
+                        — {endTimeLabel}
                     {/if}
                 </span>
                 <div class="indicators">
@@ -83,6 +121,9 @@
                         <span class="ref-tag">{$nicheSettings.refIcon} {appt.referenceTag}</span>
                     {/if}
                     <span class="sv">{appt.service}</span>
+                    {#if render.spansDays}
+                        <span class="sv rent-end">до {rentEndLabel}</span>
+                    {/if}
                 </div>
             {/if}
 
@@ -187,6 +228,7 @@
     .sub-details-stack { display: flex; flex-direction: column; gap: 0; overflow: hidden; }
     .ref-tag { font-size: 9px; font-weight: 900; color: #2aa198; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sv { font-size: 9px; color: #657b83; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rent-end { color: #268bd2; }
 
     .cmt-preview {
         margin-top: 5px; /* Фибоначчи */

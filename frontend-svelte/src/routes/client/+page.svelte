@@ -23,11 +23,15 @@
 		staffId: '',
 		resourceId: null
 	};
+	let rentEndDate = '';
+	let rentEndTime = '10:00';
 
 	let isSubmitting = false;
 	let errorMsg = '';
 	let successMsg = '';
 	let dateStr = '';
+
+	$: isRentMode = branches.find(b => b.id === selectedBranchId)?.niche === 'RENT';
 
 	$: if ($selectedDate) {
 		const d = $selectedDate;
@@ -127,6 +131,8 @@
 			staffId: detail.staffId,
 			resourceId: detail.resourceId || null
 		};
+		rentEndDate = dateStr;
+		rentEndTime = formatTime((detail.hour + 1) % 24, detail.min);
 
 		// Получаем актуальный список мастеров для правильного отображения имени
 		if (scheduleScreenRef) {
@@ -147,12 +153,11 @@
 	}
 
 	async function bookAppointment() {
-		isSubmitting = true;
 		errorMsg = '';
 
 		// Находим длительность выбранной услуги
 		const selectedService = services.find(s => s.name === bookingForm.service);
-		const duration = selectedService ? selectedService.durationInMinutes : 60;
+		let duration = selectedService ? selectedService.durationInMinutes : 60;
 
 		// Конвертируем время филиала в UTC
 		const currentBranch = branches.find(b => b.id === selectedBranchId);
@@ -160,6 +165,22 @@
 		const dateStr = timeUtils.toBranchLocalDateStr($selectedDate, currentBranch?.timezone);
 		const localDateStr = `${dateStr}T${pad(bookingForm.hour)}:${pad(bookingForm.min)}`;
 		const correctedStart = timeUtils.fromBranchLocalToUTC(localDateStr, currentBranch?.timezone) || new Date(localDateStr).toISOString();
+
+		// RENT: срок аренды задаётся датой/временем окончания
+		if (isRentMode) {
+			const endLocalStr = `${rentEndDate}T${rentEndTime}`;
+			duration = Math.round((new Date(endLocalStr) - new Date(localDateStr)) / 60000);
+			if (duration < 15) {
+				errorMsg = 'Окончание аренды должно быть позже начала (минимум 15 минут)';
+				return;
+			}
+			if (duration > 43200) {
+				errorMsg = 'Максимальная длительность аренды — 30 дней';
+				return;
+			}
+		}
+
+		isSubmitting = true;
 
 		const appointmentData = {
 			startTime: correctedStart,
@@ -296,20 +317,30 @@
 								}
 							}} />
 						</div>
-						<div class="summary-item">
-							<span class="sum-label">Время</span>
-							<input type="time" class="sum-input" value={timeStr} on:change={e => {
-								const val = e.target.value;
-								if (val && val.includes(':')) {
-									const [h, m] = val.split(':').map(Number);
-									if (!isNaN(h) && !isNaN(m)) {
-										bookingForm.hour = h;
-										bookingForm.min = m;
-									}
+					<div class="summary-item">
+						<span class="sum-label">Время</span>
+						<input type="time" class="sum-input" value={timeStr} on:change={e => {
+							const val = e.target.value;
+							if (val && val.includes(':')) {
+								const [h, m] = val.split(':').map(Number);
+								if (!isNaN(h) && !isNaN(m)) {
+									bookingForm.hour = h;
+									bookingForm.min = m;
 								}
-							}} />
-						</div>
+							}
+						}} />
 					</div>
+					{#if isRentMode}
+						<div class="summary-item">
+							<span class="sum-label">Окончание аренды</span>
+							<input type="date" class="sum-input" bind:value={rentEndDate} />
+						</div>
+						<div class="summary-item">
+							<span class="sum-label">Время окончания</span>
+							<input type="time" class="sum-input" bind:value={rentEndTime} />
+						</div>
+					{/if}
+				</div>
 
 					<form on:submit|preventDefault={bookAppointment} class="modal-form">
 						<div class="field-group">

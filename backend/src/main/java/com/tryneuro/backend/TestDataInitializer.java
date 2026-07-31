@@ -11,10 +11,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.time.LocalDateTime;
-
 /**
- * Инициализация тестовых данных для тестового профиля
+ * Инициализация тестовых данных для тестового профиля.
+ * Находится в main, чтобы работал запуск через `mvn spring-boot:run -Dspring-boot.run.profiles=test`
+ * (например, для e2e-тестов Playwright).
  */
 @Configuration
 @Profile("test")
@@ -28,7 +28,7 @@ public class TestDataInitializer {
     CommandLineRunner initTestData(UserRepository userRepository) {
         return args -> {
             log.info("🚀 Инициализация тестовых данных...");
-            
+
             // Создаем тестовых пользователей если их нет
             if (userRepository.count() == 0) {
                 createTestUsers(userRepository);

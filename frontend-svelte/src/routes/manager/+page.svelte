@@ -9,10 +9,12 @@
     import AppointmentDetailMobile from '$lib/components/schedule/AppointmentDetailMobile.svelte';
     import ResourceEditScreen from '$lib/components/resources/ResourceEditScreen.svelte';
     import { isMobile } from '$lib/stores/ui.js';
-    import { selectedDate } from '$lib/stores/dashboardStore.js';
+    import { selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { activeNiche } from '$lib/stores/nicheStore.js';
     import { managerService } from '$lib/services/managerService.js';
     import { resourceService } from '$lib/services/resourceService.js';
+    import { timeUtils } from '$lib/utils/timeUtils.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -38,7 +40,8 @@
             date: $selectedDate,
             hour: event?.detail?.hour || 10,
             min: event?.detail?.min || 0,
-            staffId: event?.detail?.staffId || null
+            staffId: event?.detail?.staffId || null,
+            resourceId: event?.detail?.resourceId || null
         };
         currentAppointment = null;
         showModal = 'edit';
@@ -63,6 +66,17 @@
         if (scheduleScreenRef && typeof scheduleScreenRef.handleRefresh === 'function') {
             scheduleScreenRef.handleRefresh();
         }
+    }
+
+    // RENT: после сохранения с изменённой датой «перепрыгиваем» на дату записи.
+    function handleSaved(event) {
+        const startTime = event?.detail?.startTime;
+        if ($activeNiche === 'RENT' && startTime) {
+            const branch = $branchStore.find(b => b.id === $activeBranchId);
+            const dayStr = timeUtils.toBranchLocalDateStr(startTime, branch?.timezone);
+            if (dayStr) selectedDate.set(new Date(dayStr + 'T12:00:00'));
+        }
+        closeModal();
     }
 
     function handleLogout() {
@@ -111,9 +125,9 @@
             <div class="modal-body">
                 {#if showModal === 'edit'}
                     {#if $isMobile}
-                        <AppointmentEditMobile bind:this={appointmentEditRef} appointment={currentAppointment} preselected={preselectedData} service={managerService} on:cancel={closeModal} on:saved={closeModal} />
+                        <AppointmentEditMobile bind:this={appointmentEditRef} appointment={currentAppointment} preselected={preselectedData} service={managerService} on:cancel={closeModal} on:saved={handleSaved} />
                     {:else}
-                        <AppointmentEditScreen bind:this={appointmentEditRef} appointment={currentAppointment} preselected={preselectedData} service={managerService} on:cancel={closeModal} on:saved={closeModal} />
+                        <AppointmentEditScreen bind:this={appointmentEditRef} appointment={currentAppointment} preselected={preselectedData} service={managerService} on:cancel={closeModal} on:saved={handleSaved} />
                     {/if}
                 {:else if showModal === 'detail'}
                     {#if $isMobile}

@@ -5,6 +5,7 @@ import com.tryneuro.backend.dto.AppointmentDto;
 import com.tryneuro.backend.dto.DtoMapper;
 import com.tryneuro.backend.model.Appointment;
 import com.tryneuro.backend.model.AppointmentStatus;
+import com.tryneuro.backend.model.Branch;
 import com.tryneuro.backend.model.Contact;
 import com.tryneuro.backend.model.StaffShift;
 import com.tryneuro.backend.repository.AppointmentRepository;
@@ -23,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -278,7 +280,19 @@ public class ScheduleService {
     }
 
     public List<Appointment> getAppointmentsForDay(LocalDate date, String tenantId, String branchId) {
-        List<Appointment> apps = appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
+        List<Appointment> apps;
+        if (isRentBranch(branchId)) {
+            // RENT: многодневная аренда. Границы дня филиала в UTC, чтобы запись,
+            // начавшаяся в первые часы дня, не терялась из-за UTC-смещения, и чтобы
+            // аренда, покрывающая несколько дней, была видна на каждом из них.
+            String tz = branchRepository.findById(branchId).map(Branch::getTimezone).orElse("Europe/Moscow");
+            ZonedDateTime dayStart = date.atStartOfDay(ZoneId.of(tz));
+            ZonedDateTime dayEnd = dayStart.plusDays(1);
+            apps = appointmentRepository.findSpanningDay(tenantId, branchId,
+                    dayStart.toOffsetDateTime(), dayEnd.toOffsetDateTime());
+        } else {
+            apps = appointmentRepository.findByDateAndTenantIdAndBranchId(date, tenantId, branchId);
+        }
         // Обогащаем КАЖДУЮ запись телефоном перед отправкой на фронтенд
         apps.forEach(this::enrichAppointmentPhone);
         return apps;
@@ -306,11 +320,25 @@ public class ScheduleService {
                 .map(b -> b.getTimezone())
                 .orElse("Europe/Moscow");
 
+        boolean rent = isRentBranch(app.getBranchId());
+        String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
+
+        if (rent) {
+            // RENT: аренда может длиться до 30 дней, ресурс доступен 24/7 без смен.
+            int duration = app.getDurationInMinutes() != null ? app.getDurationInMinutes() : 0;
+            if (duration < 15 || duration > 43200) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Длительность аренды должна быть от 15 минут до 30 дней");
+            }
+            if (app.getResourceId() != null && !isResourceAvailableSpan(app.getTenantId(), app.getResourceId(),
+                    app.getStartTime(), app.getStartTime().plusMinutes(duration), appId)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Ресурс занят в это время");
+            }
+            return;
+        }
+
         ZonedDateTime branchDateTime = app.getStartTime().atZoneSameInstant(ZoneId.of(timezone));
         LocalDate localDate = branchDateTime.toLocalDate();
         LocalTime localTime = branchDateTime.toLocalTime();
-
-        String appId = (app.getId() == null || app.getId().equals("new")) ? null : app.getId();
 
         // Проверяем доступность мастера
         if (app.getStaffMemberId() != null && !isStaffMemberAvailable(app.getTenantId(), app.getStaffMemberId(), localDate, localTime, app.getDurationInMinutes(), appId, app.getBranchId())) {
@@ -321,6 +349,21 @@ public class ScheduleService {
         if (app.getResourceId() != null && !isResourceAvailable(app.getTenantId(), app.getResourceId(), localDate, localTime, app.getDurationInMinutes(), appId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ресурс занят в это время");
         }
+    }
+
+    private boolean isRentBranch(String branchId) {
+        if (branchId == null || branchId.isBlank()) return false;
+        return "RENT".equals(branchRepository.findById(branchId).map(Branch::getNiche).orElse(null));
+    }
+
+    // RENT: проверка пересечения аренды [startUtc, endUtc) с другими записями ресурса
+    public boolean isResourceAvailableSpan(String tenantId, String resourceId, OffsetDateTime startUtc, OffsetDateTime endUtc, String currentAppId) {
+        List<Appointment> allResourceApps = appointmentRepository.findResourceSpan(tenantId, resourceId, startUtc, endUtc);
+        for (Appointment existing : allResourceApps) {
+            if (currentAppId != null && existing.getId().equals(currentAppId)) continue;
+            return false;
+        }
+        return true;
     }
 
     public boolean isStaffMemberAvailable(String tenantId, String staffId, LocalDate date, LocalTime time, int duration, String currentAppId, String branchId) {

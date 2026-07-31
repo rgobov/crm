@@ -25,6 +25,37 @@ public interface AppointmentRepository extends JpaRepository<Appointment, String
                                                        @Param("tenantId") String tenantId, 
                                                        @Param("branchId") String branchId);
 
+    // RENT: записи, покрывающие день (многодневная аренда) — границы дня в UTC вычисляет сервис.
+    // start_time + duration_in_minutes * interval > :dayStartUtc — синтаксис общий для
+    // PostgreSQL и H2 (тестовый профиль). CANCELLED не исключаем — дневной вид показывает статусы.
+    @Query(value = """
+        SELECT * FROM appointments a
+        WHERE a.tenant_id = :tenantId
+          AND (:branchId IS NULL OR :branchId = '' OR a.branch_id = :branchId)
+          AND a.start_time < :dayEndUtc
+          AND a.start_time + (a.duration_in_minutes * INTERVAL '1' MINUTE) > :dayStartUtc
+        ORDER BY a.start_time
+        """, nativeQuery = true)
+    List<Appointment> findSpanningDay(@Param("tenantId") String tenantId,
+                                      @Param("branchId") String branchId,
+                                      @Param("dayStartUtc") OffsetDateTime dayStartUtc,
+                                      @Param("dayEndUtc") OffsetDateTime dayEndUtc);
+
+    // RENT: пересечение интервала аренды [startUtc, endUtc) с существующими записями ресурса
+    @Query(value = """
+        SELECT * FROM appointments a
+        WHERE a.resource_id = :resourceId
+          AND a.tenant_id = :tenantId
+          AND a.status != 'CANCELLED'
+          AND a.start_time < :endUtc
+          AND a.start_time + (a.duration_in_minutes * INTERVAL '1' MINUTE) > :startUtc
+        ORDER BY a.start_time
+        """, nativeQuery = true)
+    List<Appointment> findResourceSpan(@Param("tenantId") String tenantId,
+                                       @Param("resourceId") String resourceId,
+                                       @Param("startUtc") OffsetDateTime startUtc,
+                                       @Param("endUtc") OffsetDateTime endUtc);
+
     @Modifying
     @Query("UPDATE Appointment a SET a.clientName = :newName WHERE a.contactId = :contactId AND a.tenantId = :tenantId")
     void updateClientNameForContact(@Param("contactId") String contactId, @Param("newName") String newName, @Param("tenantId") String tenantId);

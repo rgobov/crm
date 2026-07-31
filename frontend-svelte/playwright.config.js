@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { fileURLToPath } from 'url';
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -77,8 +78,8 @@ export default defineConfig({
   },
   
   /* Global setup for test environment */
-  globalSetup: require.resolve('./tests/global-setup.js'),
+  globalSetup: fileURLToPath(new URL('./tests/global-setup.js', import.meta.url)),
   
   /* Global teardown for test environment */
-  globalTeardown: require.resolve('./tests/global-teardown.js'),
+  globalTeardown: fileURLToPath(new URL('./tests/global-teardown.js', import.meta.url)),
 });

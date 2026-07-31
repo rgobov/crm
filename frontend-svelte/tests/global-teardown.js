@@ -18,4 +18,4 @@ async function globalTeardown(config) {
   console.log('✅ Очистка завершена');
 }
 
-module.exports = globalTeardown;
+export default globalTeardown;

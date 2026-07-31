@@ -44,9 +44,25 @@
     let durationHours = 1;
     let durationMinutes = 0;
     let showDurationPicker = false;
+    let rentEndTime = '';
+
+    $: isRentMode = $activeNiche === 'RENT';
 
     const HOURS_OPTIONS = Array.from({length: 13}, (_, i) => i);
     const MINS_OPTIONS = [0, 5, 10, 15, 20, 30, 45];
+
+    function addMinutesToLocal(localStr, minutes) {
+        if (!localStr) return '';
+        const d = new Date(localStr);
+        d.setMinutes(d.getMinutes() + minutes);
+        const pad = n => n < 10 ? '0'+n : n;
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function minutesBetween(startStr, endStr) {
+        if (!startStr || !endStr) return 0;
+        return Math.round((new Date(endStr) - new Date(startStr)) / 60000);
+    }
 
     let searchInput = '';
     let searchResults = [];
@@ -107,6 +123,7 @@
                 durationHours = Math.floor(formData.durationInMinutes / 60);
                 durationMinutes = formData.durationInMinutes % 60;
                 formData.startTime = timeUtils.toBranchLocalISO(appointment.startTime, currentBranchData?.timezone);
+                rentEndTime = addMinutesToLocal(formData.startTime, formData.durationInMinutes);
                 serviceSearchInput = appointment.service;
                 
                 // Находим услугу в списке услуг
@@ -125,6 +142,7 @@
                 const pad = n => n < 10 ? '0'+n : n;
                 const dateStr = timeUtils.toBranchLocalDateStr(preselected.date, currentBranchData?.timezone);
                 formData.startTime = `${dateStr}T${pad(preselected.hour)}:${pad(preselected.min)}`;
+                rentEndTime = addMinutesToLocal(formData.startTime, 60);
             }
         } catch (e) {
             console.error('Load failed', e);
@@ -210,6 +228,14 @@
         let finalPhone = isNewClientMode ? newClientPhone.trim() : formData.clientPhone;
         if (!finalPhone) return alert('Укажите номер телефона');
 
+        let finalDuration = formData.durationInMinutes;
+        if (isRentMode) {
+            const dur = minutesBetween(formData.startTime, rentEndTime);
+            if (dur < 15) return alert('Окончание аренды должно быть позже начала (минимум 15 минут)');
+            if (dur > 43200) return alert('Максимальная длительность аренды — 30 дней');
+            finalDuration = dur;
+        }
+
         isSaving = true;
         try {
             let contactId = formData.contactId;
@@ -236,6 +262,7 @@
 
             const payload = {
                 ...formData,
+                durationInMinutes: finalDuration,
                 staffMemberId: firstStaffId,
                 service: sName,
                 clientName: clientName,
@@ -267,7 +294,7 @@
                     throw err;
                 }
             }
-            dispatch('saved');
+            dispatch('saved', { startTime: correctedStartTime });
         } catch (e) {
             console.error('Save failed', e);
             alert('Ошибка сохранения');
@@ -455,32 +482,45 @@
                     </div>
                 </div>
 
-                <div class="tile-card dual">
-                    <div class="part date-part">
-                        <label>КОГДА (ВРЕМЯ ФИЛИАЛА)</label>
-                        <input type="datetime-local" bind:value={formData.startTime} />
-                    </div>
-                    <div class="part duration-part" on:click|stopPropagation>
-                        <label>ДЛИТЕЛЬНОСТЬ</label>
-                        <button class="duration-v2-trigger" on:click={() => showDurationPicker = !showDurationPicker}>
-                            <span class="val">{durationHours}ч {durationMinutes}м</span>
-                            <span class="chevron">▼</span>
-                        </button>
-                        {#if showDurationPicker}
-                            <div class="duration-v2-popover" in:fade={{duration: 100}}>
-                                <div class="duration-v2-cols">
-                                    <div class="duration-v2-col">
-                                        <div class="duration-v2-col-label">ЧАСЫ</div>
-                                        <div class="duration-v2-col-list">{#each HOURS_OPTIONS as h}<button class:active={durationHours===h} on:click={() => durationHours=h}>{h}</button>{/each}</div>
-                                    </div>
-                                    <div class="duration-v2-col border-l">
-                                        <div class="duration-v2-col-label">МИНУТЫ</div>
-                                        <div class="duration-v2-col-list">{#each MINS_OPTIONS as m}<button class:active={durationMinutes===m} on:click={() => {durationMinutes=m; showDurationPicker=false;}}>{m.toString().padStart(2, '0')}</button>{/each}</div>
+                <div class="tile-card" class:dual={!isRentMode}>
+                    {#if isRentMode}
+                        <div class="rent-period">
+                            <div class="part">
+                                <label>НАЧАЛО АРЕНДЫ (ВРЕМЯ ФИЛИАЛА)</label>
+                                <input type="datetime-local" bind:value={formData.startTime} />
+                            </div>
+                            <div class="part">
+                                <label>ОКОНЧАНИЕ АРЕНДЫ</label>
+                                <input type="datetime-local" bind:value={rentEndTime} />
+                            </div>
+                        </div>
+                    {:else}
+                        <div class="part date-part">
+                            <label>КОГДА (ВРЕМЯ ФИЛИАЛА)</label>
+                            <input type="datetime-local" bind:value={formData.startTime} />
+                        </div>
+                        <div class="part duration-part" on:click|stopPropagation>
+                            <label>ДЛИТЕЛЬНОСТЬ</label>
+                            <button class="duration-v2-trigger" on:click={() => showDurationPicker = !showDurationPicker}>
+                                <span class="val">{durationHours}ч {durationMinutes}м</span>
+                                <span class="chevron">▼</span>
+                            </button>
+                            {#if showDurationPicker}
+                                <div class="duration-v2-popover" in:fade={{duration: 100}}>
+                                    <div class="duration-v2-cols">
+                                        <div class="duration-v2-col">
+                                            <div class="duration-v2-col-label">ЧАСЫ</div>
+                                            <div class="duration-v2-col-list">{#each HOURS_OPTIONS as h}<button class:active={durationHours===h} on:click={() => durationHours=h}>{h}</button>{/each}</div>
+                                        </div>
+                                        <div class="duration-v2-col border-l">
+                                            <div class="duration-v2-col-label">МИНУТЫ</div>
+                                            <div class="duration-v2-col-list">{#each MINS_OPTIONS as m}<button class:active={durationMinutes===m} on:click={() => {durationMinutes=m; showDurationPicker=false;}}>{m.toString().padStart(2, '0')}</button>{/each}</div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        {/if}
-                    </div>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
 
                 <div class="tile-card staff-card">
@@ -646,6 +686,8 @@
     .divider { height: 1px; background: #f1f5f9; margin: 4px 0; }
 
     .dual { display: grid; grid-template-columns: 1fr 140px; padding: 0; }
+    .rent-period { display: flex; flex-direction: column; gap: 14px; padding: 0; }
+    .rent-period .part { display: flex; flex-direction: column; gap: 4px; }
     .date-part { padding: 14px 18px; border-right: 1px solid #f1f5f9; }
     .duration-part { padding: 14px 18px; position: relative; background: #f8fafc; border-radius: 0 22px 22px 0; }
     .duration-v2-trigger { width: 100%; border: none; background: none; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }

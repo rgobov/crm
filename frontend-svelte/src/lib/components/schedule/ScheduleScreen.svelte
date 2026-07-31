@@ -28,6 +28,8 @@
     let resources = [];
     let isLoading = false;
     let lastLoadTime = 0;
+    let lastLoadedDate = null;
+    let lastLoadedBranch = null;
     let refreshTimeout;
     let staffRefreshTimeout = null;
 
@@ -244,11 +246,22 @@
     // РЕАКТИВНАЯ ЗАГРУЗКА ПРИ СМЕНЕ ДАТЫ, ФИЛИАЛА ИЛИ НИШИ
     // isRentMode зависит от activeNiche ← activeBranchId, поэтому смена филиала
     // триггерит и branchLocalDate, и isRentMode — один блок заменяет два.
+    // RENT: значенческий guard — любая смена даты/филиала гарантированно перезагружает
+    // таймлайн (многодневная аренда/смена даты), без окна 800мс.
+    // Не-RENT: прежняя логика с time-guard (дедупликация каскада зависимостей).
     $: if (branchLocalDate && currentBranchId && typeof isRentMode !== 'undefined') {
-        const now = Date.now();
-        if (now - lastLoadTime > 800) {
-            lastLoadTime = now;
-            loadDayData(branchLocalDate, currentBranchId);
+        if (isRentMode) {
+            if (lastLoadedDate !== branchLocalDate || lastLoadedBranch !== currentBranchId) {
+                lastLoadedDate = branchLocalDate;
+                lastLoadedBranch = currentBranchId;
+                loadDayData(branchLocalDate, currentBranchId);
+            }
+        } else {
+            const now = Date.now();
+            if (now - lastLoadTime > 800) {
+                lastLoadTime = now;
+                loadDayData(branchLocalDate, currentBranchId);
+            }
         }
     }
 

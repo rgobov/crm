@@ -11,6 +11,7 @@
     import { branchStore } from '$lib/stores/branchStore.js';
     import { activeNiche } from '$lib/stores/nicheStore.js';
     import { resourceService } from '$lib/services/resourceService.js';
+    import { timeUtils } from '$lib/utils/timeUtils.js';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
 
@@ -106,6 +107,17 @@
         if (scheduleScreenRef && typeof scheduleScreenRef.handleRefresh === 'function') {
             scheduleScreenRef.handleRefresh();
         }
+    }
+
+    // RENT: после сохранения с изменённой датой «перепрыгиваем» на дату записи.
+    function handleSaved(event) {
+        const startTime = event?.detail?.startTime;
+        if ($activeNiche === 'RENT' && startTime) {
+            const branch = $branchStore.find(b => b.id === $activeBranchId);
+            const dayStr = timeUtils.toBranchLocalDateStr(startTime, branch?.timezone);
+            if (dayStr) selectedDate.set(new Date(dayStr + 'T12:00:00'));
+        }
+        closeModal();
     }
 
     function handleContactAdded(event) {
@@ -273,7 +285,7 @@
                 </header>
                 <div class="modal-body">
                     {#if showModal === 'edit'}
-                        <AppointmentEditMobile bind:this={appointmentEditRef} appointment={currentAppointment} preselected={preselectedData} on:cancel={closeModal} on:saved={closeModal} on:open-add-contact-modal={() => showNestedAddContact = true} />
+                        <AppointmentEditMobile bind:this={appointmentEditRef} appointment={currentAppointment} preselected={preselectedData} on:cancel={closeModal} on:saved={handleSaved} on:open-add-contact-modal={() => showNestedAddContact = true} />
                     {:else if showModal === 'detail'}
                         <AppointmentDetailMobile appointment={currentAppointment} on:edit={(e) => { currentAppointment = e.detail; showModal = 'edit'; }} on:deleted={closeModal} on:open-client={(e) => handleOpenClient(e.detail)} />
                     {:else if showModal === 'client-profile'}
