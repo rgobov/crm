@@ -290,7 +290,7 @@
             // Проверка релевантности: только если наш филиал и наш день
             // Если в сигнале нет branchId или date — считаем его глобальным
             const isRelevantBranch = !branchId || branchId === currentBranchId;
-            const isRelevantDate = !date || date === currentLocalDate;
+            const isRelevantDate = !date || date === currentLocalDate || isRentMode;
 
             console.log('🔍 WS: Relevance check:', {
                 isRelevantBranch,
