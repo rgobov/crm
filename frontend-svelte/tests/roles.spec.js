@@ -8,13 +8,17 @@ const testUsers = {
 };
 
 async function login(page, email, password) {
-    // Страница уже на '/' (см. beforeEach) — дожидаемся формы и заполняем по id.
-    // toHaveValue гарантирует, что Svelte bind:value уже обновил переменные до клика.
-    await expect(page.locator('#email')).toBeVisible();
-    await page.locator('#email').fill(email);
-    await page.locator('#password').fill(password);
-    await expect(page.locator('#email')).toHaveValue(email);
-    await expect(page.locator('#password')).toHaveValue(password);
+    // Страница уже на '/' (см. beforeEach). Заполняем ОБА поля атомарно через evaluate —
+    // это исключает гонку отдельных fill() с ре-рендером Svelte bind:value.
+    await page.waitForSelector('#email');
+    await page.evaluate(([e, p]) => {
+        const el = document.getElementById('email');
+        const pw = document.getElementById('password');
+        el.value = e;
+        pw.value = p;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        pw.dispatchEvent(new Event('input', { bubbles: true }));
+    }, [email, password]);
     await page.getByRole('button', { name: 'Войти' }).click();
 }
 

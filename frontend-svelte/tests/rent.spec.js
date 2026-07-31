@@ -17,14 +17,19 @@ async function loginAsAdmin(request) {
     return body.token;
 }
 
-// Логин в браузере. toHaveValue гарантирует, что Svelte bind:value обновил переменные до клика
-// (иначе гоночная ситуация: клик «Войти» с пустым полем).
+// Логин в браузере. Оба поля заполняются атомарно через evaluate, чтобы исключить
+// гонку отдельных fill() с ре-рендером Svelte bind:value.
 async function loginAdminInBrowser(page) {
     await page.goto('/');
-    await page.locator('#email').fill('admin@test.com');
-    await page.locator('#password').fill('password');
-    await expect(page.locator('#email')).toHaveValue('admin@test.com');
-    await expect(page.locator('#password')).toHaveValue('password');
+    await page.waitForSelector('#email');
+    await page.evaluate(() => {
+        const el = document.getElementById('email');
+        const pw = document.getElementById('password');
+        el.value = 'admin@test.com';
+        pw.value = 'password';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        pw.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     await page.getByRole('button', { name: 'Войти' }).click();
     await page.waitForURL('**/admin');
 }

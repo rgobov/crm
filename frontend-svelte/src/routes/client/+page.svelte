@@ -704,6 +704,7 @@
 	/* РЕЗЮМЕ ЗАПИСИ В КАРТОЧКЕ */
 	.booking-summary-card {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 16px;
 		background: #eee8d5;
 		border: 1px solid #ddd6c1;
@@ -715,7 +716,8 @@
 	.summary-item {
 		display: flex;
 		flex-direction: column;
-		flex: 1;
+		flex: 1 1 40%;
+		min-width: 0;
 	}
 
 	.sum-label {
