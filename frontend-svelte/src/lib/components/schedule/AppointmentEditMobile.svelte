@@ -307,9 +307,10 @@
                 branchId: $activeBranchId
             };
 
+            const effectiveUpdateMode = appointment?.groupId ? updateMode : 'single';
             try {
                 if (isEditing) {
-                    await service.updateAppointment(appointment.id, payload, false, updateMode);
+                    await service.updateAppointment(appointment.id, payload, false, effectiveUpdateMode);
                 } else {
                     await service.createAppointment(payload, false);
                 }
@@ -317,7 +318,7 @@
                 if (err.response && err.response.status === 409) {
                     if (confirm('Один из выбранных сотрудников занят или не работает в это время. Все равно сохранить запись?')) {
                         if (isEditing) {
-                            await service.updateAppointment(appointment.id, payload, true, updateMode);
+                            await service.updateAppointment(appointment.id, payload, true, effectiveUpdateMode);
                         } else {
                             await service.createAppointment(payload, true);
                         }

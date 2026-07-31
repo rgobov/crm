@@ -317,4 +317,45 @@ class ScheduleServiceTest {
         Appointment result = scheduleService.addAppointment(app, null, false);
         org.junit.jupiter.api.Assertions.assertNotNull(result);
     }
+
+    @Test
+    @DisplayName("RENT: обновление записи без группы (updateMode=all) не удаляет её, а сохраняет")
+    void testUpdateAppointment_RentNoGroup_NotDeletedWithUpdateModeAll() {
+        String branchId = "rent-branch";
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(rentBranch(branchId)));
+
+        Appointment existing = rentApp("a1", "res-1", OffsetDateTime.parse("2026-02-21T09:00:00+03:00"), 120);
+        existing.setGroupId(null);
+        when(appointmentRepository.findById("a1")).thenReturn(Optional.of(existing));
+        when(appointmentRepository.findResourceSpan(eq("t1"), eq("res-1"), any(), any())).thenReturn(List.of());
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment details = rentApp("a1", "res-1", OffsetDateTime.parse("2026-02-21T10:00:00+03:00"), 240);
+        Appointment result = scheduleService.updateAppointment("a1", details, new java.util.ArrayList<>(), "all", false);
+
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+        verify(appointmentRepository).save(any(Appointment.class));
+        assertEquals("res-1", result.getResourceId());
+        assertEquals(240, result.getDurationInMinutes());
+    }
+
+    @Test
+    @DisplayName("RENT: групповая запись (staffMemberId=null) не удаляется при пустом списке сотрудников")
+    void testUpdateAppointment_RentGroupWithNullStaff_NotDeleted() {
+        String branchId = "rent-branch";
+        when(branchRepository.findById(branchId)).thenReturn(Optional.of(rentBranch(branchId)));
+
+        Appointment existing = rentApp("a1", "res-1", OffsetDateTime.parse("2026-02-21T09:00:00+03:00"), 120);
+        existing.setGroupId("grp-1");
+        Appointment sibling = rentApp("a2", "res-1", OffsetDateTime.parse("2026-02-21T09:00:00+03:00"), 120);
+        sibling.setGroupId("grp-1");
+        when(appointmentRepository.findById("a1")).thenReturn(Optional.of(existing));
+        when(appointmentRepository.findByGroupId("grp-1")).thenReturn(List.of(existing, sibling));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment details = rentApp("a1", "res-1", OffsetDateTime.parse("2026-02-21T10:00:00+03:00"), 240);
+        scheduleService.updateAppointment("a1", details, new java.util.ArrayList<>(), "all", true);
+
+        verify(appointmentRepository, never()).delete(any(Appointment.class));
+    }
 }

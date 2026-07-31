@@ -159,7 +159,8 @@ public class ScheduleService {
         
         enrichAppointmentPhone(details);
         
-        boolean isGroupUpdate = "all".equalsIgnoreCase(updateMode) || (staffMemberIds != null && staffMemberIds.size() > 1);
+        boolean isGroupUpdate = appointment.getGroupId() != null
+                && ("all".equalsIgnoreCase(updateMode) || (staffMemberIds != null && staffMemberIds.size() > 1));
         
         if (isGroupUpdate) {
             String groupId = appointment.getGroupId();
@@ -183,7 +184,7 @@ public class ScheduleService {
             
             // Удаляем записи для сотрудников, которых убрали из группы
             for (Appointment app : groupApps) {
-                if (!targetStaffIds.contains(app.getStaffMemberId())) {
+                if (app.getStaffMemberId() != null && !targetStaffIds.contains(app.getStaffMemberId())) {
                     notifyAppointmentChange(app, "DELETED");
                     appointmentRepository.delete(app);
                 }
