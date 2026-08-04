@@ -25,8 +25,9 @@
         try {
             isLoadingBranches = true;
             await branchStore.refresh();
-            if ($branchStore.length > 0 && !$activeBranchId) {
-                activeBranchId.set($branchStore[0].id);
+            if ($activeBranchId && !$branchStore.some(branch => String(branch.id) === String($activeBranchId))) {
+                // Устаревший ID нельзя оставлять: иначе запросы могут уйти без филиала.
+                activeBranchId.set(null);
             }
         } catch (e) {
             console.error('Sidebar: Failed to load branches', e);
@@ -93,7 +94,12 @@
                 {#if isLoadingBranches}
                     <div class="branch-loading">...</div>
                 {:else if branches && branches.length > 0}
-                    <select class="branch-select" bind:value={$activeBranchId}>
+                    <select
+                        class="branch-select"
+                        value={$activeBranchId || ''}
+                        on:change={(event) => activeBranchId.set(event.currentTarget.value || null)}
+                    >
+                        <option value="" disabled>Выберите филиал</option>
                         {#each branches as b}
                             <option value={b.id}>{getNicheIcon(b.niche)} {b.name}</option>
                         {/each}

@@ -5,7 +5,7 @@
     import { contactService } from '$lib/services/contactService.js';
     import { serviceService } from '$lib/services/serviceService.js';
     import { branchService } from '$lib/services/branchService.js';
-    import { nicheSettings, activeNiche } from '$lib/stores/nicheStore.js';
+    import { getNicheConfig } from '$lib/config/nicheConfig.js';
     import { resourceService } from '$lib/services/resourceService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
     import { timeUtils } from '$lib/utils/timeUtils.js';
@@ -45,7 +45,9 @@
     let showDurationPicker = false;
     let rentEndTime = '';
 
-    $: isRentMode = $activeNiche === 'RENT';
+    let currentNiche = null;
+    $: isRentMode = currentNiche === 'RENT';
+    $: formNicheSettings = getNicheConfig(currentNiche);
 
     const HOURS_OPTIONS = Array.from({length: 13}, (_, i) => i);
     const MINS_OPTIONS = [0, 5, 10, 15, 20, 30, 45];
@@ -72,6 +74,7 @@
     let isNewService = false;
     let selectedService = null;
     let isLoading = true;
+    let loadError = '';
     let isSaving = false;
     let debounceTimer;
 
@@ -89,18 +92,34 @@
 
     async function loadInitialData() {
         isLoading = true;
+        loadError = '';
+        currentBranchData = null;
+        currentNiche = null;
         try {
             const allBranches = await branchService.getBranches();
-            currentBranchData = allBranches.find(b => b.id === $activeBranchId);
+            const selectedBranchId = $activeBranchId;
+            currentBranchData = allBranches.find(b => String(b.id) === String(selectedBranchId));
+
+            if (!currentBranchData) {
+                resources = [];
+                services = [];
+                staffList = [];
+                loadError = 'Сначала выберите филиал для создания записи.';
+                return;
+            }
+
+            const branchId = currentBranchData.id;
+            currentNiche = String(currentBranchData.niche || 'AUTO').toUpperCase();
 
             const [servicesData, resourcesData, staffData] = await Promise.all([
-                serviceService.getServices($activeNiche).catch(e => { console.error('Services load failed:', e); return []; }),
-                resourceService.getResources($activeBranchId).catch(e => { console.error('Resources load failed:', e); return []; }),
-                service.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, $activeBranchId).catch(e => { console.error('Staff load failed:', e); return []; })
+                serviceService.getServices(currentNiche).catch(e => { console.error('Services load failed:', e); return []; }),
+                resourceService.getResources(branchId).catch(e => { console.error('Resources load failed:', e); return []; }),
+                service.getStaffForSchedule(isEditing ? new Date(appointment.startTime) : preselected.date, branchId).catch(e => { console.error('Staff load failed:', e); return []; })
             ]);
 
             services = servicesData || [];
-            resources = resourcesData || [];
+            // Защита UI от tenant-wide ответа при ошибочном или устаревшем запросе.
+            resources = (resourcesData || []).filter(resource => String(resource.branchId) === String(branchId));
             staffList = (staffData || []).map(s => ({
                 ...s,
                 id: s.id ? String(s.id) : null
@@ -116,7 +135,7 @@
                     ...appointment,
                     staffMemberId: appointment.staffMemberId ? String(appointment.staffMemberId) : (appointment.staffMember?.id ? String(appointment.staffMember.id) : ''),
                     staffMemberIds: appointment.staffMemberIds ? appointment.staffMemberIds.map(String) : (appointment.staffMemberId ? [String(appointment.staffMemberId)] : []),
-                    branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : $activeBranchId),
+                    branchId: appointment.branchId || (appointment.branch ? appointment.branch.id : branchId),
                     allowReminder: appointment.allowReminder ?? true,
                     reminderLeadTimeHours: appointment.reminderLeadTimeHours ?? 24,
                     status: appointment.status || 'SCHEDULED',
@@ -143,7 +162,7 @@
                 formData.staffMemberId = preselected.staffId ? String(preselected.staffId) : '';
                 formData.staffMemberIds = initialStaff;
                 formData.resourceId = preselected.resourceId ? String(preselected.resourceId) : null;
-                formData.branchId = $activeBranchId;
+                formData.branchId = branchId;
                 const pad = n => n < 10 ? '0'+n : n;
                 const dateStr = timeUtils.toBranchLocalDateStr(preselected.date, currentBranchData?.timezone);
                 formData.startTime = `${dateStr}T${pad(preselected.hour)}:${pad(preselected.min)}`;
@@ -151,6 +170,7 @@
             }
         } catch (e) {
             console.error('Load failed', e);
+            loadError = 'Не удалось загрузить данные филиала.';
         } finally {
             isLoading = false;
         }
@@ -262,7 +282,7 @@
         let finalPhone = isNewClientMode ? newClientPhone.trim() : formData.clientPhone;
         if (!finalPhone) return alert('Укажите номер телефона');
         if (!currentBranchData) return alert('Данные филиала еще загружаются...');
-        if ($activeNiche !== 'RENT' && formData.staffMemberIds.length === 0) return alert('Выберите хотя бы одного исполнителя');
+        if (!isRentMode && formData.staffMemberIds.length === 0) return alert('Выберите хотя бы одного исполнителя');
 
         let finalDuration = formData.durationInMinutes;
         if (isRentMode) {
@@ -281,7 +301,7 @@
                 const newContact = await contactService.addContact({
                     name: clientName,
                     phones: [finalPhone],
-                    tags: formData.referenceTag ? [formData.referenceTag] : []
+                    tags: !isRentMode && formData.referenceTag ? [formData.referenceTag] : []
                 }, $activeBranchId);
                 contactId = newContact.id;
             }
@@ -304,7 +324,8 @@
                 clientPhone: finalPhone,
                 contactId: contactId,
                 startTime: correctedStartTime,
-                branchId: $activeBranchId
+                branchId: currentBranchData.id,
+                referenceTag: isRentMode ? '' : formData.referenceTag
             };
 
             try {
@@ -342,6 +363,11 @@
 <div class="appt-edit-mobile" on:click|stopPropagation on:keydown={(e) => e.key === 'Escape' && dispatch('cancel')} role="presentation">
     {#if isLoading}
         <div class="loader-center"><span class="spinner"></span></div>
+    {:else if loadError}
+        <div class="load-error">
+            <span class="load-error-icon">🏢</span>
+            <p>{loadError}</p>
+        </div>
     {:else}
         <div class="tiles-layout" in:fade>
             <!-- Секция Клиент (БЕЗ АВАТАРА, НА ВСЮ ШИРИНУ) -->
@@ -383,7 +409,7 @@
                                     <button class="dropdown-action-btn" on:click={() => selectContact(c)} type="button" role="option" aria-selected="false">
                                         <SearchDropdownItem
                                             title={c.name}
-                                            subtitle={(c.tags && c.tags.length > 0) ? `${$nicheSettings.assetIcon} ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
+                                             subtitle={currentNiche !== 'RENT' && c.tags && c.tags.length > 0 ? `${formNicheSettings.assetIcon} ${c.tags.join(', ')}` : (c.phones[0] || 'Нет номера')}
                                             type="client"
                                         />
                                     </button>
@@ -403,7 +429,7 @@
 
             <div class="tiles-stack">
                 <div class="tile-card staff-card">
-                    {#if $activeNiche !== 'RENT'}
+                                     {#if !isRentMode}
                         <label>ИСПОЛНИТЕЛИ ({formData.staffMemberIds.length})</label>
                         
                         <div class="selected-staff-container">
@@ -472,11 +498,11 @@
                     </div>
                 {/if}
 
-                {#if $activeNiche !== 'RENT'}
-                <div class="tile-card reference-card">
-                    <label for="ref-tag-id">{$nicheSettings.refLabel}</label>
-                    <div class="tag-input-wrap">
-                        <input id="ref-tag-id" type="text" bind:value={formData.referenceTag} placeholder={$nicheSettings.refPlaceholder} />
+                 {#if !isRentMode}
+                 <div class="tile-card reference-card">
+                     <label for="ref-tag-id">{formNicheSettings.refLabel}</label>
+                     <div class="tag-input-wrap">
+                         <input id="ref-tag-id" type="text" bind:value={formData.referenceTag} placeholder={formNicheSettings.refPlaceholder} />
                         {#if selectedContact?.tags?.length > 0}
                             <div class="quick-tags" in:slide>
                                 {#each selectedContact.tags as tag}
@@ -598,7 +624,7 @@
                     {/if}
                 </div>
 
-                {#if $activeNiche !== 'RENT'}
+                {#if !isRentMode}
                     <div class="tile-card">
                         <label for="resource-select-id">КАБИНЕТ / РЕСУРС</label>
                         <select id="resource-select-id" bind:value={formData.resourceId}>
@@ -850,6 +876,9 @@
     .spinner { width: 24px; height: 24px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loader-center { display: flex; justify-content: center; align-items: center; height: 200px; }
+    .load-error { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240px; padding: 24px; color: #586e75; text-align: center; }
+    .load-error-icon { font-size: 32px; margin-bottom: 12px; }
+    .load-error p { margin: 0; font-size: 14px; font-weight: 700; }
     .rel-pos { position: relative; }
     
     .input-rel { position: relative; }

@@ -85,6 +85,7 @@
                     </div>
                 {/each}
             </div>
+            <div class="bottom-spacer" aria-hidden="true"></div>
         {/if}
 
         {#if showModal}
@@ -99,6 +100,7 @@
         overflow-y: auto;
         height: 100%;
         background: #fdf6e3;
+        -webkit-overflow-scrolling: touch;
     }
     .page-wrapper { padding: 32px; max-width: 1000px; margin: 0 auto; min-height: 100%; }
     .page-header { margin-bottom: 32px; }
@@ -145,4 +147,13 @@
     .loader-box { text-align: center; padding: 100px; }
     .spinner { width: 40px; height: 40px; border: 4px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .bottom-spacer { display: none; }
+
+    @media (max-width: 1279px) {
+        .page-scroll-container { min-height: 0; box-sizing: border-box; }
+        .page-wrapper { padding: 20px; }
+        .branches-grid { gap: 16px; }
+        .bottom-spacer { display: block; height: calc(120px + env(safe-area-inset-bottom, 0px)); }
+    }
 </style>

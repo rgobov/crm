@@ -1,6 +1,7 @@
 <script>
-    import { onMount } from 'svelte';
-    import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
+import { onMount } from 'svelte';
+import { get } from 'svelte/store';
+import { activeTab, selectedDate, activeBranchId } from '$lib/stores/dashboardStore.js';
     import { branchStore } from '$lib/stores/branchStore.js';
     import { websocketService } from '$lib/services/websocketService.js';
     import AdminSidebar from '$lib/components/admin/AdminSidebar.svelte';
@@ -24,6 +25,14 @@
 
         try {
             await branchStore.refresh();
+            const branches = get(branchStore);
+            const savedBranchId = get(activeBranchId);
+            const hasSavedBranch = savedBranchId && branches.some(branch => String(branch.id) === String(savedBranchId));
+
+            // Не выбираем филиал молча: пользователь должен явно подтвердить контекст работы.
+            if (savedBranchId && !hasSavedBranch) {
+                activeBranchId.set(null);
+            }
         } catch (e) { /* ignore */ }
     });
 

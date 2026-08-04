@@ -14,6 +14,8 @@
     const dispatch = createEventDispatcher();
 
     $: branches = $branchStore;
+    $: hasValidActiveBranch = Boolean($activeBranchId) && branches.some(b => String(b.id) === String($activeBranchId));
+    $: branchSelectionRequired = branches.length > 0 && !hasValidActiveBranch;
 
     let showMoreMenu = false;
     let showCalendarModal = false;
@@ -185,6 +187,24 @@
             </div>
         </div>
     {/if}
+
+    {#if branchSelectionRequired}
+        <div class="branch-required-backdrop" role="presentation">
+            <section class="branch-required-dialog" role="dialog" aria-modal="true" aria-labelledby="branch-required-title">
+                <div class="branch-required-icon">🏢</div>
+                <h2 id="branch-required-title">Выберите филиал</h2>
+                <p>Для расписания и создания записи нужно выбрать филиал.</p>
+                <div class="branch-required-list">
+                    {#each branches as b}
+                        <button class="branch-required-btn" on:click={() => selectBranch(b.id)} type="button">
+                            <span class="required-branch-icon">{getNicheIcon(b.niche)}</span>
+                            <span>{b.name}</span>
+                        </button>
+                    {/each}
+                </div>
+            </section>
+        </div>
+    {/if}
 </div>
 
 <style>
@@ -252,4 +272,54 @@
 
     .sheet-footer { margin-top: 10px; }
     .btn-logout-full { width: 100%; background: #dc322f; color: white; border: none; padding: 16px; border-radius: 16px; font-weight: 900; font-size: 14px; cursor: pointer; }
+
+    .branch-required-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 5000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        box-sizing: border-box;
+        background: rgba(7, 54, 66, 0.78);
+    }
+
+    .branch-required-dialog {
+        width: 100%;
+        max-width: 480px;
+        max-height: calc(100dvh - 40px - env(safe-area-inset-bottom, 0px));
+        overflow-y: auto;
+        box-sizing: border-box;
+        padding: 28px 20px 20px;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 28px;
+        background: #fdf6e3;
+        text-align: center;
+        box-shadow: 0 24px 60px rgba(0, 43, 54, 0.35);
+    }
+
+    .branch-required-icon { font-size: 32px; }
+    .branch-required-dialog h2 { margin: 10px 0 8px; color: #073642; font-size: 20px; }
+    .branch-required-dialog p { margin: 0 0 20px; color: #586e75; font-size: 13px; line-height: 1.4; }
+    .branch-required-list { display: grid; gap: 10px; text-align: left; }
+    .branch-required-btn {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 14px 16px;
+        border: 1.5px solid #ddd6c1;
+        border-radius: 16px;
+        background: #eee8d5;
+        color: #073642;
+        font: inherit;
+        font-weight: 800;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .branch-required-btn:active { border-color: #268bd2; background: white; }
+    .required-branch-icon { font-size: 22px; }
 </style>

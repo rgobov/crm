@@ -107,14 +107,14 @@
 
 <style>
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0, 43, 54, 0.4); backdrop-filter: blur(8px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
-    .modal-card { background: #fdf6e3; width: 100%; max-width: 480px; border-radius: 32px; overflow: hidden; box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.3); border: 1.5px solid #ddd6c1; }
+    .modal-card { background: #fdf6e3; width: 100%; max-width: 480px; max-height: calc(100dvh - 40px); border-radius: 32px; overflow: hidden; box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.3); border: 1.5px solid #ddd6c1; display: flex; flex-direction: column; box-sizing: border-box; }
 
-    .modal-header { padding: 20px 24px; border-bottom: 1.5px solid #ddd6c1; display: flex; justify-content: space-between; align-items: center; background: #eee8d5; }
+    .modal-header { padding: 20px 24px; border-bottom: 1.5px solid #ddd6c1; display: flex; justify-content: space-between; align-items: center; background: #eee8d5; flex-shrink: 0; }
     .modal-header h2 { margin: 0; font-size: 16px; font-weight: 850; color: #073642; text-transform: uppercase; letter-spacing: 0.5px; }
     .btn-close { background: #fdf6e3; border: 1.5px solid #ddd6c1; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: #586e75; font-weight: 800; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
     .btn-close:hover { background: white; border-color: #268bd2; color: #268bd2; }
 
-    .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 20px; background: #fdf6e3; }
+    .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 20px; background: #fdf6e3; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
     .form-group { display: flex; flex-direction: column; gap: 8px; }
     label { font-size: 10px; font-weight: 850; color: #93a1a1; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 2px; }
 
@@ -127,7 +127,7 @@
 
     .hint { font-size: 12px; color: #586e75; margin: 0; font-weight: 600; line-height: 1.4; }
 
-    .modal-footer { padding: 20px 24px; background: #eee8d5; border-top: 1.5px solid #ddd6c1; display: flex; justify-content: flex-end; gap: 12px; }
+    .modal-footer { padding: 20px 24px; background: #eee8d5; border-top: 1.5px solid #ddd6c1; display: flex; justify-content: flex-end; gap: 12px; flex-shrink: 0; }
     .btn-secondary { background: #fdf6e3; border: 1.5px solid #ddd6c1; padding: 14px 24px; border-radius: 14px; font-weight: 850; cursor: pointer; color: #586e75; font-size: 13px; text-transform: uppercase; }
     .btn-save {
         background: #268bd2; color: white; border: none; padding: 14px 28px; border-radius: 14px;
