@@ -5,7 +5,8 @@ import { get } from 'svelte/store';
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
-    baseURL: API_URL
+    baseURL: API_URL,
+    timeout: 15000
 });
 
 // Кэш для активных (pending) GET-запросов

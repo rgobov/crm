@@ -15,6 +15,7 @@
     import { tick } from 'svelte';
     import { fade, scale } from 'svelte/transition';
     import { portal } from '$lib/actions/portal.js';
+    import { swipeDown } from '$lib/actions/swipeDown.js';
 
     export let forcedDate = null;
 
@@ -108,6 +109,10 @@
         if (scheduleScreenRef && typeof scheduleScreenRef.handleRefresh === 'function') {
             scheduleScreenRef.handleRefresh();
         }
+    }
+
+    function closeMoreView() {
+        viewMode = 'month';
     }
 
     // RENT: после сохранения «перепрыгиваем» на дату записи, чтобы таймлайн показал её.
@@ -245,10 +250,10 @@
         </div>
         {/if}
     {:else if viewMode === 'more'}
-        <div class="more-view-mobile" in:fade>
-            <div class="header-row">
+        <div class="more-view-mobile" transition:fade={{duration: 150}}>
+            <div class="header-row more-view-header" use:swipeDown on:swipe={closeMoreView}>
                 <h2>Ещё</h2>
-                <button class="back-btn" on:click={() => viewMode = 'month'}>←</button>
+                <button class="back-btn" on:click={closeMoreView}>←</button>
             </div>
             <div class="branch-selector">
                 <h3>Выбор филиала</h3>
@@ -335,6 +340,7 @@
     .more-btn { background: #268bd2; color: #fdf6e3; border: 1.5px solid #268bd2; padding: 8px 16px; border-radius: 12px; font-weight: 800; font-size: 12px; }
     .back-btn { background: #859900; color: #fdf6e3; border: 1.5px solid #859900; padding: 8px 12px; border-radius: 12px; font-weight: 800; font-size: 14px; }
     .more-view-mobile { flex: 1; padding: 16px; overflow-y: auto; }
+    .more-view-header { user-select: none; }
     .branch-selector { background: #eee8d5; border-radius: 16px; padding: 20px; margin-top: 16px; }
     .branch-selector h3 { font-size: 18px; font-weight: 800; color: #073642; margin: 0 0 16px 0; }
     .branch-list { display: flex; flex-direction: column; gap: 8px; }

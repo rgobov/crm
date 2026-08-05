@@ -148,6 +148,9 @@
                 durationMinutes = formData.durationInMinutes % 60;
                 formData.startTime = timeUtils.toBranchLocalISO(appointment.startTime, currentBranchData?.timezone);
                 rentEndTime = addMinutesToLocal(formData.startTime, formData.durationInMinutes);
+                // Старые записи могут быть созданы без contactId, но имя клиента
+                // все равно должно попасть в обязательное поле формы редактирования.
+                searchInput = appointment.clientName || '';
                 serviceSearchInput = appointment.service;
                 
                 // Находим услугу в списке услуг
@@ -360,7 +363,15 @@
     }
 </script>
 
-<div class="appt-edit-mobile" on:click|stopPropagation on:keydown={(e) => e.key === 'Escape' && dispatch('cancel')} role="presentation">
+<div
+    class="appt-edit-mobile"
+    data-testid="appointment-edit-form"
+    data-state={isLoading ? 'loading' : (loadError ? 'error' : 'ready')}
+    aria-busy={isLoading}
+    on:click|stopPropagation
+    on:keydown={(e) => e.key === 'Escape' && dispatch('cancel')}
+    role="presentation"
+>
     {#if isLoading}
         <div class="loader-center"><span class="spinner"></span></div>
     {:else if loadError}
@@ -668,7 +679,7 @@
 
             <div class="footer-actions">
                 <button class="btn-secondary-solar" on:click={() => dispatch('cancel')} type="button">ОТМЕНА</button>
-                <button class="btn-primary-solar" on:click={handleSave} disabled={isSaving} type="button">
+                <button class="btn-primary-solar" data-testid="appointment-save" on:click={handleSave} disabled={isSaving} type="button">
                     {isSaving ? '...' : (isEditing ? 'ОБНОВИТЬ' : 'ЗАПИСАТЬ')}
                 </button>
             </div>

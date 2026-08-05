@@ -42,6 +42,7 @@ async function createAppointment(request, token, data) {
         data
     });
     expect(res.status(), `Создание аренды: ${res.status()}`).toBe(200);
+    return res.json();
 }
 
 async function createContact(request, token, name, tags) {
@@ -88,7 +89,7 @@ test.describe('RENT: таймлайн (мобильный)', () => {
         const resourceId = await createResource(request, token, branchId, resourceName);
 
         const todayMsk = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
-        await createAppointment(request, token, {
+        const appointment = await createAppointment(request, token, {
             startTime: `${todayMsk}T10:00:00+03:00`,
             durationInMinutes: 60,
             service: 'Аренда бокса',
@@ -97,6 +98,7 @@ test.describe('RENT: таймлайн (мобильный)', () => {
             resourceId,
             branchId
         });
+        expect(appointment.id).toBeTruthy();
 
         await loginAdminInBrowser(page);
         await selectInitialMobileBranch(page, branchName);
@@ -106,6 +108,7 @@ test.describe('RENT: таймлайн (мобильный)', () => {
         const bottomNav = page.locator('.bottom-nav');
         await bottomNav.getByRole('button', { name: 'Ещё' }).click();
         await page.locator('.branch-card', { hasText: branchName }).click();
+        await expect(page.locator('.more-menu-backdrop')).toHaveCount(0);
         await bottomNav.getByRole('button', { name: 'Таймлайн' }).click();
 
         // Колонка ресурса (объекта аренды) видна на таймлайне
@@ -117,7 +120,36 @@ test.describe('RENT: таймлайн (мобильный)', () => {
         // Регрессия: открыть запись → «Изменить всё» → «ОБНОВИТЬ» без изменений → запись остаётся
         await block.click();
         await page.getByRole('button', { name: 'Изменить всё' }).click();
-        await page.getByRole('button', { name: 'ОБНОВИТЬ' }).click();
+
+        const editModal = page.locator('.modal-content-mobile');
+        const editForm = editModal.locator('[data-testid="appointment-edit-form"]');
+        await expect(editModal).toBeVisible();
+        await expect(editForm).toHaveAttribute('data-state', 'ready');
+
+        const saveButton = editForm.locator('[data-testid="appointment-save"]');
+        await expect(saveButton).toHaveText('ОБНОВИТЬ');
+        await expect(saveButton).toBeEnabled();
+
+        const updateResponsePromise = page.waitForResponse(response => {
+            const request = response.request();
+            return request.method() === 'PUT'
+                && response.url().includes(`/api/admin/appointments/${appointment.id}`);
+        });
+
+        await saveButton.click();
+        const updateResponse = await updateResponsePromise;
+        expect(updateResponse.status()).toBe(200);
+        expect(updateResponse.url()).toContain('force=false');
+        expect(updateResponse.url()).toContain('updateMode=all');
+
+        const updatePayload = updateResponse.request().postDataJSON();
+        expect(updatePayload.id).toBe(appointment.id);
+        expect(updatePayload.branchId).toBe(branchId);
+        expect(String(updatePayload.resourceId)).toBe(String(resourceId));
+        expect(updatePayload.clientName).toBe('Мобильная Аренда');
+        expect(updatePayload.durationInMinutes).toBe(60);
+
+        await expect(editModal).toHaveCount(0);
 
         await expect(page.locator('.appt-box', { hasText: 'Мобильная Аренда' }).first()).toBeVisible();
     });
@@ -190,5 +222,49 @@ test.describe('RENT: таймлайн (мобильный)', () => {
         const footerBox = await modal.locator('.modal-footer').boundingBox();
         expect(footerBox).not.toBeNull();
         expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(page.viewportSize().height);
+    });
+
+    test('нижняя панель «Ещё» закрывается свайпом вниз', async ({ page, request }) => {
+        const token = await loginAsAdmin(request);
+        const branchName = uid('mobile-more-swipe');
+        await createBranch(request, token, branchName, 'RENT');
+
+        await loginAdminInBrowser(page);
+        await selectInitialMobileBranch(page, branchName);
+
+        const moreButton = page.locator('.bottom-nav').getByRole('button', { name: 'Ещё' });
+        await moreButton.click();
+
+        const sheet = page.locator('.more-menu-sheet');
+        await expect(sheet).toBeVisible();
+
+        await page.locator('.sheet-drag-zone').evaluate((element) => {
+            const eventOptions = {
+                bubbles: true,
+                cancelable: true,
+                pointerId: 1,
+                pointerType: 'touch',
+                isPrimary: true,
+                button: 0
+            };
+
+            element.dispatchEvent(new PointerEvent('pointerdown', {
+                ...eventOptions,
+                clientX: 100,
+                clientY: 100
+            }));
+            element.dispatchEvent(new PointerEvent('pointermove', {
+                ...eventOptions,
+                clientX: 100,
+                clientY: 220
+            }));
+            element.dispatchEvent(new PointerEvent('pointerup', {
+                ...eventOptions,
+                clientX: 100,
+                clientY: 220
+            }));
+        });
+
+        await expect(sheet).toHaveCount(0);
     });
 });

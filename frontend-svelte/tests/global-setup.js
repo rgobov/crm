@@ -1,4 +1,3 @@
-import { chromium } from 'playwright';
 import { spawn } from 'child_process';
 
 async function isBackendUp() {
@@ -34,8 +33,24 @@ async function globalSetup(config) {
     '-Dspring-boot.run.jvmArguments=-Xmx512m'
   ], {
     cwd: '../backend',
-    stdio: 'pipe'
+    stdio: ['ignore', 'pipe', 'pipe']
   });
+
+  let backendOutput = '';
+  const captureBackendOutput = (chunk) => {
+    backendOutput = `${backendOutput}${chunk.toString()}`.slice(-8000);
+  };
+
+  // Pipe обязательно нужно читать: DEBUG + SQL-логи иначе блокируют Maven-процесс.
+  backendProcess.stdout.on('data', captureBackendOutput);
+  backendProcess.stderr.on('data', captureBackendOutput);
+
+  let backendProcessError = null;
+  backendProcess.on('error', (error) => {
+    backendProcessError = error;
+  });
+
+  global.backendProcess = backendProcess;
 
   // Ждем запуска бэкенда (максимум 90 секунд, шаг 2 секунды)
   console.log('⏳ Ожидание запуска тестового бэкенда...');
@@ -49,11 +64,11 @@ async function globalSetup(config) {
   if (up) {
     console.log('✅ Тестовый бэкенд успешно запущен');
   } else {
-    console.log('❌ Тестовый бэкенд не отвечает за отведённое время (занят ли порт 8080?)');
+    const output = backendOutput.trim();
+    const reason = backendProcessError?.message || (output ? `Последние логи:\n${output}` : 'порт 8080 недоступен');
+    backendProcess.kill('SIGTERM');
+    throw new Error(`Тестовый бэкенд не запустился. ${reason}`);
   }
-
-  // Сохраняем процесс для последующего использования
-  global.backendProcess = backendProcess;
 
   console.log('✅ Глобальная настройка завершена');
 }

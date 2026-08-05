@@ -10,6 +10,7 @@
     import { createEventDispatcher } from 'svelte';
     import HorizontalDatePicker from '$lib/components/schedule/HorizontalDatePicker.svelte';
     import CalendarScreen from '$lib/components/calendar/CalendarScreen.svelte';
+    import { swipeDown } from '$lib/actions/swipeDown.js';
 
     const dispatch = createEventDispatcher();
 
@@ -56,6 +57,10 @@
     function toggleMoreMenu() {
         showMoreMenu = !showMoreMenu;
         showCalendarModal = false;
+    }
+
+    function closeMoreMenu() {
+        showMoreMenu = false;
     }
 
     function openCalendar() {
@@ -123,9 +128,11 @@
     {/if}
 
     {#if showMoreMenu}
-        <div class="more-menu-backdrop" on:click|self={toggleMoreMenu} transition:fade={{duration: 200}}>
-            <div class="more-menu-sheet" in:slide={{axis: 'y', duration: 300}}>
-                <div class="sheet-handle"></div>
+        <div class="more-menu-backdrop" on:click|self={closeMoreMenu} transition:fade={{duration: 200}}>
+            <div class="more-menu-sheet" transition:slide={{axis: 'y', duration: 250}}>
+                <div class="sheet-drag-zone" use:swipeDown on:swipe={closeMoreMenu} aria-hidden="true">
+                    <div class="sheet-handle"></div>
+                </div>
 
                 <section class="sheet-section">
                     <label>ВЫБОР ФИЛИАЛА</label>
@@ -252,8 +259,9 @@
     .modal-scroll-body { flex: 1; overflow-y: auto; padding: 20px; }
 
     .more-menu-backdrop { position: fixed; inset: 0; background: rgba(7, 54, 66, 0.7); backdrop-filter: blur(8px); z-index: 3000; display: flex; align-items: flex-end; }
-    .more-menu-sheet { width: 100%; background: #fdf6e3; border-radius: 32px 32px 0 0; padding: 24px; padding-bottom: calc(30px + env(safe-area-inset-bottom)); border-top: 2px solid #ddd6c1; }
-    .sheet-handle { width: 40px; height: 4px; background: #ddd6c1; border-radius: 2px; margin: -10px auto 24px auto; }
+    .more-menu-sheet { width: 100%; max-height: calc(100dvh - 8px); box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #fdf6e3; border-radius: 32px 32px 0 0; padding: 24px; padding-bottom: calc(30px + env(safe-area-inset-bottom)); border-top: 2px solid #ddd6c1; }
+    .sheet-drag-zone { height: 28px; margin: -12px 0 8px; display: flex; justify-content: center; align-items: flex-start; padding-top: 2px; box-sizing: border-box; user-select: none; }
+    .sheet-handle { width: 40px; height: 4px; background: #ddd6c1; border-radius: 2px; }
 
     .sheet-section { margin-bottom: 24px; }
     .sheet-section label { display: block; font-size: 10px; font-weight: 900; color: #93a1a1; letter-spacing: 1px; margin-bottom: 12px; }
