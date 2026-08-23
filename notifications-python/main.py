@@ -10,6 +10,7 @@ import os
 import asyncio
 import logging
 import shutil
+import time
 import qrcode
 from io import BytesIO
 import base64
@@ -26,6 +27,13 @@ from pyrogram.errors import (
     PhoneNumberBanned,
     SessionPasswordNeeded,
     ApiIdInvalid,
+    AuthKeyDuplicated,
+    AuthKeyInvalid,
+    AuthKeyUnregistered,
+    SessionExpired,
+    SessionRevoked,
+    UserDeactivated,
+    UserDeactivatedBan,
 )
 import httpx
 import traceback
@@ -39,11 +47,13 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting notifications-python service...")
     asyncio.create_task(warmup_clients())
+    reconnect_task = asyncio.create_task(reconnect_worker())
     yield
     # Shutdown
     global is_stopping
     is_stopping = True
-    
+    reconnect_task.cancel()
+
     for tenant_id, client_wrapper in active_clients.items():
         try:
             await client_wrapper.stop()
@@ -79,6 +89,22 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+
+# Ошибки, при которых сессия действительно мертва и требуется переавторизация в UI
+FATAL_AUTH_ERRORS = (
+    AuthKeyDuplicated,
+    AuthKeyInvalid,
+    AuthKeyUnregistered,
+    SessionExpired,
+    SessionRevoked,
+    UserDeactivated,
+    UserDeactivatedBan,
+)
+
+# Настройки фонового автопереподключения тенантов
+RECONNECT_INTERVAL_SECONDS = 60
+RECONNECT_BACKOFF_SECONDS = 300
+RECONNECT_FAILURES_BEFORE_BACKOFF = 3
 
 # Storage (async-safe)
 active_clients: Dict[str, "TelegramClientWrapper"] = {}
@@ -134,6 +160,21 @@ class TelegramClientWrapper:
         except Exception as e:
             logger.error(f"Failed to delete session for {self.tenant_id}: {e}")
 
+    async def _reset_client(self):
+        """Отключить клиент и сбросить состояние, НЕ удаляя файл сессии."""
+        if self.client:
+            try:
+                if self.client.is_connected:
+                    await self.client.disconnect()
+            except Exception as e:
+                logger.warning(f"Error disconnecting client for {self.tenant_id}: {e}")
+            self.client = None
+        self.is_ready = False
+        self.is_authorized = False
+        self.phone_code_hash = None
+        self.phone_number = None
+        self.auth_state = "DISCONNECTED"
+
     async def start(self):
         os.makedirs(self.session_path, exist_ok=True)
         # Session name should not be the same as the directory path to avoid SQLite errors
@@ -185,6 +226,8 @@ class TelegramClientWrapper:
         session_exists = os.path.exists(session_file)
 
         if session_exists:
+            auth_error: Optional[Exception] = None
+            transient_error: Optional[Exception] = None
             try:
                 # Try to start with existing session
                 await self.client.connect()
@@ -200,23 +243,38 @@ class TelegramClientWrapper:
                             # Setup deep link handler for /start command
                             await self._setup_deep_link_handler()
                             return
-                        else:
-                            logger.warning(f"Session exists but not authorized for {self.tenant_id}")
-                            await self.client.disconnect()
-                            await self._delete_session(session_file)
+                        # get_me() вернул None — сессия нежизнеспособна
+                        auth_error = RuntimeError("get_me() returned no user")
+                    except FATAL_AUTH_ERRORS as e:
+                        auth_error = e
                     except Exception as e:
-                        logger.warning(f"Session exists but not authorized for {self.tenant_id}: {e}")
-                        await self.client.disconnect()
-                        await self._delete_session(session_file)
+                        # Сетевая/транзитная проблема (прокси недоступен и т.п.) — сессия может быть валидна
+                        transient_error = e
                 else:
-                    logger.warning(f"Session exists but not connected for {self.tenant_id}")
-                    await self._delete_session(session_file)
+                    transient_error = ConnectionError("client.connect() finished without connection")
+            except FATAL_AUTH_ERRORS as e:
+                auth_error = e
             except Exception as e:
-                logger.warning(f"Failed to start with existing session for {self.tenant_id}: {e}")
+                # Сетевая/транзитная проблема (прокси недоступен и т.п.) — сессия может быть валидна
+                transient_error = e
+
+            if auth_error is not None:
+                logger.warning(
+                    f"Session for tenant {self.tenant_id} is invalid "
+                    f"({type(auth_error).__name__}: {auth_error}) — deleting, re-authorization required"
+                )
                 await self._delete_session(session_file)
+            elif transient_error is not None:
+                # Файл сессии сохраняем: вероятнее всего временный сбой сети/прокси
+                logger.warning(
+                    f"Transient error for tenant {self.tenant_id}, keeping session "
+                    f"({type(transient_error).__name__}: {transient_error})"
+                )
+                await self._reset_client()
 
         # New session needed - wait for phone number
-        logger.info(f"New session needed for tenant {self.tenant_id}")
+        if not session_exists:
+            logger.info(f"New session needed for tenant {self.tenant_id}")
         self.is_ready = False
         self.is_authorized = False
         self.auth_state = "DISCONNECTED"
@@ -410,6 +468,11 @@ class TelegramClientWrapper:
              
     async def send_message(self, phone: str, name: str, text: str):
         if not self.client or not self.is_ready or not self.is_authorized:
+            logger.warning(
+                f"Send skipped for tenant {self.tenant_id} (phone {phone}): "
+                f"client not ready (client={self.client is not None}, ready={self.is_ready}, "
+                f"authorized={self.is_authorized}, state={self.auth_state})"
+            )
             raise HTTPException(status_code=400, detail="Client not connected or not authorized")
             
         try:
@@ -547,6 +610,77 @@ async def warmup_clients():
     except Exception as e:
         logger.error(f"Failed to warmup telegram clients: {e}")
 
+async def reconnect_worker():
+    """Фоновое автопереподключение тенантов с сохранёнными сессиями.
+
+    Проверяет раз в RECONNECT_INTERVAL_SECONDS. Тенанты с несколькими
+    подряд неудачами ретраятся реже (RECONNECT_BACKOFF_SECONDS), чтобы
+    не спамить мёртвый прокси. Сессии при сетевых сбоях не удаляются.
+    """
+    failures: Dict[str, int] = {}
+    last_attempt: Dict[str, float] = {}
+
+    while not is_stopping:
+        try:
+            await asyncio.sleep(RECONNECT_INTERVAL_SECONDS)
+            if is_stopping:
+                break
+
+            sessions_dir = settings.sessions_path
+            if not os.path.isdir(sessions_dir):
+                continue
+
+            now = time.monotonic()
+            for entry in os.listdir(sessions_dir):
+                if is_stopping:
+                    break
+
+                entry_path = os.path.join(sessions_dir, entry)
+                if not os.path.isdir(entry_path):
+                    continue
+                if not os.path.exists(os.path.join(entry_path, "tg_session.session")):
+                    continue
+
+                tenant_id = entry
+                if tenant_id in tenants_to_cleanup:
+                    continue
+
+                wrapper = active_clients.get(tenant_id)
+                if wrapper and wrapper.client is not None and wrapper.is_authorized and wrapper.auth_state == "CONNECTED":
+                    failures[tenant_id] = 0
+                    continue
+
+                # Не мешаем интерактивной авторизации по коду/паролю
+                if wrapper and wrapper.auth_state in ("WAITING_CODE", "WAITING_PASSWORD"):
+                    continue
+
+                fail_count = failures.get(tenant_id, 0)
+                interval = (
+                    RECONNECT_BACKOFF_SECONDS
+                    if fail_count >= RECONNECT_FAILURES_BEFORE_BACKOFF
+                    else RECONNECT_INTERVAL_SECONDS
+                )
+                if now - last_attempt.get(tenant_id, 0.0) < interval:
+                    continue
+
+                last_attempt[tenant_id] = now
+                logger.info(f"Auto-reconnect: trying tenant {tenant_id} (previous failures: {fail_count})")
+                try:
+                    wrapper = await get_client(tenant_id)
+                    if wrapper and wrapper.is_authorized:
+                        failures[tenant_id] = 0
+                        logger.info(f"Auto-reconnect: tenant {tenant_id} connected")
+                    else:
+                        failures[tenant_id] = fail_count + 1
+                except Exception as e:
+                    failures[tenant_id] = fail_count + 1
+                    logger.warning(f"Auto-reconnect failed for tenant {tenant_id}: {type(e).__name__}: {e}")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Reconnect worker error: {e}")
+            await asyncio.sleep(RECONNECT_INTERVAL_SECONDS)
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -563,6 +697,7 @@ async def send_message_endpoint(
     
     client_wrapper = await get_client(tenant_id)
     if not client_wrapper:
+        logger.warning(f"Send request for tenant {tenant_id}: client wrapper unavailable (OFFLINE)")
         raise HTTPException(status_code=400, detail="OFFLINE")
         
     result = await client_wrapper.send_message(request.phone, request.name, request.text)
