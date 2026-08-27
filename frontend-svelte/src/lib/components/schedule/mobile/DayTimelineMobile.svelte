@@ -3,6 +3,7 @@
     import { timeUtils } from '$lib/utils/timeUtils.js';
     import { timeSyncService } from '$lib/services/timeSyncService.js';
     import { activeBranchId } from '$lib/stores/dashboardStore.js';
+    import { branchStore } from '$lib/stores/branchStore.js';
     import { branchService } from '$lib/services/branchService.js';
     import TimelineAppointment from '../TimelineAppointment.svelte';
     import TimelineNowIndicator from '../TimelineNowIndicator.svelte';
@@ -24,6 +25,9 @@
     let currentTime = new Date(), nowLinePos = -1, branchTime = "";
     let currentBranch = null;
     let scrollHeader, scrollBody;
+    let branchRequest = null;
+    let timer;
+    let scrollTimeout;
 
     $: apptsByStaff = (() => {
         const map = { 'unassigned': [] };
@@ -62,31 +66,75 @@
         SLOT_HEIGHT = HOUR_HEIGHT / 4;
     }
 
-    onMount(async () => {
-        await timeSyncService.sync();
-        await fetchBranchData();
-        const timer = setInterval(() => {
+    onMount(() => {
+        let isDestroyed = false;
+
+        async function initialize() {
+            // Если филиалы уже загружены, линия может рассчитаться сразу по его timezone.
+            const cachedBranch = $branchStore.find(branch => branch.id === $activeBranchId);
+            if (cachedBranch) {
+                currentBranch = cachedBranch;
+                currentTime = timeSyncService.getNow();
+                updateNowPosition();
+            }
+
+            // Время и данные филиала не зависят друг от друга, поэтому загружаются параллельно.
+            await Promise.all([
+                timeSyncService.sync(),
+                fetchBranchData()
+            ]);
+            if (isDestroyed) return;
+
             currentTime = timeSyncService.getNow();
             updateNowPosition();
-        }, 30000);
-        updateNowPosition();
-        setTimeout(() => {
-            if (scrollBody && nowLinePos > 0) {
-                scrollBody.scrollTo({ top: nowLinePos - (scrollBody.clientHeight / 3), behavior: 'smooth' });
-            }
-        }, 600);
+
+            timer = setInterval(() => {
+                currentTime = timeSyncService.getNow();
+                updateNowPosition();
+            }, 5000);
+            scrollTimeout = setTimeout(() => {
+                if (scrollBody && nowLinePos > 0) {
+                    scrollBody.scrollTo({ top: nowLinePos - (scrollBody.clientHeight / 3), behavior: 'smooth' });
+                }
+            }, 600);
+        }
+
+        initialize();
+
         return () => {
-            window.removeEventListener('resize', updateLayout);
-            clearInterval(timer);
+            isDestroyed = true;
+            if (timer) clearInterval(timer);
+            if (scrollTimeout) clearTimeout(scrollTimeout);
         };
     });
 
     async function fetchBranchData() {
-        if (!$activeBranchId) return;
-        try {
-            const branches = await branchService.getBranches();
-            currentBranch = branches.find(b => b.id === $activeBranchId);
-        } catch (e) {}
+        const branchId = $activeBranchId;
+        if (!branchId) return;
+
+        // Реактивный блок и onMount могут запустить один и тот же запрос.
+        if (branchRequest?.branchId === branchId) {
+            return branchRequest.promise;
+        }
+
+        const promise = branchService.getBranches()
+            .then(branches => {
+                currentBranch = branches.find(branch => branch.id === branchId) || null;
+                if (currentBranch) {
+                    branchStore.setBranches(branches);
+                }
+            })
+            .catch(() => {
+                // При наличии кэша сохраняем его, чтобы линия не исчезала из-за временной ошибки сети.
+            })
+            .finally(() => {
+                if (branchRequest?.promise === promise) {
+                    branchRequest = null;
+                }
+            });
+
+        branchRequest = { branchId, promise };
+        return promise;
     }
 
     function updateNowPosition() {
