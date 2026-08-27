@@ -1,9 +1,10 @@
 {
   "name": "999 CRM",
-  "short_name": "999CRM",
+  "short_name": "999 CRM",
   "description": "Система записи клиентов",
   "start_url": "/",
   "display": "standalone",
+  "scope": "/",
   "background_color": "#fdf6e3",
   "theme_color": "#268bd2",
   "orientation": "portrait",

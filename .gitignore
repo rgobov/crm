@@ -46,6 +46,9 @@ analysis_options.yaml.lock
 /android/*.keystore
 /android/*.jks
 /android/captured_screenshots/
+/android/.gradle/
+/android/build/
+/android/app/build/
 
 # --- iOS ---
 **/ios/.generated/

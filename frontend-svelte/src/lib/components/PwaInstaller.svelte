@@ -143,33 +143,10 @@
         </button>
         
         <div class="pwa-card-header">
-          <img src="/icon-192x192.png" alt="999 CRM Logo" class="pwa-app-logo" />
+          <img src="/icon-192x192.png" alt="Логотип 999 CRM" class="pwa-app-logo" />
           <div class="pwa-app-meta">
             <h3>999 CRM</h3>
-            <p class="pwa-developer">Try Neuro Corp.</p>
-            <span class="pwa-verified">
-              <svg class="pwa-shield-icon" viewBox="0 0 24 24" width="12" height="12">
-                <path fill="#01875f" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-              Проверено Play Защитой
-            </span>
-          </div>
-        </div>
-        
-        <div class="pwa-stats-grid">
-          <div class="pwa-stat-box">
-            <span class="pwa-stat-value">4.9 ★</span>
-            <span class="pwa-stat-label">120+ отзывов</span>
-          </div>
-          <div class="pwa-stat-divider"></div>
-          <div class="pwa-stat-box">
-            <span class="pwa-stat-value">120 КБ</span>
-            <span class="pwa-stat-label">Размер</span>
-          </div>
-          <div class="pwa-stat-divider"></div>
-          <div class="pwa-stat-box">
-            <span class="pwa-stat-value">3+</span>
-            <span class="pwa-stat-label">Для всех</span>
+            <p class="pwa-developer">Система записи клиентов</p>
           </div>
         </div>
 
@@ -201,7 +178,7 @@
           </div>
         </div>
 
-        <p class="pwa-disclaimer">Установка приложения займет всего несколько секунд и не расходует память телефона.</p>
+        <p class="pwa-disclaimer">Приложение устанавливается на главный экран устройства и использует защищенное соединение.</p>
       </div>
     </div>
   {/if}

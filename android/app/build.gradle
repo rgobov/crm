@@ -1,0 +1,53 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "ru.tryneuro.crm"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "ru.tryneuro.crm"
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+android.sourceSets.main.res.srcDir("$buildDir/generated/res/launcher")
+
+tasks.register("syncLauncherIcon", Copy) {
+    from file("../../frontend-svelte/static/icon-512x512.png")
+    into "$buildDir/generated/res/launcher/drawable-nodpi"
+    rename { "ic_launcher.png" }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("syncLauncherIcon")
+}
+
+configurations.configureEach {
+    resolutionStrategy.force(
+            "org.jetbrains.kotlin:kotlin-stdlib:1.8.22",
+            "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22",
+            "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
+    )
+}
+
+dependencies {
+    implementation "androidx.browser:browser:1.8.0"
+    implementation "androidx.appcompat:appcompat:1.7.0"
+}
