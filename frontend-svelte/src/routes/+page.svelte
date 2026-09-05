@@ -182,21 +182,25 @@
 </div>
 
 <style>
-	.auth-wrapper { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; background-color: #f8fafc; }
-	.loading-screen { text-align: center; }
-	.auth-card { width: 100%; max-width: 420px; background: white; padding: 48px; border-radius: 32px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05); text-align: center; }
-	.logo { font-size: 64px; font-weight: 900; background: linear-gradient(135deg, #3897f0 0%, #0052D4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; }
+	.auth-wrapper { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; background-color: #fdf6e3; }
+	.loading-screen { text-align: center; color: #657b83; }
+	.auth-card { width: 100%; max-width: 420px; background: white; padding: 48px; border-radius: 32px; box-shadow: 0 20px 50px rgba(101, 123, 131, 0.15); text-align: center; }
+	.logo { font-size: 64px; font-weight: 900; background: linear-gradient(135deg, #268bd2 0%, #2aa198 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; }
+	h1 { color: #073642; }
+	.header p { color: #657b83; }
+	.error-box { background-color: #fdf0ee; color: #dc322f; padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 13px; }
 	.form-group { margin-bottom: 24px; text-align: left; }
-	label { display: block; font-size: 12px; font-weight: 700; color: #3897f0; margin-bottom: 10px; }
-	input { width: 100%; padding: 18px; border: 2px solid #f1f5f9; border-radius: 18px; font-size: 16px; background: #f8fafc; box-sizing: border-box; }
-	input:focus { border-color: #3897f0; background: white; outline: none; }
+	label { display: block; font-size: 12px; font-weight: 700; color: #268bd2; margin-bottom: 10px; }
+	input { width: 100%; padding: 18px; border: 2px solid #eee8d5; border-radius: 18px; font-size: 16px; background: #fdf6e3; box-sizing: border-box; color: #073642; }
+	input:focus { border-color: #268bd2; background: white; outline: none; }
 	.password-container { position: relative; display: flex; align-items: center; width: 100%; }
 	.password-container input { padding-right: 48px; }
 	.toggle-password-btn { position: absolute; right: 16px; background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
-	.toggle-password-btn:hover { color: #475569; }
-	.login-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #3897f0 0%, #0052D4 100%); color: white; border: none; border-radius: 18px; font-size: 17px; font-weight: 700; cursor: pointer; }
-	.register-link { background: none; border: none; color: #3897f0; font-size: 14px; margin-top: 24px; cursor: pointer; }
-	.spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: #3897f0; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
-	.privacy-link { color: #3897f0; font-size: 13px; }
+	.toggle-password-btn:hover { color: #586e75; }
+	.login-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #268bd2 0%, #2aa198 100%); color: white; border: none; border-radius: 18px; font-size: 17px; font-weight: 700; cursor: pointer; }
+	.register-link { background: none; border: none; color: #268bd2; font-size: 14px; margin-top: 24px; cursor: pointer; }
+	.spinner { width: 32px; height: 32px; border: 3px solid #eee8d5; border-top-color: #268bd2; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
+	.privacy-link { color: #268bd2; font-size: 13px; }
+	.footer { color: #93a1a1; }
 	@keyframes spin { to { transform: rotate(360deg); } }
 </style>

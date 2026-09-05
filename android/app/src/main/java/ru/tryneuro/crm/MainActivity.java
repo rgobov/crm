@@ -217,13 +217,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // Нативная шапка для WebView-режима: без неё меню (⋮) негде показать (тема NoActionBar).
+    // Заголовок убран: текст залезал под часы и иконки статус-бара. fitsSystemWindows
+    // опускает шапку ниже системных иконок (edge-to-edge на targetSdk 35).
     private android.view.View buildFallbackLayout(WebView webView) {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
+        root.setFitsSystemWindows(true);
 
         Toolbar toolbar = new Toolbar(this);
-        toolbar.setTitle("999 CRM");
-        toolbar.setTitleTextColor(0xFFFFFFFF);
+        toolbar.setTitle("");
         toolbar.setBackgroundColor(getColor(R.color.primary));
         setSupportActionBar(toolbar);
         root.addView(toolbar, new LinearLayout.LayoutParams(
