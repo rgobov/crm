@@ -8,7 +8,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -99,6 +101,31 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                // Офлайн-заглушка для модерации RuStore: вместо системной ошибки показываем свой экран.
+                if (request.isForMainFrame()) {
+                    view.loadUrl("file:///android_asset/offline.html");
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                if (request.isForMainFrame()) {
+                    int status = errorResponse.getStatusCode();
+                    if (status >= 500) {
+                        view.loadUrl("file:///android_asset/offline.html");
+                    }
+                }
+            }
+
+            // Совместимость со старыми WebView (API < 23).
+            @Override
+            @SuppressWarnings("deprecation")
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                view.loadUrl("file:///android_asset/offline.html");
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {

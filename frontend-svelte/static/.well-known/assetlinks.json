@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ru.tryneuro.crm",
+      "sha256_cert_fingerprints": [
+        "24:FC:D8:41:77:AC:EA:0C:00:40:E4:82:19:2C:14:25:ED:4E:F7:F9:CC:2C:B1:1D:3D:19:7F:1F:53:6A:E2:FC"
+      ]
+    }
+  }
+]

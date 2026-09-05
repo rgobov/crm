@@ -12,9 +12,10 @@
         />
         <span class="consent-text">
             Я даю согласие на обработку моих персональных данных в соответствии с
-            <a href="https://999crm.ru/%D0%BF%D0%BE%D0%BB%D0%B8%D1%82%D0%B8%D0%BA%D0%B0-%D0%BE%D0%B1%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%BA%D0%B8-%D0%BF%D0%B5%D1%80%D1%81%D0%BE%D0%BD%D0%B0%D0%BB%D1%8C%D0%BD%D1%8B%D1%85-%D0%B4%D0%B0%D0%BD/" target="_blank" rel="noopener noreferrer">
+            <a href="/privacy">
                 Политикой обработки персональных данных
             </a>
+            <span class="mirror">(зеркало: <a href="https://999crm.ru/privacy-policy/" target="_blank" rel="noopener noreferrer">999crm.ru</a>)</span>
         </span>
     </label>
 </div>
@@ -57,5 +58,10 @@
 
     .consent-text a:hover {
         color: #1d4ed8;
+    }
+
+    .mirror {
+        font-size: 12px;
+        color: #94a3b8;
     }
 </style>

@@ -176,6 +176,9 @@
             <button class="back-link" on:click={() => goto('/')}>
                 Уже есть аккаунт? Войти
             </button>
+            <div class="privacy-footer">
+                <a href="/privacy">Политика конфиденциальности</a>
+            </div>
         </div>
     </div>
 </div>
@@ -195,5 +198,7 @@
     .toggle-password-btn:hover { color: #475569; }
     .login-btn { width: 100%; padding: 18px; background: var(--primary-gradient); color: white; border: none; border-radius: 18px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 10px 25px rgba(56, 151, 240, 0.3); }
     .back-link { background: none; border: none; color: var(--hint-color); font-size: 14px; margin-top: 24px; cursor: pointer; }
+    .privacy-footer { margin-top: 12px; font-size: 13px; }
+    .privacy-footer a { color: #3897f0; }
     .error-box { background-color: #fef2f2; color: var(--error-color); padding: 12px; border-radius: 12px; margin-bottom: 20px; font-size: 13px; }
 </style>

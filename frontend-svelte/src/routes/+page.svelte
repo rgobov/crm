@@ -174,7 +174,8 @@
 			</form>
 
 			<div class="footer">
-				© 999 • Версия 1.0.0
+				© 999 • Версия 1.0.0<br />
+				<a href="/privacy" class="privacy-link">Политика конфиденциальности</a>
 			</div>
 		</div>
 	{/if}
@@ -196,5 +197,6 @@
 	.login-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #3897f0 0%, #0052D4 100%); color: white; border: none; border-radius: 18px; font-size: 17px; font-weight: 700; cursor: pointer; }
 	.register-link { background: none; border: none; color: #3897f0; font-size: 14px; margin-top: 24px; cursor: pointer; }
 	.spinner { width: 32px; height: 32px; border: 3px solid #f1f5f9; border-top-color: #3897f0; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; }
+	.privacy-link { color: #3897f0; font-size: 13px; }
 	@keyframes spin { to { transform: rotate(360deg); } }
 </style>

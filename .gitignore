@@ -76,6 +76,7 @@ analysis_options.yaml.lock
 **/dist/
 **/.svelte-kit/
 /frontend-svelte/build/
+vite.config.js.timestamp-*.mjs
 .npm
 .eslintcache
 

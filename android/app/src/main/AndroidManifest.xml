@@ -17,6 +17,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Верификация TWA: связывает приложение с crm.999crm.ru через assetlinks.json.
+                 Без autoVerify система показывает адресную строку браузера. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="crm.999crm.ru" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>

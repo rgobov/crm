@@ -9,8 +9,15 @@
   onMount(() => {
     console.log('[PWA TEST] PwaInstaller mounted');
     // 1. Проверяем, запущено ли уже приложение как установленное PWA
-    isAlreadyInstalled = window.matchMedia('(display-mode: standalone)').matches 
-                         || window.navigator.standalone === true;
+    // Внутри Android APK (TWA / WebView) предложение «Установить» не показываем:
+    // приложение уже установлено, иначе модерация видит «редирект на установку сайта».
+    const referrer = typeof document !== 'undefined' ? document.referrer || '' : '';
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    const isAndroidApp = referrer.indexOf('android-app://') === 0
+        || (ua.indexOf('; wv)') !== -1 && /Android/.test(ua));
+    isAlreadyInstalled = window.matchMedia('(display-mode: standalone)').matches
+                         || window.navigator.standalone === true
+                         || isAndroidApp;
     console.log('[PWA TEST] isAlreadyInstalled =', isAlreadyInstalled);
 
     if (isAlreadyInstalled) {

@@ -236,6 +236,8 @@
 
 		<div class="footer-links">
 			Уже есть аккаунт? <button class="login-link" on:click={() => goto('/')}>Войти</button>
+			<br />
+			<a href="/privacy" class="privacy-link">Политика конфиденциальности</a>
 		</div>
 	</div>
 </div>
@@ -424,6 +426,11 @@
 
 	.login-link:hover {
 		text-decoration: underline;
+	}
+
+	.privacy-link {
+		color: #2563eb;
+		font-size: 13px;
 	}
 
 	.spinner {
