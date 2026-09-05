@@ -14,7 +14,16 @@ self.addEventListener("message", (event) => {
 self.addEventListener('install', async (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.add(offlineFallbackPage))
+      .then(async (cache) => {
+        await cache.add(offlineFallbackPage);
+        // Политика должна открываться и офлайн (требование RuStore):
+        // предкэшируем /privacy, чтобы не зависеть от первого визита.
+        try {
+          await cache.add('/privacy');
+        } catch (e) {
+          // Нет сети при первой установке — закэшируется при первом визите (NetworkFirst).
+        }
+      })
   );
 });
 

@@ -11,6 +11,12 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+
+import androidx.appcompat.widget.Toolbar;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -83,7 +89,9 @@ public class MainActivity extends AppCompatActivity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        settings.setAllowFileAccess(false);
+        // File-доступ нужен только для своих встроенных экранов (assets/offline.html, privacy.html).
+        // Доступ file:// к сети и между файлами запрещён по умолчанию (setAllow*FromFileURLs=false).
+        settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setMediaPlaybackRequiresUserGesture(true);
 
@@ -91,6 +99,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
+                // Встроенные экраны (офлайн-заглушка, политика) всегда открываем внутри приложения.
+                if ("file".equals(uri.getScheme())) {
+                    return false;
+                }
                 if ("https".equals(uri.getScheme()) && "crm.999crm.ru".equals(uri.getHost())) {
                     return false;
                 }
@@ -143,8 +155,26 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
-        setContentView(webView);
+        setContentView(buildFallbackLayout(webView));
         webView.loadUrl(START_URI.toString());
+    }
+
+    // Нативная шапка для WebView-режима: без неё меню (⋮) негде показать (тема NoActionBar).
+    private android.view.View buildFallbackLayout(WebView webView) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+
+        Toolbar toolbar = new Toolbar(this);
+        toolbar.setTitle("999 CRM");
+        toolbar.setTitleTextColor(0xFFFFFFFF);
+        toolbar.setBackgroundColor(getColor(R.color.primary));
+        setSupportActionBar(toolbar);
+        root.addView(toolbar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        root.addView(webView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        return root;
     }
 
     private void openExternal(Uri uri) {
@@ -153,6 +183,27 @@ public class MainActivity extends AppCompatActivity {
         } catch (ActivityNotFoundException ignored) {
             // Внешнее приложение может отсутствовать на устройстве.
         }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Нативное меню: политика встроена в APK и открывается даже офлайн.
+        // Видно в WebView-режиме (в TWA меню рисует браузер, политика там — через ссылки в приложении).
+        menu.add(Menu.NONE, 1, Menu.NONE, "Политика конфиденциальности");
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == 1) {
+            if (webView != null) {
+                webView.loadUrl("file:///android_asset/privacy.html");
+            } else {
+                openExternal(Uri.parse("https://crm.999crm.ru/privacy"));
+            }
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
