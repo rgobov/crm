@@ -2,8 +2,11 @@ package ru.tryneuro.crm;
 
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.ValueCallback;
@@ -29,6 +32,8 @@ import androidx.browser.trusted.TrustedWebActivityIntentBuilder;
 
 import android.content.ComponentName;
 
+import java.io.IOException;
+
 public class MainActivity extends AppCompatActivity {
     private static final Uri START_URI = Uri.parse("https://crm.999crm.ru/");
     private WebView webView;
@@ -38,10 +43,26 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Без сети TWA покажет чужую страницу Chrome. Сразу идём в свой WebView —
+        // там наша заглушка, меню и встроенная политика (требование RuStore).
+        if (!isOnline()) {
+            showWebViewFallback();
+            return;
+        }
         String browserPackage = CustomTabsClient.getPackageName(this, null);
         if (browserPackage == null || !bindCustomTabs(browserPackage)) {
             showWebViewFallback();
         }
+    }
+
+    // Проверка сети для выбора режима запуска. Точность не критична:
+    // captive-портал всё равно уйдёт в TWA и покажет страницу браузера.
+    @SuppressWarnings("deprecation")
+    private boolean isOnline() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return true;
+        NetworkInfo info = cm.getActiveNetworkInfo();
+        return info != null && info.isConnected();
     }
 
     private boolean bindCustomTabs(String browserPackage) {
@@ -108,6 +129,42 @@ public class MainActivity extends AppCompatActivity {
                 }
                 openExternal(uri);
                 return true;
+            }
+
+            // Совместимость со старыми WebView (API < 24): новый колбэк там не вызывается.
+            @Override
+            @SuppressWarnings("deprecation")
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                Uri uri = Uri.parse(url);
+                if ("file".equals(uri.getScheme())) {
+                    return false;
+                }
+                if ("https".equals(uri.getScheme()) && "crm.999crm.ru".equals(uri.getHost())) {
+                    return false;
+                }
+                openExternal(uri);
+                return true;
+            }
+
+            // Политика офлайн: ссылки /privacy из футеров, чекбокса и заглушки отдаём
+            // встроенным ассетом, а не сетью. Онлайн идёт свежий текст с сайта.
+            // Перехват именно https (а не file://-переходы по клику): часть WebView
+            // молча отбрасывает навигацию file:// -> file://, а https-переход работает везде.
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                String path = uri.getPath();
+                boolean isPrivacy = "https".equals(uri.getScheme())
+                        && "crm.999crm.ru".equals(uri.getHost())
+                        && ("/privacy".equals(path) || "/privacy/".equals(path));
+                if (isPrivacy && !isOnline()) {
+                    try {
+                        return new WebResourceResponse("text/html", "utf-8", getAssets().open("privacy.html"));
+                    } catch (IOException ignored) {
+                        // Ассет на месте всегда; при сбое — обычная сетевая ошибка и заглушка.
+                    }
+                }
+                return super.shouldInterceptRequest(view, request);
             }
 
             @Override
