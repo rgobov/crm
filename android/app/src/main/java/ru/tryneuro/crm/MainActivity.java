@@ -226,7 +226,8 @@ public class MainActivity extends AppCompatActivity {
 
         Toolbar toolbar = new Toolbar(this);
         toolbar.setTitle("");
-        toolbar.setBackgroundColor(getColor(R.color.primary));
+        toolbar.setBackgroundColor(getColor(R.color.surface));
+        toolbar.setElevation(0f);
         setSupportActionBar(toolbar);
         root.addView(toolbar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
